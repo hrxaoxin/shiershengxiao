@@ -1,0 +1,23 @@
+{
+  "name": "WanNeng #6",
+  "description": "万福齐聚，好运临门",
+  "image": "https://ipfs.io/ipfs/bafybeig7ztsaeiddwpgjivwe7la6zxsck5q7hbael32thq4pw6amylxpgi",
+  "animation_url": "",
+  "external_url": "",
+  "attributes": [
+    {
+      "trait_type": "card_type",
+      "value": "WanNeng"
+    },
+    {
+      "trait_type": "series",
+      "value": "Five Blessings NFT"
+    },
+    {
+      "trait_type": "special",
+      "value": "Universal Replacement"
+    }
+  ],
+  "background_color": "",
+  "youtube_url": ""
+}

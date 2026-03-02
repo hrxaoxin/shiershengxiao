@@ -1,0 +1,1080 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>集五福活动 - Five Blessings Collection</title>
+    <meta name="description" content="使用代币铸造福卡NFT，集齐五福获得BNB分红">
+    <link rel="icon" href="images/fu-cards/wufulinmen.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+    <script src="abis.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f5f5f5;
+            background-image: linear-gradient(135deg, #f5f5f5 0%, #e8f5e8 100%);
+            overflow-x: hidden;
+        }
+        
+        /* 粒子背景容器 */
+        #particles-js {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+        
+        .navbar {
+            background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(249, 250, 251, 0.95), rgba(243, 244, 246, 0.95));
+            backdrop-filter: blur(12px);
+            border-top: 2px solid rgba(245, 158, 11, 0.5);
+            box-shadow: 0 -4px 20px rgba(245, 158, 11, 0.2);
+            animation: navbarSlideUp 0.8s ease-out;
+        }
+        
+        @keyframes navbarSlideUp {
+            from {
+                transform: translateY(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .desktop-nav {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(249, 250, 251, 0.95), rgba(243, 244, 246, 0.95));
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(245, 158, 11, 0.5);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            animation: desktopNavSlideIn 0.8s ease-out;
+        }
+        
+        @keyframes desktopNavSlideIn {
+            from {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .hero-section {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            border-radius: 20px;
+            color: white;
+            box-shadow: 0 10px 25px rgba(238, 90, 111, 0.3);
+            animation: heroFadeIn 1s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        @keyframes heroFadeIn {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        /* 英雄区域装饰 */
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+            animation: heroRotate 20s linear infinite;
+        }
+        
+        @keyframes heroRotate {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        
+        .btn-primary {
+            background-color: #ff6b6b;
+            color: white;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+            z-index: -1;
+        }
+        
+        .btn-primary:hover::before {
+            left: 100%;
+        }
+        
+        .btn-primary:hover {
+            background-color: #ee5a6f;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(238, 90, 111, 0.4);
+        }
+        
+        .btn-secondary {
+            background-color: white;
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+        
+        .btn-secondary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(238, 90, 111, 0.1), transparent);
+            transition: left 0.5s ease;
+            z-index: -1;
+        }
+        
+        .btn-secondary:hover::before {
+            left: 100%;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(255, 107, 107, 0.3);
+        }
+        
+        .stats-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            animation: statsCardFadeIn 1.2s ease-out;
+        }
+        
+        @keyframes statsCardFadeIn {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
+        .stats-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .fu-card-showcase {
+            position: relative;
+            transition: all 0.3s ease;
+            animation: fuCardSlideIn 1.5s ease-out;
+        }
+        
+        @keyframes fuCardSlideIn {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .fu-card-showcase:nth-child(1) { animation-delay: 0.1s; }
+        .fu-card-showcase:nth-child(2) { animation-delay: 0.2s; }
+        .fu-card-showcase:nth-child(3) { animation-delay: 0.3s; }
+        .fu-card-showcase:nth-child(4) { animation-delay: 0.4s; }
+        .fu-card-showcase:nth-child(5) { animation-delay: 0.5s; }
+        .fu-card-showcase:nth-child(6) { animation-delay: 0.6s; }
+        
+        .fu-card-showcase:hover {
+            transform: scale(1.08);
+        }
+        
+        .fu-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .fu-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            opacity: 0.2;
+            background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.8) 0%, transparent 50%),
+                        radial-gradient(circle at bottom left, rgba(255, 255, 255, 0.8) 0%, transparent 50%);
+        }
+        
+        .fu-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .fu-card:hover::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(255, 255, 255, 0.2) 0%, transparent 70%);
+            animation: fuCardGlow 2s ease-in-out infinite;
+        }
+        
+        @keyframes fuCardGlow {
+            0%, 100% {
+                opacity: 0;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+        
+        .fu-card h3 {
+            position: relative;
+            z-index: 1;
+            font-size: 20px;
+            font-weight: 700;
+            color: black;
+            text-shadow: 0 2px 4px rgba(255, 255, 255, 0.5);
+            font-family: 'Ma Shan Zheng', cursive;
+        }
+        
+        .rare-card {
+            position: relative;
+        }
+        
+        .rare-badge {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            z-index: 10;
+            background: linear-gradient(to right, #8b5cf6, #ec4899);
+            color: black;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 8px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            50% {
+                opacity: 0.7;
+                transform: scale(1.05);
+            }
+        }
+        
+        .hongbao {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(255, 215, 0, 0.3);
+            transition: all 0.3s ease;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            animation: hongbaoFadeIn 1.5s ease-out;
+        }
+        
+        @keyframes hongbaoFadeIn {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .hongbao:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 20px 40px rgba(255, 215, 0, 0.4);
+            border-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .wallet-button {
+            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+            color: white;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+            animation: walletButtonFadeIn 1s ease-out;
+        }
+        
+        @keyframes walletButtonFadeIn {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
+        .wallet-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s ease;
+            z-index: -1;
+        }
+        
+        .wallet-button:hover::before {
+            left: 100%;
+        }
+        
+        .wallet-button:hover {
+            background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+        }
+        
+        .nav-item {
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .nav-item:hover {
+            transform: scale(1.1);
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+        }
+        
+        .nav-item:hover span {
+            color: #f59e0b;
+            animation: navItemTextGlow 1s ease-in-out infinite;
+        }
+        
+        @keyframes navItemTextGlow {
+            0%, 100% {
+                text-shadow: 0 0 5px rgba(245, 158, 11, 0.5);
+            }
+            50% {
+                text-shadow: 0 0 15px rgba(245, 158, 11, 0.8);
+            }
+        }
+        
+        .nav-item:hover div {
+            transform: scale(1.3) rotate(5deg);
+            animation: navItemIconBounce 1s ease-in-out infinite;
+        }
+        
+        @keyframes navItemIconBounce {
+            0%, 100% {
+                transform: scale(1.3) rotate(5deg);
+            }
+            50% {
+                transform: scale(1.4) rotate(-5deg);
+            }
+        }
+        
+        .card-image {
+            position: relative;
+            width: 100%;
+            height: 128px;
+            margin-bottom: 16px;
+        }
+        
+        .card-image img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            color: transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .fu-card:hover .card-image img {
+            transform: scale(1.1) rotate(5deg);
+        }
+        
+        .title-section {
+            animation: titleFadeIn 1s ease-out;
+        }
+        
+        @keyframes titleFadeIn {
+            from {
+                transform: translateY(-30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .button-section {
+            animation: buttonFadeIn 1.2s ease-out;
+        }
+        
+        @keyframes buttonFadeIn {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .footer {
+            animation: footerFadeIn 1.5s ease-out;
+        }
+        
+        @keyframes footerFadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #ee5a6f 0%, #ff6b6b 100%);
+        }
+    </style>
+</head>
+<body>
+    <!-- 粒子背景 -->
+    <div id="particles-js"></div>
+
+    <!-- 主容器 -->
+    <div class="min-h-screen pb-20 md:pb-0">
+        <!-- 顶部区域 -->
+        <header class="container mx-auto px-4 py-6 title-section">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <!-- 左侧标题 -->
+                <div class="flex items-center">
+                    <div class="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center mr-3">
+                        <span class="text-white text-2xl font-bold">福</span>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-800">集五福</h1>
+                </div>
+                <!-- 中间倒计时 -->
+                <div id="countdown" class="text-lg font-bold text-orange-600 bg-white/90 px-4 py-2 rounded-full shadow-md">
+                    下次分红: 30:00
+                </div>
+                <!-- 右侧钱包按钮 -->
+                <button id="walletBtn" class="wallet-button">连接钱包</button>
+            </div>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="container mx-auto px-4 pb-24">
+            <!-- 英雄区域 -->
+            <div class="hero-section p-8 mb-12">
+                <h2 class="text-3xl font-bold mb-4">使用代币铸造福卡，集齐五福获得BNB分红</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                    <div class="stats-card">
+                        <div class="text-blue-300 text-sm mb-1">总分红池</div>
+                        <div class="text-black font-bold text-2xl" id="totalPool">0.0000</div>
+                        <div class="text-black/60 text-xs">BNB</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="text-green-300 text-sm mb-1">已领取分红</div>
+                        <div class="text-black font-bold text-2xl" id="distributed">0.0000</div>
+                        <div class="text-black/60 text-xs">BNB</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="text-yellow-300 text-sm mb-1">未领取分红</div>
+                        <div class="text-black font-bold text-2xl" id="unclaimedDividend">0.0000</div>
+                        <div class="text-black/60 text-xs">BNB</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="text-purple-300 text-sm mb-1">持有者</div>
+                        <div class="text-black font-bold text-2xl" id="holders">0</div>
+                        <div class="text-black/60 text-xs">五福临门</div>
+                    </div>
+                </div>
+                <div class="text-center text-black/70 text-sm">
+                    💡 总分红池 = 已领取分红 + 未领取分红 · 按权重比例分配
+                </div>
+            </div>
+
+            <!-- 开始按钮 -->
+            <div class="flex flex-col items-center gap-4 mb-12 button-section">
+                <p class="text-xl text-black/80 text-center">点击下方按钮开始你的集福之旅</p>
+                <div class="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+                    <button class="btn-primary w-full" onclick="window.location.href='mint.html'">开始铸造福卡</button>
+                    <button class="btn-secondary w-full" onclick="window.location.href='collection.html'">我的福卡</button>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-4 w-full max-w-md">
+                    <button class="btn-secondary w-full" onclick="window.location.href='rewards.html'">税收奖励</button>
+                    <button class="btn-secondary w-full" onclick="window.location.href='trading.html'">NFT交易</button>
+                </div>
+            </div>
+
+            <!-- 福卡展示 -->
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-16">
+                <!-- 爱国福 -->
+                <div class="fu-card-showcase">
+                    <div class="fu-card bg-gradient-to-br from-red-500 to-red-600">
+                        <div class="card-image">
+                            <img src="images/fu-cards/aiguo.png" alt="爱国福" fetchpriority="high" decoding="async">
+                        </div>
+                        <h3>爱国福</h3>
+                    </div>
+                </div>
+
+                <!-- 富强福 -->
+                <div class="fu-card-showcase">
+                    <div class="fu-card bg-gradient-to-br from-yellow-500 to-orange-500">
+                        <div class="card-image">
+                            <img src="images/fu-cards/fuqiang.png" alt="富强福" fetchpriority="high" decoding="async">
+                        </div>
+                        <h3>富强福</h3>
+                    </div>
+                </div>
+
+                <!-- 和谐福 -->
+                <div class="fu-card-showcase">
+                    <div class="fu-card bg-gradient-to-br from-green-500 to-emerald-600">
+                        <div class="card-image">
+                            <img src="images/fu-cards/hexie.png" alt="和谐福" fetchpriority="high" decoding="async">
+                        </div>
+                        <h3>和谐福</h3>
+                    </div>
+                </div>
+
+                <!-- 友善福 -->
+                <div class="fu-card-showcase">
+                    <div class="fu-card bg-gradient-to-br from-blue-500 to-blue-600">
+                        <div class="card-image">
+                            <img src="images/fu-cards/youshan.png" alt="友善福" fetchpriority="high" decoding="async">
+                        </div>
+                        <h3>友善福</h3>
+                    </div>
+                </div>
+
+                <!-- 敬业福 -->
+                <div class="fu-card-showcase rare-card">
+                    <div class="rare-badge">⚡ 稀有</div>
+                    <div class="fu-card bg-gradient-to-br from-purple-500 to-pink-500">
+                        <div class="card-image">
+                            <img src="images/fu-cards/jingye.png" alt="敬业福" fetchpriority="high" decoding="async">
+                        </div>
+                        <h3>敬业福</h3>
+                    </div>
+                </div>
+
+                <!-- 万能福 -->
+                <div class="fu-card-showcase rare-card">
+                    <div class="rare-badge">⚡ 超稀有</div>
+                    <div class="fu-card bg-gradient-to-br from-teal-500 to-cyan-500">
+                        <div class="card-image">
+                            <img src="images/fu-cards/wanneng.png" alt="万能福" fetchpriority="high" decoding="async">
+                        </div>
+                        <h3>万能福</h3>
+                    </div>
+                </div>
+
+                <!-- 五福临门 -->
+                <div class="fu-card-showcase rare-card">
+                    <div class="rare-badge">🎊 终极</div>
+                    <div class="fu-card bg-gradient-to-br from-yellow-400 to-yellow-600">
+                        <div class="card-image">
+                            <img src="images/fu-cards/wufulinmen.png" alt="五福临门" fetchpriority="high" decoding="async">
+                        </div>
+                        <h3>五福临门</h3>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 五福临门 -->
+            <div class="max-w-2xl mx-auto mb-16">
+                <div class="fu-card bg-gradient-to-br from-yellow-400 to-yellow-600 p-12 text-center">
+                    <div class="text-8xl mb-6">🎊</div>
+                    <h3 class="text-4xl font-bold text-black mb-4">五福临门</h3>
+                    <p class="text-xl text-black/80 mb-6">集齐五福（爱国、富强、和谐、友善、敬业）可合成</p>
+                    <div class="text-2xl font-bold text-black mb-4">🎁 享受独家 1% 税收分红！</div>
+                    <div class="text-xl font-bold text-black">🏆 独享BNB分红池按持有数量分配</div>
+                </div>
+            </div>
+
+            <!-- 功能说明 -->
+            <div class="grid md:grid-cols-2 gap-8 mb-16">
+                <div class="hongbao p-8 rounded-2xl text-center">
+                    <div class="text-5xl mb-4">🧧</div>
+                    <h3 class="text-2xl font-bold text-black mb-3">铸造福卡</h3>
+                    <p class="text-black/80">使用代币铸造随机福卡NFT</p>
+                </div>
+                <div class="hongbao p-8 rounded-2xl text-center">
+                    <div class="text-5xl mb-4">🏆</div>
+                    <h3 class="text-2xl font-bold text-black mb-3">税收分红</h3>
+                    <p class="text-black/80">持有福卡即可享受对应比例税收分红</p>
+                </div>
+            </div>
+
+            <!-- 税收分红机制 -->
+            <div class="bg-gradient-to-br from-yellow-400 to-yellow-600 p-8 rounded-2xl mb-16">
+                <h3 class="text-3xl font-bold text-black mb-6 text-center">🎯 税收分红机制</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-white/10 p-6 rounded-xl backdrop-blur-md">
+                        <h4 class="text-xl font-bold text-yellow-300 mb-3">3% 代币交易费</h4>
+                        <ul class="text-black/90 space-y-2">
+                            <li>• 2% 进入福卡奖励池，每秒释放 0.4%；</li>
+                            <li>• 1% 进入五福临门奖励池</li>
+                        </ul>
+                    </div>
+                    <div class="bg-white/10 p-6 rounded-xl backdrop-blur-md">
+                        <h4 class="text-xl font-bold text-yellow-300 mb-3">额外奖励</h4>
+                        <ul class="text-black/90 space-y-2">
+                            <li>• 持有任何福卡，享受对应 0.4% 税收；</li>
+                            <li>• 集齐五福合成，独享 1% 税收分红</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 页脚 -->
+        <footer class="text-center py-8 text-black/70 footer">
+            <p>© 2026 集五福活动 · Five Blessings Collection</p>
+            <p class="mt-2">祝你五福临门，福气满满 🎊🧧</p>
+            
+            <!-- 社交媒体和联系信息 -->
+            <div class="mt-6 flex flex-col md:flex-row justify-center items-center gap-6">
+                <a href="https://x.com/UPNRt3WZ2A11248" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:bg-white hover:scale-105">
+                    <i class="fab fa-twitter text-blue-500 text-xl"></i>
+                    <span class="font-medium">X</span>
+                </a>
+                <a href="https://t.me/wufulinmen_bsc" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:bg-white hover:scale-105">
+                    <i class="fab fa-telegram-plane text-blue-400 text-xl"></i>
+                    <span class="font-medium">Telegram</span>
+                </a>
+                <div class="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:bg-white hover:scale-105 cursor-pointer" onclick="copyToClipboard('1084724677', this)">
+                    <i class="fab fa-qq text-blue-600 text-xl"></i>
+                    <span class="font-medium">1084724677</span>
+                    <i class="far fa-copy text-gray-500 hover:text-gray-700"></i>
+                </div>
+                <div class="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:bg-white hover:scale-105 cursor-pointer" onclick="copyToClipboard('0xd06994d9ff24dc4a579f53c91f65d95b6be97777', this)">
+                    <i class="fas fa-coins text-yellow-500 text-xl"></i>
+                    <span class="font-medium truncate max-w-xs">0xd06994d9ff24dc4a579f53c91f65d95b6be97777</span>
+                    <i class="far fa-copy text-gray-500 hover:text-gray-700"></i>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 移动端导航栏 -->
+    <nav class="navbar fixed bottom-0 left-0 right-0 z-50 md:hidden">
+        <div class="flex justify-around items-center px-2 py-2">
+            <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1 transition-transform duration-300">🏠&nbsp;</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">首页</span>
+            </a>
+            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1 transition-transform duration-300">🃏</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">铸造</span>
+            </a>
+            <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1 transition-transform duration-300">🎁</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">福卡</span>
+            </a>
+            <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1 transition-transform duration-300">🏆</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">奖励</span>
+            </a>
+            <a href="trading.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1 transition-transform duration-300">💰</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">交易</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- 桌面端导航栏 -->
+    <nav class="hidden md:block fixed left-6 top-1/2 -translate-y-1/2 z-50 desktop-nav">
+        <div class="p-3 space-y-3">
+            <a href="index.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 hover:scale-105 nav-item" title="首页">
+                <div class="text-3xl transition-transform duration-300 group-hover:scale-125">🏠&nbsp;</div>
+                <span class="text-xs font-bold mt-1 transition-all duration-300 text-gray-700 group-hover:text-yellow-600">首页</span>
+            </a>
+            <a href="mint.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 hover:scale-105 nav-item" title="铸造">
+                <div class="text-3xl transition-transform duration-300 group-hover:scale-125">🃏</div>
+                <span class="text-xs font-bold mt-1 transition-all duration-300 text-gray-700 group-hover:text-yellow-600">铸造</span>
+            </a>
+            <a href="collection.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 hover:scale-105 nav-item" title="我的福卡">
+                <div class="text-3xl transition-transform duration-300 group-hover:scale-125">🎁</div>
+                <span class="text-xs font-bold mt-1 transition-all duration-300 text-gray-700 group-hover:text-yellow-600">福卡</span>
+            </a>
+            <a href="rewards.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 hover:scale-105 nav-item" title="奖励">
+                <div class="text-3xl transition-transform duration-300 group-hover:scale-125">🏆</div>
+                <span class="text-xs font-bold mt-1 transition-all duration-300 text-gray-700 group-hover:text-yellow-600">奖励</span>
+            </a>
+            <a href="trading.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 hover:scale-105 nav-item" title="交易">
+                <div class="text-3xl transition-transform duration-300 group-hover:scale-125">💰</div>
+                <span class="text-xs font-bold mt-1 transition-all duration-300 text-gray-700 group-hover:text-yellow-600">交易</span>
+            </a>
+        </div>
+    </nav> 
+
+    <script src="abis.js"></script>
+    <script>
+        // 从abis.js中加载合约地址
+        const rewardManagerAddress = window.contractAddresses.rewardManager;
+        const tokenBurnerAddress = window.contractAddresses.tokenBurner;
+        const fiveBlessingsNFTAddress = window.contractAddresses.fiveBlessingsNFT;
+
+        // Web3实例
+        let web3;
+        let rewardManagerContract;
+        let tokenBurnerContract;
+        let fiveBlessingsNFTContract;
+        let account;
+
+        // 粒子背景效果
+        document.addEventListener('DOMContentLoaded', function() {
+            particlesJS('particles-js', {
+                particles: {
+                    number: {
+                        value: 80,
+                        density: {
+                            enable: true,
+                            value_area: 800
+                        }
+                    },
+                    color: {
+                        value: '#ff6b6b'
+                    },
+                    shape: {
+                        type: 'circle',
+                        stroke: {
+                            width: 0,
+                            color: '#000000'
+                        }
+                    },
+                    opacity: {
+                        value: 0.5,
+                        random: true,
+                        anim: {
+                            enable: true,
+                            speed: 1,
+                            opacity_min: 0.1,
+                            sync: false
+                        }
+                    },
+                    size: {
+                        value: 5,
+                        random: true,
+                        anim: {
+                            enable: true,
+                            speed: 2,
+                            size_min: 0.1,
+                            sync: false
+                        }
+                    },
+                    line_linked: {
+                        enable: true,
+                        distance: 150,
+                        color: '#ff6b6b',
+                        opacity: 0.4,
+                        width: 1
+                    },
+                    move: {
+                        enable: true,
+                        speed: 1,
+                        direction: 'none',
+                        random: false,
+                        straight: false,
+                        out_mode: 'out',
+                        bounce: false,
+                        attract: {
+                            enable: false,
+                            rotateX: 600,
+                            rotateY: 1200
+                        }
+                    }
+                },
+                interactivity: {
+                    detect_on: 'canvas',
+                    events: {
+                        onhover: {
+                            enable: true,
+                            mode: 'grab'
+                        },
+                        onclick: {
+                            enable: true,
+                            mode: 'push'
+                        },
+                        resize: true
+                    },
+                    modes: {
+                        grab: {
+                            distance: 140,
+                            line_linked: {
+                                opacity: 1
+                            }
+                        },
+                        bubble: {
+                            distance: 400,
+                            size: 40,
+                            duration: 2,
+                            opacity: 8,
+                            speed: 3
+                        },
+                        repulse: {
+                            distance: 200,
+                            duration: 0.4
+                        },
+                        push: {
+                            particles_nb: 4
+                        },
+                        remove: {
+                            particles_nb: 2
+                        }
+                    }
+                },
+                retina_detect: true
+            });
+        });
+
+        // 初始化Web3
+        async function initWeb3() {
+            if (typeof window.ethereum !== 'undefined') {
+                web3 = new Web3(window.ethereum);
+                try {
+                    // 请求账户访问
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    account = accounts[0];
+                    
+                    // 初始化合约
+                    rewardManagerContract = new web3.eth.Contract(window.rewardManagerABI, rewardManagerAddress);
+                    tokenBurnerContract = new web3.eth.Contract(window.tokenBurnerABI, tokenBurnerAddress);
+                    fiveBlessingsNFTContract = new web3.eth.Contract(window.fiveBlessingsNFTABI, fiveBlessingsNFTAddress);
+                    
+                    // 更新钱包按钮
+                    updateWalletButton();
+                    
+                    // 加载分红数据
+                    loadFenHongData();
+                } catch (error) {
+                    console.error('初始化Web3失败:', error);
+                }
+            } else {
+                console.log('请安装MetaMask等Web3钱包插件');
+            }
+        }
+
+        // 更新钱包按钮
+        function updateWalletButton() {
+            const walletBtn = document.getElementById('walletBtn');
+            if (account) {
+                const shortAddress = account.substring(0, 4) + '...' + account.substring(account.length - 4);
+                walletBtn.textContent = shortAddress;
+                walletBtn.style.background = 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)';
+            }
+        }
+
+        // 加载分红数据
+        async function loadFenHongData() {
+            if (!rewardManagerContract) return;
+            
+            try {
+                // 由于RewardManager合约中没有分红相关函数，暂时使用默认值
+                // 实际项目中需要根据合约实现来调整
+                const dividendPool = '0';
+                const totalDistributed = '0';
+                const totalPool = '0';
+                const holdersCount = '0';
+                
+                // 转换为BNB单位（假设合约中存储的是wei）
+                const toBNB = (value) => (Number(value) / 1e18).toFixed(4);
+                
+                // 更新页面数据
+                document.getElementById('totalPool').textContent = toBNB(totalPool);
+                document.getElementById('distributed').textContent = toBNB(totalDistributed);
+                document.getElementById('unclaimedDividend').textContent = toBNB(dividendPool);
+                document.getElementById('holders').textContent = holdersCount;
+            } catch (error) {
+                console.error('获取分红数据失败:', error);
+                // 默认显示0
+                document.getElementById('totalPool').textContent = '0.0000';
+                document.getElementById('distributed').textContent = '0.0000';
+                document.getElementById('unclaimedDividend').textContent = '0.0000';
+                document.getElementById('holders').textContent = '0';
+            }
+        }
+
+        // Web3钱包连接功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const walletBtn = document.getElementById('walletBtn');
+            
+            walletBtn.addEventListener('click', function() {
+                initWeb3();
+            });
+        });
+
+        // 滚动动画效果
+        document.addEventListener('scroll', function() {
+            const elements = document.querySelectorAll('.fu-card-showcase, .stats-card, .hongbao');
+            elements.forEach(element => {
+                const position = element.getBoundingClientRect();
+                if (position.top < window.innerHeight && position.bottom >= 0) {
+                    element.style.opacity = '1';
+                    element.style.transform = 'translateY(0)';
+                }
+            });
+        });
+
+        // 初始化倒计时
+        function initCountdown() {
+            updateCountdown();
+            setInterval(updateCountdown, 1000);
+        }
+
+        // 更新倒计时
+        function updateCountdown() {
+            const now = new Date();
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+            
+            let targetMinutes;
+            if (minutes < 30) {
+                targetMinutes = 30;
+            } else {
+                targetMinutes = 60;
+            }
+            
+            let minutesLeft = targetMinutes - minutes;
+            let secondsLeft = 60 - seconds;
+            
+            if (secondsLeft === 60) {
+                secondsLeft = 0;
+                minutesLeft++;
+            }
+            
+            if (minutesLeft > 0) {
+                minutesLeft--;
+            }
+            
+            const totalSecondsLeft = minutesLeft * 60 + secondsLeft;
+            
+            const formattedMinutes = String(minutesLeft).padStart(2, '0');
+            const formattedSeconds = String(secondsLeft).padStart(2, '0');
+            
+            const countdownElement = document.getElementById('countdown');
+            if (countdownElement) {
+                countdownElement.textContent = `下次分红: ${formattedMinutes}:${formattedSeconds}`;
+            }
+        }
+
+        // 复制到剪贴板函数
+        function copyToClipboard(text, element) {
+            navigator.clipboard.writeText(text)
+                .then(function() {
+                    // 显示复制成功反馈
+                    const originalContent = element.innerHTML;
+                    element.innerHTML = '<i class="fas fa-check-circle text-green-500 text-xl"></i><span class="font-medium">已复制!</span>';
+                    element.style.background = 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)';
+                    element.style.border = '2px solid #10b981';
+                    
+                    // 2秒后恢复原始状态
+                    setTimeout(function() {
+                        element.innerHTML = originalContent;
+                        element.style.background = '';
+                        element.style.border = '';
+                    }, 2000);
+                })
+                .catch(function(err) {
+                    console.error('复制失败:', err);
+                });
+        }
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 尝试自动连接钱包
+            initWeb3();
+            
+            // 初始化倒计时
+            initCountdown();
+            
+            // 定期更新数据
+            setInterval(loadFenHongData, 30000); // 每30秒更新一次
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+</body>
+</html>

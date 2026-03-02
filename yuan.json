@@ -1,0 +1,13 @@
+{
+  "name": "五福临门NFT系列",
+  "description": "基于中国传统五福文化的数字收藏品",
+  "image": "https://ipfs.io/ipfs/bafybeich5jq6lv5zcf2ly4dwnxmvnh4nk5xoddy75fihq6bajxnxdxumnm",
+  "seller_fee_basis_points": 500,
+  "fee_recipient": "0xe09d9C330916bfA4F57Be82327C4BcAf44cA9eEA",
+  "external_link": "https://hrxaoxin.github.io/wufulinmenma",
+  "collection": {
+    "name": "五福临门NFT系列",
+    "description": "基于中国传统五福文化的数字收藏品",
+    "image": "https://ipfs.io/ipfs/bafybeich5jq6lv5zcf2ly4dwnxmvnh4nk5xoddy75fihq6bajxnxdxumnm"
+  }
+}
