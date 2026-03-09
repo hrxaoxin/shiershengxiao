@@ -10,7 +10,7 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-enum BlessingType { AiGuo, FuQiang, HeXie, YouShan, JingYe, WanNeng, WuFuLinMen }
+enum ZodiacType { Rat, Ox, Tiger, Rabbit, Dragon, Snake, Horse, Goat, Monkey, Rooster, Dog, Pig }
 
 interface ITokenBurner {
     function hasBurnedToken(address user) external view returns (bool);
@@ -19,21 +19,17 @@ interface ITokenBurner {
 }
 
 interface IRewardManager {
-    function updateCardExternal(address user, BlessingType t, uint256 cnt) external returns (bool);
-    function addWuFu(address user) external returns (bool);
-    function _hasAllBasic(address user) external view returns (bool);
-    function isWuFuHolder(address user) external view returns (bool);
-    function cardCount(address user, BlessingType t) external view returns (uint256);
-    function resetWuFuHolder(address user) external returns (bool);
+    function updateCardExternal(address user, ZodiacType t, uint256 cnt) external returns (bool);
+    function cardCount(address user, ZodiacType t) external view returns (uint256);
     function setAuthorizedNFTContract(address nft, bool ok) external;
     function royaltyWallet() external view returns (address);
 }
 
-interface IFiveBlessingsMetadata {
-    function getCardImage(BlessingType t) external view returns (string memory);
-    function getCardName(BlessingType t) external view returns (string memory);
-    function getCardDesc(BlessingType t) external view returns (string memory);
-    function getNFTName(BlessingType t, uint256 tokenId) external view returns (string memory);
+interface IZodiacMetadata {
+    function getCardImage(ZodiacType t, uint8 starLevel) external view returns (string memory);
+    function getCardName(ZodiacType t) external view returns (string memory);
+    function getCardDesc(ZodiacType t) external view returns (string memory);
+    function getNFTName(ZodiacType t, uint256 tokenId) external view returns (string memory);
     function contractURI() external view returns (string memory);
     
     // 补充缺失的接口方法定义
@@ -43,15 +39,24 @@ interface IFiveBlessingsMetadata {
     function sellerFeeBasisPoints() external view returns (uint256);
 }
 
-// 补充FiveBlessingsMetadata接口别名定义
-interface FiveBlessingsMetadata is IFiveBlessingsMetadata {}
+// 补充ZodiacMetadata接口别名定义
+interface ZodiacMetadata is IZodiacMetadata {}
 
 struct BatchBurnInfo {
-    BlessingType cardType;
+    ZodiacType cardType;
     uint256 burnCount;
 }
 
-contract FiveBlessingsNFT is 
+struct NFTAttributes {
+    uint256 life;
+    uint256 attack;
+    uint256 defense;
+    uint256 speed;
+    uint256 level;
+    uint8 starLevel;
+}
+
+contract ZodiacNFT is 
     Initializable, 
     ERC721Upgradeable, 
     OwnableUpgradeable, 
@@ -65,13 +70,8 @@ contract FiveBlessingsNFT is
     // 核心常量
     uint256 public constant MAX_SUPPLY = 1000000;
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
-
-    // 随机概率常量
-    uint256 internal constant P_AIGUO = 24;
-    uint256 internal constant P_FUQIANG = 48;
-    uint256 internal constant P_HEXIE = 72;
-    uint256 internal constant P_YOUSHAN = 96;
-    uint256 internal constant P_JINGYE = 99;
+    uint8 public constant MAX_STAR_LEVEL = 6;
+    uint256 public constant ATTRIBUTE_INCREMENT = 10;
 
     // 核心状态变量
     uint256 public nextCardId;
@@ -81,11 +81,12 @@ contract FiveBlessingsNFT is
     address public authorizer;
     
     mapping(address => bool) public authorizedMinter;
-    mapping(uint256 => BlessingType) public tokenType;
+    mapping(uint256 => ZodiacType) public tokenType;
+    mapping(uint256 => NFTAttributes) public tokenAttributes;
 
     // 用户NFT存储
-    mapping(address => mapping(BlessingType => uint256[])) public userTokens;
-    mapping(address => mapping(BlessingType => uint256)) public userLatestToken;
+    mapping(address => mapping(ZodiacType => uint256[])) public userTokens;
+    mapping(address => mapping(ZodiacType => uint256)) public userLatestToken;
 
     // 存储间隙
     uint256[60] private __gap;
@@ -97,7 +98,7 @@ contract FiveBlessingsNFT is
 
     // 初始化函数
     function initialize(address initialOwner, address _metadataContract, address _authorizer) external initializer {
-        __ERC721_init("Five Blessings", "5BLESS");
+        __ERC721_init("Zodiac NFT", "ZODIAC");
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -114,7 +115,7 @@ contract FiveBlessingsNFT is
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     // 安全的随机卡片类型生成
-    function _getRandomType(uint256 salt) internal returns (BlessingType) {
+    function _getRandomType(uint256 salt) internal returns (ZodiacType) {
         _nonce.increment();
         uint256 r = uint256(keccak256(abi.encodePacked(
             blockhash(block.number - 1),
@@ -123,27 +124,54 @@ contract FiveBlessingsNFT is
             block.timestamp,
             _nonce.current(),
             gasleft()
-        ))) % 100;
+        ))) % 12;
 
-        if (r < P_AIGUO) return BlessingType.AiGuo;
-        if (r < P_FUQIANG) return BlessingType.FuQiang;
-        if (r < P_HEXIE) return BlessingType.HeXie;
-        if (r < P_YOUSHAN) return BlessingType.YouShan;
-        if (r < P_JINGYE) return BlessingType.JingYe;
-        return BlessingType.WanNeng;
+        return ZodiacType(r);
+    }
+
+    // 生成随机属性
+    function _generateRandomAttributes(uint8 starLevel) internal returns (NFTAttributes memory) {
+        _nonce.increment();
+        uint256 baseValue = 100 + (starLevel - 1) * 50;
+        uint256 totalIncrement = ATTRIBUTE_INCREMENT;
+        
+        NFTAttributes memory attributes;
+        attributes.life = baseValue + _randomValue(totalIncrement, 0);
+        attributes.attack = baseValue + _randomValue(totalIncrement, 1);
+        attributes.defense = baseValue + _randomValue(totalIncrement, 2);
+        attributes.speed = baseValue + _randomValue(totalIncrement, 3);
+        attributes.level = 1;
+        attributes.starLevel = starLevel;
+        
+        return attributes;
+    }
+
+    // 随机值生成
+    function _randomValue(uint256 max, uint256 offset) internal returns (uint256) {
+        _nonce.increment();
+        uint256 r = uint256(keccak256(abi.encodePacked(
+            blockhash(block.number - 1),
+            msg.sender,
+            offset,
+            block.timestamp,
+            _nonce.current(),
+            gasleft()
+        )));
+        return r % (max + 1);
     }
 
     // ========== 核心修改：Base64编码的tokenURI ==========
 function tokenURI(uint256 tokenId) public view override returns (string memory) {
     require(_ownerOf(tokenId) != address(0), "Invalid token ID");
     
-    IFiveBlessingsMetadata metadata = IFiveBlessingsMetadata(metadataContract);
-    BlessingType t = tokenType[tokenId];
+    IZodiacMetadata metadata = IZodiacMetadata(metadataContract);
+    ZodiacType t = tokenType[tokenId];
+    NFTAttributes memory attrs = tokenAttributes[tokenId];
     
     // 直接获取基础信息
     string memory baseCardName = metadata.getCardName(t);
     string memory cardDesc = metadata.getCardDesc(t);
-    string memory cardImage = metadata.getCardImage(t);
+    string memory cardImage = metadata.getCardImage(t, attrs.starLevel);
     
     // 构造NFT名称
     string memory nftName = string(abi.encodePacked(baseCardName, " #", _uint2str(tokenId)));
@@ -152,7 +180,15 @@ function tokenURI(uint256 tokenId) public view override returns (string memory) 
     string memory json = string(abi.encodePacked(
         '{"name":"', nftName, '",',
         '"description":"', cardDesc, '",',
-        '"image":"', cardImage, '"}'
+        '"image":"', cardImage, '",',
+        '"attributes":[',
+        '{"trait_type":"生命","value":', _uint2str(attrs.life), '},',
+        '{"trait_type":"攻击","value":', _uint2str(attrs.attack), '},',
+        '{"trait_type":"防御","value":', _uint2str(attrs.defense), '},',
+        '{"trait_type":"速度","value":', _uint2str(attrs.speed), '},',
+        '{"trait_type":"等级","value":', _uint2str(attrs.level), '},',
+        '{"trait_type":"星阶","value":', _uint2str(attrs.starLevel), '}',
+        ']}'
     ));
     
     // 使用标准的Base64编码格式
@@ -227,7 +263,7 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
     function contractURI() public view returns (string memory) {
         require(metadataContract != address(0), "Metadata contract not set");
         
-        FiveBlessingsMetadata metaContract = FiveBlessingsMetadata(metadataContract);
+        ZodiacMetadata metaContract = ZodiacMetadata(metadataContract);
         IRewardManager rm = IRewardManager(rewardManager);
         
         // 获取元数据信息并进行转义处理
@@ -264,71 +300,98 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         require(tb.decreaseBurnCount(msg.sender), "Burn count decrease failed");
 
         uint256 tokenId = nextCardId++;
-        BlessingType t = _getRandomType(tokenId);
+        ZodiacType t = _getRandomType(tokenId);
         tokenType[tokenId] = t;
+        tokenAttributes[tokenId] = _generateRandomAttributes(1);
         
         _safeMint(msg.sender, tokenId);
         userTokens[msg.sender][t].push(tokenId);
         userLatestToken[msg.sender][t] = tokenId;
 
-        emit CardMinted(tokenId, t, msg.sender, uint64(block.timestamp));
+        emit CardMinted(tokenId, t, msg.sender, uint64(block.timestamp), 1);
         return tokenId;
     }
 
     // 指定类型铸造
-    function mintSpecificType(address to, BlessingType t) external nonReentrant returns (uint256) {
+    function mintSpecificType(address to, ZodiacType t, uint8 starLevel) external nonReentrant returns (uint256) {
         require(authorizedMinter[msg.sender] || msg.sender == owner(), "Not authorized");
         require(to != address(0) && nextCardId < MAX_SUPPLY, "Invalid params");
+        require(starLevel >= 1 && starLevel <= MAX_STAR_LEVEL, "Invalid star level");
 
         uint256 tokenId = nextCardId++;
         tokenType[tokenId] = t;
+        tokenAttributes[tokenId] = _generateRandomAttributes(starLevel);
         _safeMint(to, tokenId);
         
         userTokens[to][t].push(tokenId);
         userLatestToken[to][t] = tokenId;
 
-        emit CardMinted(tokenId, t, to, uint64(block.timestamp));
+        emit CardMinted(tokenId, t, to, uint64(block.timestamp), starLevel);
         return tokenId;
     }
 
-    // 合成五福临门
-    function synthesizeWuFu() external nonReentrant {
-        address user = msg.sender;
-        IRewardManager rm = IRewardManager(rewardManager);
+    // 升级NFT等级
+    function upgradeNFT(uint256 tokenId) external nonReentrant {
+        require(_ownerOf(tokenId) == msg.sender, "Not owner");
+        require(tokenBurner != address(0), "TokenBurner not set");
         
-        require(rewardManager != address(0), "RewardManager not set");
-        require(!rm.isWuFuHolder(user), "Already holder");
-        require(rm._hasAllBasic(user), "Insufficient cards");
-
-        BlessingType[] memory types = new BlessingType[](5);
-        types[0] = BlessingType.AiGuo;
-        types[1] = BlessingType.FuQiang;
-        types[2] = BlessingType.HeXie;
-        types[3] = BlessingType.YouShan;
-        types[4] = BlessingType.JingYe;
-
-        uint256 wanNengUsed = 0;
+        ITokenBurner tb = ITokenBurner(tokenBurner);
+        require(tb.hasBurnedToken(msg.sender) && tb.getBurnCount(msg.sender) > 0, "No permission");
+        require(tb.decreaseBurnCount(msg.sender), "Burn count decrease failed");
         
-        for (uint256 i = 0; i < 5; i++) {
-            if (rm.cardCount(user, types[i]) == 0) {
-                require(rm.cardCount(user, BlessingType.WanNeng) > wanNengUsed, "Insufficient WanNeng");
-                wanNengUsed++;
-            }
-        }
-
-        for (uint256 i = 0; i < 5; i++) {
-            BlessingType burnType = rm.cardCount(user, types[i]) > 0 ? types[i] : BlessingType.WanNeng;
-            _burnCard(user, burnType);
-        }
-
-        _mintWuFu(user);
-        require(rm.addWuFu(user), "Add WuFu failed");
+        NFTAttributes memory attrs = tokenAttributes[tokenId];
+        attrs.level += 1;
         
-        emit WuFuSynthesized(user, block.timestamp, wanNengUsed);
+        // 随机增加属性
+        uint256 totalIncrement = ATTRIBUTE_INCREMENT;
+        attrs.life += _randomValue(totalIncrement, 0);
+        attrs.attack += _randomValue(totalIncrement, 1);
+        attrs.defense += _randomValue(totalIncrement, 2);
+        attrs.speed += _randomValue(totalIncrement, 3);
+        
+        tokenAttributes[tokenId] = attrs;
+        
+        emit NFTUpgraded(tokenId, attrs.level, attrs.life, attrs.attack, attrs.defense, attrs.speed);
+    }
+
+    // 合成NFT
+    function synthesizeNFT(uint256 tokenId1, uint256 tokenId2) external nonReentrant {
+        require(_ownerOf(tokenId1) == msg.sender, "Not owner of token1");
+        require(_ownerOf(tokenId2) == msg.sender, "Not owner of token2");
+        
+        ZodiacType t1 = tokenType[tokenId1];
+        ZodiacType t2 = tokenType[tokenId2];
+        require(t1 == t2, "Different zodiac types");
+        
+        NFTAttributes memory attrs1 = tokenAttributes[tokenId1];
+        NFTAttributes memory attrs2 = tokenAttributes[tokenId2];
+        require(attrs1.starLevel == attrs2.starLevel, "Different star levels");
+        require(attrs1.starLevel < MAX_STAR_LEVEL, "Max star level reached");
+        
+        // 销毁两个NFT
+        _burn(tokenId1);
+        _burn(tokenId2);
+        
+        // 从用户记录中移除
+        _removeToken(msg.sender, t1, tokenId1);
+        _removeToken(msg.sender, t1, tokenId2);
+        
+        // 铸造新的高阶NFT
+        uint256 newTokenId = nextCardId++;
+        require(newTokenId < MAX_SUPPLY, "Max supply reached");
+        
+        tokenType[newTokenId] = t1;
+        tokenAttributes[newTokenId] = _generateRandomAttributes(uint8(attrs1.starLevel + 1));
+        
+        _safeMint(msg.sender, newTokenId);
+        userTokens[msg.sender][t1].push(newTokenId);
+        userLatestToken[msg.sender][t1] = newTokenId;
+        
+        emit NFTSynthesized(newTokenId, t1, attrs1.starLevel + 1, tokenId1, tokenId2, msg.sender);
     }
 
     // 销毁卡片
-    function _burnCard(address user, BlessingType t) internal {
+    function _burnCard(address user, ZodiacType t) internal {
         uint256 tokenId = userLatestToken[user][t];
         require(tokenId != 0 && _ownerOf(tokenId) == user, "Not owner of token");
 
@@ -347,33 +410,19 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         emit CardBurned(tokenId, t, user);
     }
 
-    // 铸造五福临门NFT
-    function _mintWuFu(address user) internal {
-        uint256 tokenId = nextCardId++;
-        require(tokenId < MAX_SUPPLY, "Max supply reached");
-        
-        tokenType[tokenId] = BlessingType.WuFuLinMen;
-        _safeMint(user, tokenId);
-        
-        userTokens[user][BlessingType.WuFuLinMen].push(tokenId);
-        userLatestToken[user][BlessingType.WuFuLinMen] = tokenId;
-        
-        emit WuFuLinMenCreated(tokenId, user, uint64(block.timestamp));
-    }
-
     // 重写_update函数
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = _ownerOf(tokenId);
         address prevOwner = super._update(to, tokenId, auth);
 
         if (from != address(0) && from != BLACK_HOLE) {
-            BlessingType t = tokenType[tokenId];
+            ZodiacType t = tokenType[tokenId];
             _removeToken(from, t, tokenId);
             _updateReward(from, t, false);
         }
         
         if (to != address(0) && to != BLACK_HOLE) {
-            BlessingType t = tokenType[tokenId];
+            ZodiacType t = tokenType[tokenId];
             userTokens[to][t].push(tokenId);
             userLatestToken[to][t] = tokenId;
             _updateReward(to, t, true);
@@ -383,7 +432,7 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
     }
 
     // 移除用户NFT记录
-    function _removeToken(address user, BlessingType t, uint256 tokenId) internal {
+    function _removeToken(address user, ZodiacType t, uint256 tokenId) internal {
         uint256[] storage tokens = userTokens[user][t];
         for (uint256 i = 0; i < tokens.length; i++) {
             if (tokens[i] == tokenId) {
@@ -395,7 +444,7 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
     }
 
     // 同步更新RewardManager的卡片计数
-    function _updateReward(address user, BlessingType t, bool isAdd) internal {
+    function _updateReward(address user, ZodiacType t, bool isAdd) internal {
         if (rewardManager == address(0)) return;
         
         IRewardManager rm = IRewardManager(rewardManager);
@@ -411,7 +460,7 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         uint256 escapeCount = 0;
         
         for (uint256 i = 0; i < inputBytes.length; i++) {
-            if (inputBytes[i] == "\"" || inputBytes[i] == "\\") {
+            if (inputBytes[i] == """ || inputBytes[i] == "\\") {
                 escapeCount++;
             }
         }
@@ -421,7 +470,7 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         bytes memory outputBytes = new bytes(inputBytes.length + escapeCount);
         uint256 j = 0;
         for (uint256 i = 0; i < inputBytes.length; i++) {
-            if (inputBytes[i] == "\"" || inputBytes[i] == "\\") {
+            if (inputBytes[i] == """ || inputBytes[i] == "\\") {
                 outputBytes[j++] = "\\";
             }
             outputBytes[j++] = inputBytes[i];
@@ -430,15 +479,20 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         return string(outputBytes);
     }
 
-    function _blessingTypeToString(BlessingType t) internal pure returns (string memory) {
-        if (t == BlessingType.AiGuo) return "AiGuo";
-        if (t == BlessingType.FuQiang) return "FuQiang";
-        if (t == BlessingType.HeXie) return "HeXie";
-        if (t == BlessingType.YouShan) return "YouShan";
-        if (t == BlessingType.JingYe) return "JingYe";
-        if (t == BlessingType.WanNeng) return "WanNeng";
-        if (t == BlessingType.WuFuLinMen) return "WuFuLinMen";
-        return "weizhi";
+    function _zodiacTypeToString(ZodiacType t) internal pure returns (string memory) {
+        if (t == ZodiacType.Rat) return "Rat";
+        if (t == ZodiacType.Ox) return "Ox";
+        if (t == ZodiacType.Tiger) return "Tiger";
+        if (t == ZodiacType.Rabbit) return "Rabbit";
+        if (t == ZodiacType.Dragon) return "Dragon";
+        if (t == ZodiacType.Snake) return "Snake";
+        if (t == ZodiacType.Horse) return "Horse";
+        if (t == ZodiacType.Goat) return "Goat";
+        if (t == ZodiacType.Monkey) return "Monkey";
+        if (t == ZodiacType.Rooster) return "Rooster";
+        if (t == ZodiacType.Dog) return "Dog";
+        if (t == ZodiacType.Pig) return "Pig";
+        return "unknown";
     }
 
     function _addressToString(address _addr) internal pure returns (string memory) {
@@ -473,7 +527,7 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
 
     // ========== 管理员接口 ==========
     function setAddresses(address tb, address rm) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "FiveBlessingsNFT: Unauthorized");
+        require(msg.sender == owner() || msg.sender == authorizer, "ZodiacNFT: Unauthorized");
         require(tb != address(0) && rm != address(0), "Invalid zero address");
         tokenBurner = tb;
         rewardManager = rm;
@@ -481,7 +535,7 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
     }
 
     function setMetadataContract(address _metadataContract) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "FiveBlessingsNFT: Unauthorized");
+        require(msg.sender == owner() || msg.sender == authorizer, "ZodiacNFT: Unauthorized");
         require(_metadataContract != address(0), "Invalid zero address");
         metadataContract = _metadataContract;
     }
@@ -500,18 +554,23 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         authorizer = _authorizer;
     }
 
-    function getCardCount(address user, BlessingType t) external view returns (uint256) {
+    function getCardCount(address user, ZodiacType t) external view returns (uint256) {
         require(rewardManager != address(0), "RewardManager not set");
         return IRewardManager(rewardManager).cardCount(user, t);
     }
 
-    function getUserTokens(address user, BlessingType t) external view returns (uint256[] memory) {
+    function getUserTokens(address user, ZodiacType t) external view returns (uint256[] memory) {
         return userTokens[user][t];
     }
 
+    function getNFTAttributes(uint256 tokenId) external view returns (NFTAttributes memory) {
+        require(_ownerOf(tokenId) != address(0), "Invalid token ID");
+        return tokenAttributes[tokenId];
+    }
+
     // 事件定义
-    event CardMinted(uint256 indexed cardId, BlessingType indexed cardType, address indexed owner, uint64 timestamp);
-    event CardBurned(uint256 indexed cardId, BlessingType indexed cardType, address indexed owner);
-    event WuFuLinMenCreated(uint256 indexed cardId, address indexed owner, uint64 timestamp);
-    event WuFuSynthesized(address indexed user, uint256 timestamp, uint256 wanNengUsed);
+    event CardMinted(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner, uint64 timestamp, uint8 starLevel);
+    event CardBurned(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner);
+    event NFTUpgraded(uint256 indexed tokenId, uint256 newLevel, uint256 life, uint256 attack, uint256 defense, uint256 speed);
+    event NFTSynthesized(uint256 indexed newTokenId, ZodiacType indexed zodiacType, uint8 newStarLevel, uint256 tokenId1, uint256 tokenId2, address indexed owner);
 }

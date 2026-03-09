@@ -5,21 +5,21 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-enum BlessingType { AiGuo, FuQiang, HeXie, YouShan, JingYe, WanNeng, WuFuLinMen }
+enum ZodiacType { Rat, Ox, Tiger, Rabbit, Dragon, Snake, Horse, Goat, Monkey, Rooster, Dog, Pig }
 
 interface IRewardManager {
     function royaltyWallet() external view returns (address);
 }
 
-contract FiveBlessingsMetadata is
+contract ZodiacMetadata is
     Initializable,
     OwnableUpgradeable,
     UUPSUpgradeable
 {
     // 元数据存储
-    mapping(BlessingType => string) private imgUrl;
-    mapping(BlessingType => string) private cardName;
-    mapping(BlessingType => string) private cardDesc;
+    mapping(ZodiacType => mapping(uint8 => string)) private imgUrl;
+    mapping(ZodiacType => string) private cardName;
+    mapping(ZodiacType => string) private cardDesc;
     
     // 合集元数据
     string public collImage;
@@ -47,10 +47,10 @@ contract FiveBlessingsMetadata is
         _initCardMetadata();
         
         // 初始化合集元数据
-        collName = unicode"五福临门NFT系列";
-        // 使用五福临门图片作为封面
-        collImage = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeich5jq6lv5zcf2ly4dwnxmvnh4nk5xoddy75fihq6bajxnxdxumnm";
-        collDesc = unicode"基于中国传统五福文化的数字收藏品";
+        collName = unicode"十二生肖NFT系列";
+        // 使用龙图片作为封面
+        collImage = "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20dragon%20NFT%20art%20with%20golden%20details%20and%20traditional%20chinese%20elements&image_size=square_hd";
+        collDesc = unicode"基于中国传统十二生肖文化的数字收藏品";
         sellerFeeBasisPoints = 500;
         
         // 初始化授权合约地址
@@ -62,54 +62,119 @@ contract FiveBlessingsMetadata is
 
     // 初始化卡片元数据
     function _initCardMetadata() internal {
-        // 图片URL配置 - 使用Pinata HTTP链接格式
-        imgUrl[BlessingType.AiGuo] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeicmdlx35rjx7slj3ncmjynxzmwllkvujvcrqmdiynmijpkvnc734q";
-        imgUrl[BlessingType.FuQiang] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeihkbyl6zlkx5vxxu366gwa5gpnd45twwlooczyolannp5ewcxaoja";
-        imgUrl[BlessingType.HeXie] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifsojdpnspewquotpvbwhkfq6n5celzjtsyulbaecczkwm4y25yji";
-        imgUrl[BlessingType.YouShan] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeiekctcxtyaews5udiumrogwxjdxkughjnhbycemgxvgpzhwhi564u";
-        imgUrl[BlessingType.JingYe] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeibcse6fzqol32qrwlmsl7cz4ujhi7ctrxavfywzzqjgdvxla62m4e";
-        imgUrl[BlessingType.WanNeng] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeig7ztsaeiddwpgjivwe7la6zxsck5q7hbael32thq4pw6amylxpgi";
-        imgUrl[BlessingType.WuFuLinMen] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeich5jq6lv5zcf2ly4dwnxmvnh4nk5xoddy75fihq6bajxnxdxumnm";
+        // 图片URL配置 - 使用Trae API生成图片
+        for (uint8 starLevel = 1; starLevel <= 6; starLevel++) {
+            imgUrl[ZodiacType.Rat][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20rat%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+            imgUrl[ZodiacType.Ox][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20ox%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+            imgUrl[ZodiacType.Tiger][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20tiger%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+            imgUrl[ZodiacType.Rabbit][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20rabbit%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+            imgUrl[ZodiacType.Dragon][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20dragon%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+            imgUrl[ZodiacType.Snake][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20snake%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+            imgUrl[ZodiacType.Horse][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20horse%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+            imgUrl[ZodiacType.Goat][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20goat%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+            imgUrl[ZodiacType.Monkey][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20monkey%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+            imgUrl[ZodiacType.Rooster][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20rooster%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+            imgUrl[ZodiacType.Dog][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20dog%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+            imgUrl[ZodiacType.Pig][starLevel] = string(abi.encodePacked(
+                "https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=chinese%20zodiac%20pig%20NFT%20art%20level%20",
+                _uint2str(starLevel),
+                "%20with%20traditional%20chinese%20elements&image_size=square_hd"
+            ));
+        }
         
         // 卡片名称
-        cardName[BlessingType.AiGuo] = unicode"爱国福";
-        cardName[BlessingType.FuQiang] = unicode"富强福";
-        cardName[BlessingType.HeXie] = unicode"和谐福";
-        cardName[BlessingType.YouShan] = unicode"友善福";
-        cardName[BlessingType.JingYe] = unicode"敬业福";
-        cardName[BlessingType.WanNeng] = unicode"万能福";
-        cardName[BlessingType.WuFuLinMen] = unicode"五福临门";
+        cardName[ZodiacType.Rat] = unicode"鼠";
+        cardName[ZodiacType.Ox] = unicode"牛";
+        cardName[ZodiacType.Tiger] = unicode"虎";
+        cardName[ZodiacType.Rabbit] = unicode"兔";
+        cardName[ZodiacType.Dragon] = unicode"龙";
+        cardName[ZodiacType.Snake] = unicode"蛇";
+        cardName[ZodiacType.Horse] = unicode"马";
+        cardName[ZodiacType.Goat] = unicode"羊";
+        cardName[ZodiacType.Monkey] = unicode"猴";
+        cardName[ZodiacType.Rooster] = unicode"鸡";
+        cardName[ZodiacType.Dog] = unicode"狗";
+        cardName[ZodiacType.Pig] = unicode"猪";
         
         // 卡片描述
-        cardDesc[BlessingType.AiGuo] = unicode"爱我中华，福泽绵长";
-        cardDesc[BlessingType.FuQiang] = unicode"国富民强，繁荣昌盛";
-        cardDesc[BlessingType.HeXie] = unicode"和睦相处，幸福美满";
-        cardDesc[BlessingType.YouShan] = unicode"友善待人，福报常在";
-        cardDesc[BlessingType.JingYe] = unicode"敬业乐业，福禄安康";
-        cardDesc[BlessingType.WanNeng] = unicode"万福齐聚，好运临门";
-        cardDesc[BlessingType.WuFuLinMen] = unicode"五福齐聚，好运连连";
+        cardDesc[ZodiacType.Rat] = unicode"聪明伶俐，机智过人";
+        cardDesc[ZodiacType.Ox] = unicode"勤劳踏实，任劳任怨";
+        cardDesc[ZodiacType.Tiger] = unicode"勇猛威武，气势磅礴";
+        cardDesc[ZodiacType.Rabbit] = unicode"温柔可爱，机智灵敏";
+        cardDesc[ZodiacType.Dragon] = unicode"神龙见首，威风凛凛";
+        cardDesc[ZodiacType.Snake] = unicode"灵活多变，神秘莫测";
+        cardDesc[ZodiacType.Horse] = unicode"奔腾不息，自由奔放";
+        cardDesc[ZodiacType.Goat] = unicode"温顺善良，祥和安康";
+        cardDesc[ZodiacType.Monkey] = unicode"活泼好动，聪明机智";
+        cardDesc[ZodiacType.Rooster] = unicode"鸡鸣报晓，勤奋努力";
+        cardDesc[ZodiacType.Dog] = unicode"忠诚可靠，守护家园";
+        cardDesc[ZodiacType.Pig] = unicode"福运临门，吉祥如意";
     }
 
     // ========== 元数据读取接口 ==========
-    function getCardImage(BlessingType t) external view returns (string memory) {
-        return imgUrl[t];
+    function getCardImage(ZodiacType t, uint8 starLevel) external view returns (string memory) {
+        return imgUrl[t][starLevel];
     }
 
-    function getCardName(BlessingType t) external view returns (string memory) {
+    function getCardName(ZodiacType t) external view returns (string memory) {
         return cardName[t];
     }
 
-    function getCardDesc(BlessingType t) external view returns (string memory) {
+    function getCardDesc(ZodiacType t) external view returns (string memory) {
         return cardDesc[t];
     }
 
-    function getNFTName(BlessingType t, uint256 tokenId) external view returns (string memory) {
+    function getNFTName(ZodiacType t, uint256 tokenId) external view returns (string memory) {
         return string(abi.encodePacked(cardName[t], " #", _uint2str(tokenId)));
     }
 
     // ========== 管理员接口 ==========
-    function updateCardImage(BlessingType t, string calldata url) external onlyOwner {
-        imgUrl[t] = url;
+    function updateCardImage(ZodiacType t, uint8 starLevel, string calldata url) external onlyOwner {
+        imgUrl[t][starLevel] = url;
     }
 
     function updateCollectionImage(string calldata img) external onlyOwner {
@@ -128,7 +193,7 @@ contract FiveBlessingsMetadata is
     }
 
     function setRewardManager(address rm) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "FiveBlessingsMetadata: Unauthorized");
+        require(msg.sender == owner() || msg.sender == authorizer, "ZodiacMetadata: Unauthorized");
         rewardManager = rm;
     }
 
