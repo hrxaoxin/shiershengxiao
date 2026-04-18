@@ -179,11 +179,31 @@
     <script src="abis.js"></script>
     <script>
         const ZODIAC_DATA = {
-            water: { name: '水', prefix: 'shui', animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'] },
-            wind: { name: '风', prefix: 'feng', animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'] },
-            fire: { name: '火', prefix: 'huo', animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'] },
-            dark: { name: '暗', prefix: 'an', animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'] },
-            light: { name: '光', prefix: 'guang', animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'] }
+            water: {
+                name: '水', prefix: 'shui',
+                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
+            },
+            wind: {
+                name: '风', prefix: 'feng',
+                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
+            },
+            fire: {
+                name: '火', prefix: 'huo',
+                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
+            },
+            dark: {
+                name: '暗', prefix: 'an',
+                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
+            },
+            light: {
+                name: '光', prefix: 'guang',
+                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
+            }
         };
 
         const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
@@ -322,12 +342,12 @@
                 const prefix = attrData.prefix;
                 const animal = attrData.animals[zodiacIndex];
                 const genderSuffix = gender === 1 ? '_1' : '_0';
-                const imagePath = `images/fu-cards/${prefix}${animal}${genderSuffix}.png`;
+                const imagePath = `${attrData.ipfsBase}${prefix}${animal}${genderSuffix}.png`;
                 const name = `${attrData.name}${ZODIAC_NAMES[zodiacIndex]}（${gender === 1 ? '公' : '母'}）`;
 
                 html += `
                     <div class="zodiac-card" onclick="showCardModal(${typeId})">
-                        <img src="${imagePath}" alt="${name}" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <img src="${imagePath}" alt="${name}" onerror="this.src='${attrData.ipfsBase}${prefix}shu_1.png'">
                         <h4>${name}</h4>
                         <p>拥有 ${token.count} 张</p>
                     </div>
@@ -347,7 +367,7 @@
             const prefix = attrData.prefix;
             const animal = attrData.animals[zodiacIndex];
             const genderSuffix = gender === 1 ? '_1' : '_0';
-            const imagePath = `images/fu-cards/${prefix}${animal}${genderSuffix}.png`;
+            const imagePath = `${attrData.ipfsBase}${prefix}${animal}${genderSuffix}.png`;
             const name = `${attrData.name}${ZODIAC_NAMES[zodiacIndex]}（${gender === 1 ? '公' : '母'}）`;
             const desc = `${attrData.name}属性生肖·${ZODIAC_NAMES[zodiacIndex]}·${gender === 1 ? '公' : '母'} · 持有可享受税收分红`;
 

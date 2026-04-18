@@ -173,6 +173,14 @@
             water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang'
         };
 
+        const IPFS_BASES = {
+            water: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+            wind: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+            fire: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+            dark: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/',
+            light: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
+        };
+
         const ZODIAC_ANIMALS = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
 
         const tokenABI = window.tokenABI;
@@ -523,8 +531,9 @@
             const prefix = ZODIAC_PREFIX[attr];
             const animal = ZODIAC_ANIMALS[zodiacIndex];
             const genderSuffix = cardType % 2 === 1 ? '_1' : '_0';
+            const ipfsBase = IPFS_BASES[attr];
 
-            const imagePath = `images/fu-cards/${prefix}${animal}${genderSuffix}.png`;
+            const imagePath = `${ipfsBase}${prefix}${animal}${genderSuffix}.png`;
             const name = ZODIAC_NAMES[attr][zodiacIndex] + '（' + gender + '）';
             const desc = getZodiacDescription(attr, zodiacIndex, gender);
 

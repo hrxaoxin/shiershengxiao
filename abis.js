@@ -34,6 +34,13 @@ window.getZodiacInfo = function(typeId) {
     const attrNames = { water: '水', wind: '风', fire: '火', dark: '暗', light: '光' };
     const attrPrefixes = { water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang' };
     const animalKeys = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
+    const ipfsBases = {
+        water: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+        wind: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+        fire: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+        dark: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/',
+        light: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
+    };
 
     const zodiacIndex = typeId % 12;
     const attrIndex = Math.floor(typeId / 24);
@@ -48,6 +55,7 @@ window.getZodiacInfo = function(typeId) {
     const prefix = attrPrefixes[attr];
     const animal = animalKeys[zodiacIndex];
     const genderSuffix = typeId % 2 === 1 ? '_1' : '_0';
+    const ipfsBase = ipfsBases[attr];
 
     return {
         name: attrNames[attr] + zodiacNames[zodiacIndex] + '（' + gender + '）',
@@ -55,7 +63,8 @@ window.getZodiacInfo = function(typeId) {
         animal: animal,
         gender: gender,
         attr: attr,
-        imagePath: 'images/fu-cards/' + prefix + animal + genderSuffix + '.png',
+        imagePath: ipfsBase + prefix + animal + genderSuffix + '.png',
+        ipfsBase: ipfsBase,
         attrName: attrNames[attr]
     };
 };

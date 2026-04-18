@@ -426,31 +426,36 @@
                 name: '水',
                 color: 'water-card',
                 animals: ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
-                prefix: 'shui'
+                prefix: 'shui',
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
             },
             wind: {
                 name: '风',
                 color: 'wind-card',
                 animals: ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
-                prefix: 'feng'
+                prefix: 'feng',
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
             },
             fire: {
                 name: '火',
                 color: 'fire-card',
                 animals: ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
-                prefix: 'huo'
+                prefix: 'huo',
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
             },
             dark: {
                 name: '暗',
                 color: 'dark-card',
                 animals: ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
-                prefix: 'an'
+                prefix: 'an',
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
             },
             light: {
                 name: '光',
                 color: 'light-card',
                 animals: ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
-                prefix: 'guang'
+                prefix: 'guang',
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
             }
         };
 
@@ -473,16 +478,16 @@
             let html = '';
             data.animals.forEach((animal, index) => {
                 const animalKey = ANIMAL_KEYS[animal];
-                const maleFile = `images/fu-cards/${data.prefix}${animalKey}_1.png`;
-                const femaleFile = `images/fu-cards/${data.prefix}${animalKey}_0.png`;
+                const maleFile = `${data.ipfsBase}${data.prefix}${animalKey}_1.png`;
+                const femaleFile = `${data.ipfsBase}${data.prefix}${animalKey}_0.png`;
 
                 html += `
                     <div class="zodiac-card ${data.color}">
-                        <img src="${maleFile}" alt="${data.name}${animal}公" onerror="this.src='images/fu-cards/${data.prefix}shu_1.png'">
+                        <img src="${maleFile}" alt="${data.name}${animal}公" onerror="this.src='${data.ipfsBase}${data.prefix}shu_1.png'">
                         <h4>${data.name}${animal}（公）</h4>
                     </div>
                     <div class="zodiac-card ${data.color}">
-                        <img src="${femaleFile}" alt="${data.name}${animal}母" onerror="this.src='images/fu-cards/${data.prefix}shu_0.png'">
+                        <img src="${femaleFile}" alt="${data.name}${animal}母" onerror="this.src='${data.ipfsBase}${data.prefix}shu_0.png'">
                         <h4>${data.name}${animal}（母）</h4>
                     </div>
                 `;
