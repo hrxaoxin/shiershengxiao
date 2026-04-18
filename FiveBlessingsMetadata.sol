@@ -68,8 +68,6 @@ contract FiveBlessingsMetadata is
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function _initCardMetadata() internal {
-        string memory basePath = "images/fu-cards/";
-
         cardName[ZodiacType.ShuiShu_1] = unicode"水鼠（公）";
         cardName[ZodiacType.ShuiNiu_1] = unicode"水牛（公）";
         cardName[ZodiacType.ShuiHu_1] = unicode"水虎（公）";
@@ -201,141 +199,148 @@ contract FiveBlessingsMetadata is
         cardName[ZodiacType.GuangZhu_0] = unicode"光猪（母）";
 
         for (uint i = 0; i < 120; i++) {
-            imgUrl[ZodiacType(i)] = _getImageUrl(ZodiacType(i), basePath);
+            imgUrl[ZodiacType(i)] = _getImageUrl(ZodiacType(i));
             cardDesc[ZodiacType(i)] = _getCardDescription(ZodiacType(i));
         }
     }
 
-    function _getImageUrl(ZodiacType z, string memory basePath) internal pure returns (string memory) {
-        if (z == ZodiacType.ShuiShu_1) return string(abi.encodePacked(basePath, "shuishu_1.png"));
-        if (z == ZodiacType.ShuiNiu_1) return string(abi.encodePacked(basePath, "shuiniu_1.png"));
-        if (z == ZodiacType.ShuiHu_1) return string(abi.encodePacked(basePath, "shuihu_1.png"));
-        if (z == ZodiacType.ShuiTu_1) return string(abi.encodePacked(basePath, "shuitu_1.png"));
-        if (z == ZodiacType.ShuiLong_1) return string(abi.encodePacked(basePath, "shuilong_1.png"));
-        if (z == ZodiacType.ShuiShe_1) return string(abi.encodePacked(basePath, "shuishe_1.png"));
-        if (z == ZodiacType.ShuiMa_1) return string(abi.encodePacked(basePath, "shuima_1.png"));
-        if (z == ZodiacType.ShuiYang_1) return string(abi.encodePacked(basePath, "shuiyang_1.png"));
-        if (z == ZodiacType.ShuiHou_1) return string(abi.encodePacked(basePath, "shuihou_1.png"));
-        if (z == ZodiacType.ShuiJi_1) return string(abi.encodePacked(basePath, "shuiji_1.png"));
-        if (z == ZodiacType.ShuiGou_1) return string(abi.encodePacked(basePath, "shuigou_1.png"));
-        if (z == ZodiacType.ShuiZhu_1) return string(abi.encodePacked(basePath, "shuizhu_1.png"));
+    function _getImageUrl(ZodiacType z) internal pure returns (string memory) {
+        string memory basePath1 = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/";
+        string memory basePath2 = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/";
 
-        if (z == ZodiacType.ShuiShu_0) return string(abi.encodePacked(basePath, "shuishu_0.png"));
-        if (z == ZodiacType.ShuiNiu_0) return string(abi.encodePacked(basePath, "shuiniu_0.png"));
-        if (z == ZodiacType.ShuiHu_0) return string(abi.encodePacked(basePath, "shuihu_0.png"));
-        if (z == ZodiacType.ShuiTu_0) return string(abi.encodePacked(basePath, "shuitu_0.png"));
-        if (z == ZodiacType.ShuiLong_0) return string(abi.encodePacked(basePath, "shuilong_0.png"));
-        if (z == ZodiacType.ShuiShe_0) return string(abi.encodePacked(basePath, "shuishe_0.png"));
-        if (z == ZodiacType.ShuiMa_0) return string(abi.encodePacked(basePath, "shuima_0.png"));
-        if (z == ZodiacType.ShuiYang_0) return string(abi.encodePacked(basePath, "shuiyang_0.png"));
-        if (z == ZodiacType.ShuiHou_0) return string(abi.encodePacked(basePath, "shuihou_0.png"));
-        if (z == ZodiacType.ShuiJi_0) return string(abi.encodePacked(basePath, "shuiji_0.png"));
-        if (z == ZodiacType.ShuiGou_0) return string(abi.encodePacked(basePath, "shuigou_0.png"));
-        if (z == ZodiacType.ShuiZhu_0) return string(abi.encodePacked(basePath, "shuizhu_0.png"));
+        uint256 zIndex = uint256(z);
 
-        if (z == ZodiacType.FengShu_1) return string(abi.encodePacked(basePath, "fengshu_1.png"));
-        if (z == ZodiacType.FengNiu_1) return string(abi.encodePacked(basePath, "fengniu_1.png"));
-        if (z == ZodiacType.FengHu_1) return string(abi.encodePacked(basePath, "fenghu_1.png"));
-        if (z == ZodiacType.FengTu_1) return string(abi.encodePacked(basePath, "fengtu_1.png"));
-        if (z == ZodiacType.FengLong_1) return string(abi.encodePacked(basePath, "fenglong_1.png"));
-        if (z == ZodiacType.FengShe_1) return string(abi.encodePacked(basePath, "fengshe_1.png"));
-        if (z == ZodiacType.FengMa_1) return string(abi.encodePacked(basePath, "fengma_1.png"));
-        if (z == ZodiacType.FengYang_1) return string(abi.encodePacked(basePath, "fengyang_1.png"));
-        if (z == ZodiacType.FengHou_1) return string(abi.encodePacked(basePath, "fenghou_1.png"));
-        if (z == ZodiacType.FengJi_1) return string(abi.encodePacked(basePath, "fengji_1.png"));
-        if (z == ZodiacType.FengGou_1) return string(abi.encodePacked(basePath, "fenggou_1.png"));
-        if (z == ZodiacType.FengZhu_1) return string(abi.encodePacked(basePath, "fengzhu_1.png"));
+        if (zIndex < 48) {
+            if (z == ZodiacType.ShuiShu_1) return string(abi.encodePacked(basePath1, "shuishu_1.png"));
+            if (z == ZodiacType.ShuiNiu_1) return string(abi.encodePacked(basePath1, "shuiniu_1.png"));
+            if (z == ZodiacType.ShuiHu_1) return string(abi.encodePacked(basePath1, "shuihu_1.png"));
+            if (z == ZodiacType.ShuiTu_1) return string(abi.encodePacked(basePath1, "shuitu_1.png"));
+            if (z == ZodiacType.ShuiLong_1) return string(abi.encodePacked(basePath1, "shuilong_1.png"));
+            if (z == ZodiacType.ShuiShe_1) return string(abi.encodePacked(basePath1, "shuishe_1.png"));
+            if (z == ZodiacType.ShuiMa_1) return string(abi.encodePacked(basePath1, "shuima_1.png"));
+            if (z == ZodiacType.ShuiYang_1) return string(abi.encodePacked(basePath1, "shuiyang_1.png"));
+            if (z == ZodiacType.ShuiHou_1) return string(abi.encodePacked(basePath1, "shuihou_1.png"));
+            if (z == ZodiacType.ShuiJi_1) return string(abi.encodePacked(basePath1, "shuiji_1.png"));
+            if (z == ZodiacType.ShuiGou_1) return string(abi.encodePacked(basePath1, "shuigou_1.png"));
+            if (z == ZodiacType.ShuiZhu_1) return string(abi.encodePacked(basePath1, "shuizhu_1.png"));
 
-        if (z == ZodiacType.FengShu_0) return string(abi.encodePacked(basePath, "fengshu_0.png"));
-        if (z == ZodiacType.FengNiu_0) return string(abi.encodePacked(basePath, "fengniu_0.png"));
-        if (z == ZodiacType.FengHu_0) return string(abi.encodePacked(basePath, "fenghu_0.png"));
-        if (z == ZodiacType.FengTu_0) return string(abi.encodePacked(basePath, "fengtu_0.png"));
-        if (z == ZodiacType.FengLong_0) return string(abi.encodePacked(basePath, "fenglong_0.png"));
-        if (z == ZodiacType.FengShe_0) return string(abi.encodePacked(basePath, "fengshe_0.png"));
-        if (z == ZodiacType.FengMa_0) return string(abi.encodePacked(basePath, "fengma_0.png"));
-        if (z == ZodiacType.FengYang_0) return string(abi.encodePacked(basePath, "fengyang_0.png"));
-        if (z == ZodiacType.FengHou_0) return string(abi.encodePacked(basePath, "fenghou_0.png"));
-        if (z == ZodiacType.FengJi_0) return string(abi.encodePacked(basePath, "fengji_0.png"));
-        if (z == ZodiacType.FengGou_0) return string(abi.encodePacked(basePath, "fenggou_0.png"));
-        if (z == ZodiacType.FengZhu_0) return string(abi.encodePacked(basePath, "fengzhu_0.png"));
+            if (z == ZodiacType.ShuiShu_0) return string(abi.encodePacked(basePath1, "shuishu_0.png"));
+            if (z == ZodiacType.ShuiNiu_0) return string(abi.encodePacked(basePath1, "shuiniu_0.png"));
+            if (z == ZodiacType.ShuiHu_0) return string(abi.encodePacked(basePath1, "shuihu_0.png"));
+            if (z == ZodiacType.ShuiTu_0) return string(abi.encodePacked(basePath1, "shuitu_0.png"));
+            if (z == ZodiacType.ShuiLong_0) return string(abi.encodePacked(basePath1, "shuilong_0.png"));
+            if (z == ZodiacType.ShuiShe_0) return string(abi.encodePacked(basePath1, "shuishe_0.png"));
+            if (z == ZodiacType.ShuiMa_0) return string(abi.encodePacked(basePath1, "shuima_0.png"));
+            if (z == ZodiacType.ShuiYang_0) return string(abi.encodePacked(basePath1, "shuiyang_0.png"));
+            if (z == ZodiacType.ShuiHou_0) return string(abi.encodePacked(basePath1, "shuihou_0.png"));
+            if (z == ZodiacType.ShuiJi_0) return string(abi.encodePacked(basePath1, "shuiji_0.png"));
+            if (z == ZodiacType.ShuiGou_0) return string(abi.encodePacked(basePath1, "shuigou_0.png"));
+            if (z == ZodiacType.ShuiZhu_0) return string(abi.encodePacked(basePath1, "shuizhu_0.png"));
 
-        if (z == ZodiacType.HuoShu_1) return string(abi.encodePacked(basePath, "huoshu_1.png"));
-        if (z == ZodiacType.HuoNiu_1) return string(abi.encodePacked(basePath, "huoniu_1.png"));
-        if (z == ZodiacType.HuoHu_1) return string(abi.encodePacked(basePath, "huohu_1.png"));
-        if (z == ZodiacType.HuoTu_1) return string(abi.encodePacked(basePath, "huotu_1.png"));
-        if (z == ZodiacType.HuoLong_1) return string(abi.encodePacked(basePath, "huolong_1.png"));
-        if (z == ZodiacType.HuoShe_1) return string(abi.encodePacked(basePath, "huoshe_1.png"));
-        if (z == ZodiacType.HuoMa_1) return string(abi.encodePacked(basePath, "huoma_1.png"));
-        if (z == ZodiacType.HuoYang_1) return string(abi.encodePacked(basePath, "huoyang_1.png"));
-        if (z == ZodiacType.HuoHou_1) return string(abi.encodePacked(basePath, "huohou_1.png"));
-        if (z == ZodiacType.HuoJi_1) return string(abi.encodePacked(basePath, "huoji_1.png"));
-        if (z == ZodiacType.HuoGou_1) return string(abi.encodePacked(basePath, "huogou_1.png"));
-        if (z == ZodiacType.HuoZhu_1) return string(abi.encodePacked(basePath, "huozhu_1.png"));
+            if (z == ZodiacType.FengShu_1) return string(abi.encodePacked(basePath1, "fengshu_1.png"));
+            if (z == ZodiacType.FengNiu_1) return string(abi.encodePacked(basePath1, "fengniu_1.png"));
+            if (z == ZodiacType.FengHu_1) return string(abi.encodePacked(basePath1, "fenghu_1.png"));
+            if (z == ZodiacType.FengTu_1) return string(abi.encodePacked(basePath1, "fengtu_1.png"));
+            if (z == ZodiacType.FengLong_1) return string(abi.encodePacked(basePath1, "fenglong_1.png"));
+            if (z == ZodiacType.FengShe_1) return string(abi.encodePacked(basePath1, "fengshe_1.png"));
+            if (z == ZodiacType.FengMa_1) return string(abi.encodePacked(basePath1, "fengma_1.png"));
+            if (z == ZodiacType.FengYang_1) return string(abi.encodePacked(basePath1, "fengyang_1.png"));
+            if (z == ZodiacType.FengHou_1) return string(abi.encodePacked(basePath1, "fenghou_1.png"));
+            if (z == ZodiacType.FengJi_1) return string(abi.encodePacked(basePath1, "fengji_1.png"));
+            if (z == ZodiacType.FengGou_1) return string(abi.encodePacked(basePath1, "fenggou_1.png"));
+            if (z == ZodiacType.FengZhu_1) return string(abi.encodePacked(basePath1, "fengzhu_1.png"));
 
-        if (z == ZodiacType.HuoShu_0) return string(abi.encodePacked(basePath, "huoshu_0.png"));
-        if (z == ZodiacType.HuoNiu_0) return string(abi.encodePacked(basePath, "huoniu_0.png"));
-        if (z == ZodiacType.HuoHu_0) return string(abi.encodePacked(basePath, "huohu_0.png"));
-        if (z == ZodiacType.HuoTu_0) return string(abi.encodePacked(basePath, "huotu_0.png"));
-        if (z == ZodiacType.HuoLong_0) return string(abi.encodePacked(basePath, "huolong_0.png"));
-        if (z == ZodiacType.HuoShe_0) return string(abi.encodePacked(basePath, "huoshe_0.png"));
-        if (z == ZodiacType.HuoMa_0) return string(abi.encodePacked(basePath, "huoma_0.png"));
-        if (z == ZodiacType.HuoYang_0) return string(abi.encodePacked(basePath, "huoyang_0.png"));
-        if (z == ZodiacType.HuoHou_0) return string(abi.encodePacked(basePath, "huohou_0.png"));
-        if (z == ZodiacType.HuoJi_0) return string(abi.encodePacked(basePath, "huoji_0.png"));
-        if (z == ZodiacType.HuoGou_0) return string(abi.encodePacked(basePath, "huogou_0.png"));
-        if (z == ZodiacType.HuoZhu_0) return string(abi.encodePacked(basePath, "huozhu_0.png"));
+            if (z == ZodiacType.FengShu_0) return string(abi.encodePacked(basePath1, "fengshu_0.png"));
+            if (z == ZodiacType.FengNiu_0) return string(abi.encodePacked(basePath1, "fengniu_0.png"));
+            if (z == ZodiacType.FengHu_0) return string(abi.encodePacked(basePath1, "fenghu_0.png"));
+            if (z == ZodiacType.FengTu_0) return string(abi.encodePacked(basePath1, "fengtu_0.png"));
+            if (z == ZodiacType.FengLong_0) return string(abi.encodePacked(basePath1, "fenglong_0.png"));
+            if (z == ZodiacType.FengShe_0) return string(abi.encodePacked(basePath1, "fengshe_0.png"));
+            if (z == ZodiacType.FengMa_0) return string(abi.encodePacked(basePath1, "fengma_0.png"));
+            if (z == ZodiacType.FengYang_0) return string(abi.encodePacked(basePath1, "fengyang_0.png"));
+            if (z == ZodiacType.FengHou_0) return string(abi.encodePacked(basePath1, "fenghou_0.png"));
+            if (z == ZodiacType.FengJi_0) return string(abi.encodePacked(basePath1, "fengji_0.png"));
+            if (z == ZodiacType.FengGou_0) return string(abi.encodePacked(basePath1, "fenggou_0.png"));
+            if (z == ZodiacType.FengZhu_0) return string(abi.encodePacked(basePath1, "fengzhu_0.png"));
 
-        if (z == ZodiacType.AnShu_1) return string(abi.encodePacked(basePath, "anshu_1.png"));
-        if (z == ZodiacType.AnNiu_1) return string(abi.encodePacked(basePath, "anniu_1.png"));
-        if (z == ZodiacType.AnHu_1) return string(abi.encodePacked(basePath, "anhu_1.png"));
-        if (z == ZodiacType.AnTu_1) return string(abi.encodePacked(basePath, "antu_1.png"));
-        if (z == ZodiacType.AnLong_1) return string(abi.encodePacked(basePath, "anlong_1.png"));
-        if (z == ZodiacType.AnShe_1) return string(abi.encodePacked(basePath, "anshe_1.png"));
-        if (z == ZodiacType.AnMa_1) return string(abi.encodePacked(basePath, "anma_1.png"));
-        if (z == ZodiacType.AnYang_1) return string(abi.encodePacked(basePath, "anyang_1.png"));
-        if (z == ZodiacType.AnHou_1) return string(abi.encodePacked(basePath, "anhhou_1.png"));
-        if (z == ZodiacType.AnJi_1) return string(abi.encodePacked(basePath, "anji_1.png"));
-        if (z == ZodiacType.AnGou_1) return string(abi.encodePacked(basePath, "angou_1.png"));
-        if (z == ZodiacType.AnZhu_1) return string(abi.encodePacked(basePath, "anzhu_1.png"));
+            if (z == ZodiacType.HuoShu_1) return string(abi.encodePacked(basePath1, "huoshu_1.png"));
+            if (z == ZodiacType.HuoNiu_1) return string(abi.encodePacked(basePath1, "huoniu_1.png"));
+            if (z == ZodiacType.HuoHu_1) return string(abi.encodePacked(basePath1, "huohu_1.png"));
+            if (z == ZodiacType.HuoTu_1) return string(abi.encodePacked(basePath1, "huotu_1.png"));
+            if (z == ZodiacType.HuoLong_1) return string(abi.encodePacked(basePath1, "huolong_1.png"));
+            if (z == ZodiacType.HuoShe_1) return string(abi.encodePacked(basePath1, "huoshe_1.png"));
+            if (z == ZodiacType.HuoMa_1) return string(abi.encodePacked(basePath1, "huoma_1.png"));
+            if (z == ZodiacType.HuoYang_1) return string(abi.encodePacked(basePath1, "huoyang_1.png"));
+            if (z == ZodiacType.HuoHou_1) return string(abi.encodePacked(basePath1, "huohou_1.png"));
+            if (z == ZodiacType.HuoJi_1) return string(abi.encodePacked(basePath1, "huoji_1.png"));
+            if (z == ZodiacType.HuoGou_1) return string(abi.encodePacked(basePath1, "huogou_1.png"));
+            if (z == ZodiacType.HuoZhu_1) return string(abi.encodePacked(basePath1, "huozhu_1.png"));
 
-        if (z == ZodiacType.AnShu_0) return string(abi.encodePacked(basePath, "anshu_0.png"));
-        if (z == ZodiacType.AnNiu_0) return string(abi.encodePacked(basePath, "anniu_0.png"));
-        if (z == ZodiacType.AnHu_0) return string(abi.encodePacked(basePath, "anhu_0.png"));
-        if (z == ZodiacType.AnTu_0) return string(abi.encodePacked(basePath, "antu_0.png"));
-        if (z == ZodiacType.AnLong_0) return string(abi.encodePacked(basePath, "anlong_0.png"));
-        if (z == ZodiacType.AnShe_0) return string(abi.encodePacked(basePath, "anshe_0.png"));
-        if (z == ZodiacType.AnMa_0) return string(abi.encodePacked(basePath, "anma_0.png"));
-        if (z == ZodiacType.AnYang_0) return string(abi.encodePacked(basePath, "anyang_0.png"));
-        if (z == ZodiacType.AnHou_0) return string(abi.encodePacked(basePath, "anhhou_0.png"));
-        if (z == ZodiacType.AnJi_0) return string(abi.encodePacked(basePath, "anji_0.png"));
-        if (z == ZodiacType.AnGou_0) return string(abi.encodePacked(basePath, "angou_0.png"));
-        if (z == ZodiacType.AnZhu_0) return string(abi.encodePacked(basePath, "anzhu_0.png"));
+            if (z == ZodiacType.HuoShu_0) return string(abi.encodePacked(basePath1, "huoshu_0.png"));
+            if (z == ZodiacType.HuoNiu_0) return string(abi.encodePacked(basePath1, "huoniu_0.png"));
+            if (z == ZodiacType.HuoHu_0) return string(abi.encodePacked(basePath1, "huohu_0.png"));
+            if (z == ZodiacType.HuoTu_0) return string(abi.encodePacked(basePath1, "huotu_0.png"));
+            if (z == ZodiacType.HuoLong_0) return string(abi.encodePacked(basePath1, "huolong_0.png"));
+            if (z == ZodiacType.HuoShe_0) return string(abi.encodePacked(basePath1, "huoshe_0.png"));
+            if (z == ZodiacType.HuoMa_0) return string(abi.encodePacked(basePath1, "huoma_0.png"));
+            if (z == ZodiacType.HuoYang_0) return string(abi.encodePacked(basePath1, "huoyang_0.png"));
+            if (z == ZodiacType.HuoHou_0) return string(abi.encodePacked(basePath1, "huohou_0.png"));
+            if (z == ZodiacType.HuoJi_0) return string(abi.encodePacked(basePath1, "huoji_0.png"));
+            if (z == ZodiacType.HuoGou_0) return string(abi.encodePacked(basePath1, "huogou_0.png"));
+            if (z == ZodiacType.HuoZhu_0) return string(abi.encodePacked(basePath1, "huozhu_0.png"));
+        } else {
+            if (z == ZodiacType.AnShu_1) return string(abi.encodePacked(basePath2, "anshu_1.png"));
+            if (z == ZodiacType.AnNiu_1) return string(abi.encodePacked(basePath2, "anniu_1.png"));
+            if (z == ZodiacType.AnHu_1) return string(abi.encodePacked(basePath2, "anhu_1.png"));
+            if (z == ZodiacType.AnTu_1) return string(abi.encodePacked(basePath2, "antu_1.png"));
+            if (z == ZodiacType.AnLong_1) return string(abi.encodePacked(basePath2, "anlong_1.png"));
+            if (z == ZodiacType.AnShe_1) return string(abi.encodePacked(basePath2, "anshe_1.png"));
+            if (z == ZodiacType.AnMa_1) return string(abi.encodePacked(basePath2, "anma_1.png"));
+            if (z == ZodiacType.AnYang_1) return string(abi.encodePacked(basePath2, "anyang_1.png"));
+            if (z == ZodiacType.AnHou_1) return string(abi.encodePacked(basePath2, "anhhou_1.png"));
+            if (z == ZodiacType.AnJi_1) return string(abi.encodePacked(basePath2, "anji_1.png"));
+            if (z == ZodiacType.AnGou_1) return string(abi.encodePacked(basePath2, "angou_1.png"));
+            if (z == ZodiacType.AnZhu_1) return string(abi.encodePacked(basePath2, "anzhu_1.png"));
 
-        if (z == ZodiacType.GuangShu_1) return string(abi.encodePacked(basePath, "guangshu_1.png"));
-        if (z == ZodiacType.GuangNiu_1) return string(abi.encodePacked(basePath, "guangniu_1.png"));
-        if (z == ZodiacType.GuangHu_1) return string(abi.encodePacked(basePath, "guanghu_1.png"));
-        if (z == ZodiacType.GuangTu_1) return string(abi.encodePacked(basePath, "guangtu_1.png"));
-        if (z == ZodiacType.GuangLong_1) return string(abi.encodePacked(basePath, "guanglong_1.png"));
-        if (z == ZodiacType.GuangShe_1) return string(abi.encodePacked(basePath, "guangshe_1.png"));
-        if (z == ZodiacType.GuangMa_1) return string(abi.encodePacked(basePath, "guangma_1.png"));
-        if (z == ZodiacType.GuangYang_1) return string(abi.encodePacked(basePath, "guangyang_1.png"));
-        if (z == ZodiacType.GuangHou_1) return string(abi.encodePacked(basePath, "guanghou_1.png"));
-        if (z == ZodiacType.GuangJi_1) return string(abi.encodePacked(basePath, "guangji_1.png"));
-        if (z == ZodiacType.GuangGou_1) return string(abi.encodePacked(basePath, "guanggou_1.png"));
-        if (z == ZodiacType.GuangZhu_1) return string(abi.encodePacked(basePath, "guangzhu_1.png"));
+            if (z == ZodiacType.AnShu_0) return string(abi.encodePacked(basePath2, "anshu_0.png"));
+            if (z == ZodiacType.AnNiu_0) return string(abi.encodePacked(basePath2, "anniu_0.png"));
+            if (z == ZodiacType.AnHu_0) return string(abi.encodePacked(basePath2, "anhu_0.png"));
+            if (z == ZodiacType.AnTu_0) return string(abi.encodePacked(basePath2, "antu_0.png"));
+            if (z == ZodiacType.AnLong_0) return string(abi.encodePacked(basePath2, "anlong_0.png"));
+            if (z == ZodiacType.AnShe_0) return string(abi.encodePacked(basePath2, "anshe_0.png"));
+            if (z == ZodiacType.AnMa_0) return string(abi.encodePacked(basePath2, "anma_0.png"));
+            if (z == ZodiacType.AnYang_0) return string(abi.encodePacked(basePath2, "anyang_0.png"));
+            if (z == ZodiacType.AnHou_0) return string(abi.encodePacked(basePath2, "anhhou_0.png"));
+            if (z == ZodiacType.AnJi_0) return string(abi.encodePacked(basePath2, "anji_0.png"));
+            if (z == ZodiacType.AnGou_0) return string(abi.encodePacked(basePath2, "angou_0.png"));
+            if (z == ZodiacType.AnZhu_0) return string(abi.encodePacked(basePath2, "anzhu_0.png"));
 
-        if (z == ZodiacType.GuangShu_0) return string(abi.encodePacked(basePath, "guangshu_0.png"));
-        if (z == ZodiacType.GuangNiu_0) return string(abi.encodePacked(basePath, "guangniu_0.png"));
-        if (z == ZodiacType.GuangHu_0) return string(abi.encodePacked(basePath, "guanghu_0.png"));
-        if (z == ZodiacType.GuangTu_0) return string(abi.encodePacked(basePath, "guangtu_0.png"));
-        if (z == ZodiacType.GuangLong_0) return string(abi.encodePacked(basePath, "guanglong_0.png"));
-        if (z == ZodiacType.GuangShe_0) return string(abi.encodePacked(basePath, "guangshe_0.png"));
-        if (z == ZodiacType.GuangMa_0) return string(abi.encodePacked(basePath, "guangma_0.png"));
-        if (z == ZodiacType.GuangYang_0) return string(abi.encodePacked(basePath, "guangyang_0.png"));
-        if (z == ZodiacType.GuangHou_0) return string(abi.encodePacked(basePath, "guanghou_0.png"));
-        if (z == ZodiacType.GuangJi_0) return string(abi.encodePacked(basePath, "guangji_0.png"));
-        if (z == ZodiacType.GuangGou_0) return string(abi.encodePacked(basePath, "guanggou_0.png"));
-        if (z == ZodiacType.GuangZhu_0) return string(abi.encodePacked(basePath, "guangzhu_0.png"));
+            if (z == ZodiacType.GuangShu_1) return string(abi.encodePacked(basePath2, "guangshu_1.png"));
+            if (z == ZodiacType.GuangNiu_1) return string(abi.encodePacked(basePath2, "guangniu_1.png"));
+            if (z == ZodiacType.GuangHu_1) return string(abi.encodePacked(basePath2, "guanghu_1.png"));
+            if (z == ZodiacType.GuangTu_1) return string(abi.encodePacked(basePath2, "guangtu_1.png"));
+            if (z == ZodiacType.GuangLong_1) return string(abi.encodePacked(basePath2, "guanglong_1.png"));
+            if (z == ZodiacType.GuangShe_1) return string(abi.encodePacked(basePath2, "guangshe_1.png"));
+            if (z == ZodiacType.GuangMa_1) return string(abi.encodePacked(basePath2, "guangma_1.png"));
+            if (z == ZodiacType.GuangYang_1) return string(abi.encodePacked(basePath2, "guangyang_1.png"));
+            if (z == ZodiacType.GuangHou_1) return string(abi.encodePacked(basePath2, "guanghou_1.png"));
+            if (z == ZodiacType.GuangJi_1) return string(abi.encodePacked(basePath2, "guangji_1.png"));
+            if (z == ZodiacType.GuangGou_1) return string(abi.encodePacked(basePath2, "guanggou_1.png"));
+            if (z == ZodiacType.GuangZhu_1) return string(abi.encodePacked(basePath2, "guangzhu_1.png"));
+
+            if (z == ZodiacType.GuangShu_0) return string(abi.encodePacked(basePath2, "guangshu_0.png"));
+            if (z == ZodiacType.GuangNiu_0) return string(abi.encodePacked(basePath2, "guangniu_0.png"));
+            if (z == ZodiacType.GuangHu_0) return string(abi.encodePacked(basePath2, "guanghu_0.png"));
+            if (z == ZodiacType.GuangTu_0) return string(abi.encodePacked(basePath2, "guangtu_0.png"));
+            if (z == ZodiacType.GuangLong_0) return string(abi.encodePacked(basePath2, "guanglong_0.png"));
+            if (z == ZodiacType.GuangShe_0) return string(abi.encodePacked(basePath2, "guangshe_0.png"));
+            if (z == ZodiacType.GuangMa_0) return string(abi.encodePacked(basePath2, "guangma_0.png"));
+            if (z == ZodiacType.GuangYang_0) return string(abi.encodePacked(basePath2, "guangyang_0.png"));
+            if (z == ZodiacType.GuangHou_0) return string(abi.encodePacked(basePath2, "guanghou_0.png"));
+            if (z == ZodiacType.GuangJi_0) return string(abi.encodePacked(basePath2, "guangji_0.png"));
+            if (z == ZodiacType.GuangGou_0) return string(abi.encodePacked(basePath2, "guanggou_0.png"));
+            if (z == ZodiacType.GuangZhu_0) return string(abi.encodePacked(basePath2, "guangzhu_0.png"));
+        }
 
         return "";
     }
