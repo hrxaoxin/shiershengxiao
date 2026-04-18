@@ -356,33 +356,10 @@
                 <h3 class="text-2xl font-bold text-white mb-8 text-center">属性克制</h3>
 
                 <div class="grid md:grid-cols-2 gap-12">
-                    <!-- 左侧：三角循环 -->
+                    <!-- 左侧：三角形循环 -->
                     <div class="flex flex-col items-center">
-                        <p class="text-orange-400 mb-8">风 · 水 · 火 循环克制</p>
+                        <p class="text-orange-400 mb-6">风 · 水 · 火 循环克制</p>
                         <svg viewBox="0 0 200 180" class="w-56 h-48">
-                            <circle cx="100" cy="90" r="75" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1" stroke-dasharray="4,4"/>
-
-                            <g>
-                                <circle cx="100" cy="20" r="24" fill="url(#fireGrad)" stroke="white" stroke-width="2"/>
-                                <text x="100" y="26" text-anchor="middle" font-size="18">&#128293;</text>
-                            </g>
-                            <text x="100" y="55" text-anchor="middle" fill="#fb923c" font-size="11" font-weight="bold">火</text>
-                            <text x="100" y="67" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9">克风</text>
-
-                            <g>
-                                <circle cx="35" cy="145" r="24" fill="url(#waterGrad)" stroke="white" stroke-width="2"/>
-                                <text x="35" y="151" text-anchor="middle" font-size="18">&#128167;</text>
-                            </g>
-                            <text x="35" y="175" text-anchor="middle" fill="#38bdf8" font-size="11" font-weight="bold">水</text>
-                            <text x="35" y="187" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9">克火</text>
-
-                            <g>
-                                <circle cx="165" cy="145" r="24" fill="url(#windGrad)" stroke="white" stroke-width="2"/>
-                                <text x="165" y="151" text-anchor="middle" font-size="18">&#127788;</text>
-                            </g>
-                            <text x="165" y="175" text-anchor="middle" fill="#4ade80" font-size="11" font-weight="bold">风</text>
-                            <text x="165" y="187" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-size="9">克水</text>
-
                             <defs>
                                 <linearGradient id="fireGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                                     <stop offset="0%" stop-color="#f97316"/>
@@ -396,22 +373,49 @@
                                     <stop offset="0%" stop-color="#22c55e"/>
                                     <stop offset="100%" stop-color="#15803d"/>
                                 </linearGradient>
+                                <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                                    <path d="M0,0 L6,3 L0,6 Z" fill="#fbbf24"/>
+                                </marker>
                             </defs>
 
-                            <path d="M128 35 Q160 55 160 90" stroke="#fbbf24" stroke-width="2" fill="none" marker-end="url(#arr)"/>
-                            <path d="M140 160 Q80 180 60 155" stroke="#fbbf24" stroke-width="2" fill="none" marker-end="url(#arr)"/>
-                            <path d="M40 130 Q50 70 90 35" stroke="#fbbf24" stroke-width="2" fill="none" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+                            <!-- 三角形边框 -->
+                            <polygon points="100,15 25,145 175,145" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
 
-                            <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                                <path d="M0,0 L6,3 L0,6 Z" fill="#fbbf24"/>
-                            </marker>
+                            <!-- 火 (顶部) -->
+                            <g transform="translate(100, 15)">
+                                <circle cx="0" cy="0" r="22" fill="url(#fireGrad)" stroke="white" stroke-width="2"/>
+                                <text x="0" y="5" text-anchor="middle" font-size="14">&#128293;</text>
+                            </g>
+                            <text x="100" y="45" text-anchor="middle" fill="#fb923c" font-size="10" font-weight="bold">火</text>
+
+                            <!-- 水 (左下) -->
+                            <g transform="translate(25, 145)">
+                                <circle cx="0" cy="0" r="22" fill="url(#waterGrad)" stroke="white" stroke-width="2"/>
+                                <text x="0" y="5" text-anchor="middle" font-size="14">&#128167;</text>
+                            </g>
+                            <text x="25" y="172" text-anchor="middle" fill="#38bdf8" font-size="10" font-weight="bold">水</text>
+
+                            <!-- 风 (右下) -->
+                            <g transform="translate(175, 145)">
+                                <circle cx="0" cy="0" r="22" fill="url(#windGrad)" stroke="white" stroke-width="2"/>
+                                <text x="0" y="5" text-anchor="middle" font-size="14">&#127788;</text>
+                            </g>
+                            <text x="175" y="172" text-anchor="middle" fill="#4ade80" font-size="10" font-weight="bold">风</text>
+
+                            <!-- 箭头: 火→风 -->
+                            <path d="M125 25 Q155 50 162 90" stroke="#fbbf24" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+                            <!-- 箭头: 风→水 -->
+                            <path d="M150 140 Q100 165 55 140" stroke="#fbbf24" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+                            <!-- 箭头: 水→火 -->
+                            <path d="M35 130 Q50 80 85 30" stroke="#fbbf24" stroke-width="2" fill="none" stroke-dasharray="4,3" marker-end="url(#arr)"/>
                         </svg>
+                        <p class="text-white/60 text-sm mt-4">火克风 → 风克水 → 水克火</p>
                     </div>
 
                     <!-- 右侧：光暗互克 -->
                     <div class="flex flex-col items-center">
-                        <p class="text-purple-400 mb-8">光 · 暗 相互克制</p>
-                        <div class="flex items-center gap-6">
+                        <p class="text-purple-400 mb-6">光 · 暗 相互克制</p>
+                        <div class="flex items-center gap-8">
                             <div class="text-center">
                                 <div class="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-500/20 border-2 border-yellow-400/50">
                                     <span class="text-4xl">&#9728;</span>
@@ -421,10 +425,10 @@
 
                             <div class="flex flex-col items-center">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-yellow-400 font-bold">&#8594;</span>
-                                    <span class="text-purple-400 font-bold">&#8592;</span>
+                                    <span class="text-yellow-400 font-bold text-2xl">&#8594;</span>
+                                    <span class="text-purple-400 font-bold text-2xl">&#8592;</span>
                                 </div>
-                                <div class="w-8 h-0.5 bg-gradient-to-r from-yellow-400 to-purple-400 my-2"></div>
+                                <div class="w-10 h-0.5 bg-gradient-to-r from-yellow-400 to-purple-400 my-3"></div>
                                 <span class="text-white/50 text-sm">互克</span>
                             </div>
 
@@ -435,6 +439,7 @@
                                 <p class="text-purple-300 font-bold mt-3">暗</p>
                             </div>
                         </div>
+                        <p class="text-white/60 text-sm mt-4">光克暗 · 暗克光</p>
                     </div>
                 </div>
             </div>
