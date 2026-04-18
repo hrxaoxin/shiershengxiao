@@ -454,6 +454,12 @@
             }
         };
 
+        const ANIMAL_KEYS = {
+            '鼠': 'shu', '牛': 'niu', '虎': 'hu', '兔': 'tu', '龙': 'long',
+            '蛇': 'she', '马': 'ma', '羊': 'yang', '猴': 'hou', '鸡': 'ji',
+            '狗': 'gou', '猪': 'zhu'
+        };
+
         function switchAttribute(attr) {
             document.querySelectorAll('.attribute-tab').forEach(tab => tab.classList.remove('active'));
             document.querySelector(`.tab-${attr}`).classList.add('active');
@@ -466,16 +472,17 @@
 
             let html = '';
             data.animals.forEach((animal, index) => {
-                const maleFile = `images/fu-cards/${data.prefix}${animal.toLowerCase() === 'long' ? 'long' : data.prefix + animal.charAt(0).toLowerCase()}_1.png`;
-                const femaleFile = `images/fu-cards/${data.prefix}${animal.toLowerCase() === 'long' ? 'long' : data.prefix + animal.charAt(0).toLowerCase()}_0.png`;
+                const animalKey = ANIMAL_KEYS[animal];
+                const maleFile = `images/fu-cards/${data.prefix}${animalKey}_1.png`;
+                const femaleFile = `images/fu-cards/${data.prefix}${animalKey}_0.png`;
 
                 html += `
                     <div class="zodiac-card ${data.color}">
-                        <img src="images/fu-cards/${data.prefix}${animal === '龙' ? 'long' : data.prefix}${animal.charAt(0).toLowerCase()}_1.png" alt="${data.name}${animal}公" onerror="this.src='images/fu-cards/${data.prefix}shu_1.png'">
+                        <img src="${maleFile}" alt="${data.name}${animal}公" onerror="this.src='images/fu-cards/${data.prefix}shu_1.png'">
                         <h4>${data.name}${animal}（公）</h4>
                     </div>
                     <div class="zodiac-card ${data.color}">
-                        <img src="images/fu-cards/${data.prefix}${animal === '龙' ? 'long' : data.prefix}${animal.charAt(0).toLowerCase()}_0.png" alt="${data.name}${animal}母" onerror="this.src='images/fu-cards/${data.prefix}shu_0.png'">
+                        <img src="${femaleFile}" alt="${data.name}${animal}母" onerror="this.src='images/fu-cards/${data.prefix}shu_0.png'">
                         <h4>${data.name}${animal}（母）</h4>
                     </div>
                 `;
