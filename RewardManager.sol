@@ -33,8 +33,8 @@ contract RewardManager is
     IERC2981
 {
     uint256 public constant VERSION = 2;
-    uint256 public constant WEIGHT_PER_CARD = 13;
-    uint256 public constant MIN_OWNER_WEIGHT = 100;
+    uint256 public constant WEIGHT_PER_CARD = 8;
+    uint256 public constant MIN_OWNER_WEIGHT = 1000;
     uint256 public constant MAX_ROYALTY_FEE = 5000;
 
     uint256 public holdersCount;
