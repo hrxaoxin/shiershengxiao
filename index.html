@@ -355,51 +355,81 @@
             <div class="bg-white/5 backdrop-blur-sm p-8 rounded-2xl mb-16">
                 <h3 class="text-2xl font-bold text-white mb-8 text-center">属性克制</h3>
 
-                <div class="flex flex-col md:flex-row items-center justify-center gap-8">
+                <div class="grid md:grid-cols-2 gap-8">
                     <!-- 左侧：三角循环 -->
-                    <div class="text-center">
-                        <h4 class="text-lg font-medium text-orange-400 mb-6">风 · 水 · 火</h4>
-                        <div class="flex items-center justify-center gap-4">
-                            <div class="flex flex-col items-center">
-                                <div class="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-2xl shadow-lg">💧</div>
-                                <span class="text-sm text-cyan-300 mt-2">水</span>
+                    <div class="flex flex-col items-center">
+                        <h4 class="text-lg font-medium text-orange-400 mb-6">循环克制</h4>
+                        <div class="relative w-52 h-52">
+                            <div class="absolute inset-0 rounded-full border-2 border-dashed border-white/20"></div>
+
+                            <!-- 火 顶 -->
+                            <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1">
+                                <div class="flex flex-col items-center">
+                                    <div class="w-16 h-16 rounded-full bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center text-2xl shadow-lg shadow-red-500/30">�</div>
+                                    <span class="text-xs text-orange-300 mt-1">火</span>
+                                </div>
                             </div>
-                            <span class="text-orange-400 text-xl">→</span>
-                            <div class="flex flex-col items-center">
-                                <div class="w-14 h-14 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-2xl shadow-lg">🔥</div>
-                                <span class="text-sm text-orange-300 mt-2">火</span>
+
+                            <!-- 水 左下 -->
+                            <div class="absolute bottom-2 left-0">
+                                <div class="flex flex-col items-center">
+                                    <div class="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-2xl shadow-lg shadow-blue-500/30">�</div>
+                                    <span class="text-xs text-cyan-300 mt-1">水</span>
+                                </div>
                             </div>
-                            <span class="text-orange-400 text-xl">→</span>
-                            <div class="flex flex-col items-center">
-                                <div class="w-14 h-14 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-2xl shadow-lg">🌬️</div>
-                                <span class="text-sm text-green-300 mt-2">风</span>
+
+                            <!-- 风 右下 -->
+                            <div class="absolute bottom-2 right-0">
+                                <div class="flex flex-col items-center">
+                                    <div class="w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-2xl shadow-lg shadow-green-500/30">🌬️</div>
+                                    <span class="text-xs text-green-300 mt-1">风</span>
+                                </div>
                             </div>
-                            <span class="text-orange-400 text-xl">→</span>
-                            <div class="flex flex-col items-center">
-                                <div class="w-14 h-14 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-2xl shadow-lg">💧</div>
-                                <span class="text-sm text-cyan-300 mt-2">水</span>
-                            </div>
+
+                            <!-- 箭头火→风 -->
+                            <svg class="absolute top-8 right-6 w-12 h-16" viewBox="0 0 48 64">
+                                <path d="M8 8 Q40 32 8 56" stroke="#fbbf24" stroke-width="3" fill="none" stroke-linecap="round"/>
+                                <polygon points="12,50 4,60 16,58" fill="#fbbf24"/>
+                            </svg>
+
+                            <!-- 箭头风→水 -->
+                            <svg class="absolute bottom-10 left-8 w-16 h-12" viewBox="0 0 64 48">
+                                <path d="M8 40 Q32 8 56 40" stroke="#fbbf24" stroke-width="3" fill="none" stroke-linecap="round"/>
+                                <polygon points="50,44 60,36 52,32" fill="#fbbf24"/>
+                            </svg>
+
+                            <!-- 箭头水→火 -->
+                            <svg class="absolute top-14 left-12 w-12 h-12" viewBox="0 0 48 48">
+                                <path d="M8 40 Q32 8 40 8" stroke="#fbbf24" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="4,2"/>
+                                <polygon points="36,12 44,4 38,14" fill="#fbbf24"/>
+                            </svg>
                         </div>
-                        <p class="text-white/50 text-sm mt-4">水克火 · 火克风 · 风克水</p>
+                        <p class="text-white/50 text-sm mt-4">火克风 → 水克火 → 风克水</p>
                     </div>
 
-                    <!-- 分隔线 -->
-                    <div class="hidden md:block w-px h-20 bg-white/20"></div>
-
-                    <!-- 右侧：光暗 -->
-                    <div class="text-center">
-                        <h4 class="text-lg font-medium text-purple-400 mb-6">光 · 暗</h4>
-                        <div class="flex items-center justify-center gap-4">
+                    <!-- 右侧：光暗互克 -->
+                    <div class="flex flex-col items-center">
+                        <h4 class="text-lg font-medium text-purple-400 mb-6">光暗对立</h4>
+                        <div class="flex items-center gap-6 py-4">
+                            <!-- 光 -->
                             <div class="flex flex-col items-center">
-                                <div class="w-14 h-14 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 flex items-center justify-center text-2xl shadow-lg shadow-yellow-500/20">☀️</div>
+                                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 flex items-center justify-center text-3xl shadow-lg shadow-yellow-500/30">☀️</div>
                                 <span class="text-sm text-yellow-300 mt-2">光</span>
                             </div>
-                            <div class="flex flex-col items-center text-white/50">
-                                <span class="text-lg">⟷</span>
-                                <span class="text-xs">互克</span>
-                            </div>
+
+                            <!-- 中间 -->
                             <div class="flex flex-col items-center">
-                                <div class="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-700 flex items-center justify-center text-2xl shadow-lg shadow-purple-500/20">🌙</div>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-yellow-400 text-xl">→</span>
+                                    <span class="text-purple-400 text-xl">←</span>
+                                </div>
+                                <div class="w-12 h-0.5 bg-gradient-to-r from-yellow-400 to-purple-400 mt-2"></div>
+                                <span class="text-white/50 text-xs mt-2">互克</span>
+                            </div>
+
+                            <!-- 暗 -->
+                            <div class="flex flex-col items-center">
+                                <div class="w-20 h-20 rounded-full bg-gradient-to-br from-indigo-500 to-purple-700 flex items-center justify-center text-3xl shadow-lg shadow-purple-500/30">🌙</div>
                                 <span class="text-sm text-purple-300 mt-2">暗</span>
                             </div>
                         </div>
@@ -407,7 +437,7 @@
                     </div>
                 </div>
 
-                <p class="text-white/40 text-center text-sm mt-8">持有被克属性NFT可获得额外分红</p>
+                <p class="text-white/40 text-center text-sm mt-6">持有被克属性NFT可获得额外分红</p>
             </div>
         </main>
 
