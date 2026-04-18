@@ -7,75 +7,66 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-/**
- * @title IERC2981 接口
- */
-interface IERC2981 { 
+interface IERC2981 {
     function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address receiver, uint256 royaltyAmount);
 }
 
-/**
- * @title BlessingType 枚举
- */
-enum BlessingType { AiGuo, FuQiang, HeXie, YouShan, JingYe, WanNeng, WuFuLinMen }
+enum ZodiacType {
+    ShuiShu_1, ShuiNiu_1, ShuiHu_1, ShuiTu_1, ShuiLong_1, ShuiShe_1, ShuiMa_1, ShuiYang_1, ShuiHou_1, ShuiJi_1, ShuiGou_1, ShuiZhu_1,
+    ShuiShu_0, ShuiNiu_0, ShuiHu_0, ShuiTu_0, ShuiLong_0, ShuiShe_0, ShuiMa_0, ShuiYang_0, ShuiHou_0, ShuiJi_0, ShuiGou_0, ShuiZhu_0,
+    FengShu_1, FengNiu_1, FengHu_1, FengTu_1, FengLong_1, FengShe_1, FengMa_1, FengYang_1, FengHou_1, FengJi_1, FengGou_1, FengZhu_1,
+    FengShu_0, FengNiu_0, FengHu_0, FengTu_0, FengLong_0, FengShe_0, FengMa_0, FengYang_0, FengHou_0, FengJi_0, FengGou_0, FengZhu_0,
+    HuoShu_1, HuoNiu_1, HuoHu_1, HuoTu_1, HuoLong_1, HuoShe_1, HuoMa_1, HuoYang_1, HuoHou_1, HuoJi_1, HuoGou_1, HuoZhu_1,
+    HuoShu_0, HuoNiu_0, HuoHu_0, HuoTu_0, HuoLong_0, HuoShe_0, HuoMa_0, HuoYang_0, HuoHou_0, HuoJi_0, HuoGou_0, HuoZhu_0,
+    AnShu_1, AnNiu_1, AnHu_1, AnTu_1, AnLong_1, AnShe_1, AnMa_1, AnYang_1, AnHou_1, AnJi_1, AnGou_1, AnZhu_1,
+    AnShu_0, AnNiu_0, AnHu_0, AnTu_0, AnLong_0, AnShe_0, AnMa_0, AnYang_0, AnHou_0, AnJi_0, AnGou_0, AnZhu_0,
+    GuangShu_1, GuangNiu_1, GuangHu_1, GuangTu_1, GuangLong_1, GuangShe_1, GuangMa_1, GuangYang_1, GuangHou_1, GuangJi_1, GuangGou_1, GuangZhu_1,
+    GuangShu_0, GuangNiu_0, GuangHu_0, GuangTu_0, GuangLong_0, GuangShe_0, GuangMa_0, GuangYang_0, GuangHou_0, GuangJi_0, GuangGou_0, GuangZhu_0
+}
 
-/**
- * @title RewardManager 合约
- * @dev 管理五福NFT的奖励和分红系统
- */
-contract RewardManager is 
-    Initializable, 
+contract RewardManager is
+    Initializable,
     Ownable2StepUpgradeable,
-    UUPSUpgradeable, 
-    ReentrancyGuardUpgradeable, 
+    UUPSUpgradeable,
+    ReentrancyGuardUpgradeable,
     PausableUpgradeable,
-    IERC2981 
+    IERC2981
 {
-    // 核心常量
     uint256 public constant VERSION = 2;
     uint256 public constant WEIGHT_PER_CARD = 13;
-    uint256 public constant WU_FU_WEIGHT = 100;
     uint256 public constant MIN_OWNER_WEIGHT = 100;
     uint256 public constant MAX_ROYALTY_FEE = 5000;
-    uint256 public constant MAX_BATCH_OPERATIONS = 10;
 
-    // 核心状态变量
     uint256 public holdersCount;
     uint256 public dividendPool;
     uint256 public totalDistributed;
     address public operator;
     address public nftContract;
-    address public authorizer; // 授权合约地址
+    address public authorizer;
     uint256 public ownerWeight;
     address public royaltyWallet;
     uint256 public royaltyFee = 500;
-    
+
     mapping(address => bool) public authorizedNFTContracts;
-    mapping(address => mapping(BlessingType => uint256)) public cardCount;
-    mapping(address => bool) public isWuFuHolder;
+    mapping(address => mapping(ZodiacType => uint256)) public cardCount;
+    mapping(address => bool) public isHolder;
     mapping(address => uint256) public claimedDividend;
     mapping(address => uint256) public precisionAcc;
     mapping(address => uint256) public userWeight;
     uint256 public totalWeight;
 
-    // 合格用户链表
     mapping(address => address) public eligibleUserPrev;
     mapping(address => address) public eligibleUserNext;
     address public eligibleUserHead;
     address public eligibleUserTail;
     mapping(address => bool) public inEligibleList;
 
-    // 交易限速
     mapping(address => mapping(bytes4 => uint256)) public lastOperationTime;
     uint256 public operationCooldown = 1 seconds;
 
-    // 事件定义
-    event WuFuAdded(address indexed user, uint256 ts);
-    event WuFuRemoved(address indexed user, uint256 ts);
-    event CardUpdated(address indexed user, BlessingType t, uint256 c, uint256 ts);
+    event CardUpdated(address indexed user, ZodiacType t, uint256 c, uint256 ts);
     event DividendClaimed(address indexed user, uint256 amt, uint256 prec, uint256 ts);
     event DividendDeposited(uint256 amt, address indexed sender, uint256 ts);
-    event WanNengBurned(address indexed user, uint256 cnt, uint256 ts);
     event UserWeightUpdated(address indexed user, uint256 oldWeight, uint256 newWeight, uint256 ts);
     event TotalWeightUpdated(uint256 oldTotal, uint256 newTotal, uint256 ts);
     event NFTContractAuthorized(address indexed nftContract, bool authorized, uint256 timestamp);
@@ -85,7 +76,6 @@ contract RewardManager is
     event ExtraFundsWithdrawn(address indexed owner, uint256 amount, uint256 timestamp);
     event FullFundsWithdrawn(address indexed owner, uint256 amount, uint256 timestamp);
 
-    // 存储间隙
     uint256[90] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -93,11 +83,10 @@ contract RewardManager is
         _disableInitializers();
     }
 
-    // 权限修饰器
     modifier onlyAuthorized() {
         require(
-            msg.sender == owner() || 
-            msg.sender == operator || 
+            msg.sender == owner() ||
+            msg.sender == operator ||
             msg.sender == nftContract ||
             msg.sender == authorizer ||
             authorizedNFTContracts[msg.sender],
@@ -124,11 +113,10 @@ contract RewardManager is
         lastOperationTime[msg.sender][funcSig] = block.timestamp;
         _;
     }
-    
-    // 初始化函数
+
     function initialize(
-        address initialOwner, 
-        address _royaltyWallet, 
+        address initialOwner,
+        address _royaltyWallet,
         address _operator,
         address _nftContract,
         address _authorizer
@@ -138,7 +126,7 @@ contract RewardManager is
         __ReentrancyGuard_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
-        
+
         royaltyWallet = _royaltyWallet == address(0) ? 0x55d398326f99059fF775485246999027B3197955 : _royaltyWallet;
         operator = _operator;
         nftContract = _nftContract;
@@ -146,37 +134,31 @@ contract RewardManager is
         ownerWeight = MIN_OWNER_WEIGHT;
         totalWeight = ownerWeight;
 
-        // 初始化链表
         eligibleUserHead = address(0);
         eligibleUserTail = address(0);
 
-        // 授权初始NFT合约
         authorizedNFTContracts[_nftContract] = true;
 
         emit TotalWeightUpdated(0, totalWeight, block.timestamp);
     }
 
-    // UUPS升级权限
-    function _authorizeUpgrade(address newImplementation) 
-        internal 
-        override 
-        onlyEmergencyOwner 
-        nonZeroAddress(newImplementation) 
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        override
+        onlyEmergencyOwner
+        nonZeroAddress(newImplementation)
     {}
 
-    // ERC2981 接口实现
     function royaltyInfo(uint256, uint256 salePrice) external view override returns (address, uint256) {
         return (royaltyWallet, (salePrice * royaltyFee) / 10000);
     }
 
-    // 设置授权NFT合约
     function setAuthorizedNFTContract(address nft, bool ok) external nonZeroAddress(nft) {
         require(msg.sender == owner() || msg.sender == operator || msg.sender == nftContract || msg.sender == authorizer || authorizedNFTContracts[msg.sender], "RewardManager: Unauthorized");
         authorizedNFTContracts[nft] = ok;
         emit NFTContractAuthorized(nft, ok, block.timestamp);
     }
 
-    // 设置NFT合约
     function setNFTContract(address _newNFTContract) external onlyOwner nonZeroAddress(_newNFTContract) {
         address oldNFTContract = nftContract;
         require(oldNFTContract != _newNFTContract, "RM: same nft contract");
@@ -184,121 +166,91 @@ contract RewardManager is
         emit NFTContractUpdated(oldNFTContract, _newNFTContract, block.timestamp);
     }
 
-    // 设置操作员
     function setOperator(address _op) external onlyOwner nonZeroAddress(_op) {
         operator = _op;
     }
 
-    // 设置所有者权重
     function setOwnerWeight(uint256 _w) external onlyOwner {
         require(_w >= MIN_OWNER_WEIGHT, "RM: w low");
-        
+
         uint256 oldOwnerWeight = ownerWeight;
         totalWeight = totalWeight - oldOwnerWeight + _w;
         ownerWeight = _w;
-        
+
         emit TotalWeightUpdated(totalWeight + oldOwnerWeight - _w, totalWeight, block.timestamp);
     }
 
-    // 设置版税钱包
     function setRoyaltyWallet(address _newRoyaltyWallet) external onlyOwner nonZeroAddress(_newRoyaltyWallet) {
         address oldRoyaltyWallet = royaltyWallet;
         require(oldRoyaltyWallet != _newRoyaltyWallet, "RM: same royalty wallet");
         royaltyWallet = _newRoyaltyWallet;
         emit RoyaltyWalletUpdated(oldRoyaltyWallet, _newRoyaltyWallet, block.timestamp);
     }
-    
-    // 设置版税比例
+
     function setRoyaltyFee(uint256 _f) external onlyOwner {
         require(_f >= 0 && _f <= MAX_ROYALTY_FEE, "RM: fee invalid");
         royaltyFee = _f;
     }
 
-    // 设置冷却时间
     function setOperationCooldown(uint256 _cooldown) external onlyOwner {
         operationCooldown = _cooldown;
     }
 
-    // 管理函数：设置授权合约地址
     function setAuthorizer(address _authorizer) external onlyOwner {
         authorizer = _authorizer;
     }
 
-    // 紧急暂停
     function emergencyPause() external onlyEmergencyOwner {
         _pause();
         emit EmergencyPause(msg.sender, block.timestamp);
     }
 
-    // 紧急恢复
     function emergencyUnpause() external onlyEmergencyOwner {
         _unpause();
     }
 
-    // 仅操作员修饰器
     modifier onlyOp() {
-        bool isAuthorized = (msg.sender == operator) || (msg.sender == owner()) || 
+        bool isAuthorized = (msg.sender == operator) || (msg.sender == owner()) ||
                             (authorizedNFTContracts[msg.sender]) || (msg.sender == nftContract) || (msg.sender == authorizer);
         require(isAuthorized, "RM: not op");
         _;
     }
 
-    // 计算用户权重
     function _calcUserWeight(address user) internal view returns (uint256) {
         if (user == owner()) return 0;
-        return isWuFuHolder[user] ? WU_FU_WEIGHT : _getBasicCount(user) * WEIGHT_PER_CARD;
+        return _getTotalCardCount(user) * WEIGHT_PER_CARD;
     }
 
-    // 更新用户权重
     function _updateUserWeight(address user) internal {
         if (user == owner()) return;
-        
+
         uint256 oldWeight = userWeight[user];
         uint256 newWeight = _calcUserWeight(user);
-        
+
         if (oldWeight != newWeight) {
             uint256 oldTotal = totalWeight;
             totalWeight = totalWeight - oldWeight + newWeight;
             userWeight[user] = newWeight;
-            
+
             emit UserWeightUpdated(user, oldWeight, newWeight, block.timestamp);
             emit TotalWeightUpdated(oldTotal, totalWeight, block.timestamp);
         }
     }
 
-    // 获取用户基础卡片数量
-    function _getBasicCount(address user) internal view returns (uint256) {
-        uint256 cnt = 0;
-        BlessingType[5] memory basic = [
-            BlessingType.AiGuo, BlessingType.FuQiang, BlessingType.HeXie, BlessingType.YouShan, BlessingType.JingYe
-        ];
-        
-        for (uint8 i = 0; i < 5; i++) {
-            if (cardCount[user][basic[i]] > 0) {
-                unchecked { cnt++; }
-            }
+    function _getTotalCardCount(address user) internal view returns (uint256 cnt) {
+        for (uint i = 0; i < 120; i++) {
+            cnt += cardCount[user][ZodiacType(i)];
         }
-        return cnt;
     }
 
-    // 检查用户是否有分红资格
     function _hasEligibility(address user) internal view returns (bool) {
         if (user == owner()) return true;
-        
-        return (
-            cardCount[user][BlessingType.AiGuo] > 0 ||
-            cardCount[user][BlessingType.FuQiang] > 0 ||
-            cardCount[user][BlessingType.HeXie] > 0 ||
-            cardCount[user][BlessingType.YouShan] > 0 ||
-            cardCount[user][BlessingType.JingYe] > 0 ||
-            isWuFuHolder[user]
-        );
+        return _getTotalCardCount(user) > 0;
     }
 
-    // 管理合格用户列表
     function _manageEligibleList(address user) internal {
         bool eligible = _hasEligibility(user);
-        
+
         if (eligible && !inEligibleList[user]) {
             if (eligibleUserTail == address(0)) {
                 eligibleUserHead = user;
@@ -312,20 +264,19 @@ contract RewardManager is
         } else if (!eligible && inEligibleList[user]) {
             address prev = eligibleUserPrev[user];
             address next = eligibleUserNext[user];
-            
+
             if (prev != address(0)) eligibleUserNext[prev] = next;
             if (next != address(0)) eligibleUserPrev[next] = prev;
             if (eligibleUserHead == user) eligibleUserHead = next;
             if (eligibleUserTail == user) eligibleUserTail = prev;
-            
+
             delete eligibleUserPrev[user];
             delete eligibleUserNext[user];
             inEligibleList[user] = false;
         }
     }
 
-    // 内部更新卡片数量
-    function updateCard(address user, BlessingType t, uint256 cnt) internal returns (bool) {
+    function updateCard(address user, ZodiacType t, uint256 cnt) internal returns (bool) {
         cardCount[user][t] = cnt;
         _manageEligibleList(user);
         _updateUserWeight(user);
@@ -333,80 +284,39 @@ contract RewardManager is
         return true;
     }
 
-    // 外部接口：更新卡片数量（唯一入口）
-    function updateCardExternal(address user, BlessingType t, uint256 cnt) external onlyOp whenNotPaused returns (bool) {
+    function updateCardExternal(address user, ZodiacType t, uint256 cnt) external onlyOp whenNotPaused returns (bool) {
         return updateCard(user, t, cnt);
     }
 
-    // 添加五福持有者
-    function addWuFu(address user) external onlyOp whenNotPaused returns (bool) {
-        if (!isWuFuHolder[user]) {
-            isWuFuHolder[user] = true;
+    function addHolder(address user) external onlyOp whenNotPaused returns (bool) {
+        if (!isHolder[user]) {
+            isHolder[user] = true;
             if (holdersCount < type(uint256).max) {
-                unchecked { holdersCount++ ; }
+                unchecked { holdersCount++; }
             } else {
                 revert("Holders count overflow");
             }
             _manageEligibleList(user);
             _updateUserWeight(user);
-            emit WuFuAdded(user, block.timestamp);
         }
         return true;
     }
 
-    // 移除五福持有者
-    function removeWuFu(address user) external onlyOp whenNotPaused {
-        if (isWuFuHolder[user]) {
-            isWuFuHolder[user] = false;
+    function removeHolder(address user) external onlyOp whenNotPaused {
+        if (isHolder[user]) {
+            isHolder[user] = false;
             unchecked {
                 holdersCount = holdersCount > 0 ? holdersCount - 1 : 0;
             }
             _manageEligibleList(user);
             _updateUserWeight(user);
-            emit WuFuRemoved(user, block.timestamp);
         }
     }
 
-    // 重置五福持有者状态
-    function resetWuFuHolder(address user) external onlyOp whenNotPaused returns (bool) {
-        if (isWuFuHolder[user]) {
-            isWuFuHolder[user] = false;
-            unchecked {
-                holdersCount = holdersCount > 0 ? holdersCount - 1 : 0;
-            }
-            _manageEligibleList(user);
-            _updateUserWeight(user);
-            emit WuFuRemoved(user, block.timestamp);
-        }
-        return true;
-    }
-
-    // 检查用户是否拥有所有基础卡片
-    function _hasAllBasic(address user) external view returns (bool) {
-        uint256 cnt = 0;
-        uint256 wanNeng = cardCount[user][BlessingType.WanNeng];
-        
-        BlessingType[5] memory basic = [
-            BlessingType.AiGuo, BlessingType.FuQiang, BlessingType.HeXie, BlessingType.YouShan, BlessingType.JingYe
-        ];
-        
-        for (uint8 i = 0; i < 5; i++) {
-            if (cardCount[user][basic[i]] >= 1) {
-                cnt++;
-            } else if (wanNeng > 0) {
-                cnt++;
-                wanNeng--;
-            }
-        }
-        
-        return cnt == 5;
-    }
-
-    // 领取分红
     function claimDividend() external nonReentrant whenNotPaused rateLimited(msg.sig) {
         address user = msg.sender;
         require(_hasEligibility(user), "RM: no elig");
-        
+
         uint256 totalW = totalWeight;
         require(totalW > 0 && dividendPool > 0, "RM: no div");
 
@@ -417,13 +327,13 @@ contract RewardManager is
         uint256 totalDiv = dividendPool * userW;
         uint256 base = totalDiv / totalW;
         uint256 precRemain = totalDiv % totalW;
-        
+
         uint256 acc = precisionAcc[user] + precRemain;
         uint256 precBonus = acc / totalW;
         uint256 finalAmt = base + precBonus;
         require(finalAmt > 0, "RM: no amt");
         require(finalAmt <= address(this).balance, "RM: insufficient balance");
-        
+
         precisionAcc[user] = acc % totalW;
         unchecked {
             dividendPool -= finalAmt;
@@ -436,31 +346,28 @@ contract RewardManager is
         require(success, "RM: transfer fail");
     }
 
-    // 接收ETH并添加到分红池
     receive() external payable {
         require(msg.value > 0, "RM: zero");
         unchecked { dividendPool += msg.value; }
         emit DividendDeposited(msg.value, msg.sender, block.timestamp);
     }
 
-    // 提取额外资金
     function withdrawExtraFunds() external onlyOwner nonReentrant whenNotPaused {
         uint256 contractBalance = address(this).balance;
         uint256 extraFunds = contractBalance - dividendPool;
         require(extraFunds > 0, "RM: no extra funds to withdraw");
         require(contractBalance >= dividendPool, "RM: insufficient balance for dividend pool");
-        
+
         emit ExtraFundsWithdrawn(owner(), extraFunds, block.timestamp);
         (bool success, ) = payable(owner()).call{value: extraFunds}("");
         require(success, "RM: extra funds transfer failed");
     }
 
-    // 提取所有资金
     function withdrawAllFunds() external onlyOwner nonReentrant {
         uint256 bal = address(this).balance;
         require(bal > 0, "RM: no balance");
-        
-        unchecked { 
+
+        unchecked {
             dividendPool = 0;
         }
         emit FullFundsWithdrawn(owner(), bal, block.timestamp);
@@ -468,33 +375,30 @@ contract RewardManager is
         require(success, "RM: withdraw fail");
     }
 
-    // 计算用户可领取的分红
     function calcUserDividend(address user) external view returns (uint256, uint256) {
         uint256 totalW = totalWeight;
         if (totalW == 0 || dividendPool == 0) return (0, 0);
-        
+
         if (user == owner()) {
             if (ownerWeight == 0) return (0, 0);
             uint256 ownerTotalDiv = dividendPool * ownerWeight;
             return (ownerTotalDiv / totalW, ownerTotalDiv % totalW);
         }
-        
+
         if (!_hasEligibility(user) || userWeight[user] == 0) return (0, 0);
-        
+
         uint256 userW = userWeight[user];
         uint256 userTotalDiv = dividendPool * userW;
         uint256 base = userTotalDiv / totalW;
         uint256 acc = precisionAcc[user] + (userTotalDiv % totalW);
-        
+
         return (base + (acc / totalW), acc % totalW);
     }
 
-    // 刷新用户权重
     function refreshUserWeight(address user) external onlyOwner {
         _updateUserWeight(user);
     }
 
-    // 刷新总权重
     function refreshTotalWeight() external onlyOwner {
         emit TotalWeightUpdated(totalWeight, totalWeight, block.timestamp);
     }

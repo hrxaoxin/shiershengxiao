@@ -1,5 +1,68 @@
 // 所有合约的ABI
-  
+
+// ZodiacType枚举映射 - 前端使用
+window.ZodiacType = {
+    // Water zodiac (水) - tokens 1-24
+    ShuiShu_1: 0, ShuiNiu_1: 1, ShuiHu_1: 2, ShuiTu_1: 3, ShuiLong_1: 4, ShuiShe_1: 5,
+    ShuiMa_1: 6, ShuiYang_1: 7, ShuiHou_1: 8, ShuiJi_1: 9, ShuiGou_1: 10, ShuiZhu_1: 11,
+    ShuiShu_0: 12, ShuiNiu_0: 13, ShuiHu_0: 14, ShuiTu_0: 15, ShuiLong_0: 16, ShuiShe_0: 17,
+    ShuiMa_0: 18, ShuiYang_0: 19, ShuiHou_0: 20, ShuiJi_0: 21, ShuiGou_0: 22, ShuiZhu_0: 23,
+    // Wind zodiac (风) - tokens 25-48
+    FengShu_1: 24, FengNiu_1: 25, FengHu_1: 26, FengTu_1: 27, FengLong_1: 28, FengShe_1: 29,
+    FengMa_1: 30, FengYang_1: 31, FengHou_1: 32, FengJi_1: 33, FengGou_1: 34, FengZhu_1: 35,
+    FengShu_0: 36, FengNiu_0: 37, FengHu_0: 38, FengTu_0: 39, FengLong_0: 40, FengShe_0: 41,
+    FengMa_0: 42, FengYang_0: 43, FengHou_0: 44, FengJi_0: 45, FengGou_0: 46, FengZhu_0: 47,
+    // Fire zodiac (火) - tokens 49-72
+    HuoShu_1: 48, HuoNiu_1: 49, HuoHu_1: 50, HuoTu_1: 51, HuoLong_1: 52, HuoShe_1: 53,
+    HuoMa_1: 54, HuoYang_1: 55, HuoHou_1: 56, HuoJi_1: 57, HuoGou_1: 58, HuoZhu_1: 59,
+    HuoShu_0: 60, HuoNiu_0: 61, HuoHu_0: 62, HuoTu_0: 63, HuoLong_0: 64, HuoShe_0: 65,
+    HuoMa_0: 66, HuoYang_0: 67, HuoHou_0: 68, HuoJi_0: 69, HuoGou_0: 70, HuoZhu_0: 71,
+    // Dark zodiac (暗) - tokens 73-96
+    AnShu_1: 72, AnNiu_1: 73, AnHu_1: 74, AnTu_1: 75, AnLong_1: 76, AnShe_1: 77,
+    AnMa_1: 78, AnYang_1: 79, AnHou_1: 80, AnJi_1: 81, AnGou_1: 82, AnZhu_1: 83,
+    AnShu_0: 84, AnNiu_0: 85, AnHu_0: 86, AnTu_0: 87, AnLong_0: 88, AnShe_0: 89,
+    AnMa_0: 90, AnYang_0: 91, AnHou_0: 92, AnJi_0: 93, AnGou_0: 94, AnZhu_0: 95,
+    // Light zodiac (光) - tokens 97-120
+    GuangShu_1: 96, GuangNiu_1: 97, GuangHu_1: 98, GuangTu_1: 99, GuangLong_1: 100, GuangShe_1: 101,
+    GuangMa_1: 102, GuangYang_1: 103, GuangHou_1: 104, GuangJi_1: 105, GuangGou_1: 106, GuangZhu_1: 107,
+    GuangShu_0: 108, GuangNiu_0: 109, GuangHu_0: 110, GuangTu_0: 111, GuangLong_0: 112, GuangShe_0: 113,
+    GuangMa_0: 114, GuangYang_0: 115, GuangHou_0: 116, GuangJi_0: 117, GuangGou_0: 118, GuangZhu_0: 119
+};
+
+window.getZodiacInfo = function(typeId) {
+    const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+    const attrNames = { water: '水', wind: '风', fire: '火', dark: '暗', light: '光' };
+    const attrPrefixes = { water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang' };
+    const animalKeys = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
+
+    const zodiacIndex = typeId % 12;
+    const attrIndex = Math.floor(typeId / 24);
+    const gender = typeId % 2 === 1 ? '公' : '母';
+    const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+
+    if (attrIndex < 0 || attrIndex >= attrs.length) {
+        return { name: '未知', prefix: '', animal: '', gender: gender, attr: 'water' };
+    }
+
+    const attr = attrs[attrIndex];
+    const prefix = attrPrefixes[attr];
+    const animal = animalKeys[zodiacIndex];
+    const genderSuffix = typeId % 2 === 1 ? '_1' : '_0';
+
+    return {
+        name: attrNames[attr] + zodiacNames[zodiacIndex] + '（' + gender + '）',
+        prefix: prefix,
+        animal: animal,
+        gender: gender,
+        attr: attr,
+        imagePath: 'images/fu-cards/' + prefix + animal + genderSuffix + '.png',
+        attrName: attrNames[attr]
+    };
+};
+
+// 兼容旧版本的BlessingType映射
+window.BlessingType = window.ZodiacType;
+
 // 合约地址
 window.contractAddresses = {
     tokenContract: '0xd06994d9ff24dc4a579f53c91f65d95b6be97777', // 代币合约地址

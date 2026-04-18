@@ -3,912 +3,398 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>我的福卡 - 集五福活动</title>
-    <link rel="icon" href="images/fu-cards/wufulinmen.png" type="image/png">
+    <title>我的生肖 - 十二生肖NFT</title>
+    <link rel="icon" href="images/fu-cards/shuishu_1.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
-        
         body {
             font-family: 'Noto Sans SC', sans-serif;
             background-color: #f5f5f5;
             background-image: linear-gradient(135deg, #f5f5f5 0%, #e8f5e8 100%);
             overflow-x: hidden;
         }
-        
-        /* 粒子背景容器 */
-        #particles-js {
-            position: fixed;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            z-index: -1;
-        }
-        
-        .navbar {
-            background-color: #ffffff;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-        
-        .collection-card {
-            background-color: #ffffff;
-            border-radius: 16px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-        }
-        
-        .collection-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        }
-        
-        .btn-primary {
-            background-color: #ff6b6b;
-            color: white;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-primary:hover {
-            background-color: #ee5a6f;
-            transform: translateY(-2px);
-        }
-        
-        .btn-secondary {
-            background-color: white;
-            color: #ff6b6b;
-            border: 1px solid #ff6b6b;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-secondary:hover {
-            background-color: #f8f9fa;
-            transform: translateY(-2px);
-        }
-        
-        .collection-summary {
-            background: linear-gradient(135deg, #4ecdc4 0%, #45b7aa 100%);
-            border-radius: 16px;
-            color: white;
-        }
-        
-        .fu-card-item {
-            background-color: #ffffff;
+        #particles-js { position: fixed; width: 100%; height: 100%; top: 0; left: 0; z-index: -1; }
+        .navbar { background-color: #ffffff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
+        .zodiac-card {
+            background: white;
             border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 12px;
+            text-align: center;
             transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
         }
-        
-        .fu-card-item:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
+        .zodiac-card:hover { transform: translateY(-5px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
+        .zodiac-card img { width: 60px; height: 60px; object-fit: contain; margin: 0 auto 8px; border-radius: 8px; }
+        .zodiac-card h4 { font-size: 12px; font-weight: 500; color: #333; }
+        .zodiac-card p { font-size: 10px; color: #666; }
+        .btn-primary { background-color: #3b82f6; color: white; border-radius: 8px; padding: 10px 20px; font-weight: 500; transition: all 0.3s ease; }
+        .btn-primary:hover { background-color: #2563eb; }
+        .btn-secondary { background-color: white; color: #3b82f6; border: 1px solid #3b82f6; border-radius: 8px; padding: 10px 20px; font-weight: 500; transition: all 0.3s ease; }
+        .btn-secondary:hover { background-color: #f8f9fa; }
+        .attribute-tab { padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; font-weight: 500; }
+        .attribute-tab.active { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+        .tab-water { background-color: #e0f2fe; color: #0369a1; }
+        .tab-water.active { background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%); color: white; }
+        .tab-wind { background-color: #dcfce7; color: #15803d; }
+        .tab-wind.active { background: linear-gradient(135deg, #22c55e 0%, #15803d 100%); color: white; }
+        .tab-fire { background-color: #fee2e2; color: #b91c1c; }
+        .tab-fire.active { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
+        .tab-dark { background-color: #ede9fe; color: #6d28d9; }
+        .tab-dark.active { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; }
+        .tab-light { background-color: #fef3c7; color: #d97706; }
+        .tab-light.active { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .empty-collection { text-align: center; padding: 60px 20px; }
+        .empty-collection .icon { font-size: 64px; margin-bottom: 16px; }
     </style>
 </head>
 <body>
-    <!-- 粒子背景 -->
     <div id="particles-js"></div>
-
-    <!-- 导航栏 -->
     <nav class="navbar fixed bottom-0 left-0 right-0 z-10">
         <div class="flex justify-around items-center py-2 px-4">
             <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1 transition-transform duration-300">🏠&nbsp;</div>
-                <span class="text-xs font-bold transition-all duration-300 text-gray-700">首页</span>
+                <div class="text-2xl mb-1">🏠&nbsp;</div>
+                <span class="text-xs font-bold text-gray-700">首页</span>
             </a>
             <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1 transition-transform duration-300">🃏</div>
-                <span class="text-xs font-bold transition-all duration-300 text-gray-700">铸造</span>
+                <div class="text-2xl mb-1">🀄</div>
+                <span class="text-xs font-bold text-gray-700">铸造</span>
             </a>
-            <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 bg-gray-100">
-                <div class="text-2xl mb-1 transition-transform duration-300">🎁</div>
-                <span class="text-xs font-bold transition-all duration-300 text-gray-700">福卡</span>
+            <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl bg-gray-100">
+                <div class="text-2xl mb-1">🎁</div>
+                <span class="text-xs font-bold text-gray-700">生肖</span>
             </a>
             <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1 transition-transform duration-300">🏆</div>
-                <span class="text-xs font-bold transition-all duration-300 text-gray-700">奖励</span>
+                <div class="text-2xl mb-1">🏆</div>
+                <span class="text-xs font-bold text-gray-700">奖励</span>
             </a>
             <a href="trading.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1 transition-transform duration-300">💰</div>
-                <span class="text-xs font-bold transition-all duration-300 text-gray-700">交易</span>
+                <div class="text-2xl mb-1">💰</div>
+                <span class="text-xs font-bold text-gray-700">交易</span>
             </a>
         </div>
     </nav>
 
-    <!-- 主内容区 -->
     <main class="container mx-auto px-4 pt-6 pb-24">
-        <!-- 页面标题 -->
         <div class="flex items-center mb-4">
-            <div class="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center mr-3">
-                <span class="text-white text-2xl font-bold">福</span>
+            <div class="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+                <span class="text-white text-2xl font-bold">生</span>
             </div>
-            <h1 class="text-2xl font-bold text-gray-800">我的福卡</h1>
+            <h1 class="text-2xl font-bold text-gray-800">我的生肖</h1>
         </div>
 
-        <!-- 收集说明 -->
-        <p class="text-lg text-gray-600 mb-8">收集五福，合成五福临门</p>
-
-        <!-- 钱包区域框 -->
-        <div class="bg-white rounded-xl p-6 shadow-md mb-8">
-            <!-- 钱包信息 -->
-            <div class="flex items-center mb-6">
-                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-4">
-                    <i class="text-blue-500 text-xl">👛</i>
-                </div>
-                <div class="flex-1">
-                    <h3 class="text-lg font-semibold text-gray-800">钱包信息</h3>
-                    <p class="text-sm text-gray-500" id="walletAddress">未连接钱包</p>
-                    <p class="text-xs text-gray-400" id="connectionStatus">请点击连接钱包按钮</p>
+        <div class="bg-white rounded-xl p-4 shadow-md mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <p class="text-sm text-gray-500">钱包地址</p>
+                    <p class="text-lg font-semibold text-gray-800" id="walletAddress">未连接钱包</p>
                 </div>
                 <div class="flex space-x-2">
-                    <button class="btn-primary text-sm" id="connectWalletBtn">
-                        <i class="fas fa-plug mr-1"></i> 连接
-                    </button>
-                    <button class="btn-secondary text-sm" id="refreshWallet">
-                        <i class="fas fa-sync-alt mr-1"></i> 刷新
-                    </button>
+                    <button class="btn-primary text-sm" id="connectWalletBtn"><i class="fas fa-plug mr-1"></i> 连接</button>
+                    <button class="btn-secondary text-sm" id="refreshBtn"><i class="fas fa-sync-alt mr-1"></i> 刷新</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-blue-600" id="totalCards">0</p>
+                    <p class="text-xs text-gray-500">拥有生肖</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-green-600" id="uniqueTypes">0</p>
+                    <p class="text-xs text-gray-500">不同种类</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-purple-600" id="totalDividends">0</p>
+                    <p class="text-xs text-gray-500">可领取分红</p>
                 </div>
             </div>
         </div>
 
-        <!-- 福卡区域框 -->
-        <div class="bg-white rounded-xl p-6 shadow-md mb-8">
-            <!-- 收集进度 -->
-            <div class="flex items-center mb-6">
-                <div class="w-8 h-8 rounded-full bg-orange-500 flex items-center justify-center mr-3">
-                    <i class="text-white text-sm">📊</i>
-                </div>
-                <h2 class="text-lg font-semibold text-gray-800">收集进度</h2>
-            </div>
-
-            <!-- 福卡网格 -->
-            <div class="grid grid-cols-2 gap-4 mb-4">
-                <!-- 爱国福 -->
-                <div class="bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg p-4 flex flex-col items-center">
-                    <div class="w-24 h-24 mb-2">
-                        <img src="images/fu-cards/aiguo.png" alt="爱国福" class="w-full h-full object-contain">
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-800 mb-1">爱国福</h3>
-                    <p class="text-sm font-medium text-gray-700">x0</p>
-                </div>
-
-                <!-- 富强福 -->
-                <div class="bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg p-4 flex flex-col items-center">
-                    <div class="w-24 h-24 mb-2">
-                        <img src="images/fu-cards/fuqiang.png" alt="富强福" class="w-full h-full object-contain">
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-800 mb-1">富强福</h3>
-                    <p class="text-sm font-medium text-gray-700">x0</p>
-                </div>
-
-                <!-- 和谐福 -->
-                <div class="bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg p-4 flex flex-col items-center">
-                    <div class="w-24 h-24 mb-2">
-                        <img src="images/fu-cards/hexie.png" alt="和谐福" class="w-full h-full object-contain">
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-800 mb-1">和谐福</h3>
-                    <p class="text-sm font-medium text-gray-700">x0</p>
-                </div>
-
-                <!-- 友善福 -->
-                <div class="bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg p-4 flex flex-col items-center">
-                    <div class="w-24 h-24 mb-2">
-                        <img src="images/fu-cards/youshan.png" alt="友善福" class="w-full h-full object-contain">
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-800 mb-1">友善福</h3>
-                    <p class="text-sm font-medium text-gray-700">x0</p>
-                </div>
-
-                <!-- 敬业福 -->
-                <div class="bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg p-4 flex flex-col items-center">
-                    <div class="w-24 h-24 mb-2">
-                        <img src="images/fu-cards/jingye.png" alt="敬业福" class="w-full h-full object-contain">
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-800 mb-1">敬业福</h3>
-                    <p class="text-sm font-medium text-gray-700">x0</p>
-                </div>
-
-                <!-- 万能福 -->
-                <div class="bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg p-4 flex flex-col items-center">
-                    <div class="w-24 h-24 mb-2">
-                        <img src="images/fu-cards/wanneng.png" alt="万能福" class="w-full h-full object-contain">
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-800 mb-1">万能福</h3>
-                    <p class="text-sm font-medium text-gray-700">x0</p>
-                </div>
-            </div>
-
-            <!-- 合成按钮 -->
-            <div class="flex justify-center mt-6">
-                <button id="synthesizeBtn" class="btn-primary px-8 py-3 text-lg font-semibold">
-                    合成五福临门
-                </button>
+        <div class="mb-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">筛选属性</h3>
+            <div class="flex flex-wrap gap-2">
+                <button class="attribute-tab tab-water active" onclick="switchAttribute('water')">💧 水</button>
+                <button class="attribute-tab tab-wind" onclick="switchAttribute('wind')">🌬️ 风</button>
+                <button class="attribute-tab tab-fire" onclick="switchAttribute('fire')">🔥 火</button>
+                <button class="attribute-tab tab-dark" onclick="switchAttribute('dark')">🌙 暗</button>
+                <button class="attribute-tab tab-light" onclick="switchAttribute('light')">☀️ 光</button>
+                <button class="attribute-tab active" style="background-color: #e5e7eb; color: #374151;" onclick="switchAttribute('all')">全部</button>
             </div>
         </div>
 
-        <!-- 五福临门区域 -->
-        <div class="bg-white rounded-xl p-6 shadow-md mb-8" id="wufuLinMenSection">
-            <!-- 五福临门标题 -->
-            <div class="flex items-center mb-6">
-                <div class="w-8 h-8 rounded-full bg-yellow-500 flex items-center justify-center mr-3">
-                    <span class="text-white text-sm font-bold">福</span>
-                </div>
-                <h2 class="text-lg font-semibold text-gray-800">我的五福临门</h2>
-            </div>
-
-            <!-- 五福临门福卡 -->
-            <div id="wufuLinMenCard" class="hidden">
-                <div class="bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-xl p-6 text-center">
-                    <div class="w-32 h-32 mb-4 mx-auto">
-                        <img src="images/fu-cards/wufulinmen.png" alt="五福临门" class="w-full h-full object-contain">
-                    </div>
-                    <h3 class="text-xl font-bold text-white mb-2">五福临门</h3>
-                    <p class="text-white/90">五福齐聚，好运连连</p>
-                </div>
-            </div>
-
-            <!-- 未合成提示 -->
-            <div id="noWuFuLinMen" class="text-center py-12">
-                <div class="w-24 h-24 mb-4 mx-auto rounded-full bg-gray-100 flex items-center justify-center">
-                    <i class="text-gray-400 text-4xl">🎯</i>
-                </div>
-                <h3 class="text-lg font-semibold text-gray-600 mb-2">尚未合成五福临门</h3>
-                <p class="text-gray-500">集齐五种福卡，合成五福临门，获得额外分红</p>
+        <div id="zodiacGrid" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+            <div class="col-span-full empty-collection" id="emptyState">
+                <div class="icon">🀄</div>
+                <p class="text-gray-600 mb-4">您还没有铸造任何生肖NFT</p>
+                <button class="btn-primary" onclick="window.location.href='mint.html'">去铸造</button>
             </div>
         </div>
 
-        <!-- 我的福卡区域框 -->
-        <div class="bg-white rounded-xl p-6 shadow-md mb-8">
-            <!-- 福卡标题 -->
-            <div class="flex items-center mb-6">
-                <div class="w-8 h-8 rounded-full bg-red-500 flex items-center justify-center mr-3">
-                    <span class="text-white text-sm font-bold">福</span>
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-8">
+            <h3 class="text-lg font-bold text-blue-800 mb-2">生肖收集进度</h3>
+            <div class="grid grid-cols-5 gap-2" id="progressGrid">
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-blue-600">水</p>
+                    <p class="text-xs text-gray-500"><span id="waterProgress">0</span>/24</p>
                 </div>
-                <h2 class="text-lg font-semibold text-gray-800" id="fukaCountTitle">我的福卡 (0)</h2>
-            </div>
-
-            <!-- 福卡列表 -->
-            <div class="space-y-4" id="fukaList">
-                <!-- 福卡将通过JavaScript动态加载 -->
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-green-600">风</p>
+                    <p class="text-xs text-gray-500"><span id="windProgress">0</span>/24</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-red-600">火</p>
+                    <p class="text-xs text-gray-500"><span id="fireProgress">0</span>/24</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-purple-600">暗</p>
+                    <p class="text-xs text-gray-500"><span id="darkProgress">0</span>/24</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-yellow-600">光</p>
+                    <p class="text-xs text-gray-500"><span id="lightProgress">0</span>/24</p>
+                </div>
             </div>
         </div>
     </main>
 
+    <div id="cardModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-sm w-full mx-4">
+            <div class="text-center mb-4">
+                <img id="modalCardImage" src="" alt="生肖" class="w-32 h-32 mx-auto mb-4 rounded-lg shadow-md">
+                <h3 id="modalCardName" class="text-xl font-bold text-gray-800 mb-2">生肖名称</h3>
+                <p id="modalCardDesc" class="text-gray-600 text-sm mb-4">描述</p>
+                <p class="text-sm text-gray-500">Token ID: <span id="modalCardId"></span></p>
+            </div>
+            <div class="flex space-x-4">
+                <button class="btn-secondary flex-1" id="closeModal">关闭</button>
+                <button class="btn-primary flex-1" id="listForSale">挂单出售</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="abis.js"></script>
     <script>
-        // 粒子背景效果
-        particlesJS('particles-js', {
-            particles: {
-                number: {
-                    value: 80,
-                    density: {
-                        enable: true,
-                        value_area: 800
-                    }
-                },
-                color: {
-                    value: '#ff6b6b'
-                },
-                shape: {
-                    type: 'circle',
-                    stroke: {
-                        width: 0,
-                        color: '#000000'
-                    }
-                },
-                opacity: {
-                    value: 0.5,
-                    random: true,
-                    anim: {
-                        enable: true,
-                        speed: 1,
-                        opacity_min: 0.1,
-                        sync: false
-                    }
-                },
-                size: {
-                    value: 5,
-                    random: true,
-                    anim: {
-                        enable: true,
-                        speed: 2,
-                        size_min: 0.1,
-                        sync: false
-                    }
-                },
-                line_linked: {
-                    enable: true,
-                    distance: 150,
-                    color: '#ff6b6b',
-                    opacity: 0.4,
-                    width: 1
-                },
-                move: {
-                    enable: true,
-                    speed: 1,
-                    direction: 'none',
-                    random: false,
-                    straight: false,
-                    out_mode: 'out',
-                    bounce: false,
-                    attract: {
-                        enable: false,
-                        rotateX: 600,
-                        rotateY: 1200
-                    }
-                }
-            },
-            interactivity: {
-                detect_on: 'canvas',
-                events: {
-                    onhover: {
-                        enable: true,
-                        mode: 'grab'
-                    },
-                    onclick: {
-                        enable: true,
-                        mode: 'push'
-                    },
-                    resize: true
-                },
-                modes: {
-                    grab: {
-                        distance: 140,
-                        line_linked: {
-                            opacity: 1
-                        }
-                    },
-                    push: {
-                        particles_nb: 4
-                    }
-                }
-            },
-            retina_detect: true
-        });
-        // 智能合约ABI（从abis.js文件加载）
-        // rewardManagerABI、tokenBurnerABI、fiveBlessingsNFTABI 已在 abis.js 中定义为全局变量
+        const ZODIAC_DATA = {
+            water: { name: '水', prefix: 'shui', animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'] },
+            wind: { name: '风', prefix: 'feng', animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'] },
+            fire: { name: '火', prefix: 'huo', animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'] },
+            dark: { name: '暗', prefix: 'an', animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'] },
+            light: { name: '光', prefix: 'guang', animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'] }
+        };
 
-        // 从abis.js中加载合约地址
+        const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+
+        const rewardManagerABI = window.rewardManagerABI;
+        const fiveBlessingsNFTABI = window.fiveBlessingsNFTABI;
+
         const rewardManagerAddress = window.contractAddresses.rewardManager;
-        const tokenBurnerAddress = window.contractAddresses.tokenBurner;
         const fiveBlessingsNFTAddress = window.contractAddresses.fiveBlessingsNFT;
 
-        // 全局变量
         let web3 = null;
         let rewardManagerContract = null;
-        let tokenBurnerContract = null;
         let fiveBlessingsNFTContract = null;
         let accounts = [];
+        let userTokens = [];
+        let currentFilter = 'all';
 
-        // DOM元素
-        let fukaList;
-        let synthesizeBtn;
-        let wufuLinMenCard;
-        let noWuFuLinMen;
-        let walletAddress;
-        let connectionStatus;
-        let connectWalletBtn;
-        let refreshWallet;
-
-        // 福卡描述
-        const FUKA_DESCRIPTIONS = {
-            '和谐福': '和睦相处，幸福美满',
-            '友善福': '友善待人，福报常在',
-            '富强福': '国富民强，繁荣昌盛',
-            '爱国福': '爱我中华，福泽绵长',
-            '敬业福': '敬业乐业，福禄安康',
-            '万能福': '万福齐聚，好运临门',
-            '五福临门': '五福齐聚，好运连连'
-        };
-
-        // 福卡类型枚举
-        const BlessingType = {
-            AiGuo: 0,      // 爱国福
-            FuQiang: 1,    // 富强福
-            HeXie: 2,      // 和谐福
-            YouShan: 3,    // 友善福
-            JingYe: 4,     // 敬业福
-            WanNeng: 5,    // 万能福
-            WuFuLinMen: 6  // 五福临门
-        };
-
-        // 初始化
-        console.log('collection.html: 开始执行JavaScript代码');
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('collection.html: DOMContentLoaded事件触发');
-            // 获取DOM元素
-            fukaList = document.getElementById('fukaList');
-            synthesizeBtn = document.getElementById('synthesizeBtn');
-            wufuLinMenCard = document.getElementById('wufuLinMenCard');
-            noWuFuLinMen = document.getElementById('noWuFuLinMen');
-            walletAddress = document.getElementById('walletAddress');
-            connectionStatus = document.getElementById('connectionStatus');
-            connectWalletBtn = document.getElementById('connectWalletBtn');
-            refreshWallet = document.getElementById('refreshWallet');
-            
-            console.log('collection.html: DOM元素获取结果:', {
-                fukaList: !!fukaList,
-                synthesizeBtn: !!synthesizeBtn,
-                wufuLinMenCard: !!wufuLinMenCard,
-                noWuFuLinMen: !!noWuFuLinMen,
-                walletAddress: !!walletAddress,
-                connectionStatus: !!connectionStatus,
-                connectWalletBtn: !!connectWalletBtn,
-                refreshWallet: !!refreshWallet
-            });
-            
-            // 初始连接钱包
             connectWallet();
-
-            // 合成按钮点击事件
-            synthesizeBtn.addEventListener('click', async function() {
-                await synthesizeWuFuLinMen();
-            });
-
-            // 连接钱包按钮点击事件
-            connectWalletBtn.addEventListener('click', function() {
-                connectWallet();
-            });
-
-            // 刷新钱包按钮点击事件
-            refreshWallet.addEventListener('click', function() {
-                connectWallet();
-            });
-
-            // 监听钱包账户变化
-            if (typeof window.ethereum !== 'undefined') {
-                window.ethereum.on('accountsChanged', function(accounts) {
-                    console.log('钱包账户变化:', accounts);
-                    if (accounts.length > 0) {
-                        // 钱包已连接，更新状态
-                        console.log('账户已更新，重新连接钱包...');
-                        connectWallet();
-                    } else {
-                        // 钱包已断开连接
-                        console.log('钱包已断开连接');
-                        // 重置状态
-                        web3 = null;
-                        rewardManagerContract = null;
-                        tokenBurnerContract = null;
-                        fiveBlessingsNFTContract = null;
-                        accounts = [];
-                        walletAddress.textContent = '未连接钱包';
-                        connectionStatus.textContent = '钱包已断开连接';
-                        connectionStatus.style.color = '#f44336';
-                        connectWalletBtn.textContent = '连接';
-                        connectWalletBtn.disabled = false;
-                    }
-                });
-
-                // 监听网络变化
-                window.ethereum.on('chainChanged', function(chainId) {
-                    console.log('网络已切换:', chainId);
-                    // 网络切换后重新连接钱包
-                    console.log('网络已切换，重新连接钱包...');
-                    connectWallet();
-                });
-            }
         });
 
-        // 连接钱包
         async function connectWallet() {
-            console.log('开始连接钱包...');
-            
-            // 更新连接状态显示
-            connectionStatus.textContent = '正在连接钱包...';
-            connectionStatus.style.color = '#ff9800';
-            connectWalletBtn.textContent = '连接中...';
-            connectWalletBtn.disabled = true;
-            
             if (typeof window.ethereum !== 'undefined') {
                 web3 = new Web3(window.ethereum);
                 try {
-                    // 检测网络
-                    const chainId = await web3.eth.getChainId();
-                    console.log('当前网络:', chainId);
-                    
-                    // 检查账户
                     accounts = await web3.eth.requestAccounts();
-                    console.log('获取到账户:', accounts);
-                    const address = accounts[0];
-                    const shortAddress = address.substring(0, 4) + '...' + address.substring(address.length - 4);
-                    walletAddress.textContent = shortAddress;
-                    
-                    // 检查合约地址是否为占位符
-                    if (rewardManagerAddress !== '0xPLACEHOLDER' && tokenBurnerAddress !== '0xPLACEHOLDER' && fiveBlessingsNFTAddress !== '0xPLACEHOLDER') {
-                        // 初始化合约
-                        rewardManagerContract = new web3.eth.Contract(window.rewardManagerABI, rewardManagerAddress);
-                        tokenBurnerContract = new web3.eth.Contract(window.tokenBurnerABI, tokenBurnerAddress);
-                        fiveBlessingsNFTContract = new web3.eth.Contract(window.fiveBlessingsNFTABI, fiveBlessingsNFTAddress);
-                        console.log('所有合约初始化完成');
-                    } else {
-                        console.log('部分合约地址为占位符，仅连接钱包');
-                        connectionStatus.textContent = '钱包已连接，但部分合约地址未配置';
-                        connectionStatus.style.color = '#ff9800';
-                    }
-                    
-                    // 更新连接状态显示
-                    if (connectionStatus.textContent !== '钱包已连接，但部分合约地址未配置') {
-                        connectionStatus.textContent = '钱包已连接';
-                        connectionStatus.style.color = '#4CAF50';
-                    }
-                    connectWalletBtn.textContent = '已连接';
-                    connectWalletBtn.disabled = true;
-                    
-                    console.log('钱包连接成功，状态已更新');
-                    
-                    // 加载数据
-                    loadFukaCounts();
-                    loadFukaList();
-                    checkWuFuLinMenStatus();
+                    const shortAddress = accounts[0].substring(0, 4) + '...' + accounts[0].substring(accounts[0].length - 4);
+                    document.getElementById('walletAddress').textContent = shortAddress;
+
+                    rewardManagerContract = new web3.eth.Contract(rewardManagerABI, rewardManagerAddress);
+                    fiveBlessingsNFTContract = new web3.eth.Contract(fiveBlessingsNFTABI, fiveBlessingsNFTAddress);
+
+                    await loadUserTokens();
+                    await updateDividends();
+                    await loadProgress();
+
+                    document.getElementById('connectWalletBtn').innerHTML = '<i class="fas fa-check mr-1"></i> 已连接';
+                    document.getElementById('connectWalletBtn').disabled = true;
                 } catch (error) {
-                    console.error('连接钱包失败:', error);
-                    // 重置状态
-                    web3 = null;
-                    rewardManagerContract = null;
-                    tokenBurnerContract = null;
-                    fiveBlessingsNFTContract = null;
-                    accounts = [];
-                    walletAddress.textContent = '未连接钱包';
-                    
-                    // 分析错误原因
-                    let errorMessage = '连接失败，请重试';
-                    if (error.code === 4001) {
-                        errorMessage = '用户拒绝了连接请求';
-                    } else if (error.message && error.message.includes('chainId')) {
-                        errorMessage = '网络连接失败，请检查网络设置';
-                    } else if (error.message && error.message.includes('contract')) {
-                        errorMessage = '合约连接失败，请检查合约地址';
-                    }
-                    
-                    connectionStatus.textContent = errorMessage;
-                    connectionStatus.style.color = '#f44336';
-                    connectWalletBtn.textContent = '连接';
-                    connectWalletBtn.disabled = false;
-                }
-            } else {
-                alert('请安装MetaMask等Web3钱包插件');
-                // 重置状态
-                web3 = null;
-                rewardManagerContract = null;
-                tokenBurnerContract = null;
-                fiveBlessingsNFTContract = null;
-                accounts = [];
-                walletAddress.textContent = '未连接钱包';
-                connectionStatus.textContent = '请安装Web3钱包插件';
-                connectionStatus.style.color = '#f44336';
-                connectWalletBtn.textContent = '连接';
-                connectWalletBtn.disabled = false;
-            }
-        }
-
-        // 加载福卡数量
-        async function loadFukaCounts() {
-            try {
-                console.log('开始加载福卡数量:', {
-                    rewardManagerContract: !!rewardManagerContract,
-                    accounts: accounts,
-                    accountsLength: accounts ? accounts.length : 0
-                });
-                
-                if (!rewardManagerContract || !accounts || accounts.length === 0) {
-                    console.log('rewardManagerContract不存在或accounts为空，直接返回');
-                    return;
-                }
-                
-                const account = accounts[0];
-                console.log('使用账户:', account, '加载福卡数量');
-                
-                // 使用RewardManager的cardCount函数获取每种福卡的数量
-                const aiGuoCount = await rewardManagerContract.methods.cardCount(account, 0).call();
-                const fuQiangCount = await rewardManagerContract.methods.cardCount(account, 1).call();
-                const heXieCount = await rewardManagerContract.methods.cardCount(account, 2).call();
-                const youShanCount = await rewardManagerContract.methods.cardCount(account, 3).call();
-                const jingYeCount = await rewardManagerContract.methods.cardCount(account, 4).call();
-                const wanNengCount = await rewardManagerContract.methods.cardCount(account, 5).call();
-                
-                console.log('RewardManager显示的各种福卡数量:', {
-                    aiGuoCount,
-                    fuQiangCount,
-                    heXieCount,
-                    youShanCount,
-                    jingYeCount,
-                    wanNengCount
-                });
-                
-                // 计算RewardManager中的总福卡数量
-                const totalFromRewardManager = parseInt(aiGuoCount) + parseInt(fuQiangCount) + parseInt(heXieCount) + parseInt(youShanCount) + parseInt(jingYeCount) + parseInt(wanNengCount);
-                console.log('RewardManager计算的总福卡数量:', totalFromRewardManager);
-                
-                // 更新福卡数量
-                updateFukaCount('爱国福', aiGuoCount);
-                updateFukaCount('富强福', fuQiangCount);
-                updateFukaCount('和谐福', heXieCount);
-                updateFukaCount('友善福', youShanCount);
-                updateFukaCount('敬业福', jingYeCount);
-                updateFukaCount('万能福', wanNengCount);
-            } catch (error) {
-                console.error('获取福卡数量失败:', error);
-                // 默认显示0
-                updateFukaCount('爱国福', 0);
-                updateFukaCount('富强福', 0);
-                updateFukaCount('和谐福', 0);
-                updateFukaCount('友善福', 0);
-                updateFukaCount('敬业福', 0);
-                updateFukaCount('万能福', 0);
-            }
-        }
-
-        // 更新单个福卡数量
-        function updateFukaCount(fukaName, count) {
-            const fukaElements = document.querySelectorAll('.bg-gradient-to-br.from-orange-100.to-orange-200');
-            fukaElements.forEach(element => {
-                const h3 = element.querySelector('h3');
-                if (h3 && h3.textContent === fukaName) {
-                    const countElement = element.querySelector('p');
-                    if (countElement) {
-                        countElement.textContent = `x${count}`;
-                    }
-                }
-            });
-        }
-
-        // 加载福卡列表
-        async function loadFukaList() {
-            try {
-                console.log('开始加载福卡列表:', {
-                    rewardManagerContract: !!rewardManagerContract,
-                    accounts: accounts,
-                    accountsLength: accounts ? accounts.length : 0
-                });
-                
-                if (!rewardManagerContract || !accounts || accounts.length === 0) {
-                    console.log('rewardManagerContract不存在或accounts为空，直接返回');
-                    return;
-                }
-                
-                const account = accounts[0];
-                console.log('使用账户:', account, '加载福卡列表');
-                
-                // 清空列表
-                fukaList.innerHTML = '';
-
-                // 使用RewardManager的cardCount来显示福卡数量
-                const aiGuoCount = await rewardManagerContract.methods.cardCount(account, 0).call();
-                const fuQiangCount = await rewardManagerContract.methods.cardCount(account, 1).call();
-                const heXieCount = await rewardManagerContract.methods.cardCount(account, 2).call();
-                const youShanCount = await rewardManagerContract.methods.cardCount(account, 3).call();
-                const jingYeCount = await rewardManagerContract.methods.cardCount(account, 4).call();
-                const wanNengCount = await rewardManagerContract.methods.cardCount(account, 5).call();
-                
-                console.log('RewardManager显示的福卡数量:', {
-                    aiGuoCount,
-                    fuQiangCount,
-                    heXieCount,
-                    youShanCount,
-                    jingYeCount,
-                    wanNengCount
-                });
-                
-                // 创建福卡数据数组
-                const fukaData = [
-                    { type: 0, name: '爱国福', image: 'aiguo.png', count: aiGuoCount },
-                    { type: 1, name: '富强福', image: 'fuqiang.png', count: fuQiangCount },
-                    { type: 2, name: '和谐福', image: 'hexie.png', count: heXieCount },
-                    { type: 3, name: '友善福', image: 'youshan.png', count: youShanCount },
-                    { type: 4, name: '敬业福', image: 'jingye.png', count: jingYeCount },
-                    { type: 5, name: '万能福', image: 'wanneng.png', count: wanNengCount }
-                ];
-                
-                // 计算总福卡数量
-                let totalCount = 0;
-                let hasFuka = false;
-                fukaData.forEach(fuka => {
-                    const count = parseInt(fuka.count);
-                    totalCount += count;
-                    console.log('处理福卡类型:', fuka.name, '数量:', count, '累计总数:', totalCount);
-                    if (count > 0) {
-                        hasFuka = true;
-                        for (let i = 0; i < count; i++) {
-                            const fukaCard = document.createElement('div');
-                            fukaCard.className = 'border-2 border-orange-400 bg-orange-50 rounded-lg p-4 text-center';
-                            fukaCard.innerHTML = `
-                                <div class="w-24 h-24 mb-3 mx-auto">
-                                    <img src="images/fu-cards/${fuka.image}" alt="${fuka.name}" class="w-full h-full object-contain">
-                                </div>
-                                <h3 class="text-lg font-semibold text-gray-800 mb-2">${fuka.name}</h3>
-                                <p class="text-gray-600">${FUKA_DESCRIPTIONS[fuka.name]}</p>
-                            `;
-                            fukaList.appendChild(fukaCard);
-                        }
-                    }
-                });
-                console.log('RewardManager计算的总福卡数量:', totalCount);
-
-                // 如果没有福卡，显示提示信息
-                if (!hasFuka) {
-                    console.log('用户没有福卡，显示提示信息');
-                    const emptyCard = document.createElement('div');
-                    emptyCard.className = 'border-2 border-gray-300 bg-gray-50 rounded-lg p-4 text-center';
-                    emptyCard.innerHTML = `
-                        <div class="w-16 h-16 mb-3 mx-auto">
-                            <i class="fas fa-gift text-gray-400 text-4xl"></i>
-                        </div>
-                        <h3 class="text-lg font-semibold text-gray-800 mb-2">暂无福卡</h3>
-                        <p class="text-gray-600">您当前没有持有任何福卡</p>
-                        <p class="text-gray-500 text-sm mt-2">前往铸造页面获取福卡吧！</p>
-                        <div class="mt-4">
-                            <a href="mint.html" class="btn-primary inline-block">
-                                去铸造
-                            </a>
-                        </div>
-                    `;
-                    fukaList.appendChild(emptyCard);
-                }
-
-                // 更新标题中的数量，使用RewardManager计算的总数量
-                const title = document.getElementById('fukaCountTitle');
-                if (title) {
-                    title.textContent = `我的福卡 (${totalCount})`;
-                    console.log('更新标题中的福卡数量:', totalCount);
-                }
-            } catch (error) {
-                console.error('获取福卡列表失败:', error);
-                // 清空列表
-                fukaList.innerHTML = '';
-                // 显示错误信息
-                const errorCard = document.createElement('div');
-                errorCard.className = 'border-2 border-red-300 bg-red-50 rounded-lg p-4 text-center';
-                errorCard.innerHTML = `
-                    <div class="w-16 h-16 mb-3 mx-auto">
-                        <i class="fas fa-exclamation-circle text-red-500 text-4xl"></i>
-                    </div>
-                    <h3 class="text-lg font-semibold text-gray-800 mb-2">加载失败</h3>
-                    <p class="text-gray-600">获取福卡列表时发生错误</p>
-                    <p class="text-gray-500 text-sm mt-2">请刷新页面重试</p>
-                `;
-                fukaList.appendChild(errorCard);
-                // 更新标题
-                const title = document.getElementById('fukaCountTitle');
-                if (title) {
-                    title.textContent = `我的福卡 (0)`;
+                    console.error('Connection failed:', error);
                 }
             }
         }
 
-        // 检查五福临门状态
-        async function checkWuFuLinMenStatus() {
-            try {
-                if (!rewardManagerContract || !accounts || accounts.length === 0) {
-                    return;
-                }
-                
-                const account = accounts[0];
-                // 检查用户是否持有五福临门
-                const hasWuFuLinMen = await rewardManagerContract.methods.isWuFuHolder(account).call();
-                
-                if (hasWuFuLinMen) {
-                    // 显示五福临门福卡
-                    wufuLinMenCard.classList.remove('hidden');
-                    noWuFuLinMen.classList.add('hidden');
-                } else {
-                    // 显示未合成提示
-                    wufuLinMenCard.classList.add('hidden');
-                    noWuFuLinMen.classList.remove('hidden');
-                }
-            } catch (error) {
-                console.error('检查五福临门状态失败:', error);
-            }
-        }
-
-        // 合成五福临门
-        async function synthesizeWuFuLinMen() {
-            try {
-                // 检查钱包连接状态
-                if (!fiveBlessingsNFTContract || !accounts || accounts.length === 0) {
-                    alert('请先连接钱包后再尝试合成');
-                    return;
-                }
-                
-                const account = accounts[0];
-                // 检查合约是否初始化
-                if (!fiveBlessingsNFTContract) {
-                    alert('合约未初始化，请检查合约地址配置');
-                    return;
-                }
-                
-                // 检查用户是否持有五福临门
-                const hasWuFuLinMen = await rewardManagerContract.methods.isWuFuHolder(account).call();
-                if (hasWuFuLinMen) {
-                    alert('🎉 您已经持有五福临门，无需再次合成\n\n五福临门是最高等级的福卡，持有它可以享受额外的税收分红');
-                    return;
-                }
-                
-                // 检查是否集齐五福
-                // 使用RewardManager的_hasAllBasic函数
-                const hasAllBasic = await rewardManagerContract.methods._hasAllBasic(account).call();
-                
-                if (!hasAllBasic) {
-                    // 获取每种福卡的数量
-                    const aiGuoCount = await rewardManagerContract.methods.cardCount(account, 0).call();
-                    const fuQiangCount = await rewardManagerContract.methods.cardCount(account, 1).call();
-                    const heXieCount = await rewardManagerContract.methods.cardCount(account, 2).call();
-                    const youShanCount = await rewardManagerContract.methods.cardCount(account, 3).call();
-                    const jingYeCount = await rewardManagerContract.methods.cardCount(account, 4).call();
-                    const wanNengCount = await rewardManagerContract.methods.cardCount(account, 5).call();
-                    
-                    // 构建缺失的福卡列表
-                    const missingCards = [];
-                    if (parseInt(aiGuoCount) === 0) missingCards.push('爱国福');
-                    if (parseInt(fuQiangCount) === 0) missingCards.push('富强福');
-                    if (parseInt(heXieCount) === 0) missingCards.push('和谐福');
-                    if (parseInt(youShanCount) === 0) missingCards.push('友善福');
-                    if (parseInt(jingYeCount) === 0) missingCards.push('敬业福');
-                    
-                    if (parseInt(wanNengCount) > 0) {
-                        alert(`📋 您可以使用万能福来替代缺失的福卡\n\n您当前拥有 ${wanNengCount} 张万能福\n\n请确保您有足够的万能福来替代缺失的福卡后再尝试合成！`);
-                    } else {
-                        alert(`📋 您还未集齐五福，请继续收集以下福卡：\n\n${missingCards.join('\n')}\n\n集齐后即可合成五福临门，享受额外分红！`);
-                    }
-                    return;
-                }
-                
-                // 确认合成
-                if (!confirm('🎯 合成五福临门\n\n合成后，您将获得：\n• 一张五福临门稀有福卡\n• 额外1%的税收分红资格\n• 更高的收藏价值\n\n注意：用于合成的5张基础福卡将被永久销毁\n\n确定要继续吗？')) {
-                    return;
-                }
-                
-                // 显示合成中状态
-                synthesizeBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 合成中...';
-                synthesizeBtn.disabled = true;
-                
+        async function loadUserTokens() {
+            userTokens = [];
+            for (let typeId = 0; typeId < 120; typeId++) {
                 try {
-                    // 调用合成五福临门的功能
-                    await fiveBlessingsNFTContract.methods.synthesizeWuFu().send({ from: account });
-                    
-                    // 合成成功
-                    alert('🎉 合成成功！\n\n恭喜您获得了五福临门稀有福卡！\n\n✅ 用于合成的5张基础福卡已被销毁\n✅ 您现在拥有额外1%的税收分红资格\n✅ 五福临门将为您带来更多好运\n\n快去领取页面查看您的分红吧！');
-                    
-                    // 更新页面
-                    await checkWuFuLinMenStatus();
-                    await loadFukaCounts();
-                    await loadFukaList();
-                } catch (error) {
-                    console.error('合成失败:', error);
-                    
-                    // 分析错误原因
-                    let errorMsg = '合成失败，请稍后再试';
-                    if (error.code === 4001) {
-                        errorMsg = '您取消了交易，请重试';
-                    } else if (error.message && error.message.includes('insufficient funds')) {
-                        errorMsg = 'Gas费用不足，请确保钱包中有足够的BNB支付Gas费用';
-                    } else if (error.message && error.message.includes('reverted')) {
-                        errorMsg = '合约执行失败：' + error.message;
+                    const count = await rewardManagerContract.methods.cardCount(accounts[0], typeId).call();
+                    if (count > 0) {
+                        userTokens.push({ typeId: typeId, count: parseInt(count) });
                     }
-                    
-                    alert(`❌ 合成失败\n\n${errorMsg}\n\n请检查以下事项：\n1. 钱包是否有足够的BNB支付Gas费用\n2. 网络连接是否稳定\n3. 合约地址是否正确配置\n4. 您是否确实持有5张基础福卡或足够的万能福`);
-                } finally {
-                    // 恢复按钮状态
-                    synthesizeBtn.innerHTML = '合成五福临门';
-                    synthesizeBtn.disabled = false;
+                } catch (error) {
+                    console.error('Error loading token type', typeId, error);
                 }
+            }
+            updateStats();
+            renderTokens();
+        }
+
+        function updateStats() {
+            const totalCards = userTokens.reduce((sum, t) => sum + t.count, 0);
+            const uniqueTypes = userTokens.length;
+            document.getElementById('totalCards').textContent = totalCards;
+            document.getElementById('uniqueTypes').textContent = uniqueTypes;
+        }
+
+        async function updateDividends() {
+            try {
+                const [unclaimed] = await rewardManagerContract.methods.calcUserDividend(accounts[0]).call();
+                const unclaimedBNB = web3.utils.fromWei(unclaimed.toString(), 'ether');
+                document.getElementById('totalDividends').textContent = parseFloat(unclaimedBNB).toFixed(4);
             } catch (error) {
-                console.error('合成五福临门失败:', error);
-                alert('❌ 操作失败，请稍后再试\n\n错误信息：' + error.message);
-                synthesizeBtn.innerHTML = '合成五福临门';
-                synthesizeBtn.disabled = false;
+                document.getElementById('totalDividends').textContent = '0';
             }
         }
+
+        async function loadProgress() {
+            const progress = { water: 0, wind: 0, fire: 0, dark: 0, light: 0 };
+            for (const token of userTokens) {
+                const typeId = token.typeId;
+                const attrIndex = Math.floor(typeId / 24);
+                const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+                if (attrIndex >= 0 && attrIndex < 5) {
+                    progress[attrs[attrIndex]] += token.count;
+                }
+            }
+            document.getElementById('waterProgress').textContent = progress.water;
+            document.getElementById('windProgress').textContent = progress.wind;
+            document.getElementById('fireProgress').textContent = progress.fire;
+            document.getElementById('darkProgress').textContent = progress.dark;
+            document.getElementById('lightProgress').textContent = progress.light;
+        }
+
+        function switchAttribute(attr) {
+            currentFilter = attr;
+            document.querySelectorAll('.attribute-tab').forEach(tab => tab.classList.remove('active'));
+            if (attr === 'all') {
+                document.querySelector('.attribute-tab[style]').classList.add('active');
+            } else {
+                document.querySelector(`.tab-${attr}`).classList.add('active');
+            }
+            renderTokens();
+        }
+
+        function renderTokens() {
+            const grid = document.getElementById('zodiacGrid');
+            const emptyState = document.getElementById('emptyState');
+
+            const filteredTokens = currentFilter === 'all'
+                ? userTokens
+                : userTokens.filter(t => {
+                    const attrIndex = Math.floor(t.typeId / 24);
+                    const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+                    return attrs[attrIndex] === currentFilter;
+                });
+
+            if (filteredTokens.length === 0) {
+                grid.innerHTML = '';
+                grid.appendChild(emptyState);
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            let html = '';
+
+            for (const token of filteredTokens) {
+                const typeId = token.typeId;
+                const zodiacIndex = typeId % 12;
+                const attrIndex = Math.floor(typeId / 24);
+                const gender = typeId % 2;
+                const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+                const attr = attrs[attrIndex];
+                const attrData = ZODIAC_DATA[attr];
+                const prefix = attrData.prefix;
+                const animal = attrData.animals[zodiacIndex];
+                const genderSuffix = gender === 1 ? '_1' : '_0';
+                const imagePath = `images/fu-cards/${prefix}${animal}${genderSuffix}.png`;
+                const name = `${attrData.name}${ZODIAC_NAMES[zodiacIndex]}（${gender === 1 ? '公' : '母'}）`;
+
+                html += `
+                    <div class="zodiac-card" onclick="showCardModal(${typeId})">
+                        <img src="${imagePath}" alt="${name}" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <h4>${name}</h4>
+                        <p>拥有 ${token.count} 张</p>
+                    </div>
+                `;
+            }
+
+            grid.innerHTML = html;
+        }
+
+        function showCardModal(typeId) {
+            const zodiacIndex = typeId % 12;
+            const attrIndex = Math.floor(typeId / 24);
+            const gender = typeId % 2;
+            const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+            const attr = attrs[attrIndex];
+            const attrData = ZODIAC_DATA[attr];
+            const prefix = attrData.prefix;
+            const animal = attrData.animals[zodiacIndex];
+            const genderSuffix = gender === 1 ? '_1' : '_0';
+            const imagePath = `images/fu-cards/${prefix}${animal}${genderSuffix}.png`;
+            const name = `${attrData.name}${ZODIAC_NAMES[zodiacIndex]}（${gender === 1 ? '公' : '母'}）`;
+            const desc = `${attrData.name}属性生肖·${ZODIAC_NAMES[zodiacIndex]}·${gender === 1 ? '公' : '母'} · 持有可享受税收分红`;
+
+            document.getElementById('modalCardImage').src = imagePath;
+            document.getElementById('modalCardName').textContent = name;
+            document.getElementById('modalCardDesc').textContent = desc;
+            document.getElementById('modalCardId').textContent = typeId + 1;
+            document.getElementById('cardModal').classList.remove('hidden');
+        }
+
+        document.getElementById('closeModal').addEventListener('click', function() {
+            document.getElementById('cardModal').classList.add('hidden');
+        });
+
+        document.getElementById('cardModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                document.getElementById('cardModal').classList.add('hidden');
+            }
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', async function() {
+            await loadUserTokens();
+            await updateDividends();
+            await loadProgress();
+        });
+
+        document.getElementById('connectWalletBtn').addEventListener('click', function() {
+            connectWallet();
+        });
+
+        particlesJS('particles-js', {
+            particles: {
+                number: { value: 80, density: { enable: true, value_area: 800 } },
+                color: { value: '#3b82f6' },
+                shape: { type: 'circle', stroke: { width: 0, color: '#000000' } },
+                opacity: { value: 0.5, random: true, anim: { enable: true, speed: 1, opacity_min: 0.1, sync: false } },
+                size: { value: 5, random: true, anim: { enable: true, speed: 2, size_min: 0.1, sync: false } },
+                line_linked: { enable: true, distance: 150, color: '#3b82f6', opacity: 0.4, width: 1 },
+                move: { enable: true, speed: 1, direction: 'none', random: false, straight: false, out_mode: 'out', bounce: false }
+            },
+            interactivity: {
+                detect_on: 'canvas',
+                events: { onhover: { enable: true, mode: 'grab' }, onclick: { enable: true, mode: 'push' }, resize: true },
+                modes: { grab: { distance: 140, line_linked: { opacity: 1 } }, push: { particles_nb: 4 } }
+            },
+            retina_detect: true
+        });
     </script>
 </body>
 </html>

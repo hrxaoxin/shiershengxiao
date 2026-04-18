@@ -5,7 +5,23 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-enum BlessingType { AiGuo, FuQiang, HeXie, YouShan, JingYe, WanNeng, WuFuLinMen }
+enum ZodiacType {
+    // Water zodiac (水) - tokens 1-24
+    ShuiShu_1, ShuiNiu_1, ShuiHu_1, ShuiTu_1, ShuiLong_1, ShuiShe_1, ShuiMa_1, ShuiYang_1, ShuiHou_1, ShuiJi_1, ShuiGou_1, ShuiZhu_1,
+    ShuiShu_0, ShuiNiu_0, ShuiHu_0, ShuiTu_0, ShuiLong_0, ShuiShe_0, ShuiMa_0, ShuiYang_0, ShuiHou_0, ShuiJi_0, ShuiGou_0, ShuiZhu_0,
+    // Wind zodiac (风) - tokens 25-48
+    FengShu_1, FengNiu_1, FengHu_1, FengTu_1, FengLong_1, FengShe_1, FengMa_1, FengYang_1, FengHou_1, FengJi_1, FengGou_1, FengZhu_1,
+    FengShu_0, FengNiu_0, FengHu_0, FengTu_0, FengLong_0, FengShe_0, FengMa_0, FengYang_0, FengHou_0, FengJi_0, FengGou_0, FengZhu_0,
+    // Fire zodiac (火) - tokens 49-72
+    HuoShu_1, HuoNiu_1, HuoHu_1, HuoTu_1, HuoLong_1, HuoShe_1, HuoMa_1, HuoYang_1, HuoHou_1, HuoJi_1, HuoGou_1, HuoZhu_1,
+    HuoShu_0, HuoNiu_0, HuoHu_0, HuoTu_0, HuoLong_0, HuoShe_0, HuoMa_0, HuoYang_0, HuoHou_0, HuoJi_0, HuoGou_0, HuoZhu_0,
+    // Dark zodiac (暗) - tokens 73-96
+    AnShu_1, AnNiu_1, AnHu_1, AnTu_1, AnLong_1, AnShe_1, AnMa_1, AnYang_1, AnHou_1, AnJi_1, AnGou_1, AnZhu_1,
+    AnShu_0, AnNiu_0, AnHu_0, AnTu_0, AnLong_0, AnShe_0, AnMa_0, AnYang_0, AnHou_0, AnJi_0, AnGou_0, AnZhu_0,
+    // Light zodiac (光) - tokens 97-120
+    GuangShu_1, GuangNiu_1, GuangHu_1, GuangTu_1, GuangLong_1, GuangShe_1, GuangMa_1, GuangYang_1, GuangHou_1, GuangJi_1, GuangGou_1, GuangZhu_1,
+    GuangShu_0, GuangNiu_0, GuangHu_0, GuangTu_0, GuangLong_0, GuangShe_0, GuangMa_0, GuangYang_0, GuangHou_0, GuangJi_0, GuangGou_0, GuangZhu_0
+}
 
 interface IRewardManager {
     function royaltyWallet() external view returns (address);
@@ -16,22 +32,18 @@ contract FiveBlessingsMetadata is
     OwnableUpgradeable,
     UUPSUpgradeable
 {
-    // 元数据存储
-    mapping(BlessingType => string) private imgUrl;
-    mapping(BlessingType => string) private cardName;
-    mapping(BlessingType => string) private cardDesc;
-    
-    // 合集元数据
+    mapping(ZodiacType => string) private imgUrl;
+    mapping(ZodiacType => string) private cardName;
+    mapping(ZodiacType => string) private cardDesc;
+
     string public collImage;
     string public collName;
     string public collDesc;
     uint256 public sellerFeeBasisPoints;
-    
-    // 外部依赖
+
     address public rewardManager;
     address public authorizer;
-    
-    // 存储间隙
+
     uint256[50] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -42,73 +54,328 @@ contract FiveBlessingsMetadata is
     function initialize(address initialOwner, address _authorizer) external initializer {
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
-        
-        // 初始化卡片元数据
+
         _initCardMetadata();
-        
-        // 初始化合集元数据
-        collName = unicode"五福临门NFT系列";
-        // 使用五福临门图片作为封面
-        collImage = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeich5jq6lv5zcf2ly4dwnxmvnh4nk5xoddy75fihq6bajxnxdxumnm";
-        collDesc = unicode"基于中国传统五福文化的数字收藏品";
+
+        collName = unicode"十二生肖NFT系列";
+        collImage = "images/fu-cards/shuishu_1.png";
+        collDesc = unicode"基于中国传统十二生肖文化的数字收藏品";
         sellerFeeBasisPoints = 500;
-        
-        // 初始化授权合约地址
+
         authorizer = _authorizer;
     }
 
-    // UUPS升级授权
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    // 初始化卡片元数据
     function _initCardMetadata() internal {
-        // 图片URL配置 - 使用Pinata HTTP链接格式
-        imgUrl[BlessingType.AiGuo] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeicmdlx35rjx7slj3ncmjynxzmwllkvujvcrqmdiynmijpkvnc734q";
-        imgUrl[BlessingType.FuQiang] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeihkbyl6zlkx5vxxu366gwa5gpnd45twwlooczyolannp5ewcxaoja";
-        imgUrl[BlessingType.HeXie] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifsojdpnspewquotpvbwhkfq6n5celzjtsyulbaecczkwm4y25yji";
-        imgUrl[BlessingType.YouShan] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeiekctcxtyaews5udiumrogwxjdxkughjnhbycemgxvgpzhwhi564u";
-        imgUrl[BlessingType.JingYe] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeibcse6fzqol32qrwlmsl7cz4ujhi7ctrxavfywzzqjgdvxla62m4e";
-        imgUrl[BlessingType.WanNeng] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeig7ztsaeiddwpgjivwe7la6zxsck5q7hbael32thq4pw6amylxpgi";
-        imgUrl[BlessingType.WuFuLinMen] = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeich5jq6lv5zcf2ly4dwnxmvnh4nk5xoddy75fihq6bajxnxdxumnm";
-        
-        // 卡片名称
-        cardName[BlessingType.AiGuo] = unicode"爱国福";
-        cardName[BlessingType.FuQiang] = unicode"富强福";
-        cardName[BlessingType.HeXie] = unicode"和谐福";
-        cardName[BlessingType.YouShan] = unicode"友善福";
-        cardName[BlessingType.JingYe] = unicode"敬业福";
-        cardName[BlessingType.WanNeng] = unicode"万能福";
-        cardName[BlessingType.WuFuLinMen] = unicode"五福临门";
-        
-        // 卡片描述
-        cardDesc[BlessingType.AiGuo] = unicode"爱我中华，福泽绵长";
-        cardDesc[BlessingType.FuQiang] = unicode"国富民强，繁荣昌盛";
-        cardDesc[BlessingType.HeXie] = unicode"和睦相处，幸福美满";
-        cardDesc[BlessingType.YouShan] = unicode"友善待人，福报常在";
-        cardDesc[BlessingType.JingYe] = unicode"敬业乐业，福禄安康";
-        cardDesc[BlessingType.WanNeng] = unicode"万福齐聚，好运临门";
-        cardDesc[BlessingType.WuFuLinMen] = unicode"五福齐聚，好运连连";
+        string memory basePath = "images/fu-cards/";
+
+        cardName[ZodiacType.ShuiShu_1] = unicode"水鼠（公）";
+        cardName[ZodiacType.ShuiNiu_1] = unicode"水牛（公）";
+        cardName[ZodiacType.ShuiHu_1] = unicode"水虎（公）";
+        cardName[ZodiacType.ShuiTu_1] = unicode"水兔（公）";
+        cardName[ZodiacType.ShuiLong_1] = unicode"水龙（公）";
+        cardName[ZodiacType.ShuiShe_1] = unicode"水蛇（公）";
+        cardName[ZodiacType.ShuiMa_1] = unicode"水马（公）";
+        cardName[ZodiacType.ShuiYang_1] = unicode"水羊（公）";
+        cardName[ZodiacType.ShuiHou_1] = unicode"水猴（公）";
+        cardName[ZodiacType.ShuiJi_1] = unicode"水鸡（公）";
+        cardName[ZodiacType.ShuiGou_1] = unicode"水狗（公）";
+        cardName[ZodiacType.ShuiZhu_1] = unicode"水猪（公）";
+
+        cardName[ZodiacType.ShuiShu_0] = unicode"水鼠（母）";
+        cardName[ZodiacType.ShuiNiu_0] = unicode"水牛（母）";
+        cardName[ZodiacType.ShuiHu_0] = unicode"水虎（母）";
+        cardName[ZodiacType.ShuiTu_0] = unicode"水兔（母）";
+        cardName[ZodiacType.ShuiLong_0] = unicode"水龙（母）";
+        cardName[ZodiacType.ShuiShe_0] = unicode"水蛇（母）";
+        cardName[ZodiacType.ShuiMa_0] = unicode"水马（母）";
+        cardName[ZodiacType.ShuiYang_0] = unicode"水羊（母）";
+        cardName[ZodiacType.ShuiHou_0] = unicode"水猴（母）";
+        cardName[ZodiacType.ShuiJi_0] = unicode"水鸡（母）";
+        cardName[ZodiacType.ShuiGou_0] = unicode"水狗（母）";
+        cardName[ZodiacType.ShuiZhu_0] = unicode"水猪（母）";
+
+        cardName[ZodiacType.FengShu_1] = unicode"风鼠（公）";
+        cardName[ZodiacType.FengNiu_1] = unicode"风牛（公）";
+        cardName[ZodiacType.FengHu_1] = unicode"风虎（公）";
+        cardName[ZodiacType.FengTu_1] = unicode"风兔（公）";
+        cardName[ZodiacType.FengLong_1] = unicode"风龙（公）";
+        cardName[ZodiacType.FengShe_1] = unicode"风蛇（公）";
+        cardName[ZodiacType.FengMa_1] = unicode"风马（公）";
+        cardName[ZodiacType.FengYang_1] = unicode"风羊（公）";
+        cardName[ZodiacType.FengHou_1] = unicode"风猴（公）";
+        cardName[ZodiacType.FengJi_1] = unicode"风鸡（公）";
+        cardName[ZodiacType.FengGou_1] = unicode"风狗（公）";
+        cardName[ZodiacType.FengZhu_1] = unicode"风猪（公）";
+
+        cardName[ZodiacType.FengShu_0] = unicode"风鼠（母）";
+        cardName[ZodiacType.FengNiu_0] = unicode"风牛（母）";
+        cardName[ZodiacType.FengHu_0] = unicode"风虎（母）";
+        cardName[ZodiacType.FengTu_0] = unicode"风兔（母）";
+        cardName[ZodiacType.FengLong_0] = unicode"风龙（母）";
+        cardName[ZodiacType.FengShe_0] = unicode"风蛇（母）";
+        cardName[ZodiacType.FengMa_0] = unicode"风马（母）";
+        cardName[ZodiacType.FengYang_0] = unicode"风羊（母）";
+        cardName[ZodiacType.FengHou_0] = unicode"风猴（母）";
+        cardName[ZodiacType.FengJi_0] = unicode"风鸡（母）";
+        cardName[ZodiacType.FengGou_0] = unicode"风狗（母）";
+        cardName[ZodiacType.FengZhu_0] = unicode"风猪（母）";
+
+        cardName[ZodiacType.HuoShu_1] = unicode"火鼠（公）";
+        cardName[ZodiacType.HuoNiu_1] = unicode"火牛（公）";
+        cardName[ZodiacType.HuoHu_1] = unicode"火虎（公）";
+        cardName[ZodiacType.HuoTu_1] = unicode"火兔（公）";
+        cardName[ZodiacType.HuoLong_1] = unicode"火龙（公）";
+        cardName[ZodiacType.HuoShe_1] = unicode"火蛇（公）";
+        cardName[ZodiacType.HuoMa_1] = unicode"火马（公）";
+        cardName[ZodiacType.HuoYang_1] = unicode"火羊（公）";
+        cardName[ZodiacType.HuoHou_1] = unicode"火猴（公）";
+        cardName[ZodiacType.HuoJi_1] = unicode"火鸡（公）";
+        cardName[ZodiacType.HuoGou_1] = unicode"火狗（公）";
+        cardName[ZodiacType.HuoZhu_1] = unicode"火猪（公）";
+
+        cardName[ZodiacType.HuoShu_0] = unicode"火鼠（母）";
+        cardName[ZodiacType.HuoNiu_0] = unicode"火牛（母）";
+        cardName[ZodiacType.HuoHu_0] = unicode"火虎（母）";
+        cardName[ZodiacType.HuoTu_0] = unicode"火兔（母）";
+        cardName[ZodiacType.HuoLong_0] = unicode"火龙（母）";
+        cardName[ZodiacType.HuoShe_0] = unicode"火蛇（母）";
+        cardName[ZodiacType.HuoMa_0] = unicode"火马（母）";
+        cardName[ZodiacType.HuoYang_0] = unicode"火羊（母）";
+        cardName[ZodiacType.HuoHou_0] = unicode"火猴（母）";
+        cardName[ZodiacType.HuoJi_0] = unicode"火鸡（母）";
+        cardName[ZodiacType.HuoGou_0] = unicode"火狗（母）";
+        cardName[ZodiacType.HuoZhu_0] = unicode"火猪（母）";
+
+        cardName[ZodiacType.AnShu_1] = unicode"暗鼠（公）";
+        cardName[ZodiacType.AnNiu_1] = unicode"暗牛（公）";
+        cardName[ZodiacType.AnHu_1] = unicode"暗虎（公）";
+        cardName[ZodiacType.AnTu_1] = unicode"暗兔（公）";
+        cardName[ZodiacType.AnLong_1] = unicode"暗龙（公）";
+        cardName[ZodiacType.AnShe_1] = unicode"暗蛇（公）";
+        cardName[ZodiacType.AnMa_1] = unicode"暗马（公）";
+        cardName[ZodiacType.AnYang_1] = unicode"暗羊（公）";
+        cardName[ZodiacType.AnHou_1] = unicode"暗猴（公）";
+        cardName[ZodiacType.AnJi_1] = unicode"暗鸡（公）";
+        cardName[ZodiacType.AnGou_1] = unicode"暗狗（公）";
+        cardName[ZodiacType.AnZhu_1] = unicode"暗猪（公）";
+
+        cardName[ZodiacType.AnShu_0] = unicode"暗鼠（母）";
+        cardName[ZodiacType.AnNiu_0] = unicode"暗牛（母）";
+        cardName[ZodiacType.AnHu_0] = unicode"暗虎（母）";
+        cardName[ZodiacType.AnTu_0] = unicode"暗兔（母）";
+        cardName[ZodiacType.AnLong_0] = unicode"暗龙（母）";
+        cardName[ZodiacType.AnShe_0] = unicode"暗蛇（母）";
+        cardName[ZodiacType.AnMa_0] = unicode"暗马（母）";
+        cardName[ZodiacType.AnYang_0] = unicode"暗羊（母）";
+        cardName[ZodiacType.AnHou_0] = unicode"暗猴（母）";
+        cardName[ZodiacType.AnJi_0] = unicode"暗鸡（母）";
+        cardName[ZodiacType.AnGou_0] = unicode"暗狗（母）";
+        cardName[ZodiacType.AnZhu_0] = unicode"暗猪（母）";
+
+        cardName[ZodiacType.GuangShu_1] = unicode"光鼠（公）";
+        cardName[ZodiacType.GuangNiu_1] = unicode"光牛（公）";
+        cardName[ZodiacType.GuangHu_1] = unicode"光虎（公）";
+        cardName[ZodiacType.GuangTu_1] = unicode"光兔（公）";
+        cardName[ZodiacType.GuangLong_1] = unicode"光龙（公）";
+        cardName[ZodiacType.GuangShe_1] = unicode"光蛇（公）";
+        cardName[ZodiacType.GuangMa_1] = unicode"光马（公）";
+        cardName[ZodiacType.GuangYang_1] = unicode"光羊（公）";
+        cardName[ZodiacType.GuangHou_1] = unicode"光猴（公）";
+        cardName[ZodiacType.GuangJi_1] = unicode"光鸡（公）";
+        cardName[ZodiacType.GuangGou_1] = unicode"光狗（公）";
+        cardName[ZodiacType.GuangZhu_1] = unicode"光猪（公）";
+
+        cardName[ZodiacType.GuangShu_0] = unicode"光鼠（母）";
+        cardName[ZodiacType.GuangNiu_0] = unicode"光牛（母）";
+        cardName[ZodiacType.GuangHu_0] = unicode"光虎（母）";
+        cardName[ZodiacType.GuangTu_0] = unicode"光兔（母）";
+        cardName[ZodiacType.GuangLong_0] = unicode"光龙（母）";
+        cardName[ZodiacType.GuangShe_0] = unicode"光蛇（母）";
+        cardName[ZodiacType.GuangMa_0] = unicode"光马（母）";
+        cardName[ZodiacType.GuangYang_0] = unicode"光羊（母）";
+        cardName[ZodiacType.GuangHou_0] = unicode"光猴（母）";
+        cardName[ZodiacType.GuangJi_0] = unicode"光鸡（母）";
+        cardName[ZodiacType.GuangGou_0] = unicode"光狗（母）";
+        cardName[ZodiacType.GuangZhu_0] = unicode"光猪（母）";
+
+        for (uint i = 0; i < 120; i++) {
+            imgUrl[ZodiacType(i)] = _getImageUrl(ZodiacType(i), basePath);
+            cardDesc[ZodiacType(i)] = _getCardDescription(ZodiacType(i));
+        }
     }
 
-    // ========== 元数据读取接口 ==========
-    function getCardImage(BlessingType t) external view returns (string memory) {
+    function _getImageUrl(ZodiacType z, string memory basePath) internal pure returns (string memory) {
+        if (z == ZodiacType.ShuiShu_1) return string(abi.encodePacked(basePath, "shuishu_1.png"));
+        if (z == ZodiacType.ShuiNiu_1) return string(abi.encodePacked(basePath, "shuiniu_1.png"));
+        if (z == ZodiacType.ShuiHu_1) return string(abi.encodePacked(basePath, "shuihu_1.png"));
+        if (z == ZodiacType.ShuiTu_1) return string(abi.encodePacked(basePath, "shuitu_1.png"));
+        if (z == ZodiacType.ShuiLong_1) return string(abi.encodePacked(basePath, "shuilong_1.png"));
+        if (z == ZodiacType.ShuiShe_1) return string(abi.encodePacked(basePath, "shuishe_1.png"));
+        if (z == ZodiacType.ShuiMa_1) return string(abi.encodePacked(basePath, "shuima_1.png"));
+        if (z == ZodiacType.ShuiYang_1) return string(abi.encodePacked(basePath, "shuiyang_1.png"));
+        if (z == ZodiacType.ShuiHou_1) return string(abi.encodePacked(basePath, "shuihou_1.png"));
+        if (z == ZodiacType.ShuiJi_1) return string(abi.encodePacked(basePath, "shuiji_1.png"));
+        if (z == ZodiacType.ShuiGou_1) return string(abi.encodePacked(basePath, "shuigou_1.png"));
+        if (z == ZodiacType.ShuiZhu_1) return string(abi.encodePacked(basePath, "shuizhu_1.png"));
+
+        if (z == ZodiacType.ShuiShu_0) return string(abi.encodePacked(basePath, "shuishu_0.png"));
+        if (z == ZodiacType.ShuiNiu_0) return string(abi.encodePacked(basePath, "shuiniu_0.png"));
+        if (z == ZodiacType.ShuiHu_0) return string(abi.encodePacked(basePath, "shuihu_0.png"));
+        if (z == ZodiacType.ShuiTu_0) return string(abi.encodePacked(basePath, "shuitu_0.png"));
+        if (z == ZodiacType.ShuiLong_0) return string(abi.encodePacked(basePath, "shuilong_0.png"));
+        if (z == ZodiacType.ShuiShe_0) return string(abi.encodePacked(basePath, "shuishe_0.png"));
+        if (z == ZodiacType.ShuiMa_0) return string(abi.encodePacked(basePath, "shuima_0.png"));
+        if (z == ZodiacType.ShuiYang_0) return string(abi.encodePacked(basePath, "shuiyang_0.png"));
+        if (z == ZodiacType.ShuiHou_0) return string(abi.encodePacked(basePath, "shuihou_0.png"));
+        if (z == ZodiacType.ShuiJi_0) return string(abi.encodePacked(basePath, "shuiji_0.png"));
+        if (z == ZodiacType.ShuiGou_0) return string(abi.encodePacked(basePath, "shuigou_0.png"));
+        if (z == ZodiacType.ShuiZhu_0) return string(abi.encodePacked(basePath, "shuizhu_0.png"));
+
+        if (z == ZodiacType.FengShu_1) return string(abi.encodePacked(basePath, "fengshu_1.png"));
+        if (z == ZodiacType.FengNiu_1) return string(abi.encodePacked(basePath, "fengniu_1.png"));
+        if (z == ZodiacType.FengHu_1) return string(abi.encodePacked(basePath, "fenghu_1.png"));
+        if (z == ZodiacType.FengTu_1) return string(abi.encodePacked(basePath, "fengtu_1.png"));
+        if (z == ZodiacType.FengLong_1) return string(abi.encodePacked(basePath, "fenglong_1.png"));
+        if (z == ZodiacType.FengShe_1) return string(abi.encodePacked(basePath, "fengshe_1.png"));
+        if (z == ZodiacType.FengMa_1) return string(abi.encodePacked(basePath, "fengma_1.png"));
+        if (z == ZodiacType.FengYang_1) return string(abi.encodePacked(basePath, "fengyang_1.png"));
+        if (z == ZodiacType.FengHou_1) return string(abi.encodePacked(basePath, "fenghou_1.png"));
+        if (z == ZodiacType.FengJi_1) return string(abi.encodePacked(basePath, "fengji_1.png"));
+        if (z == ZodiacType.FengGou_1) return string(abi.encodePacked(basePath, "fenggou_1.png"));
+        if (z == ZodiacType.FengZhu_1) return string(abi.encodePacked(basePath, "fengzhu_1.png"));
+
+        if (z == ZodiacType.FengShu_0) return string(abi.encodePacked(basePath, "fengshu_0.png"));
+        if (z == ZodiacType.FengNiu_0) return string(abi.encodePacked(basePath, "fengniu_0.png"));
+        if (z == ZodiacType.FengHu_0) return string(abi.encodePacked(basePath, "fenghu_0.png"));
+        if (z == ZodiacType.FengTu_0) return string(abi.encodePacked(basePath, "fengtu_0.png"));
+        if (z == ZodiacType.FengLong_0) return string(abi.encodePacked(basePath, "fenglong_0.png"));
+        if (z == ZodiacType.FengShe_0) return string(abi.encodePacked(basePath, "fengshe_0.png"));
+        if (z == ZodiacType.FengMa_0) return string(abi.encodePacked(basePath, "fengma_0.png"));
+        if (z == ZodiacType.FengYang_0) return string(abi.encodePacked(basePath, "fengyang_0.png"));
+        if (z == ZodiacType.FengHou_0) return string(abi.encodePacked(basePath, "fenghou_0.png"));
+        if (z == ZodiacType.FengJi_0) return string(abi.encodePacked(basePath, "fengji_0.png"));
+        if (z == ZodiacType.FengGou_0) return string(abi.encodePacked(basePath, "fenggou_0.png"));
+        if (z == ZodiacType.FengZhu_0) return string(abi.encodePacked(basePath, "fengzhu_0.png"));
+
+        if (z == ZodiacType.HuoShu_1) return string(abi.encodePacked(basePath, "huoshu_1.png"));
+        if (z == ZodiacType.HuoNiu_1) return string(abi.encodePacked(basePath, "huoniu_1.png"));
+        if (z == ZodiacType.HuoHu_1) return string(abi.encodePacked(basePath, "huohu_1.png"));
+        if (z == ZodiacType.HuoTu_1) return string(abi.encodePacked(basePath, "huotu_1.png"));
+        if (z == ZodiacType.HuoLong_1) return string(abi.encodePacked(basePath, "huolong_1.png"));
+        if (z == ZodiacType.HuoShe_1) return string(abi.encodePacked(basePath, "huoshe_1.png"));
+        if (z == ZodiacType.HuoMa_1) return string(abi.encodePacked(basePath, "huoma_1.png"));
+        if (z == ZodiacType.HuoYang_1) return string(abi.encodePacked(basePath, "huoyang_1.png"));
+        if (z == ZodiacType.HuoHou_1) return string(abi.encodePacked(basePath, "huohou_1.png"));
+        if (z == ZodiacType.HuoJi_1) return string(abi.encodePacked(basePath, "huoji_1.png"));
+        if (z == ZodiacType.HuoGou_1) return string(abi.encodePacked(basePath, "huogou_1.png"));
+        if (z == ZodiacType.HuoZhu_1) return string(abi.encodePacked(basePath, "huozhu_1.png"));
+
+        if (z == ZodiacType.HuoShu_0) return string(abi.encodePacked(basePath, "huoshu_0.png"));
+        if (z == ZodiacType.HuoNiu_0) return string(abi.encodePacked(basePath, "huoniu_0.png"));
+        if (z == ZodiacType.HuoHu_0) return string(abi.encodePacked(basePath, "huohu_0.png"));
+        if (z == ZodiacType.HuoTu_0) return string(abi.encodePacked(basePath, "huotu_0.png"));
+        if (z == ZodiacType.HuoLong_0) return string(abi.encodePacked(basePath, "huolong_0.png"));
+        if (z == ZodiacType.HuoShe_0) return string(abi.encodePacked(basePath, "huoshe_0.png"));
+        if (z == ZodiacType.HuoMa_0) return string(abi.encodePacked(basePath, "huoma_0.png"));
+        if (z == ZodiacType.HuoYang_0) return string(abi.encodePacked(basePath, "huoyang_0.png"));
+        if (z == ZodiacType.HuoHou_0) return string(abi.encodePacked(basePath, "huohou_0.png"));
+        if (z == ZodiacType.HuoJi_0) return string(abi.encodePacked(basePath, "huoji_0.png"));
+        if (z == ZodiacType.HuoGou_0) return string(abi.encodePacked(basePath, "huogou_0.png"));
+        if (z == ZodiacType.HuoZhu_0) return string(abi.encodePacked(basePath, "huozhu_0.png"));
+
+        if (z == ZodiacType.AnShu_1) return string(abi.encodePacked(basePath, "anshu_1.png"));
+        if (z == ZodiacType.AnNiu_1) return string(abi.encodePacked(basePath, "anniu_1.png"));
+        if (z == ZodiacType.AnHu_1) return string(abi.encodePacked(basePath, "anhu_1.png"));
+        if (z == ZodiacType.AnTu_1) return string(abi.encodePacked(basePath, "antu_1.png"));
+        if (z == ZodiacType.AnLong_1) return string(abi.encodePacked(basePath, "anlong_1.png"));
+        if (z == ZodiacType.AnShe_1) return string(abi.encodePacked(basePath, "anshe_1.png"));
+        if (z == ZodiacType.AnMa_1) return string(abi.encodePacked(basePath, "anma_1.png"));
+        if (z == ZodiacType.AnYang_1) return string(abi.encodePacked(basePath, "anyang_1.png"));
+        if (z == ZodiacType.AnHou_1) return string(abi.encodePacked(basePath, "anhhou_1.png"));
+        if (z == ZodiacType.AnJi_1) return string(abi.encodePacked(basePath, "anji_1.png"));
+        if (z == ZodiacType.AnGou_1) return string(abi.encodePacked(basePath, "angou_1.png"));
+        if (z == ZodiacType.AnZhu_1) return string(abi.encodePacked(basePath, "anzhu_1.png"));
+
+        if (z == ZodiacType.AnShu_0) return string(abi.encodePacked(basePath, "anshu_0.png"));
+        if (z == ZodiacType.AnNiu_0) return string(abi.encodePacked(basePath, "anniu_0.png"));
+        if (z == ZodiacType.AnHu_0) return string(abi.encodePacked(basePath, "anhu_0.png"));
+        if (z == ZodiacType.AnTu_0) return string(abi.encodePacked(basePath, "antu_0.png"));
+        if (z == ZodiacType.AnLong_0) return string(abi.encodePacked(basePath, "anlong_0.png"));
+        if (z == ZodiacType.AnShe_0) return string(abi.encodePacked(basePath, "anshe_0.png"));
+        if (z == ZodiacType.AnMa_0) return string(abi.encodePacked(basePath, "anma_0.png"));
+        if (z == ZodiacType.AnYang_0) return string(abi.encodePacked(basePath, "anyang_0.png"));
+        if (z == ZodiacType.AnHou_0) return string(abi.encodePacked(basePath, "anhhou_0.png"));
+        if (z == ZodiacType.AnJi_0) return string(abi.encodePacked(basePath, "anji_0.png"));
+        if (z == ZodiacType.AnGou_0) return string(abi.encodePacked(basePath, "angou_0.png"));
+        if (z == ZodiacType.AnZhu_0) return string(abi.encodePacked(basePath, "anzhu_0.png"));
+
+        if (z == ZodiacType.GuangShu_1) return string(abi.encodePacked(basePath, "guangshu_1.png"));
+        if (z == ZodiacType.GuangNiu_1) return string(abi.encodePacked(basePath, "guangniu_1.png"));
+        if (z == ZodiacType.GuangHu_1) return string(abi.encodePacked(basePath, "guanghu_1.png"));
+        if (z == ZodiacType.GuangTu_1) return string(abi.encodePacked(basePath, "guangtu_1.png"));
+        if (z == ZodiacType.GuangLong_1) return string(abi.encodePacked(basePath, "guanglong_1.png"));
+        if (z == ZodiacType.GuangShe_1) return string(abi.encodePacked(basePath, "guangshe_1.png"));
+        if (z == ZodiacType.GuangMa_1) return string(abi.encodePacked(basePath, "guangma_1.png"));
+        if (z == ZodiacType.GuangYang_1) return string(abi.encodePacked(basePath, "guangyang_1.png"));
+        if (z == ZodiacType.GuangHou_1) return string(abi.encodePacked(basePath, "guanghou_1.png"));
+        if (z == ZodiacType.GuangJi_1) return string(abi.encodePacked(basePath, "guangji_1.png"));
+        if (z == ZodiacType.GuangGou_1) return string(abi.encodePacked(basePath, "guanggou_1.png"));
+        if (z == ZodiacType.GuangZhu_1) return string(abi.encodePacked(basePath, "guangzhu_1.png"));
+
+        if (z == ZodiacType.GuangShu_0) return string(abi.encodePacked(basePath, "guangshu_0.png"));
+        if (z == ZodiacType.GuangNiu_0) return string(abi.encodePacked(basePath, "guangniu_0.png"));
+        if (z == ZodiacType.GuangHu_0) return string(abi.encodePacked(basePath, "guanghu_0.png"));
+        if (z == ZodiacType.GuangTu_0) return string(abi.encodePacked(basePath, "guangtu_0.png"));
+        if (z == ZodiacType.GuangLong_0) return string(abi.encodePacked(basePath, "guanglong_0.png"));
+        if (z == ZodiacType.GuangShe_0) return string(abi.encodePacked(basePath, "guangshe_0.png"));
+        if (z == ZodiacType.GuangMa_0) return string(abi.encodePacked(basePath, "guangma_0.png"));
+        if (z == ZodiacType.GuangYang_0) return string(abi.encodePacked(basePath, "guangyang_0.png"));
+        if (z == ZodiacType.GuangHou_0) return string(abi.encodePacked(basePath, "guanghou_0.png"));
+        if (z == ZodiacType.GuangJi_0) return string(abi.encodePacked(basePath, "guangji_0.png"));
+        if (z == ZodiacType.GuangGou_0) return string(abi.encodePacked(basePath, "guanggou_0.png"));
+        if (z == ZodiacType.GuangZhu_0) return string(abi.encodePacked(basePath, "guangzhu_0.png"));
+
+        return "";
+    }
+
+    function _getCardDescription(ZodiacType z) internal pure returns (string memory) {
+        if (uint(z) < 24) {
+            if (uint(z) % 2 == 1) return unicode"水属性生肖·公 · 持有可享受税收分红";
+            else return unicode"水属性生肖·母 · 持有可享受税收分红";
+        } else if (uint(z) < 48) {
+            if (uint(z) % 2 == 1) return unicode"风属性生肖·公 · 持有可享受税收分红";
+            else return unicode"风属性生肖·母 · 持有可享受税收分红";
+        } else if (uint(z) < 72) {
+            if (uint(z) % 2 == 1) return unicode"火属性生肖·公 · 持有可享受税收分红";
+            else return unicode"火属性生肖·母 · 持有可享受税收分红";
+        } else if (uint(z) < 96) {
+            if (uint(z) % 2 == 1) return unicode"暗属性生肖·公 · 持有可享受税收分红";
+            else return unicode"暗属性生肖·母 · 持有可享受税收分红";
+        } else {
+            if (uint(z) % 2 == 1) return unicode"光属性生肖·公 · 持有可享受税收分红";
+            else return unicode"光属性生肖·母 · 持有可享受税收分红";
+        }
+    }
+
+    function getCardImage(ZodiacType t) external view returns (string memory) {
         return imgUrl[t];
     }
 
-    function getCardName(BlessingType t) external view returns (string memory) {
+    function getCardName(ZodiacType t) external view returns (string memory) {
         return cardName[t];
     }
 
-    function getCardDesc(BlessingType t) external view returns (string memory) {
+    function getCardDesc(ZodiacType t) external view returns (string memory) {
         return cardDesc[t];
     }
 
-    function getNFTName(BlessingType t, uint256 tokenId) external view returns (string memory) {
+    function getNFTName(ZodiacType t, uint256 tokenId) external view returns (string memory) {
         return string(abi.encodePacked(cardName[t], " #", _uint2str(tokenId)));
     }
 
-    // ========== 管理员接口 ==========
-    function updateCardImage(BlessingType t, string calldata url) external onlyOwner {
+    function updateCardImage(ZodiacType t, string calldata url) external onlyOwner {
         imgUrl[t] = url;
     }
 
@@ -136,7 +403,6 @@ contract FiveBlessingsMetadata is
         authorizer = _authorizer;
     }
 
-    // ========== 工具函数 ==========
     function _addressToString(address _addr) internal pure returns (string memory) {
         bytes32 value = bytes32(uint256(uint160(_addr)));
         bytes memory alphabet = "0123456789abcdef";

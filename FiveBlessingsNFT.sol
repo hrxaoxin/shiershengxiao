@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// 确保导入路径正确，使用最新的OpenZeppelin升级合约版本
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -10,7 +9,18 @@ import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.
 import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-enum BlessingType { AiGuo, FuQiang, HeXie, YouShan, JingYe, WanNeng, WuFuLinMen }
+enum ZodiacType {
+    ShuiShu_1, ShuiNiu_1, ShuiHu_1, ShuiTu_1, ShuiLong_1, ShuiShe_1, ShuiMa_1, ShuiYang_1, ShuiHou_1, ShuiJi_1, ShuiGou_1, ShuiZhu_1,
+    ShuiShu_0, ShuiNiu_0, ShuiHu_0, ShuiTu_0, ShuiLong_0, ShuiShe_0, ShuiMa_0, ShuiYang_0, ShuiHou_0, ShuiJi_0, ShuiGou_0, ShuiZhu_0,
+    FengShu_1, FengNiu_1, FengHu_1, FengTu_1, FengLong_1, FengShe_1, FengMa_1, FengYang_1, FengHou_1, FengJi_1, FengGou_1, FengZhu_1,
+    FengShu_0, FengNiu_0, FengHu_0, FengTu_0, FengLong_0, FengShe_0, FengMa_0, FengYang_0, FengHou_0, FengJi_0, FengGou_0, FengZhu_0,
+    HuoShu_1, HuoNiu_1, HuoHu_1, HuoTu_1, HuoLong_1, HuoShe_1, HuoMa_1, HuoYang_1, HuoHou_1, HuoJi_1, HuoGou_1, HuoZhu_1,
+    HuoShu_0, HuoNiu_0, HuoHu_0, HuoTu_0, HuoLong_0, HuoShe_0, HuoMa_0, HuoYang_0, HuoHou_0, HuoJi_0, HuoGou_0, HuoZhu_0,
+    AnShu_1, AnNiu_1, AnHu_1, AnTu_1, AnLong_1, AnShe_1, AnMa_1, AnYang_1, AnHou_1, AnJi_1, AnGou_1, AnZhu_1,
+    AnShu_0, AnNiu_0, AnHu_0, AnTu_0, AnLong_0, AnShe_0, AnMa_0, AnYang_0, AnHou_0, AnJi_0, AnGou_0, AnZhu_0,
+    GuangShu_1, GuangNiu_1, GuangHu_1, GuangTu_1, GuangLong_1, GuangShe_1, GuangMa_1, GuangYang_1, GuangHou_1, GuangJi_1, GuangGou_1, GuangZhu_1,
+    GuangShu_0, GuangNiu_0, GuangHu_0, GuangTu_0, GuangLong_0, GuangShe_0, GuangMa_0, GuangYang_0, GuangHou_0, GuangJi_0, GuangGou_0, GuangZhu_0
+}
 
 interface ITokenBurner {
     function hasBurnedToken(address user) external view returns (bool);
@@ -19,42 +29,34 @@ interface ITokenBurner {
 }
 
 interface IRewardManager {
-    function updateCardExternal(address user, BlessingType t, uint256 cnt) external returns (bool);
+    function updateCardExternal(address user, ZodiacType t, uint256 cnt) external returns (bool);
     function addWuFu(address user) external returns (bool);
     function _hasAllBasic(address user) external view returns (bool);
     function isWuFuHolder(address user) external view returns (bool);
-    function cardCount(address user, BlessingType t) external view returns (uint256);
+    function cardCount(address user, ZodiacType t) external view returns (uint256);
     function resetWuFuHolder(address user) external returns (bool);
     function setAuthorizedNFTContract(address nft, bool ok) external;
     function royaltyWallet() external view returns (address);
 }
 
 interface IFiveBlessingsMetadata {
-    function getCardImage(BlessingType t) external view returns (string memory);
-    function getCardName(BlessingType t) external view returns (string memory);
-    function getCardDesc(BlessingType t) external view returns (string memory);
-    function getNFTName(BlessingType t, uint256 tokenId) external view returns (string memory);
+    function getCardImage(ZodiacType t) external view returns (string memory);
+    function getCardName(ZodiacType t) external view returns (string memory);
+    function getCardDesc(ZodiacType t) external view returns (string memory);
+    function getNFTName(ZodiacType t, uint256 tokenId) external view returns (string memory);
     function contractURI() external view returns (string memory);
-    
-    // 补充缺失的接口方法定义
     function collName() external view returns (string memory);
     function collDesc() external view returns (string memory);
     function collImage() external view returns (string memory);
     function sellerFeeBasisPoints() external view returns (uint256);
 }
 
-// 补充FiveBlessingsMetadata接口别名定义
 interface FiveBlessingsMetadata is IFiveBlessingsMetadata {}
 
-struct BatchBurnInfo {
-    BlessingType cardType;
-    uint256 burnCount;
-}
-
-contract FiveBlessingsNFT is 
-    Initializable, 
-    ERC721Upgradeable, 
-    OwnableUpgradeable, 
+contract FiveBlessingsNFT is
+    Initializable,
+    ERC721Upgradeable,
+    OwnableUpgradeable,
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable,
     ERC721HolderUpgradeable
@@ -62,32 +64,21 @@ contract FiveBlessingsNFT is
     using Counters for Counters.Counter;
     Counters.Counter private _nonce;
 
-    // 核心常量
     uint256 public constant MAX_SUPPLY = 1000000;
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
 
-    // 随机概率常量
-    uint256 internal constant P_AIGUO = 24;
-    uint256 internal constant P_FUQIANG = 48;
-    uint256 internal constant P_HEXIE = 72;
-    uint256 internal constant P_YOUSHAN = 96;
-    uint256 internal constant P_JINGYE = 99;
-
-    // 核心状态变量
     uint256 public nextCardId;
     address public tokenBurner;
     address public rewardManager;
     address public metadataContract;
     address public authorizer;
-    
+
     mapping(address => bool) public authorizedMinter;
-    mapping(uint256 => BlessingType) public tokenType;
+    mapping(uint256 => ZodiacType) public tokenType;
 
-    // 用户NFT存储
-    mapping(address => mapping(BlessingType => uint256[])) public userTokens;
-    mapping(address => mapping(BlessingType => uint256)) public userLatestToken;
+    mapping(address => mapping(ZodiacType => uint256[])) public userTokens;
+    mapping(address => mapping(ZodiacType => uint256)) public userLatestToken;
 
-    // 存储间隙
     uint256[60] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -95,14 +86,13 @@ contract FiveBlessingsNFT is
         _disableInitializers();
     }
 
-    // 初始化函数
     function initialize(address initialOwner, address _metadataContract, address _authorizer) external initializer {
-        __ERC721_init("Five Blessings", "5BLESS");
+        __ERC721_init("Twelve Zodiacs", "12ZODIAC");
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __ERC721Holder_init();
-        
+
         nextCardId = 1;
         authorizedMinter[initialOwner] = true;
         metadataContract = _metadataContract;
@@ -110,11 +100,9 @@ contract FiveBlessingsNFT is
         _nonce.increment();
     }
 
-    // UUPS升级授权
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    // 安全的随机卡片类型生成
-    function _getRandomType(uint256 salt) internal returns (BlessingType) {
+    function _getRandomType(uint256 salt) internal returns (ZodiacType) {
         _nonce.increment();
         uint256 r = uint256(keccak256(abi.encodePacked(
             blockhash(block.number - 1),
@@ -123,123 +111,77 @@ contract FiveBlessingsNFT is
             block.timestamp,
             _nonce.current(),
             gasleft()
-        ))) % 100;
+        ))) % 120;
 
-        if (r < P_AIGUO) return BlessingType.AiGuo;
-        if (r < P_FUQIANG) return BlessingType.FuQiang;
-        if (r < P_HEXIE) return BlessingType.HeXie;
-        if (r < P_YOUSHAN) return BlessingType.YouShan;
-        if (r < P_JINGYE) return BlessingType.JingYe;
-        return BlessingType.WanNeng;
+        return ZodiacType(r);
     }
 
-    // ========== 核心修改：Base64编码的tokenURI ==========
-function tokenURI(uint256 tokenId) public view override returns (string memory) {
-    require(_ownerOf(tokenId) != address(0), "Invalid token ID");
-    
-    IFiveBlessingsMetadata metadata = IFiveBlessingsMetadata(metadataContract);
-    BlessingType t = tokenType[tokenId];
-    
-    // 直接获取基础信息
-    string memory baseCardName = metadata.getCardName(t);
-    string memory cardDesc = metadata.getCardDesc(t);
-    string memory cardImage = metadata.getCardImage(t);
-    
-    // 构造NFT名称
-    string memory nftName = string(abi.encodePacked(baseCardName, " #", _uint2str(tokenId)));
-    
-    // 构造符合标准的JSON格式
-    string memory json = string(abi.encodePacked(
-        '{"name":"', nftName, '",',
-        '"description":"', cardDesc, '",',
-        '"image":"', cardImage, '"}'
-    ));
-    
-    // 使用标准的Base64编码格式
-    return string(abi.encodePacked(
-        "data:application/json;base64,",
-        _base64Encode(bytes(json))
-    ));
-}
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        require(_ownerOf(tokenId) != address(0), "Invalid token ID");
 
-// 辅助函数：将ipfs://协议转换为HTTP格式
-function _convertIpfsToHttp(string memory ipfsUrl) internal pure returns (string memory) {
-    bytes memory ipfsBytes = bytes(ipfsUrl);
-    if (ipfsBytes.length < 7) return ipfsUrl;
-    
-    // 检查是否以ipfs://开头
-    bool isIpfs = true;
-    bytes memory ipfsPrefix = bytes("ipfs://");
-    for (uint i = 0; i < 7; i++) {
-        if (ipfsBytes[i] != ipfsPrefix[i]) {
-            isIpfs = false;
-            break;
-        }
+        IFiveBlessingsMetadata metadata = IFiveBlessingsMetadata(metadataContract);
+        ZodiacType t = tokenType[tokenId];
+
+        string memory baseCardName = metadata.getCardName(t);
+        string memory cardDesc = metadata.getCardDesc(t);
+        string memory cardImage = metadata.getCardImage(t);
+
+        string memory nftName = string(abi.encodePacked(baseCardName, " #", _uint2str(tokenId)));
+
+        string memory json = string(abi.encodePacked(
+            '{"name":"', nftName, '",',
+            '"description":"', cardDesc, '",',
+            '"image":"', cardImage, '"}'
+        ));
+
+        return string(abi.encodePacked(
+            "data:application/json;base64,",
+            _base64Encode(bytes(json))
+        ));
     }
-    
-    if (!isIpfs) return ipfsUrl;
-    
-    // 提取CID并转换为HTTP格式
-    bytes memory cidBytes = new bytes(ipfsBytes.length - 7);
-    for (uint i = 0; i < cidBytes.length; i++) {
-        cidBytes[i] = ipfsBytes[i + 7];
-    }
-    string memory cid = string(cidBytes);
-    return string(abi.encodePacked("https://ipfs.io/ipfs/", cid));
-}
 
-// 测试函数：生成tokenURI用于调试
-function testTokenURI(uint256 tokenId) external view returns (string memory) {
-    return tokenURI(tokenId);
-}
-
-    // Base64编码实现
     function _base64Encode(bytes memory data) internal pure returns (string memory) {
         bytes memory base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         bytes memory result = new bytes((data.length + 2) / 3 * 4);
         uint256 cursor = 0;
-        
+
         for (uint256 i = 0; i < data.length; i += 3) {
             uint256 b0 = uint8(data[i]);
             uint256 b1 = i + 1 < data.length ? uint8(data[i + 1]) : 0;
             uint256 b2 = i + 2 < data.length ? uint8(data[i + 2]) : 0;
-            
+
             uint256 chunk = (b0 << 16) | (b1 << 8) | b2;
-            
+
             result[cursor++] = base64[(chunk >> 18) & 0x3F];
             result[cursor++] = base64[(chunk >> 12) & 0x3F];
             result[cursor++] = base64[(chunk >> 6) & 0x3F];
             result[cursor++] = base64[chunk & 0x3F];
         }
-        
-        // 处理填充
+
         if (data.length % 3 == 1) {
             result[cursor - 2] = '=';
             result[cursor - 1] = '=';
         } else if (data.length % 3 == 2) {
             result[cursor - 1] = '=';
         }
-        
+
         return string(result);
     }
 
-    // 合约元数据URI（也改为Base64格式）
     function contractURI() public view returns (string memory) {
         require(metadataContract != address(0), "Metadata contract not set");
-        
+
         FiveBlessingsMetadata metaContract = FiveBlessingsMetadata(metadataContract);
         IRewardManager rm = IRewardManager(rewardManager);
-        
-        // 获取元数据信息并进行转义处理
+
         string memory collName = metaContract.collName();
         string memory collDesc = metaContract.collDesc();
         string memory collImage = metaContract.collImage();
-        
+
         string memory escapedName = _escapeString(collName);
         string memory escapedDesc = _escapeString(collDesc);
         string memory escapedImage = _escapeString(collImage);
-        
-        // 构造合约级别的元数据JSON
+
         string memory json = string(abi.encodePacked(
             '{"name":"', escapedName, '",',
             '"description":"', escapedDesc, '",',
@@ -247,14 +189,13 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
             '"seller_fee_basis_points":', _uint2str(metaContract.sellerFeeBasisPoints()), ',',
             '"fee_recipient":"', _addressToString(rm.royaltyWallet()), '"}'
         ));
-        
+
         return string(abi.encodePacked(
             "data:application/json;base64,",
             _base64Encode(bytes(json))
         ));
     }
 
-    // 普通铸造
     function mint() external nonReentrant returns (uint256) {
         require(tokenBurner != address(0) && rewardManager != address(0), "Dependencies not set");
         require(nextCardId < MAX_SUPPLY, "Max supply reached");
@@ -264,9 +205,9 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         require(tb.decreaseBurnCount(msg.sender), "Burn count decrease failed");
 
         uint256 tokenId = nextCardId++;
-        BlessingType t = _getRandomType(tokenId);
+        ZodiacType t = _getRandomType(tokenId);
         tokenType[tokenId] = t;
-        
+
         _safeMint(msg.sender, tokenId);
         userTokens[msg.sender][t].push(tokenId);
         userLatestToken[msg.sender][t] = tokenId;
@@ -275,15 +216,14 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         return tokenId;
     }
 
-    // 指定类型铸造
-    function mintSpecificType(address to, BlessingType t) external nonReentrant returns (uint256) {
+    function mintSpecificType(address to, ZodiacType t) external nonReentrant returns (uint256) {
         require(authorizedMinter[msg.sender] || msg.sender == owner(), "Not authorized");
         require(to != address(0) && nextCardId < MAX_SUPPLY, "Invalid params");
 
         uint256 tokenId = nextCardId++;
         tokenType[tokenId] = t;
         _safeMint(to, tokenId);
-        
+
         userTokens[to][t].push(tokenId);
         userLatestToken[to][t] = tokenId;
 
@@ -291,49 +231,12 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         return tokenId;
     }
 
-    // 合成五福临门
-    function synthesizeWuFu() external nonReentrant {
-        address user = msg.sender;
-        IRewardManager rm = IRewardManager(rewardManager);
-        
-        require(rewardManager != address(0), "RewardManager not set");
-        require(!rm.isWuFuHolder(user), "Already holder");
-        require(rm._hasAllBasic(user), "Insufficient cards");
-
-        BlessingType[] memory types = new BlessingType[](5);
-        types[0] = BlessingType.AiGuo;
-        types[1] = BlessingType.FuQiang;
-        types[2] = BlessingType.HeXie;
-        types[3] = BlessingType.YouShan;
-        types[4] = BlessingType.JingYe;
-
-        uint256 wanNengUsed = 0;
-        
-        for (uint256 i = 0; i < 5; i++) {
-            if (rm.cardCount(user, types[i]) == 0) {
-                require(rm.cardCount(user, BlessingType.WanNeng) > wanNengUsed, "Insufficient WanNeng");
-                wanNengUsed++;
-            }
-        }
-
-        for (uint256 i = 0; i < 5; i++) {
-            BlessingType burnType = rm.cardCount(user, types[i]) > 0 ? types[i] : BlessingType.WanNeng;
-            _burnCard(user, burnType);
-        }
-
-        _mintWuFu(user);
-        require(rm.addWuFu(user), "Add WuFu failed");
-        
-        emit WuFuSynthesized(user, block.timestamp, wanNengUsed);
-    }
-
-    // 销毁卡片
-    function _burnCard(address user, BlessingType t) internal {
+    function _burnCard(address user, ZodiacType t) internal {
         uint256 tokenId = userLatestToken[user][t];
         require(tokenId != 0 && _ownerOf(tokenId) == user, "Not owner of token");
 
         _transfer(user, BLACK_HOLE, tokenId);
-        
+
         uint256[] storage tokens = userTokens[user][t];
         for (uint256 i = 0; i < tokens.length; i++) {
             if (tokens[i] == tokenId) {
@@ -342,38 +245,23 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
                 break;
             }
         }
-        
+
         userLatestToken[user][t] = tokens.length > 0 ? tokens[tokens.length - 1] : 0;
         emit CardBurned(tokenId, t, user);
     }
 
-    // 铸造五福临门NFT
-    function _mintWuFu(address user) internal {
-        uint256 tokenId = nextCardId++;
-        require(tokenId < MAX_SUPPLY, "Max supply reached");
-        
-        tokenType[tokenId] = BlessingType.WuFuLinMen;
-        _safeMint(user, tokenId);
-        
-        userTokens[user][BlessingType.WuFuLinMen].push(tokenId);
-        userLatestToken[user][BlessingType.WuFuLinMen] = tokenId;
-        
-        emit WuFuLinMenCreated(tokenId, user, uint64(block.timestamp));
-    }
-
-    // 重写_update函数
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = _ownerOf(tokenId);
         address prevOwner = super._update(to, tokenId, auth);
 
         if (from != address(0) && from != BLACK_HOLE) {
-            BlessingType t = tokenType[tokenId];
+            ZodiacType t = tokenType[tokenId];
             _removeToken(from, t, tokenId);
             _updateReward(from, t, false);
         }
-        
+
         if (to != address(0) && to != BLACK_HOLE) {
-            BlessingType t = tokenType[tokenId];
+            ZodiacType t = tokenType[tokenId];
             userTokens[to][t].push(tokenId);
             userLatestToken[to][t] = tokenId;
             _updateReward(to, t, true);
@@ -382,8 +270,7 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         return prevOwner;
     }
 
-    // 移除用户NFT记录
-    function _removeToken(address user, BlessingType t, uint256 tokenId) internal {
+    function _removeToken(address user, ZodiacType t, uint256 tokenId) internal {
         uint256[] storage tokens = userTokens[user][t];
         for (uint256 i = 0; i < tokens.length; i++) {
             if (tokens[i] == tokenId) {
@@ -394,30 +281,28 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         }
     }
 
-    // 同步更新RewardManager的卡片计数
-    function _updateReward(address user, BlessingType t, bool isAdd) internal {
+    function _updateReward(address user, ZodiacType t, bool isAdd) internal {
         if (rewardManager == address(0)) return;
-        
+
         IRewardManager rm = IRewardManager(rewardManager);
         uint256 cnt = rm.cardCount(user, t);
-        
+
         uint256 newCount = isAdd ? cnt + 1 : (cnt > 0 ? cnt - 1 : 0);
         require(rm.updateCardExternal(user, t, newCount), isAdd ? "Update add failed" : "Update sub failed");
     }
 
-    // ========== 工具函数 ==========
     function _escapeString(string memory input) internal pure returns (string memory) {
         bytes memory inputBytes = bytes(input);
         uint256 escapeCount = 0;
-        
+
         for (uint256 i = 0; i < inputBytes.length; i++) {
             if (inputBytes[i] == "\"" || inputBytes[i] == "\\") {
                 escapeCount++;
             }
         }
-        
+
         if (escapeCount == 0) return input;
-        
+
         bytes memory outputBytes = new bytes(inputBytes.length + escapeCount);
         uint256 j = 0;
         for (uint256 i = 0; i < inputBytes.length; i++) {
@@ -426,19 +311,12 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
             }
             outputBytes[j++] = inputBytes[i];
         }
-        
+
         return string(outputBytes);
     }
 
-    function _blessingTypeToString(BlessingType t) internal pure returns (string memory) {
-        if (t == BlessingType.AiGuo) return "AiGuo";
-        if (t == BlessingType.FuQiang) return "FuQiang";
-        if (t == BlessingType.HeXie) return "HeXie";
-        if (t == BlessingType.YouShan) return "YouShan";
-        if (t == BlessingType.JingYe) return "JingYe";
-        if (t == BlessingType.WanNeng) return "WanNeng";
-        if (t == BlessingType.WuFuLinMen) return "WuFuLinMen";
-        return "weizhi";
+    function _zodiacTypeToString(ZodiacType t) internal pure returns (string memory) {
+        return _uint2str(uint(t));
     }
 
     function _addressToString(address _addr) internal pure returns (string memory) {
@@ -471,7 +349,6 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         return string(buf);
     }
 
-    // ========== 管理员接口 ==========
     function setAddresses(address tb, address rm) external {
         require(msg.sender == owner() || msg.sender == authorizer, "FiveBlessingsNFT: Unauthorized");
         require(tb != address(0) && rm != address(0), "Invalid zero address");
@@ -491,7 +368,7 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         authorizedMinter[minter] = true;
     }
 
-    function unauthorizeMinter(address minter) external onlyOwner {
+    function unauthorizedMinter(address minter) external onlyOwner {
         authorizedMinter[minter] = false;
     }
 
@@ -500,18 +377,16 @@ function testTokenURI(uint256 tokenId) external view returns (string memory) {
         authorizer = _authorizer;
     }
 
-    function getCardCount(address user, BlessingType t) external view returns (uint256) {
+    function getCardCount(address user, ZodiacType t) external view returns (uint256) {
         require(rewardManager != address(0), "RewardManager not set");
         return IRewardManager(rewardManager).cardCount(user, t);
     }
 
-    function getUserTokens(address user, BlessingType t) external view returns (uint256[] memory) {
+    function getUserTokens(address user, ZodiacType t) external view returns (uint256[] memory) {
         return userTokens[user][t];
     }
 
-    // 事件定义
-    event CardMinted(uint256 indexed cardId, BlessingType indexed cardType, address indexed owner, uint64 timestamp);
-    event CardBurned(uint256 indexed cardId, BlessingType indexed cardType, address indexed owner);
-    event WuFuLinMenCreated(uint256 indexed cardId, address indexed owner, uint64 timestamp);
+    event CardMinted(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner, uint64 timestamp);
+    event CardBurned(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner);
     event WuFuSynthesized(address indexed user, uint256 timestamp, uint256 wanNengUsed);
 }

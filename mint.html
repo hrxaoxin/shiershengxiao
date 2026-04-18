@@ -3,117 +3,74 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>铸造福卡 - 集五福活动</title>
-    <link rel="icon" href="images/fu-cards/wufulinmen.png" type="image/png">
+    <title>铸造生肖 - 十二生肖NFT</title>
+    <link rel="icon" href="images/fu-cards/shuishu_1.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
         body {
             font-family: 'Noto Sans SC', sans-serif;
             background-color: #f5f5f5;
             background-image: linear-gradient(135deg, #f5f5f5 0%, #e8f5e8 100%);
             overflow-x: hidden;
         }
-        /* 粒子背景容器 */
-        #particles-js {
-            position: fixed;
-            width: 100%;
-            height: 100%;
-            top: 0;
-            left: 0;
-            z-index: -1;
+        #particles-js { position: fixed; width: 100%; height: 100%; top: 0; left: 0; z-index: -1; }
+        .navbar { background-color: #ffffff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
+        .mint-card { background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1); transition: all 0.3s ease; }
+        .mint-card:hover { transform: translateY(-5px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); }
+        .btn-primary { background-color: #3b82f6; color: white; border-radius: 8px; padding: 10px 20px; font-weight: 500; transition: all 0.3s ease; }
+        .btn-primary:hover { background-color: #2563eb; transform: translateY(-2px); }
+        .btn-secondary { background-color: white; color: #3b82f6; border: 1px solid #3b82f6; border-radius: 8px; padding: 10px 20px; font-weight: 500; transition: all 0.3s ease; }
+        .btn-secondary:hover { background-color: #f8f9fa; transform: translateY(-2px); }
+        .zodiac-preview {
+            width: 120px;
+            height: 120px;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 0 auto 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
-        .navbar {
-            background-color: #ffffff;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-        .mint-card {
-            background-color: #ffffff;
-            border-radius: 16px;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-            transition: all 0.3s ease;
-        }
-        .mint-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-        }
-        .btn-primary {
-            background-color: #ff6b6b;
-            color: white;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-        .btn-primary:hover {
-            background-color: #ee5a6f;
-            transform: translateY(-2px);
-        }
-        .btn-secondary {
-            background-color: white;
-            color: #ff6b6b;
-            border: 1px solid #ff6b6b;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-        .btn-secondary:hover {
-            background-color: #f8f9fa;
-            transform: translateY(-2px);
-        }
-        .token-balance {
-            background: linear-gradient(135deg, #4ecdc4 0%, #45b7aa 100%);
-            border-radius: 16px;
-            color: white;
-        }
+        .zodiac-preview img { width: 100%; height: 100%; object-fit: cover; }
     </style>
 </head>
 <body>
-    <!-- 粒子背景 -->
     <div id="particles-js"></div>
-    <!-- 导航栏 -->
     <nav class="navbar fixed bottom-0 left-0 right-0 z-10">
         <div class="flex justify-around items-center py-2 px-4">
             <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1 transition-transform duration-300">🏠&nbsp;</div>
-                <span class="text-xs font-bold transition-all duration-300 text-gray-700">首页</span>
+                <div class="text-2xl mb-1">🏠&nbsp;</div>
+                <span class="text-xs font-bold text-gray-700">首页</span>
             </a>
-            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 bg-gray-100">
-                <div class="text-2xl mb-1 transition-transform duration-300">🃏</div>
-                <span class="text-xs font-bold transition-all duration-300 text-gray-700">铸造</span>
+            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl bg-gray-100">
+                <div class="text-2xl mb-1">🀄</div>
+                <span class="text-xs font-bold text-gray-700">铸造</span>
             </a>
             <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1 transition-transform duration-300">🎁</div>
-                <span class="text-xs font-bold transition-all duration-300 text-gray-700">福卡</span>
+                <div class="text-2xl mb-1">🎁</div>
+                <span class="text-xs font-bold text-gray-700">生肖</span>
             </a>
             <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1 transition-transform duration-300">🏆</div>
-                <span class="text-xs font-bold transition-all duration-300 text-gray-700">奖励</span>
+                <div class="text-2xl mb-1">🏆</div>
+                <span class="text-xs font-bold text-gray-700">奖励</span>
             </a>
             <a href="trading.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1 transition-transform duration-300">💰</div>
-                <span class="text-xs font-bold transition-all duration-300 text-gray-700">交易</span>
+                <div class="text-2xl mb-1">💰</div>
+                <span class="text-xs font-bold text-gray-700">交易</span>
             </a>
         </div>
     </nav>
-    <!-- 主内容区 -->
     <main class="container mx-auto px-4 pt-6 pb-24">
-        <!-- 页面标题 -->
         <div class="flex items-center mb-4">
-            <div class="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center mr-3">
-                <span class="text-white text-2xl font-bold">福</span>
+            <div class="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+                <span class="text-white text-2xl font-bold">生</span>
             </div>
-            <h1 class="text-2xl font-bold text-gray-800">铸造福卡</h1>
+            <h1 class="text-2xl font-bold text-gray-800">铸造生肖</h1>
         </div>
-        <!-- 铸造说明 -->
-        <p class="text-lg text-gray-600 mb-8">使用代币随机获得一张福卡</p>
-        <!-- 钱包区域框 -->
+        <p class="text-lg text-gray-600 mb-8">使用代币随机获得一张生肖NFT</p>
+
         <div class="bg-white rounded-xl p-6 shadow-md mb-8">
-            <!-- 钱包信息 -->
             <div class="flex items-center mb-6">
                 <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-4">
                     <i class="text-blue-500 text-xl">👛</i>
@@ -124,15 +81,10 @@
                     <p class="text-xs text-gray-400" id="connectionStatus">请点击连接钱包按钮</p>
                 </div>
                 <div class="flex space-x-2">
-                    <button class="btn-primary text-sm" id="connectWalletBtn">
-                        <i class="fas fa-plug mr-1"></i> 连接
-                    </button>
-                    <button class="btn-secondary text-sm" id="refreshWallet">
-                        <i class="fas fa-sync-alt mr-1"></i> 刷新
-                    </button>
+                    <button class="btn-primary text-sm" id="connectWalletBtn"><i class="fas fa-plug mr-1"></i> 连接</button>
+                    <button class="btn-secondary text-sm" id="refreshWallet"><i class="fas fa-sync-alt mr-1"></i> 刷新</button>
                 </div>
             </div>
-            <!-- 代币信息 -->
             <div class="space-y-4">
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">代币余额</span>
@@ -156,56 +108,48 @@
                 </div>
             </div>
         </div>
-        <!-- 三步铸造流程 -->
+
         <div class="space-y-4 mb-8">
-            <!-- 第一步：授权代币 -->
             <button class="btn-secondary w-full py-4 text-lg font-bold" id="approveToken">
                 <i class="fas fa-key mr-2"></i> 第一步：授权代币
             </button>
-            <!-- 第二步：销毁代币 -->
             <button class="btn-secondary w-full py-4 text-lg font-bold" id="burnTokenBtn">
                 <i class="fas fa-fire mr-2"></i> 第二步：销毁代币
             </button>
-            <!-- 第三步：铸造福卡NFT -->
             <button class="btn-primary w-full py-4 text-lg font-bold" id="mintAfterBurnBtn" disabled>
-                <i class="fas fa-magic mr-2"></i> 第三步：铸造福卡NFT
+                <i class="fas fa-magic mr-2"></i> 第三步：铸造生肖NFT
             </button>
-            <!-- 铸造状态提示 -->
             <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4" id="mintStatus">
                 <p class="text-yellow-700">请先完成第一步：授权代币</p>
             </div>
         </div>
-        <!-- 温馨提示 -->
+
         <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
             <h3 class="text-lg font-bold text-yellow-800 mb-2">温馨提示</h3>
             <ul class="space-y-2 text-yellow-700">
-                <li>• 每次铸造将随机获得一张福卡</li>
-                <li>• 持有福卡即可享受对应的税收分红(每种0.4%)</li>
-                <li>• 集齐五福合成后可享受额外1%税收分红</li>
+                <li>• 每次铸造将随机获得一张生肖NFT</li>
+                <li>• 共有5种属性 x 12种生肖 x 2种性别 = 120种生肖</li>
+                <li>• 持有生肖NFT即可享受对应的税收分红</li>
                 <li>• 首次铸造需要授权代币，之后无需重复授权</li>
             </ul>
         </div>
     </main>
-    <!-- 铸造成功弹窗 -->
+
     <div id="mintSuccessModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
             <div class="text-center mb-4">
                 <div class="text-6xl mb-4">🎊</div>
                 <h3 class="text-2xl font-bold text-gray-800 mb-2">铸造成功！</h3>
-                <p class="text-gray-600 mb-6">恭喜您获得了一张福卡</p>
+                <p class="text-gray-600 mb-6">恭喜您获得了一张生肖NFT</p>
             </div>
-            <!-- 福卡信息 -->
             <div id="mintedCardInfo" class="mb-6">
-                <div class="flex items-center mb-4">
-                    <div id="cardImage" class="w-20 h-20 rounded-lg overflow-hidden mr-4">
-                        <img src="" alt="福卡" class="w-full h-full object-cover">
-                    </div>
-                    <div class="flex-1">
-                        <h4 id="cardName" class="text-xl font-bold text-gray-800">福卡名称</h4>
-                        <p id="cardRarity" class="text-sm text-gray-500">稀有度</p>
-                    </div>
+                <div class="zodiac-preview" id="cardImage">
+                    <img src="" alt="生肖" class="w-full h-full object-cover">
                 </div>
-                <p id="cardDescription" class="text-gray-600 text-sm">福卡描述</p>
+                <div class="text-center">
+                    <h4 id="cardName" class="text-xl font-bold text-gray-800 mb-2">生肖名称</h4>
+                    <p id="cardDescription" class="text-gray-600 text-sm">描述</p>
+                </div>
             </div>
             <div class="flex space-x-4">
                 <button class="btn-secondary flex-1" id="cancelModal">取消</button>
@@ -213,28 +157,42 @@
             </div>
         </div>
     </div>
+
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="abis.js"></script>
     <script>
-        // 使用abis.js中的ABIs
+        const ZODIAC_NAMES = {
+            water: ['水鼠', '水牛', '水虎', '水兔', '水龙', '水蛇', '水马', '水羊', '水猴', '水鸡', '水狗', '水猪'],
+            wind: ['风鼠', '风牛', '风虎', '风兔', '风龙', '风蛇', '风马', '风羊', '风猴', '风鸡', '风狗', '风猪'],
+            fire: ['火鼠', '火牛', '火虎', '火兔', '火龙', '火蛇', '火马', '火羊', '火猴', '火鸡', '火狗', '火猪'],
+            dark: ['暗鼠', '暗牛', '暗虎', '暗兔', '暗龙', '暗蛇', '暗马', '暗羊', '暗猴', '暗鸡', '暗狗', '暗猪'],
+            light: ['光鼠', '光牛', '光虎', '光兔', '光龙', '光蛇', '光马', '光羊', '光猴', '光鸡', '光狗', '光猪']
+        };
+
+        const ZODIAC_PREFIX = {
+            water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang'
+        };
+
+        const ZODIAC_ANIMALS = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
+
         const tokenABI = window.tokenABI;
         const rewardManagerABI = window.rewardManagerABI;
         const tokenBurnerABI = window.tokenBurnerABI;
         const fiveBlessingsNFTABI = window.fiveBlessingsNFTABI;
-        // 从abis.js中加载合约地址
+
         const rewardManagerAddress = window.contractAddresses.rewardManager;
         const tokenBurnerAddress = window.contractAddresses.tokenBurner;
         const fiveBlessingsNFTAddress = window.contractAddresses.fiveBlessingsNFT;
         const tokenContractAddress = window.contractAddresses.tokenContract;
-        // 全局变量
+
         let web3 = null;
         let rewardManagerContract = null;
         let tokenBurnerContract = null;
         let fiveBlessingsNFTContract = null;
         let tokenContract = null;
         let accounts = [];
-        const MINT_PRICE = 1; // 铸造价格：1枚代币
-        // DOM元素
+        const MINT_PRICE = 1;
+
         const walletAddress = document.getElementById('walletAddress');
         const connectionStatus = document.getElementById('connectionStatus');
         const tokenBalance = document.getElementById('tokenBalance');
@@ -247,81 +205,31 @@
         const mintSuccessModal = document.getElementById('mintSuccessModal');
         const cancelModal = document.getElementById('cancelModal');
         const viewCollection = document.getElementById('viewCollection');
-        // 初始化
+        const burnTokenBtn = document.getElementById('burnTokenBtn');
+        const mintAfterBurnBtn = document.getElementById('mintAfterBurnBtn');
+        const mintStatus = document.getElementById('mintStatus');
+
         document.addEventListener('DOMContentLoaded', function() {
             connectWallet();
-            // 监听钱包连接状态变化
-            if (typeof window.ethereum !== 'undefined') {
-                window.ethereum.on('accountsChanged', function(accounts) {
-                    if (accounts.length > 0) {
-                        // 钱包已连接，更新状态
-                        connectWallet();
-                    } else {
-                        // 钱包已断开连接
-                        // 重置状态
-                        web3 = null;
-                        rewardManagerContract = null;
-                        tokenBurnerContract = null;
-                        fiveBlessingsNFTContract = null;
-                        tokenContract = null;
-                        accounts = [];
-                        walletAddress.textContent = '未连接钱包';
-                        connectionStatus.textContent = '钱包已断开连接';
-                        connectionStatus.style.color = '#f44336';
-                        tokenBalance.textContent = '0';
-                        mintCount.textContent = '0';
-                        approvalStatus.textContent = '未授权';
-                        approvalStatus.style.color = '#f44336';
-                        connectWalletBtn.textContent = '连接';
-                        connectWalletBtn.disabled = false;
-                    }
-                });
-                window.ethereum.on('chainChanged', function(chainId) {
-                    // 网络切换后重新连接钱包
-                    connectWallet();
-                });
-                window.ethereum.on('disconnect', function(error) {
-                    // 重置状态
-                    web3 = null;
-                    rewardManagerContract = null;
-                    tokenBurnerContract = null;
-                    fiveBlessingsNFTContract = null;
-                    tokenContract = null;
-                    accounts = [];
-                    walletAddress.textContent = '未连接钱包';
-                    connectionStatus.textContent = '钱包已断开连接';
-                    connectionStatus.style.color = '#f44336';
-                    tokenBalance.textContent = '0';
-                    mintCount.textContent = '0';
-                    approvalStatus.textContent = '未授权';
-                    approvalStatus.style.color = '#f44336';
-                    connectWalletBtn.textContent = '连接';
-                    connectWalletBtn.disabled = false;
-                });
-            }
         });
-        // 连接钱包
+
         async function connectWallet() {
-            // 更新连接状态显示
             connectionStatus.textContent = '正在连接钱包...';
             connectionStatus.style.color = '#ff9800';
             connectWalletBtn.textContent = '连接中...';
             connectWalletBtn.disabled = true;
+
             if (typeof window.ethereum !== 'undefined') {
                 web3 = new Web3(window.ethereum);
                 try {
-                    // 检测网络
-                    const chainId = await web3.eth.getChainId();
-                    // 检查账户
                     accounts = await web3.eth.requestAccounts();
                     const address = accounts[0];
                     const shortAddress = address.substring(0, 4) + '...' + address.substring(address.length - 4);
                     walletAddress.textContent = shortAddress;
-                    // 初始化合约（即使地址是占位符也先初始化，后续操作会检查）
+
                     tokenContract = new web3.eth.Contract(tokenABI, tokenContractAddress);
-                    // 尝试更新代币余额（这会测试代币合约连接）
                     await updateTokenBalance();
-                    // 初始化所有合约
+
                     try {
                         rewardManagerContract = new web3.eth.Contract(rewardManagerABI, rewardManagerAddress);
                         tokenBurnerContract = new web3.eth.Contract(tokenBurnerABI, tokenBurnerAddress);
@@ -331,77 +239,40 @@
                         connectionStatus.textContent = '钱包已连接，但部分合约初始化失败';
                         connectionStatus.style.color = '#ff9800';
                     }
+
                     updateMintCount();
-                    // 获取用户剩余铸造次数
                     await getRemainingBurnCount();
-                    // 更新铸造状态
                     await updateMintStatus();
-                    // 更新连接状态显示
-                    if (connectionStatus.textContent !== '钱包已连接，但部分合约地址未配置') {
-                        connectionStatus.textContent = '钱包已连接';
-                        connectionStatus.style.color = '#4CAF50';
-                    }
+
+                    connectionStatus.textContent = '钱包已连接';
+                    connectionStatus.style.color = '#4CAF50';
                     connectWalletBtn.textContent = '已连接';
                     connectWalletBtn.disabled = true;
                 } catch (error) {
-                // 重置状态
-                web3 = null;
-                rewardManagerContract = null;
-                tokenBurnerContract = null;
-                fiveBlessingsNFTContract = null;
-                tokenContract = null;
-                accounts = [];
-                walletAddress.textContent = '未连接钱包';
-                // 分析错误原因
-                let errorMessage = '连接失败，请重试';
-                if (error.code === 4001) {
-                    errorMessage = '用户拒绝了连接请求';
-                } else if (error.message && error.message.includes('chainId')) {
-                    errorMessage = '网络连接失败，请检查网络设置';
-                } else if (error.message && error.message.includes('contract')) {
-                    errorMessage = '合约连接失败，请检查合约地址';
+                    web3 = null;
+                    accounts = [];
+                    walletAddress.textContent = '未连接钱包';
+                    connectionStatus.textContent = '连接失败，请重试';
+                    connectionStatus.style.color = '#f44336';
+                    connectWalletBtn.textContent = '连接';
+                    connectWalletBtn.disabled = false;
                 }
-                connectionStatus.textContent = errorMessage;
-                connectionStatus.style.color = '#f44336';
-                tokenBalance.textContent = '0';
-                mintCount.textContent = '0';
-                approvalStatus.textContent = '未授权';
-                approvalStatus.style.color = '#f44336';
-                connectWalletBtn.textContent = '连接';
-                connectWalletBtn.disabled = false;
-            }
             } else {
                 alert('请安装MetaMask等Web3钱包插件');
-                // 重置状态
-                web3 = null;
-                rewardManagerContract = null;
-                tokenBurnerContract = null;
-                fiveBlessingsNFTContract = null;
-                tokenContract = null;
-                accounts = [];
                 walletAddress.textContent = '未连接钱包';
                 connectionStatus.textContent = '请安装Web3钱包插件';
-                connectionStatus.style.color = '#f44336';
                 connectWalletBtn.textContent = '连接';
                 connectWalletBtn.disabled = false;
             }
         }
-        // 更新代币余额
+
         async function updateTokenBalance() {
             try {
                 if (web3 && tokenContract && accounts.length > 0) {
-                    // 查询用户的代币余额
                     const balance = await tokenContract.methods.balanceOf(accounts[0]).call();
-                    // 查询代币的小数位数
-                    let decimals = 18; // 默认值
-                    try {
-                        decimals = await tokenContract.methods.decimals().call();
-                    } catch (e) {
-                    }
-                    // 将余额转换为枚
-                    // 使用Web3.js的fromWei方法，避免精度问题
+                    let decimals = 18;
+                    try { decimals = await tokenContract.methods.decimals().call(); } catch (e) {}
                     const balanceInTokens = web3.utils.fromWei(balance, 'ether');
-                    // 显示为整数
                     const balanceInt = Math.floor(parseFloat(balanceInTokens));
                     tokenBalance.textContent = balanceInt;
                 }
@@ -410,14 +281,12 @@
             }
             updateMintCount();
         }
-        // 更新可铸造次数
+
         function updateMintCount() {
             try {
                 if (web3 && accounts.length > 0) {
-                    // 获取代币余额
                     const balanceStr = tokenBalance.textContent || '0';
                     const balance = parseInt(balanceStr);
-                    // 计算可铸造次数（向下取整）
                     const count = Math.floor(balance / MINT_PRICE);
                     mintCount.textContent = count;
                 } else {
@@ -427,15 +296,10 @@
                 mintCount.textContent = '0';
             }
         }
-        // 连接钱包按钮
-        connectWalletBtn.addEventListener('click', function() {
-            connectWallet();
-        });
-        // 刷新钱包
-        refreshWallet.addEventListener('click', function() {
-            connectWallet();
-        });
-        // 检查授权状态
+
+        connectWalletBtn.addEventListener('click', function() { connectWallet(); });
+        refreshWallet.addEventListener('click', function() { connectWallet(); });
+
         async function checkApprovalStatus() {
             try {
                 if (web3 && tokenContract && accounts.length > 0) {
@@ -455,7 +319,7 @@
                 approvalStatus.style.color = '#ff9800';
             }
         }
-        // 获取用户剩余铸造次数
+
         async function getRemainingBurnCount() {
             try {
                 if (web3 && tokenBurnerContract && accounts.length > 0) {
@@ -471,37 +335,14 @@
                 return 0;
             }
         }
-        // 授权代币函数
+
         approveToken.addEventListener('click', async function() {
-            console.log('点击授权代币按钮，当前状态:', {
-                web3: !!web3,
-                tokenContract: !!tokenContract,
-                accountsLength: accounts.length,
-                accounts: accounts
-            });
-            // 检查钱包连接状态，如果未连接则尝试连接
             if (!web3 || !tokenContract || accounts.length === 0) {
-                alert('正在检查钱包连接...');
-                try {
-                    await connectWallet();
-                    console.log('重新连接后状态:', {
-                        web3: !!web3,
-                        tokenContract: !!tokenContract,
-                        accountsLength: accounts.length,
-                        accounts: accounts
-                    });
-                    // 再次检查连接状态
-                    if (!web3 || !tokenContract || accounts.length === 0) {
-                        alert('请先连接钱包');
-                        return;
-                    }
-                } catch (error) {
-                    alert('请先连接钱包');
-                    return;
-                }
+                alert('请先连接钱包');
+                return;
             }
+
             try {
-                // 获取代币余额
                 const balanceStr = tokenBalance.textContent || '0';
                 const balance = parseInt(balanceStr);
                 if (balance < MINT_PRICE) {
@@ -512,64 +353,41 @@
                 alert('检查余额失败，请刷新页面重试');
                 return;
             }
+
             try {
                 approveToken.textContent = '授权中...';
                 approveToken.disabled = true;
-                // 使用Web3.js的toWei方法，避免科学计数法问题
+
                 const amountInWei = web3.utils.toWei(MINT_PRICE.toString(), 'ether');
-                // 设置合理的Gas价格和上限
-                // 使用动态Gas价格，根据网络状况自动调整
                 const gasPrice = await web3.eth.getGasPrice();
-                // 增加20%的Gas价格以提高交易优先级
                 const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.2);
-                const gasLimit = 1000000; // 1,000,000 gas
-                // 显示授权提示
-                alert('即将授权智能合约使用1枚代币\n\n这是正常的铸造流程，用于支付铸造费用\n\n请在MetaMask等web3钱包中确认授权交易');
-                await tokenContract.methods.approve(tokenBurnerAddress, amountInWei).send({ 
+                const gasLimit = 1000000;
+
+                alert('即将授权智能合约使用1枚代币\n\n请在MetaMask等web3钱包中确认授权交易');
+
+                await tokenContract.methods.approve(tokenBurnerAddress, amountInWei).send({
                     from: accounts[0],
                     gasPrice: adjustedGasPrice,
                     gas: gasLimit
                 });
-                // 更新授权状态
+
                 await checkApprovalStatus();
-                // 显示成功提示
                 alert('代币授权成功！现在可以开始铸造了');
-                // 恢复按钮状态
+
                 approveToken.textContent = '授权代币';
                 approveToken.disabled = false;
             } catch (error) {
                 approveToken.textContent = '授权代币';
                 approveToken.disabled = false;
                 let errorMsg = '授权失败，请重试';
-                if (error.message) {
-                    errorMsg += '\n错误信息: ' + error.message;
-                }
+                if (error.message) { errorMsg += '\n错误信息: ' + error.message; }
                 alert(errorMsg);
             }
         });
-        // 两步铸造流程
-        // DOM元素
-        const burnTokenBtn = document.getElementById('burnTokenBtn');
-        const mintAfterBurnBtn = document.getElementById('mintAfterBurnBtn');
-        const mintStatus = document.getElementById('mintStatus');
-        // 检查用户是否已销毁代币
-        async function checkBurnStatus() {
-            try {
-                if (web3 && tokenBurnerContract && accounts.length > 0) {
-                    // 检查用户是否已销毁代币（使用hasBurnedToken函数）
-                    const hasBurned = await tokenBurnerContract.methods.hasBurnedToken(accounts[0]).call();
-                    return hasBurned;
-                }
-                return false;
-            } catch (error) {
-                return false;
-            }
-        }
-        // 更新铸造状态
+
         async function updateMintStatus() {
             try {
                 if (web3 && tokenBurnerContract && accounts.length > 0) {
-                    // 直接检查用户的剩余铸造次数
                     const burnCount = await tokenBurnerContract.methods.getBurnCount(accounts[0]).call();
                     if (burnCount > 0) {
                         mintAfterBurnBtn.disabled = false;
@@ -587,582 +405,160 @@
                 mintStatus.innerHTML = '<p class="text-yellow-700">请先完成第一步：销毁代币</p>';
             }
         }
-        // 第一步：销毁代币
+
         burnTokenBtn.addEventListener('click', async function() {
-            console.log('点击了销毁代币按钮，当前状态:', {
-                web3: !!web3,
-                tokenBurnerContract: !!tokenBurnerContract,
-                tokenContract: !!tokenContract,
-                accountsLength: accounts.length,
-                accounts: accounts
-            });
             if (!web3 || !tokenBurnerContract || !tokenContract || accounts.length === 0) {
-                try {
-                    await connectWallet();
-                    console.log('重新连接后状态:', {
-                        web3: !!web3,
-                        tokenBurnerContract: !!tokenBurnerContract,
-                        tokenContract: !!tokenContract,
-                        accountsLength: accounts.length,
-                        accounts: accounts
-                    });
-                    if (!web3 || !tokenBurnerContract || !tokenContract || accounts.length === 0) {
-                        alert('请先连接钱包');
-                        return;
-                    }
-                } catch (error) {
+                await connectWallet();
+                if (!web3 || !tokenBurnerContract || !tokenContract || accounts.length === 0) {
                     alert('请先连接钱包');
                     return;
                 }
             }
-            // 添加视觉反馈
+
             burnTokenBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 处理中...';
             burnTokenBtn.disabled = true;
+
             try {
-                // 检查授权状态
                 const amountInWei = web3.utils.toWei(MINT_PRICE.toString(), 'ether');
                 const allowance = await tokenContract.methods.allowance(accounts[0], tokenBurnerAddress).call();
-                console.log('授权检查详情:', {
-                    userAddress: accounts[0],
-                    tokenBurnerAddress: tokenBurnerAddress,
-                    requiredAmount: MINT_PRICE,
-                    requiredAmountInWei: amountInWei,
-                    currentAllowance: allowance,
-                    isSufficient: allowance >= amountInWei
-                });
                 if (allowance < amountInWei) {
                     alert('请先授权代币后再销毁');
                     burnTokenBtn.disabled = false;
                     return;
                 }
-                // 获取代币余额
-                const balanceStr = tokenBalance.textContent || '0';
-                const balance = parseInt(balanceStr);
-                console.log('余额检查详情:', {
-                    currentBalance: balance,
-                    requiredBalance: MINT_PRICE,
-                    isSufficient: balance >= MINT_PRICE
-                });
-                if (balance < MINT_PRICE) {
-                    alert(`代币余额不足，需要${MINT_PRICE}枚代币，当前余额为${balance}枚`);
-                    burnTokenBtn.disabled = false;
-                    return;
-                }
-                // 设置合理的Gas价格和上限
+
                 const gasPrice = await web3.eth.getGasPrice();
                 const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.2);
-                const gasLimit = 1000000; // 1,000,000 gas
-                // 显示销毁提示
+                const gasLimit = 1000000;
+
                 alert('即将销毁1枚代币作为铸造费用\n\n请在MetaMask等web3钱包中确认销毁交易');
-                // 调用智能合约销毁代币
-                console.log('开始调用burnTokenForMint()函数...');
-                try {
-                    // 代币合约地址和铸造价格已在合约中固定，无需查询
-                    console.log('前端代码中的铸造价格:', web3.utils.toWei(MINT_PRICE.toString(), 'ether'));
-                    // 再次检查授权状态
-                    const amountInWei = web3.utils.toWei(MINT_PRICE.toString(), 'ether');
-                    const allowance = await tokenContract.methods.allowance(accounts[0], tokenBurnerAddress).call();
-                    console.log('最终授权检查:', {
-                        allowance: allowance,
-                        required: amountInWei,
-                        isSufficient: allowance >= amountInWei
-                    });
-                    // 再次检查代币余额
-                    const balance = await tokenContract.methods.balanceOf(accounts[0]).call();
-                    console.log('最终余额检查:', {
-                        balance: balance,
-                        required: amountInWei,
-                        isSufficient: balance >= amountInWei
-                    });
-                    // 调用销毁代币获取铸造次数函数
-                    const tx = await tokenBurnerContract.methods.burnTokenForMint().send({ 
-                        from: accounts[0],
-                        gasPrice: adjustedGasPrice,
-                        gas: gasLimit
-                    });
-                } catch (error) {
-                    // 显示详细的错误信息给用户
-                    let errorMessage = '销毁代币失败';
-                    if (error.message) {
-                        errorMessage += ': ' + error.message;
-                    } else if (error.reason) {
-                        errorMessage += ': ' + error.reason;
-                    } else if (error.data) {
-                        errorMessage += ': ' + JSON.stringify(error.data);
-                    }
-                    alert(errorMessage);
-                    return;
-                }
-                // 更新铸造状态
+
+                await tokenBurnerContract.methods.burnTokenForMint().send({
+                    from: accounts[0],
+                    gasPrice: adjustedGasPrice,
+                    gas: gasLimit
+                });
+
                 await updateMintStatus();
-                // 更新余额
                 await updateTokenBalance();
-                // 更新剩余铸造次数
                 await getRemainingBurnCount();
-                // 显示成功提示
                 alert('代币销毁成功！现在可以开始铸造NFT了');
-                // 恢复按钮状态
+
                 burnTokenBtn.innerHTML = '<i class="fas fa-fire mr-2"></i> 第二步：销毁代币';
                 burnTokenBtn.disabled = false;
             } catch (error) {
-                // 恢复按钮状态
                 burnTokenBtn.innerHTML = '<i class="fas fa-fire mr-2"></i> 第二步：销毁代币';
                 burnTokenBtn.disabled = false;
-                // 分析错误原因，提供更详细的错误信息
                 let errorMsg = '销毁代币失败，请重试';
-                if (error.message) {
-                    if (error.message.includes('Insufficient token balance')) {
-                        errorMsg = '代币余额不足，需要1枚代币';
-                    } else if (error.message.includes('Insufficient token allowance')) {
-                        errorMsg = '代币授权不足，请先授权智能合约使用代币';
-                    } else if (error.message.includes('Token transfer to burn address failed')) {
-                        errorMsg = '代币转移失败，请检查代币合约状态';
-                    } else if (error.message.includes('User rejected the request')) {
-                        errorMsg = '您取消了交易，请重试';
-                    } else {
-                        errorMsg += '\n错误信息: ' + error.message;
-                    }
-                }
+                if (error.message) { errorMsg += '\n错误信息: ' + error.message; }
                 alert(errorMsg);
             }
         });
-        // 第二步：铸造NFT
+
         mintAfterBurnBtn.addEventListener('click', async function() {
-            console.log('点击了铸造NFT按钮，当前状态:', {
-                web3: !!web3,
-                fiveBlessingsNFTContract: !!fiveBlessingsNFTContract,
-                accountsLength: accounts.length,
-                accounts: accounts
-            });
-            // 添加视觉反馈
+            if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
+                await connectWallet();
+                if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
+                    alert('请先连接钱包');
+                    mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造生肖NFT';
+                    mintAfterBurnBtn.disabled = false;
+                    return;
+                }
+            }
+
             mintAfterBurnBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 处理中...';
             mintAfterBurnBtn.disabled = true;
-            if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
-                try {
-                    await connectWallet();
-                    console.log('重新连接后状态:', {
-                        web3: !!web3,
-                        fiveBlessingsNFTContract: !!fiveBlessingsNFTContract,
-                        accountsLength: accounts.length,
-                        accounts: accounts
-                    });
-                    if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
-                        alert('请先连接钱包');
-                        // 恢复按钮状态
-                        mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造福卡NFT';
-                        mintAfterBurnBtn.disabled = false;
-                        return;
-                    }
-                } catch (error) {
-                    alert('请先连接钱包');
-                    // 恢复按钮状态
-                    mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造福卡NFT';
-                    mintAfterBurnBtn.disabled = false;
-                    return;
-                }
-            }
+
             try {
-                // 检查是否已销毁代币
-                const hasBurned = await checkBurnStatus();
+                const hasBurned = await tokenBurnerContract.methods.hasBurnedToken(accounts[0]).call();
                 if (!hasBurned) {
                     alert('请先完成第一步：销毁代币');
-                    // 恢复按钮状态
-                    mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造福卡NFT';
+                    mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造生肖NFT';
                     mintAfterBurnBtn.disabled = false;
                     return;
                 }
-            } catch (error) {
-                alert('检查销毁状态失败，请刷新页面重试');
-                // 恢复按钮状态
-                mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造福卡NFT';
-                mintAfterBurnBtn.disabled = false;
-                return;
-            }
-            try {
-                // 设置合理的Gas价格和上限
+
                 const gasPrice = await web3.eth.getGasPrice();
-                const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.5); // 增加Gas价格以提高交易优先级
-                const gasLimit = 3000000; // 增加Gas上限到3,000,000 gas，确保有足够的Gas执行交易
-                // 估算Gas需求
-                try {
-                    const estimatedGas = await fiveBlessingsNFTContract.methods.mint().estimateGas({ from: accounts[0] });
-                } catch (gasError) {
-                    console.error('Gas估算错误详情:', {
-                        message: gasError.message,
-                        reason: gasError.reason,
-                        code: gasError.code,
-                        data: gasError.data
-                    });
-                }
-                // 再次检查用户的剩余铸造次数
-                try {
-                    const burnCount = await tokenBurnerContract.methods.getBurnCount(accounts[0]).call();
-                    if (burnCount === '0') {
-                        throw new Error('用户剩余铸造次数为0');
-                    }
-                } catch (countError) {
-                    throw countError;
-                }
-                // 再次检查FiveBlessingsNFT合约中的地址设置
-                try {
-                    const tokenBurnerAddr = await fiveBlessingsNFTContract.methods.tokenBurner().call();
-                    const rewardManagerAddr = await fiveBlessingsNFTContract.methods.rewardManager().call();
-                } catch (addrError) {
-                    throw addrError;
-                }
-                // 显示铸造提示
-                alert('即将开始铸造NFT\n\n请在MetaMask等web3钱包中确认铸造交易\n\n交易详情：\n- 铸造费用：已通过销毁代币支付\n- 网络：当前连接的区块链网络\n- Gas费用：约' + (Math.floor(parseInt(adjustedGasPrice) * parseInt(gasLimit) / 1000000000000000000 * 100) / 100) + ' BNB');
-                // 调用智能合约铸造NFT
-                    console.log('开始调用mint()函数...');
-                    // 监听CardMinted事件，获取铸造的卡ID
-                    let mintedCardId = null;
-                    fiveBlessingsNFTContract.events.CardMinted({ fromBlock: 'latest' }, (error, event) => {
-                        if (!error && event && event.returnValues.owner === accounts[0]) {
-                            mintedCardId = event.returnValues.cardId;
-                        }
-                    });
-                // 监听MintStep事件，获取铸造步骤信息
-                // 查询并打印TokenBurner和RewardManager合约状态
-                // 查询TokenBurner合约状态
-                try {
-                    // 查询用户的销毁次数
-                    const userBurnCount = await tokenBurnerContract.methods.getBurnCount(accounts[0]).call();
-                    // 检查用户是否有可铸造次数
-                    const hasBurned = await tokenBurnerContract.methods.hasBurnedToken(accounts[0]).call();
-                } catch (error) {
-                }
-                // 查询FiveBlessingsNFT中的合约地址设置
-                try {
-                    // 查询TokenBurner地址
-                    const bmTokenBurnerAddr = await fiveBlessingsNFTContract.methods.tokenBurner().call();
-                    // 查询RewardManager地址
-                    const bmRewardManagerAddr = await fiveBlessingsNFTContract.methods.rewardManager().call();
-                    // 查询下一个卡片ID
-                    const nextCardId = await fiveBlessingsNFTContract.methods.nextCardId().call();
-                } catch (error) {
-                }
-                // 查询RewardManager合约状态
-                try {
-                    // 检查用户是否有所有基础福卡
-                    const hasAllBasic = await rewardManagerContract.methods._hasAllBasic(accounts[0]).call();
-                    // 检查用户是否是五福临门持有者
-                    const isWuFuHolder = await rewardManagerContract.methods.isWuFuHolder(accounts[0]).call();
-                } catch (error) {
-                }
-                // 检查mintBlessingCardAfterBurn方法是否存在
-                try {
-                    console.log('交易参数:', {
-                        from: accounts[0],
-                        gasPrice: adjustedGasPrice,
-                        gas: gasLimit
-                    });
-                    // 先估算Gas
-                    // 检查hasBurnedToken状态
-                    const hasBurned = await tokenBurnerContract.methods.hasBurnedToken(accounts[0]).call();
-                    console.log('用户是否有可铸造次数(hasBurnedToken):', hasBurned);
-                    if (!hasBurned) {
-                        throw new Error('用户的铸造次数已耗尽，请先销毁代币获取铸造次数');
-                    }
-                    // 检查FiveBlessingsNFT中设置的TokenBurner地址
-                    const bmTokenBurnerAddr = await fiveBlessingsNFTContract.methods.tokenBurner().call();
-                    // 执行铸造操作
-                    console.time('铸造交易执行时间');
-                    const tx = await fiveBlessingsNFTContract.methods.mint().send({ 
-                        from: accounts[0],
-                        gasPrice: adjustedGasPrice,
-                        gas: gasLimit
-                    });
-                    console.timeEnd('铸造交易执行时间');
-                } catch (txError) {
-                    console.timeEnd('铸造交易执行时间');
-                    console.error('错误详情:', {
-                        message: txError.message,
-                        reason: txError.reason,
-                        code: txError.code,
-                        data: txError.data,
-                        receipt: txError.receipt
-                    });
-                    // 尝试解析错误数据
-                    if (txError.data) {
-                        try {
-                            if (typeof txError.data === 'string' && txError.data.includes('0x')) {
-                                const errorHex = txError.data;
-                                console.error('错误数据(hex):', errorHex);
-                                // 尝试解析错误码
-                                if (errorHex.startsWith('0x7e273289')) {
-                                    // 提取错误码的后半部分
-                                    const errorCode = errorHex.substring(10);
-                                    // 尝试解析为十进制
-                                    const errorCodeDec = parseInt(errorCode, 16);
-                                    console.error('错误码(十进制):', errorCodeDec);
-                                    // 根据错误码推断可能的错误
-                                    switch (errorCodeDec) {
-                                        case 0:
-                                            break;
-                                        case 1:
-                                            break;
-                                        case 2:
-                                            break;
-                                        case 3:
-                                            break;
-                                        default:
-                                            break;
-                                    }
-                                }
-                                // 尝试解析为字符串
-                                const errorBytes = web3.utils.hexToBytes(errorHex);
-                                const errorStr = web3.utils.bytesToString(errorBytes.slice(4));
-                            }
-                        } catch (parseError) {
-                        }
-                    }
-                    throw txError;
-                }
-                // 获取铸造的卡信息
-                // 先获取当前的nextCardId，然后减1得到刚铸造的卡ID
+                const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.5);
+                const gasLimit = 3000000;
+
+                alert('即将开始铸造NFT\n\n请在MetaMask等web3钱包中确认铸造交易');
+
+                const tx = await fiveBlessingsNFTContract.methods.mint().send({
+                    from: accounts[0],
+                    gasPrice: adjustedGasPrice,
+                    gas: gasLimit
+                });
+
                 const currentNextCardId = await fiveBlessingsNFTContract.methods.nextCardId().call();
                 const actualCardId = (parseInt(currentNextCardId) - 1).toString();
-                // 获取卡类型
                 const cardType = await fiveBlessingsNFTContract.methods.tokenType(actualCardId).call();
-                // 构造卡信息
-                const cardInfo = {
-                    cardId: actualCardId,
-                    cardType: cardType
-                };
-                // 显示成功弹窗
-                mintSuccessModal.classList.remove('hidden');
-                // 显示卡信息
+
+                const cardInfo = { cardId: actualCardId, cardType: cardType };
                 displayCardInfo(cardInfo);
-                // 更新铸造状态
+                mintSuccessModal.classList.remove('hidden');
+
                 await updateMintStatus();
-                // 更新剩余铸造次数
                 await getRemainingBurnCount();
-                // 恢复按钮状态
-                mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造福卡NFT';
+
+                mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造生肖NFT';
                 mintAfterBurnBtn.disabled = true;
             } catch (error) {
-                // 分析错误原因，提供更详细的错误信息
-                let errorMsg = '铸造NFT失败，请重试\n\n详细信息：';
-                if (error.message) {
-                    if (error.message.includes('User rejected the request')) {
-                        errorMsg = '您取消了交易，请重试';
-                    } else if (error.message.includes('Insufficient funds')) {
-                        errorMsg = 'Gas费用不足，请确保您的钱包中有足够的BNB支付Gas费用\n\n建议：\n- 检查钱包中的BNB余额\n- 尝试降低Gas价格设置';
-                    } else if (error.message.includes('execution reverted')) {
-                        errorMsg = '智能合约执行失败\n\n可能的原因：\n1. 您的剩余铸造次数不足\n2. TokenBurner合约地址未设置\n3. RewardManager合约地址未设置\n4. 智能合约执行异常';
-                    } else if (error.message.includes('nonce too low')) {
-                        errorMsg = '交易nonce过低，请尝试重置钱包或等待之前的交易完成';
-                    } else if (error.message.includes('replacement transaction underpriced')) {
-                        errorMsg = '替换交易价格过低，请增加Gas价格后重试';
-                    } else {
-                        errorMsg += '\n错误信息: ' + error.message;
-                    }
-                } 
-                if (error.reason) {
-                    errorMsg += '\n错误原因: ' + error.reason;
-                }
-                if (error.code) {
-                    errorMsg += '\n错误代码: ' + error.code;
-                }
-                if (error.data) {
-                    try {
-                        if (typeof error.data === 'string' && error.data.includes('0x')) {
-                            // 尝试解析智能合约的错误信息
-                            const web3 = new Web3();
-                            const errorHex = error.data;
-                            const errorBytes = web3.utils.hexToBytes(errorHex);
-                            const errorStr = web3.utils.bytesToString(errorBytes.slice(4));
-                            errorMsg += '\n智能合约错误: ' + errorStr;
-                        } else if (error.data.message) {
-                            errorMsg += '\n错误数据: ' + error.data.message;
-                        } else {
-                            errorMsg += '\n错误数据: ' + JSON.stringify(error.data);
-                        }
-                    } catch (parseError) {
-                        errorMsg += '\n错误数据: ' + JSON.stringify(error.data);
-                    }
-                }
-                if (error.receipt) {
-                    errorMsg += '\n交易状态: 失败 (receipt available)';
-                }
-                // 添加智能合约地址信息
-                errorMsg += '\n\n合约地址信息：';
-                errorMsg += '\n- FiveBlessingsNFT: ' + fiveBlessingsNFTAddress;
-                errorMsg += '\n- TokenBurner: ' + tokenBurnerAddress;
-                errorMsg += '\n- RewardManager: ' + rewardManagerAddress;
-                // 添加排查建议
-                errorMsg += '\n\n排查建议：';
-                errorMsg += '\n1. 检查浏览器控制台获取完整错误信息';
-                errorMsg += '\n2. 确认所有合约地址设置正确';
-                errorMsg += '\n3. 确认您的剩余铸造次数大于0';
-                errorMsg += '\n4. 确认钱包中有足够的BNB支付Gas费用';
-                errorMsg += '\n5. 尝试刷新页面后重新操作';
-                alert(errorMsg);
-                // 恢复按钮状态
-                mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造福卡NFT';
+                mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造生肖NFT';
                 mintAfterBurnBtn.disabled = false;
-                return;
+                let errorMsg = '铸造NFT失败，请重试\n\n详细信息：';
+                if (error.message) { errorMsg += '\n错误信息: ' + error.message; }
+                alert(errorMsg);
             }
         });
-        // 显示卡信息
+
         function displayCardInfo(cardInfo) {
             const cardType = parseInt(cardInfo.cardType);
-            // 根据卡类型获取对应的信息
-            const cardData = getCardDataByType(cardType);
-            // 更新UI
-            document.getElementById('cardImage').querySelector('img').src = cardData.image;
-            document.getElementById('cardName').textContent = cardData.name;
-            document.getElementById('cardRarity').textContent = `稀有度: ${cardData.rarity}`;
-            document.getElementById('cardDescription').textContent = cardData.description;
+            const zodiacIndex = cardType % 12;
+            const attrIndex = Math.floor(cardType / 24);
+            const gender = cardType % 2 === 1 ? '公' : '母';
+
+            const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+            const attr = attrs[attrIndex] || 'water';
+            const prefix = ZODIAC_PREFIX[attr];
+            const animal = ZODIAC_ANIMALS[zodiacIndex];
+            const genderSuffix = cardType % 2 === 1 ? '_1' : '_0';
+
+            const imagePath = `images/fu-cards/${prefix}${animal}${genderSuffix}.png`;
+            const name = ZODIAC_NAMES[attr][zodiacIndex] + '（' + gender + '）';
+            const desc = getZodiacDescription(attr, zodiacIndex, gender);
+
+            document.getElementById('cardImage').querySelector('img').src = imagePath;
+            document.getElementById('cardName').textContent = name;
+            document.getElementById('cardDescription').textContent = desc;
         }
-        // 根据卡类型获取卡数据
-        function getCardDataByType(cardType) {
-            const cardDataMap = {
-                0: {
-                    name: "爱国福",
-                    description: "爱国福，象征着对祖国的热爱与忠诚。持有此卡可享受税收分红。",
-                    image: "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeicmdlx35rjx7slj3ncmjynxzmwllkvujvcrqmdiynmijpkvnc734q",
-                    rarity: "Common"
-                },
-                1: {
-                    name: "富强福",
-                    description: "富强福，象征着国家繁荣昌盛，人民生活富裕。持有此卡可享受税收分红。",
-                    image: "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeihkbyl6zlkx5vxxu366gwa5gpnd45twwlooczyolannp5ewcxaoja",
-                    rarity: "Common"
-                },
-                2: {
-                    name: "和谐福",
-                    description: "和谐福，象征着社会和谐，家庭和睦。持有此卡可享受税收分红。",
-                    image: "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifsojdpnspewquotpvbwhkfq6n5celzjtsyulbaecczkwm4y25yji",
-                    rarity: "Common"
-                },
-                3: {
-                    name: "友善福",
-                    description: "友善福，象征着人际关系友善，社会充满爱心。持有此卡可享受税收分红。",
-                    image: "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeiekctcxtyaews5udiumrogwxjdxkughjnhbycemgxvgpzhwhi564u",
-                    rarity: "Common"
-                },
-                4: {
-                    name: "敬业福",
-                    description: "敬业福，象征着爱岗敬业，精益求精的职业精神。持有此卡可享受税收分红。",
-                    image: "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeibcse6fzqol32qrwlmsl7cz4ujhi7ctrxavfywzzqjgdvxla62m4e",
-                    rarity: "Rare"
-                },
-                5: {
-                    name: "万能福",
-                    description: "万能福，象征着无限可能，可替代任何一种基础福卡。持有此卡可享受税收分红。",
-                    image: "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeig7ztsaeiddwpgjivwe7la6zxsck5q7hbael32thq4pw6amylxpgi",
-                    rarity: "Ultra Rare"
-                },
-                6: {
-                    name: "五福临门",
-                    description: "五福临门，象征着五种福气同时降临，是最高等级的福卡。持有此卡可享受额外税收分红。",
-                    image: "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeich5jq6lv5zcf2ly4dwnxmvnh4nk5xoddy75fihq6bajxnxdxumnm",
-                    rarity: "Legendary"
-                }
-            };
-            return cardDataMap[cardType] || {
-                name: "未知福卡",
-                description: "未知福卡类型",
-                image: "",
-                rarity: "Unknown"
-            };
+
+        function getZodiacDescription(attr, zodiacIndex, gender) {
+            const attrNames = { water: '水', wind: '风', fire: '火', dark: '暗', light: '光' };
+            const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+            return `${attrNames[attr]}属性生肖·${zodiacNames[zodiacIndex]}·${gender} · 持有可享受税收分红`;
         }
-        // 取消弹窗
-        cancelModal.addEventListener('click', function() {
-            mintSuccessModal.classList.add('hidden');
-        });
-        // 去查看
+
+        cancelModal.addEventListener('click', function() { mintSuccessModal.classList.add('hidden'); });
         viewCollection.addEventListener('click', function() {
             mintSuccessModal.classList.add('hidden');
             window.location.href = 'collection.html';
         });
-        // 粒子背景效果
+
         particlesJS('particles-js', {
             particles: {
-                number: {
-                    value: 80,
-                    density: {
-                        enable: true,
-                        value_area: 800
-                    }
-                },
-                color: {
-                    value: '#ff6b6b'
-                },
-                shape: {
-                    type: 'circle',
-                    stroke: {
-                        width: 0,
-                        color: '#000000'
-                    }
-                },
-                opacity: {
-                    value: 0.5,
-                    random: true,
-                    anim: {
-                        enable: true,
-                        speed: 1,
-                        opacity_min: 0.1,
-                        sync: false
-                    }
-                },
-                size: {
-                    value: 5,
-                    random: true,
-                    anim: {
-                        enable: true,
-                        speed: 2,
-                        size_min: 0.1,
-                        sync: false
-                    }
-                },
-                line_linked: {
-                    enable: true,
-                    distance: 150,
-                    color: '#ff6b6b',
-                    opacity: 0.4,
-                    width: 1
-                },
-                move: {
-                    enable: true,
-                    speed: 1,
-                    direction: 'none',
-                    random: false,
-                    straight: false,
-                    out_mode: 'out',
-                    bounce: false,
-                    attract: {
-                        enable: false,
-                        rotateX: 600,
-                        rotateY: 1200
-                    }
-                }
+                number: { value: 80, density: { enable: true, value_area: 800 } },
+                color: { value: '#3b82f6' },
+                shape: { type: 'circle', stroke: { width: 0, color: '#000000' } },
+                opacity: { value: 0.5, random: true, anim: { enable: true, speed: 1, opacity_min: 0.1, sync: false } },
+                size: { value: 5, random: true, anim: { enable: true, speed: 2, size_min: 0.1, sync: false } },
+                line_linked: { enable: true, distance: 150, color: '#3b82f6', opacity: 0.4, width: 1 },
+                move: { enable: true, speed: 1, direction: 'none', random: false, straight: false, out_mode: 'out', bounce: false }
             },
             interactivity: {
                 detect_on: 'canvas',
-                events: {
-                    onhover: {
-                        enable: true,
-                        mode: 'grab'
-                    },
-                    onclick: {
-                        enable: true,
-                        mode: 'push'
-                    },
-                    resize: true
-                },
-                modes: {
-                    grab: {
-                        distance: 140,
-                        line_linked: {
-                            opacity: 1
-                        }
-                    },
-                    push: {
-                        particles_nb: 4
-                    }
-                }
+                events: { onhover: { enable: true, mode: 'grab' }, onclick: { enable: true, mode: 'push' }, resize: true },
+                modes: { grab: { distance: 140, line_linked: { opacity: 1 } }, push: { particles_nb: 4 } }
             },
             retina_detect: true
         });
