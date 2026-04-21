@@ -222,7 +222,7 @@
             <div class="hero-section p-8 mb-12">
                 <h2 class="text-3xl font-bold mb-4">为你的生肖NFT升阶，提升等级获得更多权益</h2>
                 <p class="text-white/80 mb-6">选择一种升阶方式，提升你的生肖NFT等级，获得更高的分红权重</p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="bg-white/10 p-6 rounded-xl backdrop-blur-md">
                         <h4 class="text-xl font-bold text-blue-200 mb-3">方式一：消耗相同NFT</h4>
                         <ul class="text-white/90 space-y-2">
@@ -243,6 +243,16 @@
                             <li>• 5阶 → 6阶：消耗2400000枚代币</li>
                         </ul>
                     </div>
+                    <div class="bg-white/10 p-6 rounded-xl backdrop-blur-md">
+                        <h4 class="text-xl font-bold text-blue-200 mb-3">方式三：消耗USDT价值代币</h4>
+                        <ul class="text-white/90 space-y-2">
+                            <li>• 1阶 → 2阶：消耗价值1 USDT的代币</li>
+                            <li>• 2阶 → 3阶：消耗价值4 USDT的代币</li>
+                            <li>• 3阶 → 4阶：消耗价值12 USDT的代币</li>
+                            <li>• 4阶 → 5阶：消耗价值48 USDT的代币</li>
+                            <li>• 5阶 → 6阶：消耗价值240 USDT的代币</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
 
@@ -259,9 +269,10 @@
                     <div id="selectedNftInfo" class="mb-6">
                         <!-- 选中的NFT信息 -->
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <button id="upgradeWithNftBtn" class="btn-primary w-full">使用NFT升阶</button>
                         <button id="upgradeWithTokenBtn" class="btn-secondary w-full">使用代币升阶</button>
+                        <button id="upgradeWithUSDValueBtn" class="btn-secondary w-full">使用USDT价值代币升阶</button>
                     </div>
                 </div>
             </div>
@@ -443,17 +454,22 @@
 
             const upgradeWithNftBtn = document.getElementById('upgradeWithNftBtn');
             const upgradeWithTokenBtn = document.getElementById('upgradeWithTokenBtn');
+            const upgradeWithUSDValueBtn = document.getElementById('upgradeWithUSDValueBtn');
 
             if (level >= 6) {
                 upgradeWithNftBtn.disabled = true;
                 upgradeWithTokenBtn.disabled = true;
+                upgradeWithUSDValueBtn.disabled = true;
                 upgradeWithNftBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 upgradeWithTokenBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                upgradeWithUSDValueBtn.classList.add('opacity-50', 'cursor-not-allowed');
             } else {
                 upgradeWithNftBtn.disabled = false;
                 upgradeWithTokenBtn.disabled = false;
+                upgradeWithUSDValueBtn.disabled = false;
                 upgradeWithNftBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 upgradeWithTokenBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                upgradeWithUSDValueBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             }
 
             upgradeSection.classList.remove('hidden');
@@ -504,6 +520,36 @@
             }
         });
 
+        document.getElementById('upgradeWithUSDValueBtn').addEventListener('click', async function() {
+            if (!selectedNft) return;
+            if (selectedNft.level >= 6) return;
+
+            try {
+                // 首先检查代币余额
+                const requiredTokens = getRequiredTokens(selectedNft.level);
+                const balance = await tokenContract.methods.balanceOf(account).call();
+                
+                if (parseInt(balance) < requiredTokens) {
+                    alert(`代币不足，需要 ${requiredTokens} 枚代币（价值 ${getUSDValue(selectedNft.level)} USDT）`);
+                    return;
+                }
+
+                // 检查授权
+                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.fiveBlessingsNFT).call();
+                if (parseInt(allowance) < requiredTokens) {
+                    await tokenContract.methods.approve(window.contractAddresses.fiveBlessingsNFT, requiredTokens).send({ from: account });
+                }
+
+                const result = await nftContract.methods.upgradeWithUSDValue(selectedNft.id).send({ from: account });
+                alert(`升级成功！NFT ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 阶`);
+                loadUserNFTs();
+                document.getElementById('upgradeSection').classList.add('hidden');
+            } catch (error) {
+                console.error('升级失败:', error);
+                alert('升级失败，请检查代币余额和授权');
+            }
+        });
+
         function getRequiredTokens(level) {
             switch (level) {
                 case 1: return 10000;
@@ -511,6 +557,17 @@
                 case 3: return 120000;
                 case 4: return 480000;
                 case 5: return 2400000;
+                default: return 0;
+            }
+        }
+
+        function getUSDValue(level) {
+            switch (level) {
+                case 1: return 1;
+                case 2: return 4;
+                case 3: return 12;
+                case 4: return 48;
+                case 5: return 240;
                 default: return 0;
             }
         }

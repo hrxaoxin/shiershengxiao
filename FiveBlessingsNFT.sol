@@ -33,6 +33,10 @@ interface IToken {
     function balanceOf(address account) external view returns (uint256);
 }
 
+interface IPriceOracle {
+    function getTokenPriceInUSD() external view returns (uint256);
+}
+
 interface IRewardManager {
     function updateCardExternal(address user, ZodiacType t, uint256 cnt) external returns (bool);
     function addWuFu(address user) external returns (bool);
@@ -78,6 +82,7 @@ contract FiveBlessingsNFT is
     address public metadataContract;
     address public authorizer;
     address public tokenContract;
+    address public priceOracle;
 
     mapping(address => bool) public authorizedMinter;
     mapping(uint256 => ZodiacType) public tokenType;
@@ -415,6 +420,12 @@ contract FiveBlessingsNFT is
         tokenContract = _tokenContract;
     }
 
+    function setPriceOracle(address _priceOracle) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "FiveBlessingsNFT: Unauthorized");
+        require(_priceOracle != address(0), "Invalid zero address");
+        priceOracle = _priceOracle;
+    }
+
     function getCardCount(address user, ZodiacType t) external view returns (uint256) {
         require(rewardManager != address(0), "RewardManager not set");
         return IRewardManager(rewardManager).cardCount(user, t);
@@ -472,6 +483,44 @@ contract FiveBlessingsNFT is
         else if (currentLevel == 4) requiredTokens = 480000;
         else if (currentLevel == 5) requiredTokens = 2400000;
         else revert("Invalid level");
+
+        IToken token = IToken(tokenContract);
+        require(token.balanceOf(msg.sender) >= requiredTokens, "Insufficient token balance");
+        require(token.transferFrom(msg.sender, BLACK_HOLE, requiredTokens), "Token transfer failed");
+
+        uint8 newLevel = currentLevel + 1;
+        tokenLevel[tokenId] = newLevel;
+        _removeTokenByLevel(msg.sender, t, currentLevel, tokenId);
+        userTokensByLevel[msg.sender][t][newLevel].push(tokenId);
+        userLatestTokenByLevel[msg.sender][t][newLevel] = tokenId;
+
+        emit CardUpgraded(tokenId, t, currentLevel, newLevel, msg.sender, uint64(block.timestamp));
+        return newLevel;
+    }
+
+    function upgradeWithUSDValue(uint256 tokenId) external nonReentrant returns (uint8) {
+        require(_ownerOf(tokenId) == msg.sender, "Not owner of token");
+        require(tokenContract != address(0), "Token contract not set");
+        require(priceOracle != address(0), "Price oracle not set");
+        
+        ZodiacType t = tokenType[tokenId];
+        uint8 currentLevel = tokenLevel[tokenId];
+        require(currentLevel < 6, "Already max level");
+
+        uint256 requiredUSDValue;
+        if (currentLevel == 1) requiredUSDValue = 1 ether; // 1 USDT
+        else if (currentLevel == 2) requiredUSDValue = 4 ether; // 4 USDT
+        else if (currentLevel == 3) requiredUSDValue = 12 ether; // 12 USDT
+        else if (currentLevel == 4) requiredUSDValue = 48 ether; // 48 USDT
+        else if (currentLevel == 5) requiredUSDValue = 240 ether; // 240 USDT
+        else revert("Invalid level");
+
+        IPriceOracle oracle = IPriceOracle(priceOracle);
+        uint256 tokenPriceInUSD = oracle.getTokenPriceInUSD();
+        require(tokenPriceInUSD > 0, "Invalid token price");
+
+        uint256 requiredTokens = (requiredUSDValue * 10**18) / tokenPriceInUSD;
+        require(requiredTokens > 0, "Required tokens must be greater than 0");
 
         IToken token = IToken(tokenContract);
         require(token.balanceOf(msg.sender) >= requiredTokens, "Insufficient token balance");
