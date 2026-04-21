@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>生肖升阶 - Twelve Zodiacs Upgrade</title>
+    <meta name="description" content="为你的生肖NFT升阶，提升等级获得更多权益">
+    <link rel="icon" href="images/fu-cards/shuishu_1.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+    <script src="abis.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f5f5f5;
+            background-image: linear-gradient(135deg, #f5f5f5 0%, #e8f5e8 100%);
+            overflow-x: hidden;
+        }
+
+        #particles-js {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+
+        .navbar {
+            background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(249, 250, 251, 0.95), rgba(243, 244, 246, 0.95));
+            backdrop-filter: blur(12px);
+            border-top: 2px solid rgba(59, 130, 246, 0.5);
+            box-shadow: 0 -4px 20px rgba(59, 130, 246, 0.2);
+            animation: navbarSlideUp 0.8s ease-out;
+        }
+
+        @keyframes navbarSlideUp {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .desktop-nav {
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(249, 250, 251, 0.95), rgba(243, 244, 246, 0.95));
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(59, 130, 246, 0.5);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            animation: desktopNavSlideIn 0.8s ease-out;
+        }
+
+        @keyframes desktopNavSlideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .hero-section {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            border-radius: 20px;
+            color: white;
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
+            animation: heroFadeIn 1s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @keyframes heroFadeIn {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .btn-primary:hover {
+            background-color: #2563eb;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background-color: white;
+            color: #3b82f6;
+            border: 1px solid #3b82f6;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-secondary:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+        }
+
+        .nft-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 16px;
+            padding: 16px;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            background: white;
+        }
+
+        .nft-card:hover {
+            transform: scale(1.05) translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .nft-card img {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+            margin: 0 auto 8px;
+        }
+
+        .nft-card h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .level-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .upgrade-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .upgrade-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+        }
+
+        .wallet-button {
+            background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+            color: white;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .wallet-button:hover {
+            background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(79, 70, 229, 0.4);
+        }
+
+        .nav-item:hover {
+            transform: scale(1.1);
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+        }
+
+        .footer {
+            animation: footerFadeIn 1.5s ease-out;
+        }
+
+        @keyframes footerFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div id="particles-js"></div>
+
+    <div class="min-h-screen pb-20 md:pb-0">
+        <header class="container mx-auto px-4 py-6 title-section">
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+                <div class="flex items-center">
+                    <div class="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+                        <span class="text-white text-2xl font-bold">生肖</span>
+                    </div>
+                    <h1 class="text-2xl font-bold text-gray-800">生肖升阶</h1>
+                </div>
+                <button id="walletBtn" class="wallet-button">连接钱包</button>
+            </div>
+        </header>
+
+        <main class="container mx-auto px-4 pb-24">
+            <div class="hero-section p-8 mb-12">
+                <h2 class="text-3xl font-bold mb-4">为你的生肖NFT升阶，提升等级获得更多权益</h2>
+                <p class="text-white/80 mb-6">选择一种升阶方式，提升你的生肖NFT等级，获得更高的分红权重</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white/10 p-6 rounded-xl backdrop-blur-md">
+                        <h4 class="text-xl font-bold text-blue-200 mb-3">方式一：消耗相同NFT</h4>
+                        <ul class="text-white/90 space-y-2">
+                            <li>• 1阶 → 2阶：消耗1张相同生肖相同属性的1阶NFT</li>
+                            <li>• 2阶 → 3阶：消耗2张相同生肖相同属性的2阶NFT</li>
+                            <li>• 3阶 → 4阶：消耗3张相同生肖相同属性的3阶NFT</li>
+                            <li>• 4阶 → 5阶：消耗4张相同生肖相同属性的4阶NFT</li>
+                            <li>• 5阶 → 6阶：消耗5张相同生肖相同属性的5阶NFT</li>
+                        </ul>
+                    </div>
+                    <div class="bg-white/10 p-6 rounded-xl backdrop-blur-md">
+                        <h4 class="text-xl font-bold text-blue-200 mb-3">方式二：消耗代币</h4>
+                        <ul class="text-white/90 space-y-2">
+                            <li>• 1阶 → 2阶：消耗10000枚代币</li>
+                            <li>• 2阶 → 3阶：消耗40000枚代币</li>
+                            <li>• 3阶 → 4阶：消耗120000枚代币</li>
+                            <li>• 4阶 → 5阶：消耗480000枚代币</li>
+                            <li>• 5阶 → 6阶：消耗2400000枚代币</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-8">
+                <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">我的生肖NFT</h3>
+                <div id="nftGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    <!-- NFT卡片将通过JavaScript动态生成 -->
+                </div>
+            </div>
+
+            <div id="upgradeSection" class="hidden mb-12">
+                <div class="upgrade-card">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">升阶操作</h3>
+                    <div id="selectedNftInfo" class="mb-6">
+                        <!-- 选中的NFT信息 -->
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button id="upgradeWithNftBtn" class="btn-primary w-full">使用NFT升阶</button>
+                        <button id="upgradeWithTokenBtn" class="btn-secondary w-full">使用代币升阶</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="text-center py-8 text-black/70 footer">
+            <p>© 2026 十二生肖NFT系列 · Twelve Zodiacs Collection</p>
+            <p class="mt-2">祝你心想事成，生肖大旺 🀄✨</p>
+        </footer>
+    </div>
+
+    <nav class="navbar fixed bottom-0 left-0 right-0 z-50 md:hidden">
+        <div class="flex justify-around items-center px-2 py-2">
+            <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1">🏠&nbsp;</div>
+                <span class="text-xs font-bold text-gray-700">首页</span>
+            </a>
+            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1">🃏</div>
+                <span class="text-xs font-bold text-gray-700">铸造</span>
+            </a>
+            <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1">🎁</div>
+                <span class="text-xs font-bold text-gray-700">生肖</span>
+            </a>
+            <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1">🏆</div>
+                <span class="text-xs font-bold text-gray-700">奖励</span>
+            </a>
+            <a href="trading.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1">💰</div>
+                <span class="text-xs font-bold text-gray-700">交易</span>
+            </a>
+        </div>
+    </nav>
+
+    <nav class="hidden md:block fixed left-6 top-1/2 -translate-y-1/2 z-50 desktop-nav">
+        <div class="p-3 space-y-3">
+            <a href="index.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="首页">
+                <div class="text-3xl">🏠&nbsp;</div>
+                <span class="text-xs font-bold mt-1 text-gray-700">首页</span>
+            </a>
+            <a href="mint.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="铸造">
+                <div class="text-3xl">🃏</div>
+                <span class="text-xs font-bold mt-1 text-gray-700">铸造</span>
+            </a>
+            <a href="collection.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="我的生肖">
+                <div class="text-3xl">🎁</div>
+                <span class="text-xs font-bold mt-1 text-gray-700">生肖</span>
+            </a>
+            <a href="rewards.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="奖励">
+                <div class="text-3xl">🏆</div>
+                <span class="text-xs font-bold mt-1 text-gray-700">奖励</span>
+            </a>
+            <a href="trading.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="交易">
+                <div class="text-3xl">💰</div>
+                <span class="text-xs font-bold mt-1 text-gray-700">交易</span>
+            </a>
+        </div>
+    </nav>
+
+    <script>
+        let web3;
+        let account;
+        let nftContract;
+        let tokenContract;
+        let selectedNft = null;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            particlesJS('particles-js', {
+                particles: {
+                    number: { value: 80, density: { enable: true, value_area: 800 } },
+                    color: { value: '#3b82f6' },
+                    shape: { type: 'circle', stroke: { width: 0, color: '#000000' } },
+                    opacity: { value: 0.5, random: true, anim: { enable: true, speed: 1, opacity_min: 0.1, sync: false } },
+                    size: { value: 5, random: true, anim: { enable: true, speed: 2, size_min: 0.1, sync: false } },
+                    line_linked: { enable: true, distance: 150, color: '#3b82f6', opacity: 0.4, width: 1 },
+                    move: { enable: true, speed: 1, direction: 'none', random: false, straight: false, out_mode: 'out', bounce: false }
+                },
+                interactivity: {
+                    detect_on: 'canvas',
+                    events: { onhover: { enable: true, mode: 'grab' }, onclick: { enable: true, mode: 'push' }, resize: true },
+                    modes: { grab: { distance: 140, line_linked: { opacity: 1 } }, push: { particles_nb: 4 } }
+                },
+                retina_detect: true
+            });
+
+            initWeb3();
+        });
+
+        async function initWeb3() {
+            if (typeof window.ethereum !== 'undefined') {
+                web3 = new Web3(window.ethereum);
+                try {
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    account = accounts[0];
+                    updateWalletButton();
+                    initContracts();
+                    loadUserNFTs();
+                } catch (error) {
+                    console.error('Web3 init failed:', error);
+                }
+            }
+        }
+
+        function updateWalletButton() {
+            const walletBtn = document.getElementById('walletBtn');
+            if (account) {
+                const shortAddress = account.substring(0, 4) + '...' + account.substring(account.length - 4);
+                walletBtn.textContent = shortAddress;
+                walletBtn.style.background = 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)';
+            }
+        }
+
+        function initContracts() {
+            nftContract = new web3.eth.Contract(window.fiveBlessingsNFTABI, window.contractAddresses.fiveBlessingsNFT);
+            tokenContract = new web3.eth.Contract(window.tokenABI, window.contractAddresses.tokenContract);
+        }
+
+        async function loadUserNFTs() {
+            const nftGrid = document.getElementById('nftGrid');
+            nftGrid.innerHTML = '<div class="col-span-full text-center py-12">加载中...</div>';
+
+            try {
+                // 这里需要实现获取用户NFT的逻辑
+                // 由于合约没有直接的balanceOf和tokenOfOwnerByIndex方法，我们需要使用其他方式
+                // 暂时使用模拟数据
+                const mockNFTs = [
+                    { id: 1, type: 0, level: 1, name: '水鼠（公）', image: 'images/fu-cards/shuishu_1.png' },
+                    { id: 2, type: 1, level: 1, name: '水牛（公）', image: 'images/fu-cards/shuiniu_1.png' },
+                    { id: 3, type: 12, level: 1, name: '水鼠（母）', image: 'images/fu-cards/shuishu_0.png' },
+                    { id: 4, type: 24, level: 1, name: '风鼠（公）', image: 'images/fu-cards/fengshu_1.png' },
+                ];
+
+                renderNFTs(mockNFTs);
+            } catch (error) {
+                console.error('加载NFT失败:', error);
+                nftGrid.innerHTML = '<div class="col-span-full text-center py-12 text-red-500">加载失败，请重试</div>';
+            }
+        }
+
+        function renderNFTs(nfts) {
+            const nftGrid = document.getElementById('nftGrid');
+            if (nfts.length === 0) {
+                nftGrid.innerHTML = '<div class="col-span-full text-center py-12">你还没有NFT，去铸造页面创建一个吧！</div>';
+                return;
+            }
+
+            let html = '';
+            nfts.forEach(nft => {
+                html += `
+                    <div class="nft-card" onclick="selectNFT(${nft.id}, ${nft.type}, ${nft.level}, '${nft.name}', '${nft.image}')">
+                        <div class="level-badge">${nft.level}</div>
+                        <img src="${nft.image}" alt="${nft.name}">
+                        <h4>${nft.name}</h4>
+                        <p class="text-xs text-gray-500">ID: ${nft.id}</p>
+                    </div>
+                `;
+            });
+            nftGrid.innerHTML = html;
+        }
+
+        function selectNFT(id, type, level, name, image) {
+            selectedNft = { id, type, level, name, image };
+            const selectedNftInfo = document.getElementById('selectedNftInfo');
+            const upgradeSection = document.getElementById('upgradeSection');
+
+            selectedNftInfo.innerHTML = `
+                <div class="flex items-center gap-4">
+                    <img src="${image}" alt="${name}" class="w-20 h-20 object-contain">
+                    <div>
+                        <h4 class="text-lg font-bold">${name}</h4>
+                        <p class="text-gray-600">等级: ${level} ⭐</p>
+                        <p class="text-gray-600">ID: ${id}</p>
+                        ${level < 6 ? `<p class="text-green-600 font-medium">可升级到 ${level + 1} 阶</p>` : `<p class="text-red-600 font-medium">已达到最高等级</p>`}
+                    </div>
+                </div>
+            `;
+
+            const upgradeWithNftBtn = document.getElementById('upgradeWithNftBtn');
+            const upgradeWithTokenBtn = document.getElementById('upgradeWithTokenBtn');
+
+            if (level >= 6) {
+                upgradeWithNftBtn.disabled = true;
+                upgradeWithTokenBtn.disabled = true;
+                upgradeWithNftBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                upgradeWithTokenBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                upgradeWithNftBtn.disabled = false;
+                upgradeWithTokenBtn.disabled = false;
+                upgradeWithNftBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                upgradeWithTokenBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+
+            upgradeSection.classList.remove('hidden');
+        }
+
+        document.getElementById('upgradeWithNftBtn').addEventListener('click', async function() {
+            if (!selectedNft) return;
+            if (selectedNft.level >= 6) return;
+
+            try {
+                const result = await nftContract.methods.upgradeWithNFT(selectedNft.id).send({ from: account });
+                alert(`升级成功！NFT ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 阶`);
+                loadUserNFTs();
+                document.getElementById('upgradeSection').classList.add('hidden');
+            } catch (error) {
+                console.error('升级失败:', error);
+                alert('升级失败，请检查是否有足够的相同NFT');
+            }
+        });
+
+        document.getElementById('upgradeWithTokenBtn').addEventListener('click', async function() {
+            if (!selectedNft) return;
+            if (selectedNft.level >= 6) return;
+
+            try {
+                // 首先检查代币余额
+                const requiredTokens = getRequiredTokens(selectedNft.level);
+                const balance = await tokenContract.methods.balanceOf(account).call();
+                
+                if (parseInt(balance) < requiredTokens) {
+                    alert(`代币不足，需要 ${requiredTokens} 枚代币`);
+                    return;
+                }
+
+                // 检查授权
+                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.fiveBlessingsNFT).call();
+                if (parseInt(allowance) < requiredTokens) {
+                    await tokenContract.methods.approve(window.contractAddresses.fiveBlessingsNFT, requiredTokens).send({ from: account });
+                }
+
+                const result = await nftContract.methods.upgradeWithToken(selectedNft.id).send({ from: account });
+                alert(`升级成功！NFT ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 阶`);
+                loadUserNFTs();
+                document.getElementById('upgradeSection').classList.add('hidden');
+            } catch (error) {
+                console.error('升级失败:', error);
+                alert('升级失败，请检查代币余额和授权');
+            }
+        });
+
+        function getRequiredTokens(level) {
+            switch (level) {
+                case 1: return 10000;
+                case 2: return 40000;
+                case 3: return 120000;
+                case 4: return 480000;
+                case 5: return 2400000;
+                default: return 0;
+            }
+        }
+
+        document.getElementById('walletBtn').addEventListener('click', function() {
+            initWeb3();
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+</body>
+</html>

@@ -28,6 +28,11 @@ interface ITokenBurner {
     function getBurnCount(address user) external view returns (uint256);
 }
 
+interface IToken {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
 interface IRewardManager {
     function updateCardExternal(address user, ZodiacType t, uint256 cnt) external returns (bool);
     function addWuFu(address user) external returns (bool);
@@ -72,10 +77,14 @@ contract FiveBlessingsNFT is
     address public rewardManager;
     address public metadataContract;
     address public authorizer;
+    address public tokenContract;
 
     mapping(address => bool) public authorizedMinter;
     mapping(uint256 => ZodiacType) public tokenType;
+    mapping(uint256 => uint8) public tokenLevel;
 
+    mapping(address => mapping(ZodiacType => mapping(uint8 => uint256[]))) public userTokensByLevel;
+    mapping(address => mapping(ZodiacType => mapping(uint8 => uint256))) public userLatestTokenByLevel;
     mapping(address => mapping(ZodiacType => uint256[])) public userTokens;
     mapping(address => mapping(ZodiacType => uint256)) public userLatestToken;
 
@@ -207,10 +216,13 @@ contract FiveBlessingsNFT is
         uint256 tokenId = nextCardId++;
         ZodiacType t = _getRandomType(tokenId);
         tokenType[tokenId] = t;
+        tokenLevel[tokenId] = 1;
 
         _safeMint(msg.sender, tokenId);
         userTokens[msg.sender][t].push(tokenId);
         userLatestToken[msg.sender][t] = tokenId;
+        userTokensByLevel[msg.sender][t][1].push(tokenId);
+        userLatestTokenByLevel[msg.sender][t][1] = tokenId;
 
         emit CardMinted(tokenId, t, msg.sender, uint64(block.timestamp));
         return tokenId;
@@ -222,10 +234,13 @@ contract FiveBlessingsNFT is
 
         uint256 tokenId = nextCardId++;
         tokenType[tokenId] = t;
+        tokenLevel[tokenId] = 1;
         _safeMint(to, tokenId);
 
         userTokens[to][t].push(tokenId);
         userLatestToken[to][t] = tokenId;
+        userTokensByLevel[to][t][1].push(tokenId);
+        userLatestTokenByLevel[to][t][1] = tokenId;
 
         emit CardMinted(tokenId, t, to, uint64(block.timestamp));
         return tokenId;
@@ -256,14 +271,19 @@ contract FiveBlessingsNFT is
 
         if (from != address(0) && from != BLACK_HOLE) {
             ZodiacType t = tokenType[tokenId];
+            uint8 level = tokenLevel[tokenId];
             _removeToken(from, t, tokenId);
+            _removeTokenByLevel(from, t, level, tokenId);
             _updateReward(from, t, false);
         }
 
         if (to != address(0) && to != BLACK_HOLE) {
             ZodiacType t = tokenType[tokenId];
+            uint8 level = tokenLevel[tokenId];
             userTokens[to][t].push(tokenId);
             userLatestToken[to][t] = tokenId;
+            userTokensByLevel[to][t][level].push(tokenId);
+            userLatestTokenByLevel[to][t][level] = tokenId;
             _updateReward(to, t, true);
         }
 
@@ -279,6 +299,18 @@ contract FiveBlessingsNFT is
                 break;
             }
         }
+    }
+
+    function _removeTokenByLevel(address user, ZodiacType t, uint8 level, uint256 tokenId) internal {
+        uint256[] storage tokens = userTokensByLevel[user][t][level];
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (tokens[i] == tokenId) {
+                tokens[i] = tokens[tokens.length - 1];
+                tokens.pop();
+                break;
+            }
+        }
+        userLatestTokenByLevel[user][t][level] = tokens.length > 0 ? tokens[tokens.length - 1] : 0;
     }
 
     function _updateReward(address user, ZodiacType t, bool isAdd) internal {
@@ -377,6 +409,12 @@ contract FiveBlessingsNFT is
         authorizer = _authorizer;
     }
 
+    function setTokenContract(address _tokenContract) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "FiveBlessingsNFT: Unauthorized");
+        require(_tokenContract != address(0), "Invalid zero address");
+        tokenContract = _tokenContract;
+    }
+
     function getCardCount(address user, ZodiacType t) external view returns (uint256) {
         require(rewardManager != address(0), "RewardManager not set");
         return IRewardManager(rewardManager).cardCount(user, t);
@@ -386,7 +424,71 @@ contract FiveBlessingsNFT is
         return userTokens[user][t];
     }
 
+    function getUserTokensByLevel(address user, ZodiacType t, uint8 level) external view returns (uint256[] memory) {
+        return userTokensByLevel[user][t][level];
+    }
+
+    function upgradeWithNFT(uint256 tokenId) external nonReentrant returns (uint8) {
+        require(_ownerOf(tokenId) == msg.sender, "Not owner of token");
+        ZodiacType t = tokenType[tokenId];
+        uint8 currentLevel = tokenLevel[tokenId];
+        require(currentLevel < 6, "Already max level");
+
+        uint8 requiredCount = currentLevel;
+        uint256[] storage tokens = userTokensByLevel[msg.sender][t][currentLevel];
+        require(tokens.length >= requiredCount + 1, "Not enough NFTs to upgrade");
+
+        for (uint i = 0; i < requiredCount; i++) {
+            if (tokens[i] != tokenId) {
+                _transfer(msg.sender, BLACK_HOLE, tokens[i]);
+                _removeToken(msg.sender, t, tokens[i]);
+                _removeTokenByLevel(msg.sender, t, currentLevel, tokens[i]);
+                emit CardBurned(tokens[i], t, msg.sender);
+            }
+        }
+
+        uint8 newLevel = currentLevel + 1;
+        tokenLevel[tokenId] = newLevel;
+        _removeTokenByLevel(msg.sender, t, currentLevel, tokenId);
+        userTokensByLevel[msg.sender][t][newLevel].push(tokenId);
+        userLatestTokenByLevel[msg.sender][t][newLevel] = tokenId;
+
+        emit CardUpgraded(tokenId, t, currentLevel, newLevel, msg.sender, uint64(block.timestamp));
+        return newLevel;
+    }
+
+    function upgradeWithToken(uint256 tokenId) external nonReentrant returns (uint8) {
+        require(_ownerOf(tokenId) == msg.sender, "Not owner of token");
+        require(tokenContract != address(0), "Token contract not set");
+        
+        ZodiacType t = tokenType[tokenId];
+        uint8 currentLevel = tokenLevel[tokenId];
+        require(currentLevel < 6, "Already max level");
+
+        uint256 requiredTokens;
+        if (currentLevel == 1) requiredTokens = 10000;
+        else if (currentLevel == 2) requiredTokens = 40000;
+        else if (currentLevel == 3) requiredTokens = 120000;
+        else if (currentLevel == 4) requiredTokens = 480000;
+        else if (currentLevel == 5) requiredTokens = 2400000;
+        else revert("Invalid level");
+
+        IToken token = IToken(tokenContract);
+        require(token.balanceOf(msg.sender) >= requiredTokens, "Insufficient token balance");
+        require(token.transferFrom(msg.sender, BLACK_HOLE, requiredTokens), "Token transfer failed");
+
+        uint8 newLevel = currentLevel + 1;
+        tokenLevel[tokenId] = newLevel;
+        _removeTokenByLevel(msg.sender, t, currentLevel, tokenId);
+        userTokensByLevel[msg.sender][t][newLevel].push(tokenId);
+        userLatestTokenByLevel[msg.sender][t][newLevel] = tokenId;
+
+        emit CardUpgraded(tokenId, t, currentLevel, newLevel, msg.sender, uint64(block.timestamp));
+        return newLevel;
+    }
+
     event CardMinted(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner, uint64 timestamp);
     event CardBurned(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner);
     event WuFuSynthesized(address indexed user, uint256 timestamp, uint256 wanNengUsed);
+    event CardUpgraded(uint256 indexed cardId, ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, address indexed owner, uint64 timestamp);
 }
