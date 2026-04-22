@@ -19,6 +19,7 @@
         #particles-js { position: fixed; width: 100%; height: 100%; top: 0; left: 0; z-index: -1; }
         .navbar { background-color: #ffffff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
         .zodiac-card {
+            position: relative;
             background: white;
             border-radius: 12px;
             padding: 12px;
@@ -349,8 +350,14 @@
                 const imagePath = `${attrData.ipfsBase}${prefix}${animal}${genderSuffix}.png`;
                 const name = `${attrData.name}${ZODIAC_NAMES[zodiacIndex]}（${gender === 1 ? '公' : '母'}）`;
 
+                // 模拟等级数据，实际应该从合约获取
+                const level = Math.min(6, Math.floor(Math.random() * 6) + 1);
+
                 html += `
-                    <div class="zodiac-card" onclick="showCardModal(${typeId})">
+                    <div class="zodiac-card" onclick="showCardModal(${typeId}, ${level})")>
+                        <div class="absolute top-2 right-2 bg-yellow-400 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
+                            ${getStars(level)}
+                        </div>
                         <img src="${imagePath}" alt="${name}" onerror="this.src='${attrData.ipfsBase}${prefix}shu_1.png'">
                         <h4>${name}</h4>
                         <p>拥有 ${token.count} 张</p>
@@ -361,7 +368,7 @@
             grid.innerHTML = html;
         }
 
-        function showCardModal(typeId) {
+        function showCardModal(typeId, level) {
             const zodiacIndex = typeId % 12;
             const attrIndex = Math.floor(typeId / 24);
             const gender = typeId % 2;
@@ -401,6 +408,10 @@
         document.getElementById('connectWalletBtn').addEventListener('click', function() {
             connectWallet();
         });
+
+        function getStars(level) {
+            return '⭐'.repeat(level);
+        }
 
         particlesJS('particles-js', {
             particles: {

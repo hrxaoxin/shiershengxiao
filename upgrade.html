@@ -425,7 +425,7 @@
             nfts.forEach(nft => {
                 html += `
                     <div class="nft-card" onclick="selectNFT(${nft.id}, ${nft.type}, ${nft.level}, '${nft.name}', '${nft.image}')">
-                        <div class="level-badge">${nft.level}</div>
+                        <div class="level-badge">${getStars(nft.level)}</div>
                         <img src="${nft.image}" alt="${nft.name}">
                         <h4>${nft.name}</h4>
                         <p class="text-xs text-gray-500">ID: ${nft.id}</p>
@@ -445,9 +445,9 @@
                     <img src="${image}" alt="${name}" class="w-20 h-20 object-contain">
                     <div>
                         <h4 class="text-lg font-bold">${name}</h4>
-                        <p class="text-gray-600">等级: ${level} ⭐</p>
+                        <p class="text-gray-600">等级: ${getStars(level)}</p>
                         <p class="text-gray-600">ID: ${id}</p>
-                        ${level < 6 ? `<p class="text-green-600 font-medium">可升级到 ${level + 1} 阶</p>` : `<p class="text-red-600 font-medium">已达到最高等级</p>`}
+                        ${level < 6 ? `<p class="text-green-600 font-medium">可升级到 ${getStars(level + 1)}</p>` : `<p class="text-red-600 font-medium">已达到最高等级</p>`}
                     </div>
                 </div>
             `;
@@ -570,6 +570,10 @@
                 case 5: return 240;
                 default: return 0;
             }
+        }
+
+        function getStars(level) {
+            return '⭐'.repeat(level);
         }
 
         document.getElementById('walletBtn').addEventListener('click', function() {
