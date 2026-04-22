@@ -93,6 +93,8 @@ contract FiveBlessingsNFT is
     mapping(address => mapping(ZodiacType => uint256[])) public userTokens;
     mapping(address => mapping(ZodiacType => uint256)) public userLatestToken;
 
+    address public breedingContract;
+
     uint256[60] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -534,6 +536,28 @@ contract FiveBlessingsNFT is
 
         emit CardUpgraded(tokenId, t, currentLevel, newLevel, msg.sender, uint64(block.timestamp));
         return newLevel;
+    }
+
+    function setBreedingContract(address _breedingContract) external onlyOwner {
+        require(_breedingContract != address(0), "Invalid address");
+        breedingContract = _breedingContract;
+    }
+
+    function mintBreedResult(address to, ZodiacType t) external returns (uint256) {
+        require(msg.sender == breedingContract, "Not authorized");
+        require(nextCardId < MAX_SUPPLY, "Max supply reached");
+
+        uint256 tokenId = nextCardId++;
+        tokenType[tokenId] = t;
+        tokenLevel[tokenId] = 1;
+        _safeMint(to, tokenId);
+        userTokens[to][t].push(tokenId);
+        userLatestToken[to][t] = tokenId;
+        userTokensByLevel[to][t][1].push(tokenId);
+        userLatestTokenByLevel[to][t][1] = tokenId;
+
+        emit CardMinted(tokenId, t, to, uint64(block.timestamp));
+        return tokenId;
     }
 
     event CardMinted(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner, uint64 timestamp);
