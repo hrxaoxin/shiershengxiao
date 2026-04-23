@@ -78,8 +78,9 @@ window.contractAddresses = {
     rewardManager: '0x3aAe06CC813ED61B5BF46ef89A26721cb83F9d14', // RewardManager代理合约地址
     tokenBurner: '0x8a6437e1F2A8b7F07f5F383B36fDf4D640f81E1a', // TokenBurner代理合约地址
     fiveBlessingsNFT: '0xaBf66eee8a02bCEe1a94e1c04B7b2705966B0523', // FiveBlessingsNFT代理合约地址
-    nftTrading: '0x97fFAb23e26b45F8bab80E4A64Ac51369f4Ff5E4' // NFTTrading代理合约地址
-}; 
+    nftTrading: '0x97fFAb23e26b45F8bab80E4A64Ac51369f4Ff5E4', // NFTTrading代理合约地址
+    breeding: '0x0000000000000000000000000000000000000000' // Breeding合约地址（需部署后填写）
+};
 
 // 兼容旧版本的单独地址变量
 window.tokenContractAddress = window.contractAddresses.tokenContract;
@@ -87,6 +88,7 @@ window.rewardManagerAddress = window.contractAddresses.rewardManager;
 window.tokenBurnerAddress = window.contractAddresses.tokenBurner;
 window.fiveBlessingsNFTAddress = window.contractAddresses.fiveBlessingsNFT;
 window.NFTTradingAddress = window.contractAddresses.nftTrading;
+window.breedingAddress = window.contractAddresses.breeding;
 
 // ERC20代币合约ABI
 window.tokenABI = [
@@ -1529,6 +1531,558 @@ window.rewardManagerABI = [
 	{
 		"stateMutability": "payable",
 		"type": "receive"
+	}
+];
+
+// Breeding合约ABI
+window.breedingABI = [
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "initialOwner",
+				"type": "address"
+			}
+		],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "orderId",
+				"type": "bytes32"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			}
+		],
+		"name": "BreedingCancelled",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "orderId",
+				"type": "bytes32"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newTokenId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint8",
+				"name": "newType",
+				"type": "uint8"
+			}
+		],
+		"name": "BreedingCompleted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "orderId",
+				"type": "bytes32"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "participant",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "BreedingJoined",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "orderId",
+				"type": "bytes32"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "BreedingListed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "orderId",
+				"type": "bytes32"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "breeder",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tokenId1",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tokenId2",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "isSelf",
+				"type": "bool"
+			}
+		],
+		"name": "BreedingStarted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferred",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "implementation",
+				"type": "address"
+			}
+		],
+		"name": "Upgraded",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "BREEDING_DURATION_MARKET",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "BREEDING_DURATION_SELF",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MIN_BREEDING_LEVEL",
+		"outputs": [
+			{
+				"internalType": "uint8",
+				"name": "",
+				"type": "uint8"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "orderId",
+				"type": "bytes32"
+			}
+		],
+		"name": "breedingOrders",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "owner1",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "owner2",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId1",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId2",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint64",
+				"name": "startTime",
+				"type": "uint64"
+			},
+			{
+				"internalType": "bool",
+				"name": "completed",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "orderId",
+				"type": "bytes32"
+			}
+		],
+		"name": "cancelBreedingListing",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "orderId",
+				"type": "bytes32"
+			}
+		],
+		"name": "completeMarketBreeding",
+		"outputs": [
+			{
+				"internalType": "uint256[2]",
+				"name": "",
+				"type": "uint256[2]"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "orderId",
+				"type": "bytes32"
+			}
+		],
+		"name": "completeSelfBreeding",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getMarketBreedingOrders",
+		"outputs": [
+			{
+				"internalType": "bytes32[]",
+				"name": "",
+				"type": "bytes32[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "orderId",
+				"type": "bytes32"
+			}
+		],
+		"name": "getMarketBreedingOrder",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "owner1",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "owner2",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId1",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId2",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint64",
+				"name": "startTime",
+				"type": "uint64"
+			},
+			{
+				"internalType": "bool",
+				"name": "completed",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getUserBreedingOrders",
+		"outputs": [
+			{
+				"internalType": "bytes32[]",
+				"name": "",
+				"type": "bytes32[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "nftContract",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "orderId",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "joinBreeding",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "listForBreeding",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "proxiableUUID",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_nftContract",
+				"type": "address"
+			}
+		],
+		"name": "setNFTContract",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId1",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId2",
+				"type": "uint256"
+			}
+		],
+		"name": "startSelfBreeding",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
 	}
 ];
 

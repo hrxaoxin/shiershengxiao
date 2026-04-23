@@ -80,6 +80,10 @@
                 <div class="text-2xl mb-1">💰</div>
                 <span class="text-xs font-bold text-gray-700">交易</span>
             </a>
+            <a href="breeding.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1">🐾</div>
+                <span class="text-xs font-bold text-gray-700">孕育</span>
+            </a>
         </div>
     </nav>
 
@@ -355,11 +359,9 @@
 
                 html += `
                     <div class="zodiac-card" onclick="showCardModal(${typeId}, ${level})")>
-                        <div class="absolute top-2 right-2 bg-yellow-400 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold">
-                            ${getStars(level)}
-                        </div>
                         <img src="${imagePath}" alt="${name}" onerror="this.src='${attrData.ipfsBase}${prefix}shu_1.png'">
                         <h4>${name}</h4>
+                        <p>等级: ${getStars(level)}</p>
                         <p>拥有 ${token.count} 张</p>
                     </div>
                 `;

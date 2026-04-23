@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>孕育系统 - 五福NFT</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <script src="abis.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+        }
+        .tab-active {
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            color: white;
+        }
+        .nft-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        .nft-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(233, 69, 96, 0.3);
+        }
+        .nft-card.selected {
+            border-color: #e94560;
+            background: rgba(233, 69, 96, 0.2);
+        }
+        .market-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 16px;
+            transition: all 0.3s ease;
+        }
+        .market-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(233, 69, 96, 0.4);
+        }
+        .btn-primary:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .btn-secondary {
+            background: linear-gradient(135deg, #4a69bd 0%, #6a89cc 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(74, 105, 189, 0.4);
+        }
+        .info-box {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .countdown {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #e94560;
+            text-align: center;
+        }
+        .particles-js-canvas-el {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal.active {
+            display: flex;
+        }
+    </style>
+</head>
+<body>
+    <div id="particles-js"></div>
+
+    <nav class="bg-black/30 backdrop-blur-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-8">
+                    <a href="index.html" class="text-white font-bold text-xl">五福NFT</a>
+                    <div class="hidden md:flex space-x-4">
+                        <a href="mint.html" class="text-gray-300 hover:text-white px-3 py-2">铸造</a>
+                        <a href="collection.html" class="text-gray-300 hover:text-white px-3 py-2">我的收藏</a>
+                        <a href="upgrade.html" class="text-gray-300 hover:text-white px-3 py-2">升阶</a>
+                        <a href="trading.html" class="text-gray-300 hover:text-white px-3 py-2">交易市场</a>
+                        <a href="breeding.html" class="text-white px-3 py-2 font-medium">孕育</a>
+                    </div>
+                </div>
+                <button id="walletBtn" class="btn-primary text-white px-4 py-2 rounded-lg font-medium">
+                    连接钱包
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-white mb-4">🐾 孕育系统</h1>
+            <p class="text-gray-300">相同生肖、不同性别、5阶或以上的NFT可以一起孕育新生命</p>
+        </div>
+
+        <div class="flex justify-center mb-8">
+            <div class="inline-flex rounded-lg bg-black/30 p-1">
+                <button id="tabSelf" class="tab-active px-6 py-2 rounded-lg font-medium transition-all" onclick="switchTab('self')">
+                    自我孕育
+                </button>
+                <button id="tabMarket" class="text-white px-6 py-2 rounded-lg font-medium transition-all" onclick="switchTab('market')">
+                    市场孕育
+                </button>
+            </div>
+        </div>
+
+        <div id="selfSection">
+            <div class="info-box mb-8">
+                <h3 class="text-xl font-bold text-white mb-4">🌟 自我孕育规则</h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>• 需拥有两张相同生肖、不同性别、且满足5阶或以上的NFT</li>
+                    <li>• 质押后需等待 <span class="text-yellow-400 font-bold">12小时</span> 即可完成孕育</li>
+                    <li>• 完成后可赎回原NFT，并免费铸造获得1张相同生肖的1阶NFT</li>
+                    <li>• 新NFT的属性从孕育的两张中随机继承一张（50%概率），性别随机</li>
+                </ul>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="text-xl font-bold text-white mb-4">选择第一张NFT（公）</h3>
+                    <div id="maleNFTs" class="grid grid-cols-3 gap-3 max-h-96 overflow-y-auto mb-4">
+                        <div class="col-span-full text-center text-gray-400 py-8">加载中...</div>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-white mb-4">选择第二张NFT（母）</h3>
+                    <div id="femaleNFTs" class="grid grid-cols-3 gap-3 max-h-96 overflow-y-auto mb-4">
+                        <div class="col-span-full text-center text-gray-400 py-8">加载中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="selectedPair" class="hidden mt-8">
+                <div class="info-box">
+                    <h3 class="text-xl font-bold text-white mb-4 text-center">已选配对</h3>
+                    <div class="flex justify-center items-center gap-8 mb-6">
+                        <div class="text-center">
+                            <img id="selectedMale" src="" class="w-32 h-32 object-contain mx-auto mb-2">
+                            <p id="selectedMaleName" class="text-white"></p>
+                            <p id="selectedMaleLevel" class="text-gray-400"></p>
+                        </div>
+                        <div class="text-4xl text-pink-400">💕</div>
+                        <div class="text-center">
+                            <img id="selectedFemale" src="" class="w-32 h-32 object-contain mx-auto mb-2">
+                            <p id="selectedFemaleName" class="text-white"></p>
+                            <p id="selectedFemaleLevel" class="text-gray-400"></p>
+                        </div>
+                    </div>
+                    <div id="selfBreedingAction" class="text-center">
+                        <button id="startSelfBreedingBtn" class="btn-primary text-white px-8 py-3 rounded-lg font-bold text-lg" onclick="startSelfBreeding()">
+                            开始自我孕育
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="selfBreedingStatus" class="hidden mt-8">
+                <div class="info-box">
+                    <h3 class="text-xl font-bold text-white mb-4 text-center">🔄 自我孕育中</h3>
+                    <div class="text-center mb-4">
+                        <div id="selfCountdown" class="countdown">12:00:00</div>
+                        <p class="text-gray-400 mt-2">剩余时间</p>
+                    </div>
+                    <div class="flex justify-center gap-4">
+                        <button id="completeSelfBreedingBtn" class="btn-primary text-white px-8 py-3 rounded-lg font-bold" onclick="completeSelfBreeding()" disabled>
+                            完成孕育（等待中）
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="marketSection" class="hidden">
+            <div class="info-box mb-8">
+                <h3 class="text-xl font-bold text-white mb-4">🌐 市场孕育规则</h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>• 可以将自己的5阶或以上NFT上架到孕育市场</li>
+                    <li>• 其他人可以查看并使用自己相同生肖、5阶以上的NFT参与孕育</li>
+                    <li>• 质押后需等待 <span class="text-yellow-400 font-bold">24小时</span> 即可完成</li>
+                    <li>• 完成后双方各自赎回原NFT，并免费铸造获得1张相同生肖的1阶NFT</li>
+                    <li>• 新NFT的属性从孕育的两张中随机继承一张（50%概率），性别随机</li>
+                </ul>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-8">
+                <div>
+                    <h3 class="text-xl font-bold text-white mb-4">我的可孕育NFT</h3>
+                    <div id="myBreedableNFTs" class="grid grid-cols-3 gap-3 max-h-96 overflow-y-auto mb-4">
+                        <div class="col-span-full text-center text-gray-400 py-8">加载中...</div>
+                    </div>
+                    <button id="listForBreedingBtn" class="btn-secondary text-white w-full py-3 rounded-lg font-bold" onclick="listForBreeding()" disabled>
+                        上架到市场
+                    </button>
+                </div>
+                <div>
+                    <h3 class="text-xl font-bold text-white mb-4">市场订单</h3>
+                    <div id="marketOrders" class="space-y-4 max-h-96 overflow-y-auto">
+                        <div class="text-center text-gray-400 py-8">加载中...</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="myMarketOrders" class="mt-8">
+                <h3 class="text-xl font-bold text-white mb-4">我的市场订单</h3>
+                <div id="myOrdersList" class="space-y-4">
+                    <div class="text-center text-gray-400 py-8">暂无订单</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="joinBreedingModal" class="modal">
+            <div class="bg-gray-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-gray-700">
+                <h3 class="text-xl font-bold text-white mb-4">加入孕育</h3>
+                <div id="joinOrderInfo" class="mb-4"></div>
+                <h4 class="text-white mb-2">选择你的NFT（需同生肖不同性别）</h4>
+                <div id="joinableNFTs" class="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto mb-4"></div>
+                <div id="selectedJoinNFT" class="hidden mb-4 p-3 bg-gray-800 rounded-lg text-center"></div>
+                <div class="flex gap-4">
+                    <button onclick="closeJoinModal()" class="flex-1 bg-gray-700 text-white py-2 rounded-lg">取消</button>
+                    <button id="joinBreedingBtn" onclick="confirmJoinBreeding()" class="flex-1 btn-primary text-white py-2 rounded-lg" disabled>确认加入</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-black/30 py-6 mt-12">
+        <div class="max-w-7xl mx-auto px-4 text-center text-gray-400">
+            <p>&copy; 2024 五福NFT. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+    <script>
+        let provider, signer, account;
+        let nftContract, breedingContract;
+        let currentTab = 'self';
+        let selectedMaleNFT = null;
+        let selectedFemaleNFT = null;
+        let selectedListNFT = null;
+        let selectedJoinOrderId = null;
+        let selectedJoinNFT = null;
+        let maleNFTs = [];
+        let femaleNFTs = [];
+        let breedableNFTs = [];
+        let marketOrders = [];
+        let myMarketOrders = [];
+        let activeSelfOrder = null;
+
+        const ZODIAC_DATA = {
+            water: {
+                name: '水',
+                prefix: 'shui',
+                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
+            },
+            wind: {
+                name: '风',
+                prefix: 'feng',
+                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
+            },
+            fire: {
+                name: '火',
+                prefix: 'huo',
+                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
+            },
+            dark: {
+                name: '暗',
+                prefix: 'an',
+                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
+            },
+            light: {
+                name: '光',
+                prefix: 'guang',
+                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
+                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
+            }
+        };
+
+        const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+
+        particlesJS('particles-js', {
+            particles: {
+                number: { value: 80, density: { enable: true, value_area: 800 } },
+                color: { value: '#e94560' },
+                shape: { type: 'circle' },
+                opacity: { value: 0.5, random: false },
+                size: { value: 3, random: true },
+                line_linked: { enable: true, distance: 150, color: '#e94560', opacity: 0.4, width: 1 },
+                move: { enable: true, speed: 2, direction: 'none', random: false, straight: false, out_mode: 'out' }
+            },
+            interactivity: { detect_on: 'canvas', events: { onhover: { enable: true, mode: 'repulse' }, resize: true } },
+            retina_detect: true
+        });
+
+        function getStars(level) {
+            return '⭐'.repeat(level);
+        }
+
+        function getNFTImage(typeId, level) {
+            const zodiacIndex = typeId % 12;
+            const attrIndex = Math.floor(typeId / 24);
+            const gender = typeId % 2;
+            const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+            const attr = attrs[attrIndex] || 'water';
+            const attrData = ZODIAC_DATA[attr];
+            const prefix = attrData.prefix;
+            const animal = attrData.animals[zodiacIndex];
+            const genderSuffix = gender === 1 ? '_1' : '_0';
+            return attrData.ipfsBase + prefix + animal + genderSuffix + '.png';
+        }
+
+        function getNFTName(typeId) {
+            const zodiacIndex = typeId % 12;
+            const attrIndex = Math.floor(typeId / 24);
+            const gender = typeId % 2;
+            const attrs = ['水', '风', '火', '暗', '光'];
+            const attr = attrs[attrIndex] || '水';
+            const genderText = gender === 1 ? '公' : '母';
+            return `${attr}${ZODIAC_NAMES[zodiacIndex]}（${genderText}）`;
+        }
+
+        document.getElementById('walletBtn').addEventListener('click', initWeb3);
+
+        async function initWeb3() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    provider = new ethers.providers.Web3Provider(window.ethereum);
+                    await provider.send("eth_requestAccounts", []);
+                    signer = provider.getSigner();
+                    account = await signer.getAddress();
+
+                    document.getElementById('walletBtn').textContent = account.slice(0, 6) + '...' + account.slice(-4);
+
+                    nftContract = new ethers.Contract(fiveBlessingsNFTAddress, fiveBlessingsNFTABI, signer);
+                    breedingContract = new ethers.Contract(breedingAddress, breedingABI, signer);
+
+                    await loadNFTs();
+                    await loadMarketOrders();
+                    await loadMyMarketOrders();
+                    await checkActiveSelfOrder();
+
+                } catch (error) {
+                    console.error('钱包连接失败:', error);
+                    alert('钱包连接失败');
+                }
+            } else {
+                alert('请安装MetaMask钱包');
+            }
+        }
+
+        async function loadNFTs() {
+            try {
+                const MIN_LEVEL = 5;
+                maleNFTs = [];
+                femaleNFTs = [];
+                breedableNFTs = [];
+
+                const balance = await nftContract.balanceOf(account);
+                for (let i = 0; i < balance; i++) {
+                    const tokenId = await nftContract.tokenOfOwnerByIndex(account, i);
+                    const tokenType = await nftContract.tokenType(tokenId);
+                    const tokenLevel = await nftContract.tokenLevel(tokenId);
+                    const gender = tokenType % 2;
+
+                    if (tokenLevel >= MIN_LEVEL) {
+                        const nftData = {
+                            id: tokenId.toString(),
+                            type: tokenType.toString(),
+                            level: tokenLevel.toString(),
+                            image: getNFTImage(tokenType, tokenLevel),
+                            name: getNFTName(tokenType)
+                        };
+                        breedableNFTs.push(nftData);
+                        if (gender === 1) {
+                            maleNFTs.push(nftData);
+                        } else {
+                            femaleNFTs.push(nftData);
+                        }
+                    }
+                }
+
+                renderMaleNFTs();
+                renderFemaleNFTs();
+                renderBreedableNFTs();
+            } catch (error) {
+                console.error('加载NFT失败:', error);
+            }
+        }
+
+        function renderMaleNFTs() {
+            const container = document.getElementById('maleNFTs');
+            if (maleNFTs.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8">没有可用的公NFT（5阶或以上）</div>';
+                return;
+            }
+            let html = '';
+            maleNFTs.forEach(nft => {
+                const selected = selectedMaleNFT && selectedMaleNFT.id === nft.id ? 'selected' : '';
+                html += `
+                    <div class="nft-card ${selected}" onclick="selectMaleNFT(${nft.id})">
+                        <img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <p class="text-white text-sm truncate">${nft.name}</p>
+                        <p class="text-gray-400 text-xs">${getStars(nft.level)}</p>
+                        <p class="text-gray-500 text-xs">ID: ${nft.id}</p>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderFemaleNFTs() {
+            const container = document.getElementById('femaleNFTs');
+            if (femaleNFTs.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8">没有可用的母NFT（5阶或以上）</div>';
+                return;
+            }
+            let html = '';
+            femaleNFTs.forEach(nft => {
+                const selected = selectedFemaleNFT && selectedFemaleNFT.id === nft.id ? 'selected' : '';
+                html += `
+                    <div class="nft-card ${selected}" onclick="selectFemaleNFT(${nft.id})">
+                        <img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <p class="text-white text-sm truncate">${nft.name}</p>
+                        <p class="text-gray-400 text-xs">${getStars(nft.level)}</p>
+                        <p class="text-gray-500 text-xs">ID: ${nft.id}</p>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function renderBreedableNFTs() {
+            const container = document.getElementById('myBreedableNFTs');
+            if (breedableNFTs.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8">没有可用的NFT（5阶或以上）</div>';
+                return;
+            }
+            let html = '';
+            breedableNFTs.forEach(nft => {
+                const selected = selectedListNFT && selectedListNFT.id === nft.id ? 'selected' : '';
+                html += `
+                    <div class="nft-card ${selected}" onclick="selectListNFT(${nft.id})">
+                        <img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <p class="text-white text-sm truncate">${nft.name}</p>
+                        <p class="text-gray-400 text-xs">${getStars(nft.level)}</p>
+                        <p class="text-gray-500 text-xs">ID: ${nft.id}</p>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function selectMaleNFT(id) {
+            selectedMaleNFT = maleNFTs.find(n => n.id === id.toString());
+            renderMaleNFTs();
+            updateSelectedPair();
+        }
+
+        function selectFemaleNFT(id) {
+            selectedFemaleNFT = femaleNFTs.find(n => n.id === id.toString());
+            renderFemaleNFTs();
+            updateSelectedPair();
+        }
+
+        function selectListNFT(id) {
+            selectedListNFT = breedableNFTs.find(n => n.id === id.toString());
+            renderBreedableNFTs();
+            document.getElementById('listForBreedingBtn').disabled = !selectedListNFT;
+        }
+
+        function updateSelectedPair() {
+            const pairSection = document.getElementById('selectedPair');
+            if (selectedMaleNFT && selectedFemaleNFT) {
+                const maleType = parseInt(selectedMaleNFT.type);
+                const femaleType = parseInt(selectedFemaleNFT.type);
+                const maleZodiac = maleType % 12;
+                const femaleZodiac = femaleType % 12;
+
+                if (maleZodiac !== femaleZodiac) {
+                    alert('必须选择相同生肖的NFT！');
+                    selectedFemaleNFT = null;
+                    renderFemaleNFTs();
+                    return;
+                }
+
+                pairSection.classList.remove('hidden');
+                document.getElementById('selectedMale').src = selectedMaleNFT.image;
+                document.getElementById('selectedMaleName').textContent = selectedMaleNFT.name;
+                document.getElementById('selectedMaleLevel').textContent = getStars(selectedMaleNFT.level);
+                document.getElementById('selectedFemale').src = selectedFemaleNFT.image;
+                document.getElementById('selectedFemaleName').textContent = selectedFemaleNFT.name;
+                document.getElementById('selectedFemaleLevel').textContent = getStars(selectedFemaleNFT.level);
+            } else {
+                pairSection.classList.add('hidden');
+            }
+        }
+
+        async function startSelfBreeding() {
+            if (!selectedMaleNFT || !selectedFemaleNFT) {
+                alert('请选择两张NFT');
+                return;
+            }
+
+            const btn = document.getElementById('startSelfBreedingBtn');
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+
+            try {
+                const tx = await breedingContract.startSelfBreeding(
+                    selectedMaleNFT.id,
+                    selectedFemaleNFT.id
+                );
+                await tx.wait();
+                alert('自我孕育已开始！12小时后可以完成。');
+                await loadNFTs();
+                await checkActiveSelfOrder();
+                selectedMaleNFT = null;
+                selectedFemaleNFT = null;
+                updateSelectedPair();
+            } catch (error) {
+                console.error('开始自我孕育失败:', error);
+                alert('交易失败: ' + (error.reason || error.message));
+            }
+
+            btn.disabled = false;
+            btn.textContent = '开始自我孕育';
+        }
+
+        async function checkActiveSelfOrder() {
+            try {
+                const orders = await breedingContract.getUserBreedingOrders(account);
+                for (const orderId of orders) {
+                    const order = await breedingContract.breedingOrders(orderId);
+                    if (order.owner1 === order.owner2 && !order.completed) {
+                        activeSelfOrder = {
+                            id: orderId,
+                            owner1: order.owner1,
+                            tokenId1: order.tokenId1.toString(),
+                            tokenId2: order.tokenId2.toString(),
+                            startTime: order.startTime.toString(),
+                            completed: order.completed
+                        };
+                        showSelfBreedingStatus();
+                        return;
+                    }
+                }
+                activeSelfOrder = null;
+                document.getElementById('selfBreedingStatus').classList.add('hidden');
+            } catch (error) {
+                console.error('检查自我孕育订单失败:', error);
+            }
+        }
+
+        function showSelfBreedingStatus() {
+            const statusSection = document.getElementById('selfBreedingStatus');
+            statusSection.classList.remove('hidden');
+            updateSelfCountdown();
+            setInterval(updateSelfCountdown, 1000);
+        }
+
+        function updateSelfCountdown() {
+            if (!activeSelfOrder) return;
+
+            const DURATION = 12 * 60 * 60;
+            const startTime = parseInt(activeSelfOrder.startTime);
+            const endTime = startTime + DURATION;
+            const now = Math.floor(Date.now() / 1000);
+            const remaining = endTime - now;
+
+            if (remaining <= 0) {
+                document.getElementById('selfCountdown').textContent = '00:00:00';
+                document.getElementById('completeSelfBreedingBtn').disabled = false;
+                document.getElementById('completeSelfBreedingBtn').textContent = '完成孕育';
+            } else {
+                const hours = Math.floor(remaining / 3600);
+                const minutes = Math.floor((remaining % 3600) / 60);
+                const seconds = remaining % 60;
+                document.getElementById('selfCountdown').textContent =
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                document.getElementById('completeSelfBreedingBtn').disabled = true;
+                document.getElementById('completeSelfBreedingBtn').textContent = `等待中 (${hours}h${minutes}m)`;
+            }
+        }
+
+        async function completeSelfBreeding() {
+            if (!activeSelfOrder) return;
+
+            const btn = document.getElementById('completeSelfBreedingBtn');
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+
+            try {
+                const tx = await breedingContract.completeSelfBreeding(activeSelfOrder.id);
+                await tx.wait();
+                alert('恭喜！孕育完成！');
+                activeSelfOrder = null;
+                document.getElementById('selfBreedingStatus').classList.add('hidden');
+                await loadNFTs();
+            } catch (error) {
+                console.error('完成自我孕育失败:', error);
+                alert('交易失败: ' + (error.reason || error.message));
+                btn.disabled = false;
+                btn.textContent = '完成孕育';
+            }
+        }
+
+        async function listForBreeding() {
+            if (!selectedListNFT) {
+                alert('请选择要上架的NFT');
+                return;
+            }
+
+            const btn = document.getElementById('listForBreedingBtn');
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+
+            try {
+                const tx = await breedingContract.listForBreeding(selectedListNFT.id);
+                await tx.wait();
+                alert('已上架到市场！');
+                await loadNFTs();
+                await loadMarketOrders();
+                await loadMyMarketOrders();
+                selectedListNFT = null;
+                document.getElementById('listForBreedingBtn').disabled = true;
+            } catch (error) {
+                console.error('上架失败:', error);
+                alert('交易失败: ' + (error.reason || error.message));
+            }
+
+            btn.disabled = false;
+            btn.textContent = '上架到市场';
+        }
+
+        async function loadMarketOrders() {
+            try {
+                const orderIds = await breedingContract.getMarketBreedingOrders();
+                marketOrders = [];
+
+                for (const orderId of orderIds) {
+                    const order = await breedingContract.breedingOrders(orderId);
+                    if (order.owner2 === '0x0000000000000000000000000000000000000000' && !order.completed) {
+                        const token1Type = await nftContract.tokenType(order.tokenId1);
+                        const token1Level = await nftContract.tokenLevel(order.tokenId1);
+                        marketOrders.push({
+                            id: orderId,
+                            owner1: order.owner1,
+                            tokenId1: order.tokenId1.toString(),
+                            token1Type: token1Type.toString(),
+                            token1Level: token1Level.toString(),
+                            token1Image: getNFTImage(token1Type, token1Level),
+                            token1Name: getNFTName(token1Type)
+                        });
+                    }
+                }
+
+                renderMarketOrders();
+            } catch (error) {
+                console.error('加载市场订单失败:', error);
+            }
+        }
+
+        function renderMarketOrders() {
+            const container = document.getElementById('marketOrders');
+            if (marketOrders.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 py-8">暂没有市场订单</div>';
+                return;
+            }
+
+            let html = '';
+            marketOrders.forEach(order => {
+                const isMyOrder = order.owner1.toLowerCase() === account.toLowerCase();
+                html += `
+                    <div class="market-card">
+                        <div class="flex items-center gap-4 mb-3">
+                            <img src="${order.token1Image}" class="w-16 h-16 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                            <div class="flex-1">
+                                <p class="text-white font-medium">${order.token1Name}</p>
+                                <p class="text-gray-400 text-sm">${getStars(order.token1Level)}</p>
+                                <p class="text-gray-500 text-xs">ID: ${order.tokenId1}</p>
+                            </div>
+                            ${isMyOrder ? '<span class="text-pink-400 text-sm">我的订单</span>' : ''}
+                        </div>
+                        ${!isMyOrder ? `
+                            <button class="btn-primary w-full py-2 rounded-lg text-sm" onclick="openJoinModal('${order.id}')">
+                                加入孕育
+                            </button>
+                        ` : `
+                            <button class="btn-secondary w-full py-2 rounded-lg text-sm" onclick="cancelMyListing('${order.id}')">
+                                取消上架
+                            </button>
+                        `}
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        async function loadMyMarketOrders() {
+            try {
+                const orderIds = await breedingContract.getUserBreedingOrders(account);
+                myMarketOrders = [];
+
+                for (const orderId of orderIds) {
+                    const order = await breedingContract.breedingOrders(orderId);
+                    if (order.owner1.toLowerCase() === account.toLowerCase() && order.owner2 === '0x0000000000000000000000000000000000000000') {
+                        const token1Type = await nftContract.tokenType(order.tokenId1);
+                        const token1Level = await nftContract.tokenLevel(order.tokenId1);
+                        myMarketOrders.push({
+                            id: orderId,
+                            tokenId1: order.tokenId1.toString(),
+                            token1Type: token1Type.toString(),
+                            token1Level: token1Level.toString(),
+                            token1Image: getNFTImage(token1Type, token1Level),
+                            token1Name: getNFTName(token1Type),
+                            startTime: order.startTime.toString(),
+                            completed: order.completed
+                        });
+                    } else if (order.owner2.toLowerCase() === account.toLowerCase() && !order.completed) {
+                        const token2Type = await nftContract.tokenType(order.tokenId2);
+                        const token2Level = await nftContract.tokenLevel(order.tokenId2);
+                        const token1Type = await nftContract.tokenType(order.tokenId1);
+                        myMarketOrders.push({
+                            id: orderId,
+                            role: 'participant',
+                            tokenId1: order.tokenId1.toString(),
+                            tokenId2: order.tokenId2.toString(),
+                            token1Type: token1Type.toString(),
+                            token1Level: token1Level.toString(),
+                            token1Image: getNFTImage(token1Type, token1Level),
+                            token1Name: getNFTName(token1Type),
+                            token2Type: token2Type.toString(),
+                            token2Level: token2Level.toString(),
+                            token2Image: getNFTImage(token2Type, token2Level),
+                            token2Name: getNFTName(token2Type),
+                            startTime: order.startTime.toString(),
+                            completed: order.completed
+                        });
+                    }
+                }
+
+                renderMyMarketOrders();
+            } catch (error) {
+                console.error('加载我的市场订单失败:', error);
+            }
+        }
+
+        function renderMyMarketOrders() {
+            const container = document.getElementById('myOrdersList');
+            if (myMarketOrders.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 py-8">暂无订单</div>';
+                return;
+            }
+
+            let html = '';
+            myMarketOrders.forEach(order => {
+                if (order.role === 'participant') {
+                    const endTime = parseInt(order.startTime) + 24 * 60 * 60;
+                    const now = Math.floor(Date.now() / 1000);
+                    const canComplete = now >= endTime;
+
+                    html += `
+                        <div class="market-card">
+                            <div class="flex items-center justify-between mb-3">
+                                <div class="flex items-center gap-2">
+                                    <img src="${order.token1Image}" class="w-12 h-12 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                                    <span class="text-pink-400">💕</span>
+                                    <img src="${order.token2Image}" class="w-12 h-12 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                                </div>
+                                <span class="text-yellow-400 text-sm">等待完成</span>
+                            </div>
+                            <button class="btn-primary w-full py-2 rounded-lg text-sm ${canComplete ? '' : 'opacity-50 cursor-not-allowed'}" 
+                                    onclick="${canComplete ? `completeMarketBreeding('${order.id}')` : ''}" ${!canComplete ? 'disabled' : ''}>
+                                ${canComplete ? '完成孕育' : '等待中...'}
+                            </button>
+                        </div>
+                    `;
+                }
+            });
+            container.innerHTML = html;
+        }
+
+        function openJoinModal(orderId) {
+            selectedJoinOrderId = orderId;
+            selectedJoinNFT = null;
+            const order = marketOrders.find(o => o.id === orderId);
+            if (!order) return;
+
+            const orderZodiac = parseInt(order.token1Type) % 12;
+            const orderGender = parseInt(order.token1Type) % 2;
+
+            const joinableNFTs = breedableNFTs.filter(nft => {
+                const type = parseInt(nft.type);
+                const zodiac = type % 12;
+                const gender = type % 2;
+                return zodiac === orderZodiac && gender !== orderGender;
+            });
+
+            document.getElementById('joinOrderInfo').innerHTML = `
+                <div class="flex items-center gap-3 p-3 bg-gray-800 rounded-lg">
+                    <img src="${order.token1Image}" class="w-12 h-12 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                    <div>
+                        <p class="text-white">${order.token1Name}</p>
+                        <p class="text-gray-400 text-sm">${getStars(order.token1Level)}</p>
+                    </div>
+                </div>
+            `;
+
+            const container = document.getElementById('joinableNFTs');
+            if (joinableNFTs.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center text-gray-400 py-4">没有匹配的NFT</div>';
+            } else {
+                let html = '';
+                joinableNFTs.forEach(nft => {
+                    html += `
+                        <div class="nft-card" onclick="selectJoinNFT('${nft.id}')">
+                            <img src="${nft.image}" class="w-full aspect-square object-contain mb-1" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                            <p class="text-white text-xs truncate">${nft.name}</p>
+                            <p class="text-gray-400 text-xs">${getStars(nft.level)}</p>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            }
+
+            document.getElementById('selectedJoinNFT').classList.add('hidden');
+            document.getElementById('joinBreedingBtn').disabled = true;
+            document.getElementById('joinBreedingModal').classList.add('active');
+        }
+
+        function selectJoinNFT(id) {
+            selectedJoinNFT = breedableNFTs.find(n => n.id === id);
+            const container = document.getElementById('joinableNFTs');
+            const cards = container.querySelectorAll('.nft-card');
+            cards.forEach(card => card.classList.remove('selected'));
+
+            if (selectedJoinNFT) {
+                event.currentTarget.classList.add('selected');
+                document.getElementById('selectedJoinNFT').classList.remove('hidden');
+                document.getElementById('selectedJoinNFT').innerHTML = `
+                    <p class="text-white">已选择: ${selectedJoinNFT.name}</p>
+                    <p class="text-gray-400">${getStars(selectedJoinNFT.level)}</p>
+                `;
+                document.getElementById('joinBreedingBtn').disabled = false;
+            }
+        }
+
+        function closeJoinModal() {
+            document.getElementById('joinBreedingModal').classList.remove('active');
+            selectedJoinOrderId = null;
+            selectedJoinNFT = null;
+        }
+
+        async function confirmJoinBreeding() {
+            if (!selectedJoinOrderId || !selectedJoinNFT) return;
+
+            const btn = document.getElementById('joinBreedingBtn');
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+
+            try {
+                const tx = await breedingContract.joinBreeding(selectedJoinOrderId, selectedJoinNFT.id);
+                await tx.wait();
+                alert('成功加入孕育！24小时后可以完成。');
+                closeJoinModal();
+                await loadNFTs();
+                await loadMarketOrders();
+                await loadMyMarketOrders();
+            } catch (error) {
+                console.error('加入孕育失败:', error);
+                alert('交易失败: ' + (error.reason || error.message));
+            }
+
+            btn.disabled = false;
+            btn.textContent = '确认加入';
+        }
+
+        async function cancelMyListing(orderId) {
+            if (!confirm('确定要取消上架吗？')) return;
+
+            try {
+                const tx = await breedingContract.cancelBreedingListing(orderId);
+                await tx.wait();
+                alert('已取消上架');
+                await loadNFTs();
+                await loadMarketOrders();
+                await loadMyMarketOrders();
+            } catch (error) {
+                console.error('取消上架失败:', error);
+                alert('交易失败: ' + (error.reason || error.message));
+            }
+        }
+
+        async function completeMarketBreeding(orderId) {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+
+            try {
+                const tx = await breedingContract.completeMarketBreeding(orderId);
+                await tx.wait();
+                alert('恭喜！双方都完成了孕育！');
+                await loadNFTs();
+                await loadMarketOrders();
+                await loadMyMarketOrders();
+            } catch (error) {
+                console.error('完成市场孕育失败:', error);
+                alert('交易失败: ' + (error.reason || error.message));
+                btn.disabled = false;
+                btn.textContent = '完成孕育';
+            }
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('tabSelf').classList.toggle('tab-active', tab === 'self');
+            document.getElementById('tabMarket').classList.toggle('tab-active', tab === 'market');
+            document.getElementById('selfSection').classList.toggle('hidden', tab !== 'self');
+            document.getElementById('marketSection').classList.toggle('hidden', tab !== 'market');
+        }
+    </script>
+</body>
+</html>

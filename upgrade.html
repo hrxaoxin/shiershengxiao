@@ -302,9 +302,17 @@
                 <div class="text-2xl mb-1">🏆</div>
                 <span class="text-xs font-bold text-gray-700">奖励</span>
             </a>
+            <a href="upgrade.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">⭐</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">升阶</span>
+            </a>
             <a href="trading.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
                 <div class="text-2xl mb-1">💰</div>
                 <span class="text-xs font-bold text-gray-700">交易</span>
+            </a>
+            <a href="breeding.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <div class="text-2xl mb-1">🐾</div>
+                <span class="text-xs font-bold text-gray-700">孕育</span>
             </a>
         </div>
     </nav>
@@ -330,6 +338,10 @@
             <a href="trading.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="交易">
                 <div class="text-3xl">💰</div>
                 <span class="text-xs font-bold mt-1 text-gray-700">交易</span>
+            </a>
+            <a href="breeding.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="孕育">
+                <div class="text-3xl">🐾</div>
+                <span class="text-xs font-bold mt-1 text-gray-700">孕育</span>
             </a>
         </div>
     </nav>
@@ -425,9 +437,9 @@
             nfts.forEach(nft => {
                 html += `
                     <div class="nft-card" onclick="selectNFT(${nft.id}, ${nft.type}, ${nft.level}, '${nft.name}', '${nft.image}')">
-                        <div class="level-badge">${getStars(nft.level)}</div>
                         <img src="${nft.image}" alt="${nft.name}">
                         <h4>${nft.name}</h4>
+                        <p class="text-xs text-gray-500">等级: ${getStars(nft.level)}</p>
                         <p class="text-xs text-gray-500">ID: ${nft.id}</p>
                     </div>
                 `;
