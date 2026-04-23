@@ -32,29 +32,13 @@
         }
 
         .navbar {
-            background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(249, 250, 251, 0.95), rgba(243, 244, 246, 0.95));
-            backdrop-filter: blur(12px);
-            border-top: 2px solid rgba(59, 130, 246, 0.5);
-            box-shadow: 0 -4px 20px rgba(59, 130, 246, 0.2);
-            animation: navbarSlideUp 0.8s ease-out;
-        }
-
-        @keyframes navbarSlideUp {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+            background-color: #ffffff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
         .desktop-nav {
-            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(249, 250, 251, 0.95), rgba(243, 244, 246, 0.95));
-            backdrop-filter: blur(12px);
-            border: 2px solid rgba(59, 130, 246, 0.5);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-            animation: desktopNavSlideIn 0.8s ease-out;
-        }
-
-        @keyframes desktopNavSlideIn {
-            from { transform: translateX(-100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
+            background-color: #ffffff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
         .hero-section {
@@ -279,33 +263,33 @@
         </footer>
     </div>
 
-    <nav class="navbar fixed bottom-0 left-0 right-0 z-50 md:hidden">
-        <div class="flex justify-around items-center px-2 py-2">
-            <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+    <nav class="navbar fixed bottom-0 left-0 right-0 z-10">
+        <div class="flex justify-around items-center py-2 px-4">
+            <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
                 <div class="text-2xl mb-1">🏠</div>
                 <span class="text-xs font-bold text-gray-700">首页</span>
             </a>
-            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
                 <div class="text-2xl mb-1">🃏</div>
                 <span class="text-xs font-bold text-gray-700">铸造</span>
             </a>
-            <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+            <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
                 <div class="text-2xl mb-1">🎁</div>
                 <span class="text-xs font-bold text-gray-700">生肖</span>
             </a>
-            <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+            <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
                 <div class="text-2xl mb-1">🏆</div>
                 <span class="text-xs font-bold text-gray-700">奖励</span>
             </a>
-            <a href="upgrade.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1 transition-transform duration-300">⭐</div>
-                <span class="text-xs font-bold transition-all duration-300 text-gray-700">升阶</span>
+            <a href="upgrade.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl bg-gray-100">
+                <div class="text-2xl mb-1">⭐</div>
+                <span class="text-xs font-bold text-gray-700">升阶</span>
             </a>
-            <a href="trading.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+            <a href="trading.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
                 <div class="text-2xl mb-1">💰</div>
                 <span class="text-xs font-bold text-gray-700">交易</span>
             </a>
-            <a href="breeding.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+            <a href="breeding.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
                 <div class="text-2xl mb-1">🐾</div>
                 <span class="text-xs font-bold text-gray-700">孕育</span>
             </a>
@@ -314,27 +298,27 @@
 
     <nav class="hidden md:block fixed left-6 top-1/2 -translate-y-1/2 z-50 desktop-nav">
         <div class="p-3 space-y-3">
-            <a href="index.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="首页">
+            <a href="index.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="首页">
                 <div class="text-3xl">🏠</div>
                 <span class="text-xs font-bold mt-1 text-gray-700">首页</span>
             </a>
-            <a href="mint.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="铸造">
+            <a href="mint.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="铸造">
                 <div class="text-3xl">🃏</div>
                 <span class="text-xs font-bold mt-1 text-gray-700">铸造</span>
             </a>
-            <a href="collection.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="我的生肖">
+            <a href="collection.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="我的生肖">
                 <div class="text-3xl">🎁</div>
                 <span class="text-xs font-bold mt-1 text-gray-700">生肖</span>
             </a>
-            <a href="rewards.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="奖励">
+            <a href="rewards.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="奖励">
                 <div class="text-3xl">🏆</div>
                 <span class="text-xs font-bold mt-1 text-gray-700">奖励</span>
             </a>
-            <a href="trading.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="交易">
+            <a href="trading.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="交易">
                 <div class="text-3xl">💰</div>
                 <span class="text-xs font-bold mt-1 text-gray-700">交易</span>
             </a>
-            <a href="breeding.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="孕育">
+            <a href="breeding.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="孕育">
                 <div class="text-3xl">🐾</div>
                 <span class="text-xs font-bold mt-1 text-gray-700">孕育</span>
             </a>
