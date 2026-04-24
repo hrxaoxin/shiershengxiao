@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>质押挖矿 - 十二生肖</title>
+    <link rel="icon" href="images/fu-cards/shuishu_1.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+    <script src="abis.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f5f5f5;
+            background-image: linear-gradient(135deg, #f5f5f5 0%, #e8f5e8 100%);
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        .navbar {
+            background-color: #ffffff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .btn-primary {
+            background-color: #ff6b6b;
+            color: white;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background-color: #ee5a6f;
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background-color: white;
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+        .btn-secondary:hover {
+            background-color: #f8f9fa;
+            transform: translateY(-2px);
+        }
+        .stake-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        .stake-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .nft-card {
+            background: white;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: 2px solid transparent;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .nft-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        .nft-card.selected {
+            border-color: #ff6b6b;
+            background: #fff5f5;
+        }
+        .info-box {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .countdown {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #ff6b6b;
+            text-align: center;
+        }
+        .particles-js-canvas-el {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body>
+    <div id="particles-js"></div>
+
+    <nav class="navbar fixed bottom-0 left-0 right-0 z-10">
+        <div class="flex justify-around items-center py-2 px-4">
+            <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">🏠</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">首页</span>
+            </a>
+            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">🃏</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">铸造</span>
+            </a>
+            <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">🎁</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">生肖</span>
+            </a>
+            <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">🏆</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">奖励</span>
+            </a>
+            <a href="upgrade.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">⭐</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">升阶</span>
+            </a>
+            <a href="trading.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">💰</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">交易</span>
+            </a>
+            <a href="breeding.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">🐾</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">孕育</span>
+            </a>
+            <a href="staking.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">⚡</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">挖矿</span>
+            </a>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-4 pt-6 pb-24">
+        <div class="flex items-center mb-4">
+            <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+                <i class="text-white text-xl">⚡</i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800">质押挖矿</h1>
+        </div>
+
+        <p class="text-lg text-gray-600 mb-8">质押6阶及以上的NFT来挖矿，每分钟获得代币奖励</p>
+
+        <!-- 钱包区域框 -->
+        <div class="bg-white rounded-xl p-6 shadow-md mb-8">
+            <!-- 钱包信息 -->
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-4">
+                        <i class="text-blue-500 text-xl">👛</i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-800">钱包信息</h3>
+                        <p class="text-sm text-gray-500" id="walletAddress">未连接钱包</p>
+                        <p class="text-xs text-gray-400" id="connectionStatus">请点击连接钱包按钮</p>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button class="btn-primary text-sm" id="connectWalletBtn">
+                        <i class="fas fa-plug mr-1"></i> 连接
+                    </button>
+                    <button class="btn-secondary text-sm" id="refreshWallet">
+                        <i class="fas fa-sync-alt mr-1"></i> 刷新
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 挖矿规则 -->
+        <div class="info-box mb-8">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">🌟 挖矿规则</h3>
+            <ul class="text-gray-600 space-y-2">
+                <li>• 质押6阶及以上的NFT来挖矿</li>
+                <li>• 每分钟自动挖矿，奖励根据合约余额和质押数量动态调整</li>
+                <li>• 每日最大奖励总量为14400代币，确保长期可持续挖矿</li>
+                <li>• 每个NFT每分钟奖励不低于1个代币，不超过10个代币</li>
+                <li>• 随时可以领取已挖矿的代币</li>
+                <li>• 随时可以赎回质押的NFT</li>
+                <li>• 挖矿奖励来自合约地址中的代币</li>
+            </ul>
+        </div>
+
+        <!-- 我的可质押NFT -->
+        <div class="mb-8">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">我的可质押NFT（6阶及以上）</h3>
+            <div id="eligibleNFTs" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                <div class="col-span-full text-center text-gray-500 py-8">加载中...</div>
+            </div>
+            <button id="stakeBtn" class="btn-primary w-full mt-4" disabled>
+                质押选中的NFT
+            </button>
+        </div>
+
+        <!-- 我的质押 -->
+        <div class="mb-8">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">我的质押</h3>
+            <div id="myStakes" class="space-y-4">
+                <div class="text-center text-gray-500 py-8">暂无质押</div>
+            </div>
+        </div>
+
+        <!-- 奖励信息 -->
+        <div class="info-box mb-8">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">🎁 奖励信息</h3>
+            <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg mb-4">
+                <span class="text-lg font-medium text-gray-800">可领取代币</span>
+                <span class="text-lg font-bold text-gray-800" id="rewardsAmount">0.00</span>
+            </div>
+            <button id="claimBtn" class="btn-primary w-full" disabled>
+                领取奖励
+            </button>
+        </div>
+
+        <!-- 合约信息 -->
+        <div class="info-box">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">📊 合约信息</h3>
+            <div class="grid grid-cols-2 gap-4">
+                <div class="p-4 bg-gray-50 rounded-lg">
+                    <span class="text-sm text-gray-600">合约代币余额</span>
+                    <p class="text-lg font-bold text-gray-800" id="contractBalance">0.00</p>
+                </div>
+                <div class="p-4 bg-gray-50 rounded-lg">
+                    <span class="text-sm text-gray-600">总质押NFT数量</span>
+                    <p class="text-lg font-bold text-gray-800" id="totalStaked">0</p>
+                </div>
+                <div class="p-4 bg-gray-50 rounded-lg col-span-2">
+                    <span class="text-sm text-gray-600">每分钟预计奖励</span>
+                    <p class="text-lg font-bold text-gray-800" id="estimatedReward">0.00</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="text-center py-8 text-black/70">
+        <p>© 2026 十二生肖NFT系列 · Twelve Zodiacs Collection</p>
+        <p class="mt-2">祝你心想事成，生肖大旺 🀄✨</p>
+    </footer>
+
+    <script>
+        let web3;
+        let account;
+        let nftContract;
+        let tokenContract;
+        let stakingContract;
+        let selectedNFTs = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            particlesJS('particles-js', {
+                particles: {
+                    number: { value: 80, density: { enable: true, value_area: 800 } },
+                    color: { value: '#ff6b6b' },
+                    shape: { type: 'circle', stroke: { width: 0, color: '#000000' } },
+                    opacity: { value: 0.5, random: true, anim: { enable: true, speed: 1, opacity_min: 0.1, sync: false } },
+                    size: { value: 5, random: true, anim: { enable: true, speed: 2, size_min: 0.1, sync: false } },
+                    line_linked: { enable: true, distance: 150, color: '#ff6b6b', opacity: 0.4, width: 1 },
+                    move: { enable: true, speed: 1, direction: 'none', random: false, straight: false, out_mode: 'out', bounce: false }
+                },
+                interactivity: { detect_on: 'canvas', events: { onhover: { enable: true, mode: 'grab' }, onclick: { enable: true, mode: 'push' }, resize: true } },
+                retina_detect: true
+            });
+
+            initWeb3();
+        });
+
+        async function initWeb3() {
+            if (typeof window.ethereum !== 'undefined') {
+                web3 = new Web3(window.ethereum);
+                try {
+                    const accounts = await web3.eth.requestAccounts();
+                    account = accounts[0];
+                    updateWalletButton();
+                    initContracts();
+                    loadEligibleNFTs();
+                    loadMyStakes();
+                    loadRewards();
+                    loadContractInfo();
+                } catch (error) {
+                    console.error('Web3 init failed:', error);
+                }
+            } else {
+                alert('请安装MetaMask钱包');
+            }
+        }
+
+        function updateWalletButton() {
+            const walletBtn = document.getElementById('connectWalletBtn');
+            if (account) {
+                const shortAddress = account.substring(0, 4) + '...' + account.substring(account.length - 4);
+                walletBtn.textContent = shortAddress;
+                walletBtn.disabled = true;
+            }
+        }
+
+        function initContracts() {
+            nftContract = new web3.eth.Contract(window.fiveBlessingsNFTABI, window.contractAddresses.fiveBlessingsNFT);
+            tokenContract = new web3.eth.Contract(window.tokenABI, window.contractAddresses.tokenContract);
+            stakingContract = new web3.eth.Contract(window.stakingABI, window.contractAddresses.staking);
+        }
+
+        async function loadEligibleNFTs() {
+            const eligibleNFTs = document.getElementById('eligibleNFTs');
+            eligibleNFTs.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">加载中...</div>';
+
+            try {
+                const MIN_LEVEL = 6;
+                const eligible = [];
+
+                const balance = await nftContract.methods.balanceOf(account).call();
+                for (let i = 0; i < balance; i++) {
+                    const tokenId = await nftContract.methods.tokenOfOwnerByIndex(account, i).call();
+                    const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
+                    const tokenType = await nftContract.methods.tokenType(tokenId).call();
+
+                    if (tokenLevel >= MIN_LEVEL) {
+                        const isStaked = await stakingContract.methods.isStaked(tokenId).call();
+                        if (!isStaked) {
+                            const nftInfo = getNFTInfo(tokenType);
+                            eligible.push({
+                                id: tokenId.toString(),
+                                type: tokenType.toString(),
+                                level: tokenLevel.toString(),
+                                image: nftInfo.imagePath,
+                                name: nftInfo.name
+                            });
+                        }
+                    }
+                }
+
+                if (eligible.length === 0) {
+                    eligibleNFTs.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">没有可质押的NFT（需要6阶及以上）</div>';
+                    return;
+                }
+
+                let html = '';
+                eligible.forEach(nft => {
+                    html += `
+                        <div class="nft-card" onclick="toggleNFTSelection('${nft.id}')">
+                            <img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                            <p class="text-gray-800 text-sm truncate">${nft.name}</p>
+                            <p class="text-gray-500 text-xs">${getStars(nft.level)}</p>
+                            <p class="text-gray-400 text-xs">ID: ${nft.id}</p>
+                        </div>
+                    `;
+                });
+                eligibleNFTs.innerHTML = html;
+            } catch (error) {
+                console.error('加载NFT失败:', error);
+                eligibleNFTs.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">加载失败，请重试</div>';
+            }
+        }
+
+        async function loadMyStakes() {
+            const myStakes = document.getElementById('myStakes');
+
+            try {
+                const stakes = await stakingContract.methods.getUserStakes(account).call();
+
+                if (stakes.length === 0) {
+                    myStakes.innerHTML = '<div class="text-center text-gray-500 py-8">暂无质押</div>';
+                    return;
+                }
+
+                let html = '';
+                for (const stake of stakes) {
+                    const tokenType = await nftContract.methods.tokenType(stake.tokenId).call();
+                    const nftInfo = getNFTInfo(tokenType);
+                    const rewards = await stakingContract.methods.calculateRewards(account).call();
+                    const rewardsFormatted = web3.utils.fromWei(rewards, 'ether');
+
+                    html += `
+                        <div class="stake-card">
+                            <div class="flex items-center gap-4 mb-4">
+                                <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" class="w-16 h-16 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                                <div class="flex-1">
+                                    <h4 class="text-lg font-bold text-gray-800">${nftInfo.name}</h4>
+                                    <p class="text-gray-500">等级: ${getStars(stake.level)}</p>
+                                    <p class="text-gray-400 text-sm">ID: ${stake.tokenId}</p>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-600">已质押时间</span>
+                                <span class="text-gray-800 font-medium">${getStakingTime(stake.lastRewardTime)}</span>
+                            </div>
+                            <button class="btn-secondary w-full mt-4" onclick="unstakeNFT('${stake.tokenId}')">
+                                赎回NFT
+                            </button>
+                        </div>
+                    `;
+                }
+                myStakes.innerHTML = html;
+            } catch (error) {
+                console.error('加载质押失败:', error);
+                myStakes.innerHTML = '<div class="text-center text-gray-500 py-8">加载失败，请重试</div>';
+            }
+        }
+
+        async function loadRewards() {
+            try {
+                const rewards = await stakingContract.methods.calculateRewards(account).call();
+                const rewardsFormatted = web3.utils.fromWei(rewards, 'ether');
+                document.getElementById('rewardsAmount').textContent = rewardsFormatted.substring(0, 6);
+                document.getElementById('claimBtn').disabled = rewards == 0;
+            } catch (error) {
+                console.error('加载奖励失败:', error);
+            }
+        }
+
+        async function loadContractInfo() {
+            try {
+                const balance = await tokenContract.methods.balanceOf(window.contractAddresses.staking).call();
+                const balanceFormatted = web3.utils.fromWei(balance, 'ether');
+                document.getElementById('contractBalance').textContent = balanceFormatted.substring(0, 6);
+
+                // 获取总质押NFT数量
+                const totalStaked = await stakingContract.methods.totalStakedNFTs().call();
+                document.getElementById('totalStaked').textContent = totalStaked;
+
+                // 计算预计奖励
+                await loadEstimatedReward();
+            } catch (error) {
+                console.error('加载合约信息失败:', error);
+            }
+        }
+
+        async function loadEstimatedReward() {
+            try {
+                // 获取合约余额
+                const balance = await tokenContract.methods.balanceOf(window.contractAddresses.staking).call();
+                
+                // 计算每日可用奖励
+                let dailyReward = balance / 100; // 合约余额的1%
+                const maxDailyReward = web3.utils.toWei('14400', 'ether'); // 最大每日奖励
+                if (dailyReward > maxDailyReward) {
+                    dailyReward = maxDailyReward;
+                }
+                
+                // 获取总质押数量
+                const totalStaked = await stakingContract.methods.totalStakedNFTs().call();
+                
+                // 计算每分钟每个NFT的奖励
+                let estimatedReward = 0;
+                if (totalStaked > 0) {
+                    const totalMinuteReward = dailyReward / 1440; // 1440分钟/天
+                    estimatedReward = totalMinuteReward / totalStaked;
+                    
+                    // 确保奖励在1-10代币之间
+                    const minReward = web3.utils.toWei('1', 'ether');
+                    const maxReward = web3.utils.toWei('10', 'ether');
+                    if (estimatedReward < minReward) {
+                        estimatedReward = minReward;
+                    } else if (estimatedReward > maxReward) {
+                        estimatedReward = maxReward;
+                    }
+                }
+                
+                const estimatedRewardFormatted = web3.utils.fromWei(estimatedReward, 'ether');
+                document.getElementById('estimatedReward').textContent = estimatedRewardFormatted.substring(0, 6);
+            } catch (error) {
+                console.error('计算预计奖励失败:', error);
+            }
+        }
+
+        function toggleNFTSelection(tokenId) {
+            const index = selectedNFTs.indexOf(tokenId);
+            if (index === -1) {
+                selectedNFTs.push(tokenId);
+                event.currentTarget.classList.add('selected');
+            } else {
+                selectedNFTs.splice(index, 1);
+                event.currentTarget.classList.remove('selected');
+            }
+            document.getElementById('stakeBtn').disabled = selectedNFTs.length === 0;
+        }
+
+        async function stakeNFTs() {
+            if (selectedNFTs.length === 0) return;
+
+            const btn = document.getElementById('stakeBtn');
+            btn.disabled = true;
+            btn.textContent = '质押中...';
+
+            try {
+                for (const tokenId of selectedNFTs) {
+                    // 先批准NFT转移
+                    await nftContract.methods.approve(window.contractAddresses.staking, tokenId).send({ from: account });
+                    // 然后质押
+                    await stakingContract.methods.stakeNFT(tokenId).send({ from: account });
+                }
+
+                alert('质押成功！');
+                selectedNFTs = [];
+                loadEligibleNFTs();
+                loadMyStakes();
+                loadRewards();
+                loadContractInfo();
+            } catch (error) {
+                console.error('质押失败:', error);
+                alert('质押失败: ' + (error.reason || error.message));
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '质押选中的NFT';
+            }
+        }
+
+        async function unstakeNFT(tokenId) {
+            if (!confirm('确定要赎回这个NFT吗？')) return;
+
+            try {
+                await stakingContract.methods.unstakeNFT(tokenId).send({ from: account });
+                alert('赎回成功！');
+                loadEligibleNFTs();
+                loadMyStakes();
+                loadRewards();
+                loadContractInfo();
+            } catch (error) {
+                console.error('赎回失败:', error);
+                alert('赎回失败: ' + (error.reason || error.message));
+            }
+        }
+
+        async function claimRewards() {
+            const btn = document.getElementById('claimBtn');
+            btn.disabled = true;
+            btn.textContent = '领取中...';
+
+            try {
+                await stakingContract.methods.claimRewards().send({ from: account });
+                alert('领取成功！');
+                loadRewards();
+                loadContractInfo();
+            } catch (error) {
+                console.error('领取失败:', error);
+                alert('领取失败: ' + (error.reason || error.message));
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '领取奖励';
+            }
+        }
+
+        function getNFTInfo(typeId) {
+            const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+            const attrNames = { water: '水', wind: '风', fire: '火', dark: '暗', light: '光' };
+            const attrPrefixes = { water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang' };
+            const animalKeys = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
+            const ipfsBases = {
+                water: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+                wind: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+                fire: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+                dark: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/',
+                light: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
+            };
+
+            const zodiacIndex = typeId % 12;
+            const attrIndex = Math.floor(typeId / 24);
+            const gender = typeId % 2 === 1 ? '公' : '母';
+            const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+
+            if (attrIndex < 0 || attrIndex >= attrs.length) {
+                return { name: '未知', prefix: '', animal: '', gender: gender, attr: 'water', imagePath: 'images/fu-cards/shuishu_1.png' };
+            }
+
+            const attr = attrs[attrIndex];
+            const prefix = attrPrefixes[attr];
+            const animal = animalKeys[zodiacIndex];
+            const genderSuffix = typeId % 2 === 1 ? '_1' : '_0';
+            const ipfsBase = ipfsBases[attr];
+
+            return {
+                name: attrNames[attr] + zodiacNames[zodiacIndex] + '（' + gender + '）',
+                prefix: prefix,
+                animal: animal,
+                gender: gender,
+                attr: attr,
+                imagePath: ipfsBase + prefix + animal + genderSuffix + '.png',
+                ipfsBase: ipfsBase,
+                attrName: attrNames[attr]
+            };
+        }
+
+        function getStars(level) {
+            return '⭐'.repeat(level);
+        }
+
+        function getStakingTime(timestamp) {
+            const now = Math.floor(Date.now() / 1000);
+            const diff = now - parseInt(timestamp);
+            const hours = Math.floor(diff / 3600);
+            const minutes = Math.floor((diff % 3600) / 60);
+            return `${hours}小时${minutes}分钟`;
+        }
+
+        // 事件监听
+        document.getElementById('connectWalletBtn').addEventListener('click', initWeb3);
+        document.getElementById('refreshWallet').addEventListener('click', initWeb3);
+        document.getElementById('stakeBtn').addEventListener('click', stakeNFTs);
+        document.getElementById('claimBtn').addEventListener('click', claimRewards);
+
+        // 定期更新奖励
+        setInterval(loadRewards, 60000);
+    </script>
+</body>
+</html>
