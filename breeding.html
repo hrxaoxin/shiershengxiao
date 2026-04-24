@@ -9,47 +9,61 @@
     <script src="abis.js"></script>
     <style>
         body {
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f5f5f5;
+            background-image: linear-gradient(135deg, #f5f5f5 0%, #e8f5e8 100%);
+            overflow-x: hidden;
             min-height: 100vh;
         }
+        .navbar {
+            background-color: #ffffff;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
         .tab-active {
-            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            background-color: #ff6b6b;
             color: white;
         }
         .nft-card {
-            background: rgba(255, 255, 255, 0.1);
+            background: white;
             border-radius: 12px;
             padding: 12px;
             text-align: center;
             transition: all 0.3s ease;
             cursor: pointer;
             border: 2px solid transparent;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
         .nft-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 8px 25px rgba(233, 69, 96, 0.3);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
         .nft-card.selected {
-            border-color: #e94560;
-            background: rgba(233, 69, 96, 0.2);
+            border-color: #ff6b6b;
+            background: #fff5f5;
         }
         .market-card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: white;
+            border: 1px solid #e5e7eb;
             border-radius: 12px;
             padding: 16px;
             transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
         .market-card:hover {
-            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
         .btn-primary {
-            background: linear-gradient(135deg, #e94560 0%, #ff6b6b 100%);
+            background-color: #ff6b6b;
+            color: white;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
             transition: all 0.3s ease;
         }
         .btn-primary:hover {
+            background-color: #ee5a6f;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(233, 69, 96, 0.4);
         }
         .btn-primary:disabled {
             background: #666;
@@ -58,23 +72,29 @@
             box-shadow: none;
         }
         .btn-secondary {
-            background: linear-gradient(135deg, #4a69bd 0%, #6a89cc 100%);
+            background-color: white;
+            color: #ff6b6b;
+            border: 1px solid #ff6b6b;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-weight: 500;
             transition: all 0.3s ease;
         }
         .btn-secondary:hover {
+            background-color: #f8f9fa;
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(74, 105, 189, 0.4);
         }
         .info-box {
-            background: rgba(255, 255, 255, 0.05);
+            background: white;
             border-radius: 12px;
             padding: 20px;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
         .countdown {
             font-size: 2rem;
             font-weight: bold;
-            color: #e94560;
+            color: #ff6b6b;
             text-align: center;
         }
         .particles-js-canvas-el {
@@ -105,38 +125,55 @@
 <body>
     <div id="particles-js"></div>
 
-    <nav class="bg-black/30 backdrop-blur-md sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4">
-            <div class="flex items-center justify-between h-16">
-                <div class="flex items-center space-x-8">
-                    <a href="index.html" class="text-white font-bold text-xl">十二生肖</a>
-                    <div class="hidden md:flex space-x-4">
-                        <a href="mint.html" class="text-gray-300 hover:text-white px-3 py-2">铸造</a>
-                        <a href="collection.html" class="text-gray-300 hover:text-white px-3 py-2">我的收藏</a>
-                        <a href="upgrade.html" class="text-gray-300 hover:text-white px-3 py-2">升阶</a>
-                        <a href="trading.html" class="text-gray-300 hover:text-white px-3 py-2">交易市场</a>
-                        <a href="breeding.html" class="text-white px-3 py-2 font-medium">孕育</a>
-                    </div>
-                </div>
-                <button id="walletBtn" class="btn-primary text-white px-4 py-2 rounded-lg font-medium">
-                    连接钱包
-                </button>
-            </div>
+    <nav class="navbar fixed bottom-0 left-0 right-0 z-10">
+        <div class="flex justify-around items-center py-2 px-4">
+            <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">🏠</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">首页</span>
+            </a>
+            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">🃏</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">铸造</span>
+            </a>
+            <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">🎁</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">生肖</span>
+            </a>
+            <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">🏆</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">奖励</span>
+            </a>
+            <a href="upgrade.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">⭐</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">升阶</span>
+            </a>
+            <a href="trading.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">💰</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">交易</span>
+            </a>
+            <a href="breeding.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 bg-gray-100">
+                <div class="text-2xl mb-1 transition-transform duration-300">🐾</div>
+                <span class="text-xs font-bold transition-all duration-300 text-gray-700">孕育</span>
+            </a>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto px-4 py-8">
-        <div class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-white mb-4">🐾 孕育系统</h1>
-            <p class="text-gray-300">相同生肖、不同性别、5阶或以上的NFT可以一起孕育新生命</p>
+    <main class="container mx-auto px-4 pt-6 pb-24">
+        <div class="flex items-center mb-4">
+            <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+                <i class="text-white text-xl">🐾</i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-800">孕育系统</h1>
         </div>
 
+        <p class="text-lg text-gray-600 mb-8">相同生肖、不同性别、5阶或以上的NFT可以一起孕育新生命</p>
+
         <div class="flex justify-center mb-8">
-            <div class="inline-flex rounded-lg bg-black/30 p-1">
+            <div class="inline-flex rounded-lg bg-gray-200 p-1">
                 <button id="tabSelf" class="tab-active px-6 py-2 rounded-lg font-medium transition-all" onclick="switchTab('self')">
                     自我孕育
                 </button>
-                <button id="tabMarket" class="text-white px-6 py-2 rounded-lg font-medium transition-all" onclick="switchTab('market')">
+                <button id="tabMarket" class="text-gray-700 px-6 py-2 rounded-lg font-medium transition-all" onclick="switchTab('market')">
                     市场孕育
                 </button>
             </div>
@@ -144,10 +181,10 @@
 
         <div id="selfSection">
             <div class="info-box mb-8">
-                <h3 class="text-xl font-bold text-white mb-4">🌟 自我孕育规则</h3>
-                <ul class="text-gray-300 space-y-2">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">🌟 自我孕育规则</h3>
+                <ul class="text-gray-600 space-y-2">
                     <li>• 需拥有两张相同生肖、不同性别、且满足5阶或以上的NFT</li>
-                    <li>• 质押后需等待 <span class="text-yellow-400 font-bold">12小时</span> 即可完成孕育</li>
+                    <li>• 质押后需等待 <span class="text-yellow-600 font-bold">12小时</span> 即可完成孕育</li>
                     <li>• 完成后可赎回原NFT，并免费铸造获得1张相同生肖的1阶NFT</li>
                     <li>• 新NFT的属性从孕育的两张中随机继承一张（50%概率），性别随机</li>
                 </ul>
@@ -155,33 +192,33 @@
 
             <div class="grid md:grid-cols-2 gap-8">
                 <div>
-                    <h3 class="text-xl font-bold text-white mb-4">选择第一张NFT（公）</h3>
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">选择第一张NFT（公）</h3>
                     <div id="maleNFTs" class="grid grid-cols-3 gap-3 max-h-96 overflow-y-auto mb-4">
-                        <div class="col-span-full text-center text-gray-400 py-8">加载中...</div>
+                        <div class="col-span-full text-center text-gray-500 py-8">加载中...</div>
                     </div>
                 </div>
                 <div>
-                    <h3 class="text-xl font-bold text-white mb-4">选择第二张NFT（母）</h3>
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">选择第二张NFT（母）</h3>
                     <div id="femaleNFTs" class="grid grid-cols-3 gap-3 max-h-96 overflow-y-auto mb-4">
-                        <div class="col-span-full text-center text-gray-400 py-8">加载中...</div>
+                        <div class="col-span-full text-center text-gray-500 py-8">加载中...</div>
                     </div>
                 </div>
             </div>
 
             <div id="selectedPair" class="hidden mt-8">
                 <div class="info-box">
-                    <h3 class="text-xl font-bold text-white mb-4 text-center">已选配对</h3>
+                    <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">已选配对</h3>
                     <div class="flex justify-center items-center gap-8 mb-6">
                         <div class="text-center">
                             <img id="selectedMale" src="" class="w-32 h-32 object-contain mx-auto mb-2">
-                            <p id="selectedMaleName" class="text-white"></p>
-                            <p id="selectedMaleLevel" class="text-gray-400"></p>
+                            <p id="selectedMaleName" class="text-gray-800"></p>
+                            <p id="selectedMaleLevel" class="text-gray-500"></p>
                         </div>
-                        <div class="text-4xl text-pink-400">💕</div>
+                        <div class="text-4xl text-pink-500">💕</div>
                         <div class="text-center">
                             <img id="selectedFemale" src="" class="w-32 h-32 object-contain mx-auto mb-2">
-                            <p id="selectedFemaleName" class="text-white"></p>
-                            <p id="selectedFemaleLevel" class="text-gray-400"></p>
+                            <p id="selectedFemaleName" class="text-gray-800"></p>
+                            <p id="selectedFemaleLevel" class="text-gray-500"></p>
                         </div>
                     </div>
                     <div id="selfBreedingAction" class="text-center">
@@ -194,10 +231,10 @@
 
             <div id="selfBreedingStatus" class="hidden mt-8">
                 <div class="info-box">
-                    <h3 class="text-xl font-bold text-white mb-4 text-center">🔄 自我孕育中</h3>
+                    <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">🔄 自我孕育中</h3>
                     <div class="text-center mb-4">
                         <div id="selfCountdown" class="countdown">12:00:00</div>
-                        <p class="text-gray-400 mt-2">剩余时间</p>
+                        <p class="text-gray-500 mt-2">剩余时间</p>
                     </div>
                     <div class="flex justify-center gap-4">
                         <button id="completeSelfBreedingBtn" class="btn-primary text-white px-8 py-3 rounded-lg font-bold" onclick="completeSelfBreeding()" disabled>
@@ -210,11 +247,11 @@
 
         <div id="marketSection" class="hidden">
             <div class="info-box mb-8">
-                <h3 class="text-xl font-bold text-white mb-4">🌐 市场孕育规则</h3>
-                <ul class="text-gray-300 space-y-2">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">🌐 市场孕育规则</h3>
+                <ul class="text-gray-600 space-y-2">
                     <li>• 可以将自己的5阶或以上NFT上架到孕育市场</li>
                     <li>• 其他人可以查看并使用自己相同生肖、5阶以上的NFT参与孕育</li>
-                    <li>• 质押后需等待 <span class="text-yellow-400 font-bold">24小时</span> 即可完成</li>
+                    <li>• 质押后需等待 <span class="text-yellow-600 font-bold">24小时</span> 即可完成</li>
                     <li>• 完成后双方各自赎回原NFT，并免费铸造获得1张相同生肖的1阶NFT</li>
                     <li>• 新NFT的属性从孕育的两张中随机继承一张（50%概率），性别随机</li>
                 </ul>
@@ -222,49 +259,48 @@
 
             <div class="grid md:grid-cols-2 gap-8">
                 <div>
-                    <h3 class="text-xl font-bold text-white mb-4">我的可孕育NFT</h3>
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">我的可孕育NFT</h3>
                     <div id="myBreedableNFTs" class="grid grid-cols-3 gap-3 max-h-96 overflow-y-auto mb-4">
-                        <div class="col-span-full text-center text-gray-400 py-8">加载中...</div>
+                        <div class="col-span-full text-center text-gray-500 py-8">加载中...</div>
                     </div>
-                    <button id="listForBreedingBtn" class="btn-secondary text-white w-full py-3 rounded-lg font-bold" onclick="listForBreeding()" disabled>
+                    <button id="listForBreedingBtn" class="btn-secondary w-full py-3 rounded-lg font-bold" onclick="listForBreeding()" disabled>
                         上架到市场
                     </button>
                 </div>
                 <div>
-                    <h3 class="text-xl font-bold text-white mb-4">市场订单</h3>
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">市场订单</h3>
                     <div id="marketOrders" class="space-y-4 max-h-96 overflow-y-auto">
-                        <div class="text-center text-gray-400 py-8">加载中...</div>
+                        <div class="text-center text-gray-500 py-8">加载中...</div>
                     </div>
                 </div>
             </div>
 
             <div id="myMarketOrders" class="mt-8">
-                <h3 class="text-xl font-bold text-white mb-4">我的市场订单</h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-4">我的市场订单</h3>
                 <div id="myOrdersList" class="space-y-4">
-                    <div class="text-center text-gray-400 py-8">暂无订单</div>
+                    <div class="text-center text-gray-500 py-8">暂无订单</div>
                 </div>
             </div>
         </div>
 
         <div id="joinBreedingModal" class="modal">
-            <div class="bg-gray-900 rounded-2xl p-6 max-w-md w-full mx-4 border border-gray-700">
-                <h3 class="text-xl font-bold text-white mb-4">加入孕育</h3>
+            <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4 border border-gray-200">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">加入孕育</h3>
                 <div id="joinOrderInfo" class="mb-4"></div>
-                <h4 class="text-white mb-2">选择你的NFT（需同生肖不同性别）</h4>
+                <h4 class="text-gray-800 mb-2">选择你的NFT（需同生肖不同性别）</h4>
                 <div id="joinableNFTs" class="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto mb-4"></div>
-                <div id="selectedJoinNFT" class="hidden mb-4 p-3 bg-gray-800 rounded-lg text-center"></div>
+                <div id="selectedJoinNFT" class="hidden mb-4 p-3 bg-gray-50 rounded-lg text-center"></div>
                 <div class="flex gap-4">
-                    <button onclick="closeJoinModal()" class="flex-1 bg-gray-700 text-white py-2 rounded-lg">取消</button>
+                    <button onclick="closeJoinModal()" class="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg">取消</button>
                     <button id="joinBreedingBtn" onclick="confirmJoinBreeding()" class="flex-1 btn-primary text-white py-2 rounded-lg" disabled>确认加入</button>
                 </div>
             </div>
         </div>
     </main>
 
-    <footer class="bg-black/30 py-6 mt-12">
-        <div class="max-w-7xl mx-auto px-4 text-center text-gray-400">
-            <p>&copy; 2024 十二生肖. All rights reserved.</p>
-        </div>
+    <footer class="text-center py-8 text-black/70">
+        <p>© 2026 十二生肖NFT系列 · Twelve Zodiacs Collection</p>
+        <p class="mt-2">祝你心想事成，生肖大旺 🀄✨</p>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
@@ -440,9 +476,9 @@
                 html += `
                     <div class="nft-card ${selected}" onclick="selectMaleNFT(${nft.id})">
                         <img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
-                        <p class="text-white text-sm truncate">${nft.name}</p>
-                        <p class="text-gray-400 text-xs">${getStars(nft.level)}</p>
-                        <p class="text-gray-500 text-xs">ID: ${nft.id}</p>
+                        <p class="text-gray-800 text-sm truncate">${nft.name}</p>
+                        <p class="text-gray-500 text-xs">${getStars(nft.level)}</p>
+                        <p class="text-gray-400 text-xs">ID: ${nft.id}</p>
                     </div>
                 `;
             });
@@ -452,18 +488,17 @@
         function renderFemaleNFTs() {
             const container = document.getElementById('femaleNFTs');
             if (femaleNFTs.length === 0) {
-                container.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8">没有可用的母NFT（5阶或以上）</div>';
+                container.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">没有可用的母NFT（5阶或以上）</div>';
                 return;
             }
             let html = '';
             femaleNFTs.forEach(nft => {
                 const selected = selectedFemaleNFT && selectedFemaleNFT.id === nft.id ? 'selected' : '';
                 html += `
-                    <div class="nft-card ${selected}" onclick="selectFemaleNFT(${nft.id})">
-                        <img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
-                        <p class="text-white text-sm truncate">${nft.name}</p>
-                        <p class="text-gray-400 text-xs">${getStars(nft.level)}</p>
-                        <p class="text-gray-500 text-xs">ID: ${nft.id}</p>
+                    <div class="nft-card ${selected}" onclick="selectFemaleNFT(${nft.id})"><img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <p class="text-gray-800 text-sm truncate">${nft.name}</p>
+                        <p class="text-gray-500 text-xs">${getStars(nft.level)}</p>
+                        <p class="text-gray-400 text-xs">ID: ${nft.id}</p>
                     </div>
                 `;
             });
@@ -473,18 +508,17 @@
         function renderBreedableNFTs() {
             const container = document.getElementById('myBreedableNFTs');
             if (breedableNFTs.length === 0) {
-                container.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8">没有可用的NFT（5阶或以上）</div>';
+                container.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">没有可用的NFT（5阶或以上）</div>';
                 return;
             }
             let html = '';
             breedableNFTs.forEach(nft => {
                 const selected = selectedListNFT && selectedListNFT.id === nft.id ? 'selected' : '';
                 html += `
-                    <div class="nft-card ${selected}" onclick="selectListNFT(${nft.id})">
-                        <img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
-                        <p class="text-white text-sm truncate">${nft.name}</p>
-                        <p class="text-gray-400 text-xs">${getStars(nft.level)}</p>
-                        <p class="text-gray-500 text-xs">ID: ${nft.id}</p>
+                    <div class="nft-card ${selected}" onclick="selectListNFT(${nft.id})"><img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <p class="text-gray-800 text-sm truncate">${nft.name}</p>
+                        <p class="text-gray-500 text-xs">${getStars(nft.level)}</p>
+                        <p class="text-gray-400 text-xs">ID: ${nft.id}</p>
                     </div>
                 `;
             });
@@ -716,11 +750,11 @@
                         <div class="flex items-center gap-4 mb-3">
                             <img src="${order.token1Image}" class="w-16 h-16 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
                             <div class="flex-1">
-                                <p class="text-white font-medium">${order.token1Name}</p>
-                                <p class="text-gray-400 text-sm">${getStars(order.token1Level)}</p>
-                                <p class="text-gray-500 text-xs">ID: ${order.tokenId1}</p>
+                                <p class="text-gray-800 font-medium">${order.token1Name}</p>
+                                <p class="text-gray-500 text-sm">${getStars(order.token1Level)}</p>
+                                <p class="text-gray-400 text-xs">ID: ${order.tokenId1}</p>
                             </div>
-                            ${isMyOrder ? '<span class="text-pink-400 text-sm">我的订单</span>' : ''}
+                            ${isMyOrder ? '<span class="text-pink-500 text-sm">我的订单</span>' : ''}
                         </div>
                         ${!isMyOrder ? `
                             <button class="btn-primary w-full py-2 rounded-lg text-sm" onclick="openJoinModal('${order.id}')">
@@ -805,10 +839,10 @@
                             <div class="flex items-center justify-between mb-3">
                                 <div class="flex items-center gap-2">
                                     <img src="${order.token1Image}" class="w-12 h-12 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
-                                    <span class="text-pink-400">💕</span>
+                                    <span class="text-pink-500">💕</span>
                                     <img src="${order.token2Image}" class="w-12 h-12 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
                                 </div>
-                                <span class="text-yellow-400 text-sm">等待完成</span>
+                                <span class="text-yellow-600 text-sm">等待完成</span>
                             </div>
                             <button class="btn-primary w-full py-2 rounded-lg text-sm ${canComplete ? '' : 'opacity-50 cursor-not-allowed'}" 
                                     onclick="${canComplete ? `completeMarketBreeding('${order.id}')` : ''}" ${!canComplete ? 'disabled' : ''}>
@@ -838,26 +872,26 @@
             });
 
             document.getElementById('joinOrderInfo').innerHTML = `
-                <div class="flex items-center gap-3 p-3 bg-gray-800 rounded-lg">
+                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                     <img src="${order.token1Image}" class="w-12 h-12 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
                     <div>
-                        <p class="text-white">${order.token1Name}</p>
-                        <p class="text-gray-400 text-sm">${getStars(order.token1Level)}</p>
+                        <p class="text-gray-800">${order.token1Name}</p>
+                        <p class="text-gray-500 text-sm">${getStars(order.token1Level)}</p>
                     </div>
                 </div>
             `;
 
             const container = document.getElementById('joinableNFTs');
             if (joinableNFTs.length === 0) {
-                container.innerHTML = '<div class="col-span-full text-center text-gray-400 py-4">没有匹配的NFT</div>';
+                container.innerHTML = '<div class="col-span-full text-center text-gray-500 py-4">没有匹配的NFT</div>';
             } else {
                 let html = '';
                 joinableNFTs.forEach(nft => {
                     html += `
                         <div class="nft-card" onclick="selectJoinNFT('${nft.id}')">
                             <img src="${nft.image}" class="w-full aspect-square object-contain mb-1" onerror="this.src='images/fu-cards/shuishu_1.png'">
-                            <p class="text-white text-xs truncate">${nft.name}</p>
-                            <p class="text-gray-400 text-xs">${getStars(nft.level)}</p>
+                            <p class="text-gray-800 text-xs truncate">${nft.name}</p>
+                            <p class="text-gray-500 text-xs">${getStars(nft.level)}</p>
                         </div>
                     `;
                 });
@@ -879,8 +913,8 @@
                 event.currentTarget.classList.add('selected');
                 document.getElementById('selectedJoinNFT').classList.remove('hidden');
                 document.getElementById('selectedJoinNFT').innerHTML = `
-                    <p class="text-white">已选择: ${selectedJoinNFT.name}</p>
-                    <p class="text-gray-400">${getStars(selectedJoinNFT.level)}</p>
+                    <p class="text-gray-800">已选择: ${selectedJoinNFT.name}</p>
+                    <p class="text-gray-500">${getStars(selectedJoinNFT.level)}</p>
                 `;
                 document.getElementById('joinBreedingBtn').disabled = false;
             }
