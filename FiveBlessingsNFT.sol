@@ -26,6 +26,7 @@ interface ITokenBurner {
     function hasBurnedToken(address user) external view returns (bool);
     function decreaseBurnCount(address user) external returns (bool);
     function getBurnCount(address user) external view returns (uint256);
+    function burnAndMint(address user) external returns (bool);
 }
 
 interface IToken {
@@ -219,6 +220,28 @@ contract FiveBlessingsNFT is
         ITokenBurner tb = ITokenBurner(tokenBurner);
         require(tb.hasBurnedToken(msg.sender) && tb.getBurnCount(msg.sender) > 0, "No permission");
         require(tb.decreaseBurnCount(msg.sender), "Burn count decrease failed");
+
+        uint256 tokenId = nextCardId++;
+        ZodiacType t = _getRandomType(tokenId);
+        tokenType[tokenId] = t;
+        tokenLevel[tokenId] = 1;
+
+        _safeMint(msg.sender, tokenId);
+        userTokens[msg.sender][t].push(tokenId);
+        userLatestToken[msg.sender][t] = tokenId;
+        userTokensByLevel[msg.sender][t][1].push(tokenId);
+        userLatestTokenByLevel[msg.sender][t][1] = tokenId;
+
+        emit CardMinted(tokenId, t, msg.sender, uint64(block.timestamp));
+        return tokenId;
+    }
+
+    function mintOneStep() external nonReentrant returns (uint256) {
+        require(tokenBurner != address(0) && rewardManager != address(0), "Dependencies not set");
+        require(nextCardId < MAX_SUPPLY, "Max supply reached");
+
+        ITokenBurner tb = ITokenBurner(tokenBurner);
+        require(tb.burnAndMint(msg.sender), "Token burn failed");
 
         uint256 tokenId = nextCardId++;
         ZodiacType t = _getRandomType(tokenId);

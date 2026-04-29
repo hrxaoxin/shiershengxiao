@@ -123,23 +123,20 @@
 
         <div class="space-y-4 mb-8">
             <button class="btn-secondary w-full py-4 text-lg font-bold" id="approveToken">
-                <i class="fas fa-key mr-2"></i> 第一步：授权代币
+                <i class="fas fa-key mr-2"></i> 授权代币
             </button>
-            <button class="btn-secondary w-full py-4 text-lg font-bold" id="burnTokenBtn">
-                <i class="fas fa-fire mr-2"></i> 第二步：销毁代币
-            </button>
-            <button class="btn-primary w-full py-4 text-lg font-bold" id="mintAfterBurnBtn" disabled>
-                <i class="fas fa-magic mr-2"></i> 第三步：铸造生肖NFT
+            <button class="btn-primary w-full py-4 text-lg font-bold" id="mintBtn" disabled>
+                <i class="fas fa-magic mr-2"></i> 铸造生肖NFT
             </button>
             <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4" id="mintStatus">
-                <p class="text-yellow-700">请先完成第一步：授权代币</p>
+                <p class="text-yellow-700">请先授权代币，然后点击铸造按钮</p>
             </div>
         </div>
 
         <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
             <h3 class="text-lg font-bold text-yellow-800 mb-2">温馨提示</h3>
             <ul class="space-y-2 text-yellow-700">
-                <li>• 每次铸造将随机获得一张生肖NFT</li>
+                <li>• 每次铸造消耗1枚代币，随机获得一张生肖NFT</li>
                 <li>• 共有5种属性 x 12种生肖 x 2种性别 = 120种生肖</li>
                 <li>• 持有生肖NFT即可享受对应的税收分红</li>
                 <li>• 首次铸造需要授权代币，之后无需重复授权</li>
@@ -225,8 +222,7 @@
         const mintSuccessModal = document.getElementById('mintSuccessModal');
         const cancelModal = document.getElementById('cancelModal');
         const viewCollection = document.getElementById('viewCollection');
-        const burnTokenBtn = document.getElementById('burnTokenBtn');
-        const mintAfterBurnBtn = document.getElementById('mintAfterBurnBtn');
+        const mintBtn = document.getElementById('mintBtn');
         const mintStatus = document.getElementById('mintStatus');
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -392,6 +388,7 @@
                 });
 
                 await checkApprovalStatus();
+                await updateMintStatus();
                 alert('代币授权成功！现在可以开始铸造了');
 
                 approveToken.textContent = '授权代币';
@@ -407,104 +404,55 @@
 
         async function updateMintStatus() {
             try {
-                if (web3 && tokenBurnerContract && accounts.length > 0) {
-                    const burnCount = await tokenBurnerContract.methods.getBurnCount(accounts[0]).call();
-                    if (burnCount > 0) {
-                        mintAfterBurnBtn.disabled = false;
-                        mintStatus.innerHTML = '<p class="text-green-700">✓ 已完成代币销毁，可以开始铸造NFT</p>';
+                if (web3 && tokenContract && accounts.length > 0) {
+                    const amountInWei = web3.utils.toWei(MINT_PRICE.toString(), 'ether');
+                    const allowance = await tokenContract.methods.allowance(accounts[0], tokenBurnerAddress).call();
+                    const balance = await tokenContract.methods.balanceOf(accounts[0]).call();
+                    const hasEnoughBalance = parseInt(balance) >= parseInt(amountInWei);
+                    const hasApproval = parseInt(allowance) >= parseInt(amountInWei);
+                    
+                    if (hasApproval && hasEnoughBalance) {
+                        mintBtn.disabled = false;
+                        mintStatus.innerHTML = '<p class="text-green-700">✓ 已授权，可以铸造NFT</p>';
+                    } else if (!hasEnoughBalance) {
+                        mintBtn.disabled = true;
+                        mintStatus.innerHTML = '<p class="text-red-700">代币余额不足，需要1枚代币</p>';
                     } else {
-                        mintAfterBurnBtn.disabled = true;
-                        mintStatus.innerHTML = '<p class="text-yellow-700">请先完成第一步：销毁代币</p>';
+                        mintBtn.disabled = true;
+                        mintStatus.innerHTML = '<p class="text-yellow-700">请先授权代币</p>';
                     }
                 } else {
-                    mintAfterBurnBtn.disabled = true;
-                    mintStatus.innerHTML = '<p class="text-yellow-700">请先完成第一步：销毁代币</p>';
+                    mintBtn.disabled = true;
+                    mintStatus.innerHTML = '<p class="text-yellow-700">请先连接钱包</p>';
                 }
             } catch (error) {
-                mintAfterBurnBtn.disabled = true;
-                mintStatus.innerHTML = '<p class="text-yellow-700">请先完成第一步：销毁代币</p>';
+                mintBtn.disabled = true;
+                mintStatus.innerHTML = '<p class="text-yellow-700">请先连接钱包</p>';
             }
         }
 
-        burnTokenBtn.addEventListener('click', async function() {
-            if (!web3 || !tokenBurnerContract || !tokenContract || accounts.length === 0) {
-                await connectWallet();
-                if (!web3 || !tokenBurnerContract || !tokenContract || accounts.length === 0) {
-                    alert('请先连接钱包');
-                    return;
-                }
-            }
-
-            burnTokenBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 处理中...';
-            burnTokenBtn.disabled = true;
-
-            try {
-                const amountInWei = web3.utils.toWei(MINT_PRICE.toString(), 'ether');
-                const allowance = await tokenContract.methods.allowance(accounts[0], tokenBurnerAddress).call();
-                if (allowance < amountInWei) {
-                    alert('请先授权代币后再销毁');
-                    burnTokenBtn.disabled = false;
-                    return;
-                }
-
-                const gasPrice = await web3.eth.getGasPrice();
-                const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.2);
-                const gasLimit = 1000000;
-
-                alert('即将销毁1枚代币作为铸造费用\n\n请在MetaMask等web3钱包中确认销毁交易');
-
-                await tokenBurnerContract.methods.burnTokenForMint().send({
-                    from: accounts[0],
-                    gasPrice: adjustedGasPrice,
-                    gas: gasLimit
-                });
-
-                await updateMintStatus();
-                await updateTokenBalance();
-                await getRemainingBurnCount();
-                alert('代币销毁成功！现在可以开始铸造NFT了');
-
-                burnTokenBtn.innerHTML = '<i class="fas fa-fire mr-2"></i> 第二步：销毁代币';
-                burnTokenBtn.disabled = false;
-            } catch (error) {
-                burnTokenBtn.innerHTML = '<i class="fas fa-fire mr-2"></i> 第二步：销毁代币';
-                burnTokenBtn.disabled = false;
-                let errorMsg = '销毁代币失败，请重试';
-                if (error.message) { errorMsg += '\n错误信息: ' + error.message; }
-                alert(errorMsg);
-            }
-        });
-
-        mintAfterBurnBtn.addEventListener('click', async function() {
+        mintBtn.addEventListener('click', async function() {
             if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
                 await connectWallet();
                 if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
                     alert('请先连接钱包');
-                    mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造生肖NFT';
-                    mintAfterBurnBtn.disabled = false;
+                    mintBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 铸造生肖NFT';
+                    mintBtn.disabled = false;
                     return;
                 }
             }
 
-            mintAfterBurnBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 处理中...';
-            mintAfterBurnBtn.disabled = true;
+            mintBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 铸造中...';
+            mintBtn.disabled = true;
 
             try {
-                const hasBurned = await tokenBurnerContract.methods.hasBurnedToken(accounts[0]).call();
-                if (!hasBurned) {
-                    alert('请先完成第一步：销毁代币');
-                    mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造生肖NFT';
-                    mintAfterBurnBtn.disabled = false;
-                    return;
-                }
-
                 const gasPrice = await web3.eth.getGasPrice();
                 const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.5);
                 const gasLimit = 3000000;
 
-                alert('即将开始铸造NFT\n\n请在MetaMask等web3钱包中确认铸造交易');
+                alert('即将铸造生肖NFT（将销毁1枚代币）\n\n请在MetaMask等web3钱包中确认交易');
 
-                const tx = await fiveBlessingsNFTContract.methods.mint().send({
+                const tx = await fiveBlessingsNFTContract.methods.mintOneStep().send({
                     from: accounts[0],
                     gasPrice: adjustedGasPrice,
                     gas: gasLimit
@@ -518,14 +466,15 @@
                 displayCardInfo(cardInfo);
                 mintSuccessModal.classList.remove('hidden');
 
+                await updateTokenBalance();
                 await updateMintStatus();
                 await getRemainingBurnCount();
 
-                mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造生肖NFT';
-                mintAfterBurnBtn.disabled = true;
+                mintBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 铸造生肖NFT';
+                mintBtn.disabled = false;
             } catch (error) {
-                mintAfterBurnBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 第三步：铸造生肖NFT';
-                mintAfterBurnBtn.disabled = false;
+                mintBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 铸造生肖NFT';
+                mintBtn.disabled = false;
                 let errorMsg = '铸造NFT失败，请重试\n\n详细信息：';
                 if (error.message) { errorMsg += '\n错误信息: ' + error.message; }
                 alert(errorMsg);

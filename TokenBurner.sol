@@ -109,6 +109,25 @@ contract TokenBurner is
         return true;
     }
 
+    // 核心业务函数：授权合约调用销毁代币并直接铸造（一步到位）
+    function burnAndMint(address user) 
+        external 
+        onlyAuthorized 
+        whenNotPaused 
+        nonReentrant 
+        nonZeroAddress(user) 
+        returns (bool) 
+    {
+        IERC20 token = IERC20(tokenContract);
+        uint256 req = BURN_AMOUNT;
+        require(token.balanceOf(user) >= req, "Insufficient balance");
+        require(token.allowance(user, address(this)) >= req, "Insufficient allowance");
+
+        token.safeTransferFrom(user, BURN_ADDRESS, req);
+        emit TokenBurned(user, req, burnCount[user], block.timestamp);
+        return true;
+    }
+
     // 核心业务函数：扣减可铸造次数（授权NFT合约调用）
     function decreaseBurnCount(address user) 
         external onlyAuthorized whenNotPaused nonZeroAddress(user) returns (bool) 
