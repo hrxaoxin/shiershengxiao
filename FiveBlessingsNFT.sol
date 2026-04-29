@@ -121,16 +121,24 @@ contract FiveBlessingsNFT is
 
     function _getRandomType(uint256 salt) internal returns (ZodiacType) {
         _nonce.increment();
-        uint256 r = uint256(keccak256(abi.encodePacked(
+        uint256 rand = uint256(keccak256(abi.encodePacked(
             blockhash(block.number - 1),
             msg.sender,
             salt,
             block.timestamp,
             _nonce.current(),
             gasleft()
-        ))) % 120;
+        )));
 
-        return ZodiacType(r);
+        uint256 r = rand % 100;
+        
+        if (r < 2) {
+            return ZodiacType(72 + (rand % 24));
+        } else if (r < 4) {
+            return ZodiacType(96 + (rand % 24));
+        } else {
+            return ZodiacType((rand % 48));
+        }
     }
 
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
@@ -245,6 +253,48 @@ contract FiveBlessingsNFT is
 
         uint256 tokenId = nextCardId++;
         ZodiacType t = _getRandomType(tokenId);
+        tokenType[tokenId] = t;
+        tokenLevel[tokenId] = 1;
+
+        _safeMint(msg.sender, tokenId);
+        userTokens[msg.sender][t].push(tokenId);
+        userLatestToken[msg.sender][t] = tokenId;
+        userTokensByLevel[msg.sender][t][1].push(tokenId);
+        userLatestTokenByLevel[msg.sender][t][1] = tokenId;
+
+        emit CardMinted(tokenId, t, msg.sender, uint64(block.timestamp));
+        return tokenId;
+    }
+
+    uint256 public constant LIGHT_DARK_COST = 88888;
+
+    function mintLightDark() external nonReentrant returns (uint256) {
+        require(tokenContract != address(0), "Token contract not set");
+        require(rewardManager != address(0), "RewardManager not set");
+        require(nextCardId < MAX_SUPPLY, "Max supply reached");
+
+        IToken token = IToken(tokenContract);
+        require(token.balanceOf(msg.sender) >= LIGHT_DARK_COST, "Insufficient tokens");
+        require(token.transferFrom(msg.sender, BLACK_HOLE, LIGHT_DARK_COST), "Token transfer failed");
+
+        _nonce.increment();
+        uint256 rand = uint256(keccak256(abi.encodePacked(
+            blockhash(block.number - 1),
+            msg.sender,
+            nextCardId,
+            block.timestamp,
+            _nonce.current(),
+            gasleft()
+        )));
+
+        ZodiacType t;
+        if (rand % 2 == 0) {
+            t = ZodiacType(72 + (rand % 24));
+        } else {
+            t = ZodiacType(96 + (rand % 24));
+        }
+
+        uint256 tokenId = nextCardId++;
         tokenType[tokenId] = t;
         tokenLevel[tokenId] = 1;
 

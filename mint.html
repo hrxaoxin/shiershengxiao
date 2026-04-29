@@ -126,7 +126,10 @@
                 <i class="fas fa-key mr-2"></i> 授权代币
             </button>
             <button class="btn-primary w-full py-4 text-lg font-bold" id="mintBtn" disabled>
-                <i class="fas fa-magic mr-2"></i> 铸造生肖NFT
+                <i class="fas fa-magic mr-2"></i> 普通铸造（消耗1代币）
+            </button>
+            <button class="btn-secondary w-full py-4 text-lg font-bold bg-gradient-to-r from-purple-500 to-yellow-500 text-white" id="mintLightDarkBtn" disabled>
+                <i class="fas fa-star mr-2"></i> 光暗铸造（消耗88888代币）
             </button>
             <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4" id="mintStatus">
                 <p class="text-yellow-700">请先授权代币，然后点击铸造按钮</p>
@@ -136,8 +139,9 @@
         <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
             <h3 class="text-lg font-bold text-yellow-800 mb-2">温馨提示</h3>
             <ul class="space-y-2 text-yellow-700">
-                <li>• 每次铸造消耗1枚代币，随机获得一张生肖NFT</li>
-                <li>• 共有5种属性 x 12种生肖 x 2种性别 = 120种生肖</li>
+                <li>• <strong>普通铸造</strong>：消耗1枚代币，随机获得生肖NFT</li>
+                <li>• <strong>光暗铸造</strong>：消耗88888枚代币，必定获得光/暗属性NFT</li>
+                <li>• 普通铸造概率：水/风/火属性各约32.67%，暗/光属性各2%</li>
                 <li>• 持有生肖NFT即可享受对应的税收分红</li>
                 <li>• 首次铸造需要授权代币，之后无需重复授权</li>
             </ul>
@@ -210,6 +214,8 @@
         let accounts = [];
         const MINT_PRICE = 1;
 
+        const LIGHT_DARK_COST = 88888;
+        
         const walletAddress = document.getElementById('walletAddress');
         const connectionStatus = document.getElementById('connectionStatus');
         const tokenBalance = document.getElementById('tokenBalance');
@@ -223,6 +229,7 @@
         const cancelModal = document.getElementById('cancelModal');
         const viewCollection = document.getElementById('viewCollection');
         const mintBtn = document.getElementById('mintBtn');
+        const mintLightDarkBtn = document.getElementById('mintLightDarkBtn');
         const mintStatus = document.getElementById('mintStatus');
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -406,27 +413,43 @@
             try {
                 if (web3 && tokenContract && accounts.length > 0) {
                     const amountInWei = web3.utils.toWei(MINT_PRICE.toString(), 'ether');
+                    const lightDarkCostInWei = web3.utils.toWei(LIGHT_DARK_COST.toString(), 'ether');
                     const allowance = await tokenContract.methods.allowance(accounts[0], tokenBurnerAddress).call();
                     const balance = await tokenContract.methods.balanceOf(accounts[0]).call();
                     const hasEnoughBalance = parseInt(balance) >= parseInt(amountInWei);
+                    const hasEnoughBalanceForLightDark = parseInt(balance) >= parseInt(lightDarkCostInWei);
                     const hasApproval = parseInt(allowance) >= parseInt(amountInWei);
+                    const hasLightDarkApproval = parseInt(allowance) >= parseInt(lightDarkCostInWei);
                     
                     if (hasApproval && hasEnoughBalance) {
                         mintBtn.disabled = false;
-                        mintStatus.innerHTML = '<p class="text-green-700">✓ 已授权，可以铸造NFT</p>';
-                    } else if (!hasEnoughBalance) {
-                        mintBtn.disabled = true;
-                        mintStatus.innerHTML = '<p class="text-red-700">代币余额不足，需要1枚代币</p>';
                     } else {
                         mintBtn.disabled = true;
-                        mintStatus.innerHTML = '<p class="text-yellow-700">请先授权代币</p>';
                     }
+                    
+                    if (hasLightDarkApproval && hasEnoughBalanceForLightDark) {
+                        mintLightDarkBtn.disabled = false;
+                    } else {
+                        mintLightDarkBtn.disabled = true;
+                    }
+                    
+                    let statusText = '';
+                    if (!hasEnoughBalance) {
+                        statusText = '<p class="text-red-700">代币余额不足，普通铸造需要1枚代币，光暗铸造需要88888枚代币</p>';
+                    } else if (!hasApproval) {
+                        statusText = '<p class="text-yellow-700">请先授权代币</p>';
+                    } else {
+                        statusText = '<p class="text-green-700">✓ 已授权，可以铸造NFT</p>';
+                    }
+                    mintStatus.innerHTML = statusText;
                 } else {
                     mintBtn.disabled = true;
+                    mintLightDarkBtn.disabled = true;
                     mintStatus.innerHTML = '<p class="text-yellow-700">请先连接钱包</p>';
                 }
             } catch (error) {
                 mintBtn.disabled = true;
+                mintLightDarkBtn.disabled = true;
                 mintStatus.innerHTML = '<p class="text-yellow-700">请先连接钱包</p>';
             }
         }
@@ -475,6 +498,56 @@
             } catch (error) {
                 mintBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 铸造生肖NFT';
                 mintBtn.disabled = false;
+                let errorMsg = '铸造NFT失败，请重试\n\n详细信息：';
+                if (error.message) { errorMsg += '\n错误信息: ' + error.message; }
+                alert(errorMsg);
+            }
+        });
+
+        mintLightDarkBtn.addEventListener('click', async function() {
+            if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
+                await connectWallet();
+                if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
+                    alert('请先连接钱包');
+                    mintLightDarkBtn.innerHTML = '<i class="fas fa-star mr-2"></i> 光暗铸造（消耗88888代币）';
+                    mintLightDarkBtn.disabled = false;
+                    return;
+                }
+            }
+
+            mintLightDarkBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 铸造中...';
+            mintLightDarkBtn.disabled = true;
+
+            try {
+                const gasPrice = await web3.eth.getGasPrice();
+                const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.5);
+                const gasLimit = 3000000;
+
+                alert('即将铸造光暗属性NFT（将销毁88888枚代币）\n\n请在MetaMask等web3钱包中确认交易');
+
+                const tx = await fiveBlessingsNFTContract.methods.mintLightDark().send({
+                    from: accounts[0],
+                    gasPrice: adjustedGasPrice,
+                    gas: gasLimit
+                });
+
+                const currentNextCardId = await fiveBlessingsNFTContract.methods.nextCardId().call();
+                const actualCardId = (parseInt(currentNextCardId) - 1).toString();
+                const cardType = await fiveBlessingsNFTContract.methods.tokenType(actualCardId).call();
+
+                const cardInfo = { cardId: actualCardId, cardType: cardType };
+                displayCardInfo(cardInfo);
+                mintSuccessModal.classList.remove('hidden');
+
+                await updateTokenBalance();
+                await updateMintStatus();
+                await getRemainingBurnCount();
+
+                mintLightDarkBtn.innerHTML = '<i class="fas fa-star mr-2"></i> 光暗铸造（消耗88888代币）';
+                mintLightDarkBtn.disabled = false;
+            } catch (error) {
+                mintLightDarkBtn.innerHTML = '<i class="fas fa-star mr-2"></i> 光暗铸造（消耗88888代币）';
+                mintLightDarkBtn.disabled = false;
                 let errorMsg = '铸造NFT失败，请重试\n\n详细信息：';
                 if (error.message) { errorMsg += '\n错误信息: ' + error.message; }
                 alert(errorMsg);
