@@ -61,6 +61,10 @@ interface IFiveBlessingsMetadata {
     function sellerFeeBasisPoints() external view returns (uint256);
 }
 
+interface IFiveBlessingsNFTWeight {
+    function calcUserWeight(address user) external view returns (uint256);
+}
+
 interface FiveBlessingsMetadata is IFiveBlessingsMetadata {}
 
 contract FiveBlessingsNFT is
@@ -401,6 +405,7 @@ contract FiveBlessingsNFT is
 
         uint256 newCount = isAdd ? cnt + 1 : (cnt > 0 ? cnt - 1 : 0);
         require(rm.updateCardExternal(user, t, newCount), isAdd ? "Update add failed" : "Update sub failed");
+        rm.refreshUserWeight(user);
     }
 
     function _escapeString(string memory input) internal pure returns (string memory) {
@@ -540,6 +545,7 @@ contract FiveBlessingsNFT is
         userLatestTokenByLevel[msg.sender][t][newLevel] = tokenId;
 
         emit CardUpgraded(tokenId, t, currentLevel, newLevel, msg.sender, uint64(block.timestamp));
+        IRewardManager(rewardManager).refreshUserWeight(msg.sender);
         return newLevel;
     }
 
@@ -570,6 +576,7 @@ contract FiveBlessingsNFT is
         userLatestTokenByLevel[msg.sender][t][newLevel] = tokenId;
 
         emit CardUpgraded(tokenId, t, currentLevel, newLevel, msg.sender, uint64(block.timestamp));
+        IRewardManager(rewardManager).refreshUserWeight(msg.sender);
         return newLevel;
     }
 
@@ -608,6 +615,7 @@ contract FiveBlessingsNFT is
         userLatestTokenByLevel[msg.sender][t][newLevel] = tokenId;
 
         emit CardUpgraded(tokenId, t, currentLevel, newLevel, msg.sender, uint64(block.timestamp));
+        IRewardManager(rewardManager).refreshUserWeight(msg.sender);
         return newLevel;
     }
 
@@ -637,4 +645,18 @@ contract FiveBlessingsNFT is
     event CardBurned(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner);
     event WuFuSynthesized(address indexed user, uint256 timestamp, uint256 wanNengUsed);
     event CardUpgraded(uint256 indexed cardId, ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, address indexed owner, uint64 timestamp);
+
+    function calcUserWeight(address user) external view returns (uint256) {
+        uint256 totalWeight = 0;
+        for (uint i = 0; i < 120; i++) {
+            ZodiacType t = ZodiacType(i);
+            uint256[] memory tokens = userTokens[user][t];
+            for (uint j = 0; j < tokens.length; j++) {
+                uint256 tokenId = tokens[j];
+                uint8 level = tokenLevel[tokenId];
+                totalWeight += level + 2;
+            }
+        }
+        return totalWeight;
+    }
 }

@@ -11,6 +11,10 @@ interface IERC2981 {
     function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address receiver, uint256 royaltyAmount);
 }
 
+interface IFiveBlessingsNFTWeight {
+    function calcUserWeight(address user) external view returns (uint256);
+}
+
 enum ZodiacType {
     ShuiShu_1, ShuiNiu_1, ShuiHu_1, ShuiTu_1, ShuiLong_1, ShuiShe_1, ShuiMa_1, ShuiYang_1, ShuiHou_1, ShuiJi_1, ShuiGou_1, ShuiZhu_1,
     ShuiShu_0, ShuiNiu_0, ShuiHu_0, ShuiTu_0, ShuiLong_0, ShuiShe_0, ShuiMa_0, ShuiYang_0, ShuiHou_0, ShuiJi_0, ShuiGou_0, ShuiZhu_0,
@@ -218,7 +222,8 @@ contract RewardManager is
 
     function _calcUserWeight(address user) internal view returns (uint256) {
         if (user == owner()) return 0;
-        return _getTotalCardCount(user) * WEIGHT_PER_CARD;
+        if (nftContract == address(0)) return 0;
+        return IFiveBlessingsNFTWeight(nftContract).calcUserWeight(user);
     }
 
     function _updateUserWeight(address user) internal {

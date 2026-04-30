@@ -675,10 +675,36 @@
         }
 
         async function loadFenHongData() {
-            document.getElementById('totalPool').textContent = '0.0000';
-            document.getElementById('distributed').textContent = '0.0000';
-            document.getElementById('unclaimedDividend').textContent = '0.0000';
-            document.getElementById('holders').textContent = '0';
+            if (!account || !web3) {
+                document.getElementById('totalPool').textContent = '0.0000';
+                document.getElementById('distributed').textContent = '0.0000';
+                document.getElementById('unclaimedDividend').textContent = '0.0000';
+                document.getElementById('holders').textContent = '0';
+                return;
+            }
+
+            try {
+                const rewardManager = new web3.eth.Contract(window.rewardManagerABI, window.rewardManagerAddress);
+
+                const [totalPool, distributed, holders] = await Promise.all([
+                    rewardManager.methods.dividendPool().call(),
+                    rewardManager.methods.totalDistributed().call(),
+                    rewardManager.methods.holdersCount().call()
+                ]);
+
+                document.getElementById('totalPool').textContent = (totalPool / 1e18).toFixed(4);
+                document.getElementById('distributed').textContent = (distributed / 1e18).toFixed(4);
+                document.getElementById('holders').textContent = holders;
+
+                const [userDiv] = await rewardManager.methods.calcUserDividend(account).call();
+                document.getElementById('unclaimedDividend').textContent = (userDiv / 1e18).toFixed(4);
+            } catch (error) {
+                console.error('Load dividend data failed:', error);
+                document.getElementById('totalPool').textContent = '0.0000';
+                document.getElementById('distributed').textContent = '0.0000';
+                document.getElementById('unclaimedDividend').textContent = '0.0000';
+                document.getElementById('holders').textContent = '0';
+            }
         }
 
         document.getElementById('walletBtn').addEventListener('click', function() {
