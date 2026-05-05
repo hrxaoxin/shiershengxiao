@@ -43,7 +43,7 @@ contract Breeding is
 
     uint256 public constant BREEDING_DURATION_SELF = 12 hours;
     uint256 public constant BREEDING_DURATION_MARKET = 24 hours;
-    uint8 public constant MIN_BREEDING_LEVEL = 5;
+    uint8 public constant MIN_BREEDING_LEVEL = 6;
 
     IFiveBlessingsNFT public nftContract;
 
