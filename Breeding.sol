@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+// 全部使用正确的 v4.9 升级合约 GitHub 源（无 404）
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/IERC721Upgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/utils/ERC721HolderUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
+
+// ✅ 修复：Counters 必须使用 v4.9 对应版本（与升级合约匹配）
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/utils/Counters.sol";
 
 interface IFiveBlessingsNFT {
     enum ZodiacType {
@@ -66,8 +71,8 @@ contract Breeding is
         _disableInitializers();
     }
 
-    function initialize(address initialOwner) external initializer {
-        __Ownable_init(initialOwner);
+    function initialize() external initializer {
+        __Ownable_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __ERC721Holder_init();
@@ -158,25 +163,28 @@ contract Breeding is
     }
 
     function listForBreeding(uint256 tokenId) external nonReentrant returns (bytes32) {
-        require(nftContract.ownerOf(tokenId) == msg.sender, "Not owner of token");
-        require(nftContract.tokenLevel(tokenId) >= MIN_BREEDING_LEVEL, "Level too low");
+    require(nftContract.ownerOf(tokenId) == msg.sender, "Not owner of token");
+    require(nftContract.tokenLevel(tokenId) >= MIN_BREEDING_LEVEL, "Level too low");
 
-        nftContract.safeTransferFrom(msg.sender, address(this), tokenId);
+    nftContract.safeTransferFrom(msg.sender, address(this), tokenId);
 
-        bytes32 orderId = keccak256(abi.encodePacked(tokenId, block.timestamp, msg.sender));
-        breedingOrders[orderId] = BreedingOrder({
-            owner1: msg.sender,
-            owner2: address(0),
-            tokenId1: tokenId,
-            tokenId2: 0,
-            startTime: 0,
-            completed: false
-        });
-        userBreedingOrders[msg.sender].push(orderId);
+    bytes32 orderId = keccak256(abi.encodePacked(tokenId, block.timestamp, msg.sender));
+    breedingOrders[orderId] = BreedingOrder({
+        owner1: msg.sender,
+        owner2: address(0),
+        tokenId1: tokenId,
+        tokenId2: 0,
+        startTime: 0,
+        completed: false
+    });
+    userBreedingOrders[msg.sender].push(orderId);
+    
+    // ✅ 新增：把市场挂单ID加入全局数组，用于遍历查询
+    allMarketListings.push(orderId);
 
-        emit BreedingListed(orderId, msg.sender, tokenId);
-        return orderId;
-    }
+    emit BreedingListed(orderId, msg.sender, tokenId);
+    return orderId;
+}
 
     function joinBreeding(bytes32 orderId, uint256 tokenId) external nonReentrant {
         BreedingOrder memory order = breedingOrders[orderId];
@@ -243,13 +251,33 @@ contract Breeding is
         return [newTokenId1, newTokenId2];
     }
 
-    function getMarketBreedingOrders() external view returns (bytes32[] memory) {
-        bytes32[] memory result = new bytes32[](userBreedingOrders[address(this)].length);
-        for (uint256 i = 0; i < userBreedingOrders[address(this)].length; i++) {
-            result[i] = userBreedingOrders[address(this)][i];
+    // ✅ 已修复：mapping 无法直接遍历，改用存储所有挂单ID的方式实现
+    bytes32[] public allMarketListings; // 新增：存储所有市场挂单ID，用于遍历
+
+function getMarketBreedingOrders() external view returns (bytes32[] memory) {
+    uint256 count;
+    // 第一步：统计当前有效的市场挂单数量
+    for (uint256 i = 0; i < allMarketListings.length; i++) {
+        bytes32 orderId = allMarketListings[i];
+        BreedingOrder memory order = breedingOrders[orderId];
+        // 筛选条件：未参与、未完成、未开始繁殖
+        if (order.owner2 == address(0) && !order.completed && order.startTime == 0) {
+            count++;
         }
-        return result;
     }
+
+    // 第二步：组装结果数组
+    bytes32[] memory result = new bytes32[](count);
+    uint256 index;
+    for (uint256 i = 0; i < allMarketListings.length; i++) {
+        bytes32 orderId = allMarketListings[i];
+        BreedingOrder memory order = breedingOrders[orderId];
+        if (order.owner2 == address(0) && !order.completed && order.startTime == 0) {
+            result[index++] = orderId;
+        }
+    }
+    return result;
+}
 
     function getMarketBreedingOrder(bytes32 orderId) external view returns (
         address owner1,

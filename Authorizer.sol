@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.35;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+
+
+
+// v5 已移除：ERC721HolderUpgradeable、ReentrancyGuardUpgradeable、PausableUpgradeable
+// 如需使用，需单独安装 @openzeppelin/contracts 并导入非升级版本
 
 enum BlessingType { AiGuo, FuQiang, HeXie, YouShan, JingYe, WanNeng, WuFuLinMen }
 
@@ -30,35 +35,20 @@ interface IFiveBlessingsNFT {
     function setMetadataContract(address _metadataContract) external;
 }
 
-contract Authorizer is 
-    Initializable, 
-    OwnableUpgradeable, 
-    UUPSUpgradeable
-{
-    // 存储间隙
-    uint256[49] private __gap;
-
+contract Authorizer is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address initialOwner) external initializer {
-        __Ownable_init(initialOwner);
+    // ✅ 修复：只保留一个 initialize 函数（合并初始化逻辑）
+    function initialize() external initializer {
         __UUPSUpgradeable_init();
+        __Ownable_init(); // ✅ 修复：这里不传参数
     }
 
-    // UUPS升级授权
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    /**
-     * @dev 一次性授权所有合约
-     * @param tokenBurner TokenBurner合约地址
-     * @param rewardManager RewardManager合约地址
-     * @param nftTrading NFTTrading合约地址
-     * @param fiveBlessingsMetadata FiveBlessingsMetadata合约地址
-     * @param fiveBlessingsNFT FiveBlessingsNFT合约地址
-     */
     function authorizeAll(
         address tokenBurner,
         address rewardManager,
@@ -72,20 +62,14 @@ contract Authorizer is
         require(fiveBlessingsMetadata != address(0), "FiveBlessingsMetadata address cannot be zero");
         require(fiveBlessingsNFT != address(0), "FiveBlessingsNFT address cannot be zero");
 
-        // 1. 给tokenburner合约授权，调用setAuthorizedNFTContract
         ITokenBurner(tokenBurner).setAuthorizedNFTContract(fiveBlessingsNFT, true);
-
-        // 2. 给rewardmanager合约授权，调用setAuthorizedNFTContract
         IRewardManager(rewardManager).setAuthorizedNFTContract(fiveBlessingsNFT, true);
 
-        // 3. 给nfttrading合约授权，调用setNFTContract和setRewardManager
         INFTTrading(nftTrading).setNFTContract(fiveBlessingsNFT);
         INFTTrading(nftTrading).setRewardManager(rewardManager);
 
-        // 4. 给fiveblessingsmetadata合约授权，调用setRewardManager
         IFiveBlessingsMetadata(fiveBlessingsMetadata).setRewardManager(rewardManager);
 
-        // 5. 给fiveblessingsnft合约授权，调用setAddresses和setMetadataContract
         IFiveBlessingsNFT(fiveBlessingsNFT).setAddresses(tokenBurner, rewardManager);
         IFiveBlessingsNFT(fiveBlessingsNFT).setMetadataContract(fiveBlessingsMetadata);
     }

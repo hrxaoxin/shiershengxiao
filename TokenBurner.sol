@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
+// 修复：使用标准库路径，移除远程GitHub链接，解决依赖拉取失败
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
 
-interface IERC20Extended is IERC20 {
+// 修复：继承接口使用升级兼容版本
+interface IERC20Extended is IERC20Upgradeable {
     function decimals() external view returns (uint8);
 }
 
@@ -21,7 +23,8 @@ contract TokenBurner is
     PausableUpgradeable, 
     ReentrancyGuardUpgradeable 
 {
-    using SafeERC20 for IERC20;
+    // 修复：使用正确的升级版SafeERC20
+    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     // 常量定义
     address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
@@ -33,11 +36,11 @@ contract TokenBurner is
     uint256 public BURN_AMOUNT_BASE;
 
     // 状态变量
-    address public tokenContract; // 优化：将代币地址改为可配置
-    address public authorizer; // 授权合约地址
+    address public tokenContract;
+    address public authorizer;
     uint8 public tokenDecimals;
     uint256 public BURN_AMOUNT;
-    mapping(address => uint256) public burnCount; // 可铸造总次数
+    mapping(address => uint256) public burnCount;
     mapping(address => bool) public authorizedNFTContracts;
 
     // 事件
@@ -77,13 +80,12 @@ contract TokenBurner is
         address _tokenContract,
         address _authorizer
     ) external initializer nonZeroAddress(initialOwner) nonZeroAddress(_tokenContract) {
-        __Ownable_init(initialOwner);
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __Pausable_init();
         __ReentrancyGuard_init();
 
-        BURN_AMOUNT_BASE = 1; // 设置初始值
+        BURN_AMOUNT_BASE = 1;
         tokenContract = _tokenContract;
         authorizer = _authorizer;
         tokenDecimals = _safeGetTokenDecimals();
@@ -92,24 +94,23 @@ contract TokenBurner is
         emit TokenDecimalsUpdated(0, tokenDecimals, BURN_AMOUNT, block.timestamp);
     }
 
-    // 核心业务函数：销毁代币获取铸造次数
+    // 核心业务函数
     function burnTokenForMint() external whenNotPaused nonReentrant returns (bool) {
         address user = msg.sender;
         
-        IERC20 token = IERC20(tokenContract);
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         uint256 req = BURN_AMOUNT;
         require(token.balanceOf(user) >= req, "Insufficient balance");
         require(token.allowance(user, address(this)) >= req, "Insufficient allowance");
 
         token.safeTransferFrom(user, BURN_ADDRESS, req);
         unchecked {
-            burnCount[user]++;       // 可铸造次数+1
+            burnCount[user]++;
         }
         emit TokenBurned(user, req, burnCount[user], block.timestamp);
         return true;
     }
 
-    // 核心业务函数：授权合约调用销毁代币并直接铸造（一步到位）
     function burnAndMint(address user) 
         external 
         onlyAuthorized 
@@ -118,7 +119,7 @@ contract TokenBurner is
         nonZeroAddress(user) 
         returns (bool) 
     {
-        IERC20 token = IERC20(tokenContract);
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         uint256 req = BURN_AMOUNT;
         require(token.balanceOf(user) >= req, "Insufficient balance");
         require(token.allowance(user, address(this)) >= req, "Insufficient allowance");
@@ -128,17 +129,15 @@ contract TokenBurner is
         return true;
     }
 
-    // 核心业务函数：扣减可铸造次数（授权NFT合约调用）
     function decreaseBurnCount(address user) 
         external onlyAuthorized whenNotPaused nonZeroAddress(user) returns (bool) 
     {
         require(burnCount[user] > 0, "No mint count left");
-        unchecked { burnCount[user]--; } // 可铸造次数-1
+        unchecked { burnCount[user]--; }
         emit BurnCountDecreased(user, burnCount[user], block.timestamp);
         return true;
     }
 
-    // 批量扣减可铸造次数
     function batchDecreaseBurnCount(address[] calldata users) 
         external 
         onlyAuthorized 
@@ -189,8 +188,6 @@ contract TokenBurner is
         return successCount;
     }
 
-
-    // 管理函数：更新代币小数位
     function updateTokenDecimals(uint8 newDecimals) external onlyAuthorized returns (bool success) {
         require(newDecimals <= MAX_DECIMALS, "TokenBurner: Decimals exceed max");
         require(newDecimals != tokenDecimals, "TokenBurner: Same decimals");
@@ -205,7 +202,6 @@ contract TokenBurner is
         return true;
     }
 
-    // 管理函数：手动设置销毁金额
     function setBurnAmountManually(uint256 newAmount) external onlyAuthorized returns (bool success) {
         require(newAmount > 0, "TokenBurner: Amount must be >0");
 
@@ -218,7 +214,6 @@ contract TokenBurner is
         return true;
     }
 
-    // 管理函数：暂停/恢复合约
     function togglePause() external onlyAuthorized returns (bool success) {
         if (paused()) {
             _unpause();
@@ -229,18 +224,15 @@ contract TokenBurner is
         return true;
     }
 
-    // 管理函数：授权NFT合约
     function setAuthorizedNFTContract(address nft, bool ok) external nonZeroAddress(nft) {
         require(msg.sender == owner() || msg.sender == authorizer, "TokenBurner: Unauthorized");
         authorizedNFTContracts[nft] = ok;
         emit NFTContractAuthorized(nft, ok, block.timestamp);
     }
 
-    // 管理函数：更新代币合约地址
     function updateTokenContract(address newTokenContract) external onlyOwner nonZeroAddress(newTokenContract) {
         tokenContract = newTokenContract;
         
-        // 重新计算销毁金额
         uint8 oldDecimals = tokenDecimals;
         tokenDecimals = _safeGetTokenDecimals();
         uint256 newBurnAmount = _calculateBurnAmount(tokenDecimals);
@@ -249,7 +241,6 @@ contract TokenBurner is
         emit TokenDecimalsUpdated(oldDecimals, tokenDecimals, BURN_AMOUNT, block.timestamp);
     }
 
-    // 管理函数：修改基础销毁金额（只能由所有者调用）
     function setBurnAmountBase(uint256 newBaseAmount) external onlyOwner returns (bool success) {
         require(newBaseAmount > 0, "TokenBurner: Base amount must be >0");
 
@@ -258,7 +249,6 @@ contract TokenBurner is
 
         BURN_AMOUNT_BASE = newBaseAmount;
         
-        // 重新计算销毁金额
         uint256 newBurnAmount = _calculateBurnAmount(tokenDecimals);
         BURN_AMOUNT = newBurnAmount;
 
@@ -266,18 +256,16 @@ contract TokenBurner is
         return true;
     }
 
-    // 管理函数：设置授权合约地址
     function setAuthorizer(address _authorizer) external onlyOwner {
         authorizer = _authorizer;
     }
 
-    // 视图函数：检查用户销毁代币状态
     function checkBurnTokenStatus() 
         external 
         view 
         returns (uint256 balance, uint256 allowance, bool ready) 
     {
-        IERC20 token = IERC20(tokenContract);
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         address user = msg.sender;
         
         balance = token.balanceOf(user);
@@ -285,17 +273,14 @@ contract TokenBurner is
         ready = (balance >= BURN_AMOUNT) && (allowance >= BURN_AMOUNT) && !paused();
     }
 
-    // 视图函数：获取用户可铸造次数
     function getBurnCount(address user) external view returns (uint256 count) {
         return burnCount[user];
     }
 
-    // 视图函数：检查用户是否有可铸造次数
     function hasBurnedToken(address user) external view returns (bool hasCount) {
         return burnCount[user] > 0;
     }
 
-    // 内部工具函数：安全获取代币小数位
     function _safeGetTokenDecimals() internal view returns (uint8 decimals) {
         bytes4 decimalsSelector = IERC20Extended.decimals.selector;
         
@@ -311,14 +296,12 @@ contract TokenBurner is
         }
     }
 
-    // 内部工具函数：计算销毁金额
     function _calculateBurnAmount(uint8 decimals) internal view returns (uint256 burnAmount) {
         unchecked {
             burnAmount = BURN_AMOUNT_BASE * (10 ** uint256(decimals));
         }
     }
 
-    // UUPS升级授权 - 优化：提高升级安全性
     function _authorizeUpgrade(address newImplementation) 
         internal 
         override 

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/ERC721Upgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/utils/ERC721HolderUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/utils/Counters.sol";
 
 enum ZodiacType {
     ShuiShu_1, ShuiNiu_1, ShuiHu_1, ShuiTu_1, ShuiLong_1, ShuiShe_1, ShuiMa_1, ShuiYang_1, ShuiHou_1, ShuiJi_1, ShuiGou_1, ShuiZhu_1,
@@ -65,22 +66,74 @@ interface IFiveBlessingsNFTWeight {
     function calcUserWeight(address user) external view returns (uint256);
 }
 
-interface FiveBlessingsMetadata is IFiveBlessingsMetadata {}
+// ====================== 工具库（大幅减小合约尺寸）======================
+library NFTLib {
+    function uint2str(uint256 n) internal pure returns (string memory) {
+        if (n == 0) return "0";
+        uint256 temp = n;
+        uint256 len;
+        while (temp != 0) { len++; temp /= 10; }
+        bytes memory buf = new bytes(len);
+        while (n != 0) { len--; buf[len] = bytes1(uint8(48 + n % 10)); n /= 10; }
+        return string(buf);
+    }
 
-contract FiveBlessingsNFT is
-    Initializable,
-    ERC721Upgradeable,
-    OwnableUpgradeable,
-    UUPSUpgradeable,
-    ReentrancyGuardUpgradeable,
-    ERC721HolderUpgradeable
-{
+    function addressToString(address _addr) internal pure returns (string memory) {
+        bytes32 value = bytes32(uint256(uint160(_addr)));
+        bytes memory alphabet = "0123456789abcdef";
+        bytes memory str = new bytes(42);
+        str[0] = '0'; str[1] = 'x';
+        for (uint i = 0; i < 20; i++) {
+            str[2+i*2] = alphabet[uint8(value[i+12] >> 4)];
+            str[3+i*2] = alphabet[uint8(value[i+12] & 0x0f)];
+        }
+        return string(str);
+    }
+
+    function base64Encode(bytes memory data) internal pure returns (string memory) {
+        bytes memory base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        bytes memory result = new bytes((data.length + 2) / 3 * 4);
+        uint cursor = 0;
+        for (uint i = 0; i < data.length; i += 3) {
+            uint b0 = uint8(data[i]);
+            uint b1 = i+1 < data.length ? uint8(data[i+1]) : 0;
+            uint b2 = i+2 < data.length ? uint8(data[i+2]) : 0;
+            uint chunk = (b0 << 16) | (b1 << 8) | b2;
+            result[cursor++] = base64[(chunk >> 18) & 0x3F];
+            result[cursor++] = base64[(chunk >> 12) & 0x3F];
+            result[cursor++] = base64[(chunk >> 6) & 0x3F];
+            result[cursor++] = base64[chunk & 0x3F];
+        }
+        if (data.length % 3 == 1) { result[cursor-2] = '='; result[cursor-1] = '='; }
+        else if (data.length % 3 == 2) { result[cursor-1] = '='; }
+        return string(result);
+    }
+
+    function escapeString(string memory input) internal pure returns (string memory) {
+        bytes memory b = bytes(input);
+        uint esc;
+        for (uint i; i<b.length; i++) { if (b[i] == '"' || b[i] == '\\') esc++; }
+        if (esc == 0) return input;
+        bytes memory o = new bytes(b.length + esc);
+        uint j;
+        for (uint i; i<b.length; i++) {
+            if (b[i] == '"' || b[i] == '\\') o[j++] = '\\';
+            o[j++] = b[i];
+        }
+        return string(o);
+    }
+}
+
+contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, ERC721HolderUpgradeable {
     using Counters for Counters.Counter;
-    Counters.Counter private _nonce;
+    using NFTLib for uint256;
+    using NFTLib for address;
+    using NFTLib for bytes;
+    using NFTLib for string;
 
+    Counters.Counter private _nonce;
     uint256 public constant MAX_SUPPLY = 1000000;
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
-
     uint256 public nextCardId;
     address public tokenBurner;
     address public rewardManager;
@@ -88,32 +141,26 @@ contract FiveBlessingsNFT is
     address public authorizer;
     address public tokenContract;
     address public priceOracle;
+    address public breedingContract;
 
     mapping(address => bool) public authorizedMinter;
     mapping(uint256 => ZodiacType) public tokenType;
     mapping(uint256 => uint8) public tokenLevel;
-
-    mapping(address => mapping(ZodiacType => mapping(uint8 => uint256[]))) public userTokensByLevel;
-    mapping(address => mapping(ZodiacType => mapping(uint8 => uint256))) public userLatestTokenByLevel;
     mapping(address => mapping(ZodiacType => uint256[])) public userTokens;
     mapping(address => mapping(ZodiacType => uint256)) public userLatestToken;
+    mapping(address => mapping(ZodiacType => mapping(uint8 => uint256[]))) public userTokensByLevel;
+    mapping(address => mapping(ZodiacType => mapping(uint8 => uint256))) public userLatestTokenByLevel;
 
-    address public breedingContract;
+    uint256[50] private __gap;
 
-    uint256[60] private __gap;
-
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
+    constructor() { _disableInitializers(); }
 
     function initialize(address initialOwner, address _metadataContract, address _authorizer) external initializer {
         __ERC721_init("Twelve Zodiacs", "12ZODIAC");
-        __Ownable_init(initialOwner);
+        __Ownable_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __ERC721Holder_init();
-
         nextCardId = 1;
         authorizedMinter[initialOwner] = true;
         metadataContract = _metadataContract;
@@ -121,542 +168,263 @@ contract FiveBlessingsNFT is
         _nonce.increment();
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
+    // ====================== 随机类型 ======================
     function _getRandomType(uint256 salt) internal returns (ZodiacType) {
         _nonce.increment();
-        uint256 rand = uint256(keccak256(abi.encodePacked(
-            blockhash(block.number - 1),
-            msg.sender,
-            salt,
-            block.timestamp,
-            _nonce.current(),
-            gasleft()
-        )));
-
-        uint256 r = rand % 100;
-        
-        if (r < 2) {
-            return ZodiacType(72 + (rand % 24));
-        } else if (r < 4) {
-            return ZodiacType(96 + (rand % 24));
-        } else {
-            return ZodiacType((rand % 48));
-        }
+        uint rand = uint(keccak256(abi.encodePacked(blockhash(block.number-1), msg.sender, salt, block.timestamp, _nonce.current(), gasleft())));
+        uint r = rand % 100;
+        if (r < 2) return ZodiacType(72 + (rand % 24));
+        else if (r < 4) return ZodiacType(96 + (rand % 24));
+        else return ZodiacType(rand % 48);
     }
 
+    // ====================== URI ======================
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        require(_ownerOf(tokenId) != address(0), "Invalid token ID");
-
-        IFiveBlessingsMetadata metadata = IFiveBlessingsMetadata(metadataContract);
+        require(_ownerOf(tokenId) != address(0), "E0");
+        IFiveBlessingsMetadata m = IFiveBlessingsMetadata(metadataContract);
         ZodiacType t = tokenType[tokenId];
-
-        string memory baseCardName = metadata.getCardName(t);
-        string memory cardDesc = metadata.getCardDesc(t);
-        string memory cardImage = metadata.getCardImage(t);
-
-        string memory nftName = string(abi.encodePacked(baseCardName, " #", _uint2str(tokenId)));
-
         string memory json = string(abi.encodePacked(
-            '{"name":"', nftName, '",',
-            '"description":"', cardDesc, '",',
-            '"image":"', cardImage, '"}'
+            '{"name":"', m.getCardName(t), " #", tokenId.uint2str(), '",',
+            '"description":"', m.getCardDesc(t).escapeString(), '",',
+            '"image":"', m.getCardImage(t).escapeString(), '"}'
         ));
-
-        return string(abi.encodePacked(
-            "data:application/json;base64,",
-            _base64Encode(bytes(json))
-        ));
-    }
-
-    function _base64Encode(bytes memory data) internal pure returns (string memory) {
-        bytes memory base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        bytes memory result = new bytes((data.length + 2) / 3 * 4);
-        uint256 cursor = 0;
-
-        for (uint256 i = 0; i < data.length; i += 3) {
-            uint256 b0 = uint8(data[i]);
-            uint256 b1 = i + 1 < data.length ? uint8(data[i + 1]) : 0;
-            uint256 b2 = i + 2 < data.length ? uint8(data[i + 2]) : 0;
-
-            uint256 chunk = (b0 << 16) | (b1 << 8) | b2;
-
-            result[cursor++] = base64[(chunk >> 18) & 0x3F];
-            result[cursor++] = base64[(chunk >> 12) & 0x3F];
-            result[cursor++] = base64[(chunk >> 6) & 0x3F];
-            result[cursor++] = base64[chunk & 0x3F];
-        }
-
-        if (data.length % 3 == 1) {
-            result[cursor - 2] = '=';
-            result[cursor - 1] = '=';
-        } else if (data.length % 3 == 2) {
-            result[cursor - 1] = '=';
-        }
-
-        return string(result);
+        return string(abi.encodePacked("data:application/json;base64,", bytes(json).base64Encode()));
     }
 
     function contractURI() public view returns (string memory) {
-        require(metadataContract != address(0), "Metadata contract not set");
-
-        FiveBlessingsMetadata metaContract = FiveBlessingsMetadata(metadataContract);
+        require(metadataContract != address(0), "E1");
+        IFiveBlessingsMetadata m = IFiveBlessingsMetadata(metadataContract);
         IRewardManager rm = IRewardManager(rewardManager);
-
-        string memory collName = metaContract.collName();
-        string memory collDesc = metaContract.collDesc();
-        string memory collImage = metaContract.collImage();
-
-        string memory escapedName = _escapeString(collName);
-        string memory escapedDesc = _escapeString(collDesc);
-        string memory escapedImage = _escapeString(collImage);
-
         string memory json = string(abi.encodePacked(
-            '{"name":"', escapedName, '",',
-            '"description":"', escapedDesc, '",',
-            '"image":"', escapedImage, '",',
-            '"seller_fee_basis_points":', _uint2str(metaContract.sellerFeeBasisPoints()), ',',
-            '"fee_recipient":"', _addressToString(rm.royaltyWallet()), '"}'
+            '{"name":"', m.collName().escapeString(), '",',
+            '"description":"', m.collDesc().escapeString(), '",',
+            '"image":"', m.collImage().escapeString(), '",',
+            '"seller_fee_basis_points":', m.sellerFeeBasisPoints().uint2str(), ',',
+            '"fee_recipient":"', rm.royaltyWallet().addressToString(), '"}'
         ));
-
-        return string(abi.encodePacked(
-            "data:application/json;base64,",
-            _base64Encode(bytes(json))
-        ));
+        return string(abi.encodePacked("data:application/json;base64,", bytes(json).base64Encode()));
     }
 
+    // ====================== 核心MINT ======================
     function mint() external nonReentrant returns (uint256) {
-        require(tokenBurner != address(0) && rewardManager != address(0), "Dependencies not set");
-        require(nextCardId < MAX_SUPPLY, "Max supply reached");
-
+        require(tokenBurner != address(0) && rewardManager != address(0), "E2");
+        require(nextCardId < MAX_SUPPLY, "E3");
         ITokenBurner tb = ITokenBurner(tokenBurner);
-        require(tb.hasBurnedToken(msg.sender) && tb.getBurnCount(msg.sender) > 0, "No permission");
-        require(tb.decreaseBurnCount(msg.sender), "Burn count decrease failed");
-
-        uint256 tokenId = nextCardId++;
-        ZodiacType t = _getRandomType(tokenId);
-        tokenType[tokenId] = t;
-        tokenLevel[tokenId] = 1;
-
-        _safeMint(msg.sender, tokenId);
-        userTokens[msg.sender][t].push(tokenId);
-        userLatestToken[msg.sender][t] = tokenId;
-        userTokensByLevel[msg.sender][t][1].push(tokenId);
-        userLatestTokenByLevel[msg.sender][t][1] = tokenId;
-
-        emit CardMinted(tokenId, t, msg.sender, uint64(block.timestamp));
-        return tokenId;
+        require(tb.hasBurnedToken(msg.sender) && tb.getBurnCount(msg.sender) > 0, "E4");
+        require(tb.decreaseBurnCount(msg.sender), "E5");
+        return _mintTo(msg.sender, _getRandomType(nextCardId));
     }
 
     function mintOneStep() external nonReentrant returns (uint256) {
-        require(tokenBurner != address(0) && rewardManager != address(0), "Dependencies not set");
-        require(nextCardId < MAX_SUPPLY, "Max supply reached");
-
-        ITokenBurner tb = ITokenBurner(tokenBurner);
-        require(tb.burnAndMint(msg.sender), "Token burn failed");
-
-        uint256 tokenId = nextCardId++;
-        ZodiacType t = _getRandomType(tokenId);
-        tokenType[tokenId] = t;
-        tokenLevel[tokenId] = 1;
-
-        _safeMint(msg.sender, tokenId);
-        userTokens[msg.sender][t].push(tokenId);
-        userLatestToken[msg.sender][t] = tokenId;
-        userTokensByLevel[msg.sender][t][1].push(tokenId);
-        userLatestTokenByLevel[msg.sender][t][1] = tokenId;
-
-        emit CardMinted(tokenId, t, msg.sender, uint64(block.timestamp));
-        return tokenId;
+        require(tokenBurner != address(0) && rewardManager != address(0), "E2");
+        require(nextCardId < MAX_SUPPLY, "E3");
+        require(ITokenBurner(tokenBurner).burnAndMint(msg.sender), "E6");
+        return _mintTo(msg.sender, _getRandomType(nextCardId));
     }
 
     uint256 public constant LIGHT_DARK_COST = 88888;
-
     function mintLightDark() external nonReentrant returns (uint256) {
-        require(tokenContract != address(0), "Token contract not set");
-        require(rewardManager != address(0), "RewardManager not set");
-        require(nextCardId < MAX_SUPPLY, "Max supply reached");
-
-        IToken token = IToken(tokenContract);
-        require(token.balanceOf(msg.sender) >= LIGHT_DARK_COST, "Insufficient tokens");
-        require(token.transferFrom(msg.sender, BLACK_HOLE, LIGHT_DARK_COST), "Token transfer failed");
-
+        require(tokenContract != address(0) && rewardManager != address(0), "E7");
+        require(nextCardId < MAX_SUPPLY, "E3");
+        IToken t = IToken(tokenContract);
+        require(t.balanceOf(msg.sender) >= LIGHT_DARK_COST, "E8");
+        require(t.transferFrom(msg.sender, BLACK_HOLE, LIGHT_DARK_COST), "E9");
         _nonce.increment();
-        uint256 rand = uint256(keccak256(abi.encodePacked(
-            blockhash(block.number - 1),
-            msg.sender,
-            nextCardId,
-            block.timestamp,
-            _nonce.current(),
-            gasleft()
-        )));
-
-        ZodiacType t;
-        if (rand % 2 == 0) {
-            t = ZodiacType(72 + (rand % 24));
-        } else {
-            t = ZodiacType(96 + (rand % 24));
-        }
-
-        uint256 tokenId = nextCardId++;
-        tokenType[tokenId] = t;
-        tokenLevel[tokenId] = 1;
-
-        _safeMint(msg.sender, tokenId);
-        userTokens[msg.sender][t].push(tokenId);
-        userLatestToken[msg.sender][t] = tokenId;
-        userTokensByLevel[msg.sender][t][1].push(tokenId);
-        userLatestTokenByLevel[msg.sender][t][1] = tokenId;
-
-        emit CardMinted(tokenId, t, msg.sender, uint64(block.timestamp));
-        return tokenId;
+        uint rand = uint(keccak256(abi.encodePacked(blockhash(block.number-1), msg.sender, nextCardId, block.timestamp, _nonce.current(), gasleft())));
+        ZodiacType z = rand % 2 == 0 ? ZodiacType(72 + rand % 24) : ZodiacType(96 + rand % 24);
+        return _mintTo(msg.sender, z);
     }
 
     function mintSpecificType(address to, ZodiacType t) external nonReentrant returns (uint256) {
-        require(authorizedMinter[msg.sender] || msg.sender == owner(), "Not authorized");
-        require(to != address(0) && nextCardId < MAX_SUPPLY, "Invalid params");
-
-        uint256 tokenId = nextCardId++;
-        tokenType[tokenId] = t;
-        tokenLevel[tokenId] = 1;
-        _safeMint(to, tokenId);
-
-        userTokens[to][t].push(tokenId);
-        userLatestToken[to][t] = tokenId;
-        userTokensByLevel[to][t][1].push(tokenId);
-        userLatestTokenByLevel[to][t][1] = tokenId;
-
-        emit CardMinted(tokenId, t, to, uint64(block.timestamp));
-        return tokenId;
-    }
-
-    function _burnCard(address user, ZodiacType t) internal {
-        uint256 tokenId = userLatestToken[user][t];
-        require(tokenId != 0 && _ownerOf(tokenId) == user, "Not owner of token");
-
-        _transfer(user, BLACK_HOLE, tokenId);
-
-        uint256[] storage tokens = userTokens[user][t];
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (tokens[i] == tokenId) {
-                tokens[i] = tokens[tokens.length - 1];
-                tokens.pop();
-                break;
-            }
-        }
-
-        userLatestToken[user][t] = tokens.length > 0 ? tokens[tokens.length - 1] : 0;
-        emit CardBurned(tokenId, t, user);
-    }
-
-    function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
-        address from = _ownerOf(tokenId);
-        address prevOwner = super._update(to, tokenId, auth);
-
-        if (from != address(0) && from != BLACK_HOLE) {
-            ZodiacType t = tokenType[tokenId];
-            uint8 level = tokenLevel[tokenId];
-            _removeToken(from, t, tokenId);
-            _removeTokenByLevel(from, t, level, tokenId);
-            _updateReward(from, t, false);
-        }
-
-        if (to != address(0) && to != BLACK_HOLE) {
-            ZodiacType t = tokenType[tokenId];
-            uint8 level = tokenLevel[tokenId];
-            userTokens[to][t].push(tokenId);
-            userLatestToken[to][t] = tokenId;
-            userTokensByLevel[to][t][level].push(tokenId);
-            userLatestTokenByLevel[to][t][level] = tokenId;
-            _updateReward(to, t, true);
-        }
-
-        return prevOwner;
-    }
-
-    function _removeToken(address user, ZodiacType t, uint256 tokenId) internal {
-        uint256[] storage tokens = userTokens[user][t];
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (tokens[i] == tokenId) {
-                tokens[i] = tokens[tokens.length - 1];
-                tokens.pop();
-                break;
-            }
-        }
-    }
-
-    function _removeTokenByLevel(address user, ZodiacType t, uint8 level, uint256 tokenId) internal {
-        uint256[] storage tokens = userTokensByLevel[user][t][level];
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (tokens[i] == tokenId) {
-                tokens[i] = tokens[tokens.length - 1];
-                tokens.pop();
-                break;
-            }
-        }
-        userLatestTokenByLevel[user][t][level] = tokens.length > 0 ? tokens[tokens.length - 1] : 0;
-    }
-
-    function _updateReward(address user, ZodiacType t, bool isAdd) internal {
-        if (rewardManager == address(0)) return;
-
-        IRewardManager rm = IRewardManager(rewardManager);
-        uint256 cnt = rm.cardCount(user, t);
-
-        uint256 newCount = isAdd ? cnt + 1 : (cnt > 0 ? cnt - 1 : 0);
-        require(rm.updateCardExternal(user, t, newCount), isAdd ? "Update add failed" : "Update sub failed");
-        rm.refreshUserWeight(user);
-    }
-
-    function _escapeString(string memory input) internal pure returns (string memory) {
-        bytes memory inputBytes = bytes(input);
-        uint256 escapeCount = 0;
-
-        for (uint256 i = 0; i < inputBytes.length; i++) {
-            if (inputBytes[i] == "\"" || inputBytes[i] == "\\") {
-                escapeCount++;
-            }
-        }
-
-        if (escapeCount == 0) return input;
-
-        bytes memory outputBytes = new bytes(inputBytes.length + escapeCount);
-        uint256 j = 0;
-        for (uint256 i = 0; i < inputBytes.length; i++) {
-            if (inputBytes[i] == "\"" || inputBytes[i] == "\\") {
-                outputBytes[j++] = "\\";
-            }
-            outputBytes[j++] = inputBytes[i];
-        }
-
-        return string(outputBytes);
-    }
-
-    function _zodiacTypeToString(ZodiacType t) internal pure returns (string memory) {
-        return _uint2str(uint(t));
-    }
-
-    function _addressToString(address _addr) internal pure returns (string memory) {
-        bytes32 value = bytes32(uint256(uint160(_addr)));
-        bytes memory alphabet = "0123456789abcdef";
-        bytes memory str = new bytes(42);
-        str[0] = '0';
-        str[1] = 'x';
-        for (uint256 i = 0; i < 20; i++) {
-            str[2 + i * 2] = alphabet[uint8(value[i + 12] >> 4)];
-            str[3 + i * 2] = alphabet[uint8(value[i + 12] & 0x0f)];
-        }
-        return string(str);
-    }
-
-    function _uint2str(uint256 n) internal pure returns (string memory) {
-        if (n == 0) return "0";
-        uint256 temp = n;
-        uint256 len;
-        while (temp != 0) {
-            len++;
-            temp /= 10;
-        }
-        bytes memory buf = new bytes(len);
-        while (n != 0) {
-            len--;
-            buf[len] = bytes1(uint8(48 + n % 10));
-            n /= 10;
-        }
-        return string(buf);
-    }
-
-    function setAddresses(address tb, address rm) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "FiveBlessingsNFT: Unauthorized");
-        require(tb != address(0) && rm != address(0), "Invalid zero address");
-        tokenBurner = tb;
-        rewardManager = rm;
-        IRewardManager(rm).setAuthorizedNFTContract(address(this), true);
-    }
-
-    function setMetadataContract(address _metadataContract) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "FiveBlessingsNFT: Unauthorized");
-        require(_metadataContract != address(0), "Invalid zero address");
-        metadataContract = _metadataContract;
-    }
-
-    function authorizeMinter(address minter) external onlyOwner {
-        require(minter != address(0), "Invalid zero address");
-        authorizedMinter[minter] = true;
-    }
-
-    function unauthorizedMinter(address minter) external onlyOwner {
-        authorizedMinter[minter] = false;
-    }
-
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "Invalid zero address");
-        authorizer = _authorizer;
-    }
-
-    function setTokenContract(address _tokenContract) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "FiveBlessingsNFT: Unauthorized");
-        require(_tokenContract != address(0), "Invalid zero address");
-        tokenContract = _tokenContract;
-    }
-
-    function setPriceOracle(address _priceOracle) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "FiveBlessingsNFT: Unauthorized");
-        require(_priceOracle != address(0), "Invalid zero address");
-        priceOracle = _priceOracle;
-    }
-
-    function getCardCount(address user, ZodiacType t) external view returns (uint256) {
-        require(rewardManager != address(0), "RewardManager not set");
-        return IRewardManager(rewardManager).cardCount(user, t);
-    }
-
-    function getUserTokens(address user, ZodiacType t) external view returns (uint256[] memory) {
-        return userTokens[user][t];
-    }
-
-    function getUserTokensByLevel(address user, ZodiacType t, uint8 level) external view returns (uint256[] memory) {
-        return userTokensByLevel[user][t][level];
-    }
-
-    function upgradeWithNFT(uint256 tokenId) external nonReentrant returns (uint8) {
-        require(_ownerOf(tokenId) == msg.sender, "Not owner of token");
-        ZodiacType t = tokenType[tokenId];
-        uint8 currentLevel = tokenLevel[tokenId];
-        require(currentLevel < 6, "Already max level");
-
-        uint8 requiredCount = currentLevel;
-        uint256[] storage tokens = userTokensByLevel[msg.sender][t][currentLevel];
-        require(tokens.length >= requiredCount + 1, "Not enough NFTs to upgrade");
-
-        for (uint i = 0; i < requiredCount; i++) {
-            if (tokens[i] != tokenId) {
-                _transfer(msg.sender, BLACK_HOLE, tokens[i]);
-                _removeToken(msg.sender, t, tokens[i]);
-                _removeTokenByLevel(msg.sender, t, currentLevel, tokens[i]);
-                emit CardBurned(tokens[i], t, msg.sender);
-            }
-        }
-
-        uint8 newLevel = currentLevel + 1;
-        tokenLevel[tokenId] = newLevel;
-        _removeTokenByLevel(msg.sender, t, currentLevel, tokenId);
-        userTokensByLevel[msg.sender][t][newLevel].push(tokenId);
-        userLatestTokenByLevel[msg.sender][t][newLevel] = tokenId;
-
-        emit CardUpgraded(tokenId, t, currentLevel, newLevel, msg.sender, uint64(block.timestamp));
-        IRewardManager(rewardManager).refreshUserWeight(msg.sender);
-        return newLevel;
-    }
-
-    function upgradeWithToken(uint256 tokenId) external nonReentrant returns (uint8) {
-        require(_ownerOf(tokenId) == msg.sender, "Not owner of token");
-        require(tokenContract != address(0), "Token contract not set");
-        
-        ZodiacType t = tokenType[tokenId];
-        uint8 currentLevel = tokenLevel[tokenId];
-        require(currentLevel < 6, "Already max level");
-
-        uint256 requiredTokens;
-        if (currentLevel == 1) requiredTokens = 10000;
-        else if (currentLevel == 2) requiredTokens = 40000;
-        else if (currentLevel == 3) requiredTokens = 120000;
-        else if (currentLevel == 4) requiredTokens = 480000;
-        else if (currentLevel == 5) requiredTokens = 2400000;
-        else revert("Invalid level");
-
-        IToken token = IToken(tokenContract);
-        require(token.balanceOf(msg.sender) >= requiredTokens, "Insufficient token balance");
-        require(token.transferFrom(msg.sender, BLACK_HOLE, requiredTokens), "Token transfer failed");
-
-        uint8 newLevel = currentLevel + 1;
-        tokenLevel[tokenId] = newLevel;
-        _removeTokenByLevel(msg.sender, t, currentLevel, tokenId);
-        userTokensByLevel[msg.sender][t][newLevel].push(tokenId);
-        userLatestTokenByLevel[msg.sender][t][newLevel] = tokenId;
-
-        emit CardUpgraded(tokenId, t, currentLevel, newLevel, msg.sender, uint64(block.timestamp));
-        IRewardManager(rewardManager).refreshUserWeight(msg.sender);
-        return newLevel;
-    }
-
-    function upgradeWithUSDValue(uint256 tokenId) external nonReentrant returns (uint8) {
-        require(_ownerOf(tokenId) == msg.sender, "Not owner of token");
-        require(tokenContract != address(0), "Token contract not set");
-        require(priceOracle != address(0), "Price oracle not set");
-        
-        ZodiacType t = tokenType[tokenId];
-        uint8 currentLevel = tokenLevel[tokenId];
-        require(currentLevel < 6, "Already max level");
-
-        uint256 requiredUSDValue;
-        if (currentLevel == 1) requiredUSDValue = 1 ether; // 1 USDT
-        else if (currentLevel == 2) requiredUSDValue = 4 ether; // 4 USDT
-        else if (currentLevel == 3) requiredUSDValue = 12 ether; // 12 USDT
-        else if (currentLevel == 4) requiredUSDValue = 48 ether; // 48 USDT
-        else if (currentLevel == 5) requiredUSDValue = 240 ether; // 240 USDT
-        else revert("Invalid level");
-
-        IPriceOracle oracle = IPriceOracle(priceOracle);
-        uint256 tokenPriceInUSD = oracle.getTokenPriceInUSD();
-        require(tokenPriceInUSD > 0, "Invalid token price");
-
-        uint256 requiredTokens = (requiredUSDValue * 10**18) / tokenPriceInUSD;
-        require(requiredTokens > 0, "Required tokens must be greater than 0");
-
-        IToken token = IToken(tokenContract);
-        require(token.balanceOf(msg.sender) >= requiredTokens, "Insufficient token balance");
-        require(token.transferFrom(msg.sender, BLACK_HOLE, requiredTokens), "Token transfer failed");
-
-        uint8 newLevel = currentLevel + 1;
-        tokenLevel[tokenId] = newLevel;
-        _removeTokenByLevel(msg.sender, t, currentLevel, tokenId);
-        userTokensByLevel[msg.sender][t][newLevel].push(tokenId);
-        userLatestTokenByLevel[msg.sender][t][newLevel] = tokenId;
-
-        emit CardUpgraded(tokenId, t, currentLevel, newLevel, msg.sender, uint64(block.timestamp));
-        IRewardManager(rewardManager).refreshUserWeight(msg.sender);
-        return newLevel;
-    }
-
-    function setBreedingContract(address _breedingContract) external onlyOwner {
-        require(_breedingContract != address(0), "Invalid address");
-        breedingContract = _breedingContract;
+        require(authorizedMinter[msg.sender] || msg.sender == owner(), "E10");
+        require(to != address(0) && nextCardId < MAX_SUPPLY, "E11");
+        return _mintTo(to, t);
     }
 
     function mintBreedResult(address to, ZodiacType t) external returns (uint256) {
-        require(msg.sender == breedingContract, "Not authorized");
-        require(nextCardId < MAX_SUPPLY, "Max supply reached");
-
-        uint256 tokenId = nextCardId++;
-        tokenType[tokenId] = t;
-        tokenLevel[tokenId] = 1;
-        _safeMint(to, tokenId);
-        userTokens[to][t].push(tokenId);
-        userLatestToken[to][t] = tokenId;
-        userTokensByLevel[to][t][1].push(tokenId);
-        userLatestTokenByLevel[to][t][1] = tokenId;
-
-        emit CardMinted(tokenId, t, to, uint64(block.timestamp));
-        return tokenId;
+        require(msg.sender == breedingContract, "E12");
+        require(nextCardId < MAX_SUPPLY, "E3");
+        return _mintTo(to, t);
     }
 
-    event CardMinted(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner, uint64 timestamp);
-    event CardBurned(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner);
-    event WuFuSynthesized(address indexed user, uint256 timestamp, uint256 wanNengUsed);
-    event CardUpgraded(uint256 indexed cardId, ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, address indexed owner, uint64 timestamp);
+    // 统一Mint逻辑（大幅减码）
+    function _mintTo(address to, ZodiacType t) internal returns (uint256) {
+        uint id = nextCardId++;
+        tokenType[id] = t;
+        tokenLevel[id] = 1;
+        _safeMint(to, id);
+        userTokens[to][t].push(id);
+        userLatestToken[to][t] = id;
+        userTokensByLevel[to][t][1].push(id);
+        userLatestTokenByLevel[to][t][1] = id;
+        emit CardMinted(id, t, to, uint64(block.timestamp));
+        return id;
+    }
 
-    function calcUserWeight(address user) external view returns (uint256) {
-        uint256 totalWeight = 0;
-        for (uint i = 0; i < 120; i++) {
-            ZodiacType t = ZodiacType(i);
-            uint256[] memory tokens = userTokens[user][t];
-            for (uint j = 0; j < tokens.length; j++) {
-                uint256 tokenId = tokens[j];
-                uint8 level = tokenLevel[tokenId];
-                totalWeight += level + 2;
+    // ====================== 转账钩子 ======================
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override {
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+        ZodiacType t = tokenType[tokenId];
+        uint8 lv = tokenLevel[tokenId];
+        if (from != address(0) && from != BLACK_HOLE) {
+            _removeToken(from, t, tokenId);
+            _removeTokenByLevel(from, t, lv, tokenId);
+            _updateReward(from, t, false);
+        }
+        if (to != address(0) && to != BLACK_HOLE) {
+            userTokens[to][t].push(tokenId);
+            userLatestToken[to][t] = tokenId;
+            userTokensByLevel[to][t][lv].push(tokenId);
+            userLatestTokenByLevel[to][t][lv] = tokenId;
+            _updateReward(to, t, true);
+        }
+    }
+
+    // ====================== 工具 ======================
+    function _removeToken(address u, ZodiacType t, uint id) internal {
+        uint256[] storage arr = userTokens[u][t];
+        for (uint i; i<arr.length; i++) { if (arr[i] == id) { arr[i] = arr[arr.length-1]; arr.pop(); break; } }
+    }
+
+    function _removeTokenByLevel(address u, ZodiacType t, uint8 lv, uint id) internal {
+        uint256[] storage arr = userTokensByLevel[u][t][lv];
+        for (uint i; i<arr.length; i++) { if (arr[i] == id) { arr[i] = arr[arr.length-1]; arr.pop(); break; } }
+        userLatestTokenByLevel[u][t][lv] = arr.length > 0 ? arr[arr.length-1] : 0;
+    }
+
+    function _updateReward(address u, ZodiacType t, bool add) internal {
+        if (rewardManager == address(0)) return;
+        IRewardManager rm = IRewardManager(rewardManager);
+        uint cnt = rm.cardCount(u, t);
+        uint n = add ? cnt+1 : (cnt>0 ? cnt-1 : 0);
+        require(rm.updateCardExternal(u, t, n), add ? "E13" : "E14");
+    }
+
+    // ====================== 升级 ======================
+    function upgradeWithNFT(uint256 tokenId) external nonReentrant returns (uint8) {
+        require(_ownerOf(tokenId) == msg.sender, "E15");
+        ZodiacType t = tokenType[tokenId];
+        uint8 lv = tokenLevel[tokenId];
+        require(lv < 6, "E16");
+        uint req = lv;
+        uint256[] storage arr = userTokensByLevel[msg.sender][t][lv];
+        require(arr.length >= req+1, "E17");
+        for (uint i; i<req; i++) {
+            uint burnId = arr[i];
+            if (burnId != tokenId) {
+                _transfer(msg.sender, BLACK_HOLE, burnId);
+                _removeToken(msg.sender, t, burnId);
+                _removeTokenByLevel(msg.sender, t, lv, burnId);
+                emit CardBurned(burnId, t, msg.sender);
             }
         }
-        return totalWeight;
+        uint8 newLv = lv+1;
+        tokenLevel[tokenId] = newLv;
+        _removeTokenByLevel(msg.sender, t, lv, tokenId);
+        userTokensByLevel[msg.sender][t][newLv].push(tokenId);
+        userLatestTokenByLevel[msg.sender][t][newLv] = tokenId;
+        emit CardUpgraded(tokenId, t, lv, newLv, msg.sender, uint64(block.timestamp));
+        return newLv;
     }
+
+    function upgradeWithToken(uint256 tokenId) external nonReentrant returns (uint8) {
+        require(_ownerOf(tokenId) == msg.sender, "E15");
+        require(tokenContract != address(0), "E7");
+        uint8 lv = tokenLevel[tokenId];
+        require(lv < 6, "E16");
+        uint cost;
+        if (lv == 1) cost = 10000;
+        else if (lv == 2) cost = 40000;
+        else if (lv == 3) cost = 120000;
+        else if (lv == 4) cost = 480000;
+        else if (lv == 5) cost = 2400000;
+        else revert("E18");
+        IToken t = IToken(tokenContract);
+        require(t.balanceOf(msg.sender) >= cost, "E8");
+        require(t.transferFrom(msg.sender, BLACK_HOLE, cost), "E9");
+        return _upgradeLevel(tokenId, lv);
+    }
+
+    function upgradeWithUSDValue(uint256 tokenId) external nonReentrant returns (uint8) {
+        require(_ownerOf(tokenId) == msg.sender, "E15");
+        require(tokenContract != address(0) && priceOracle != address(0), "E19");
+        uint8 lv = tokenLevel[tokenId];
+        require(lv < 6, "E16");
+        uint usd;
+        if (lv == 1) usd = 1 ether;
+        else if (lv == 2) usd = 4 ether;
+        else if (lv == 3) usd = 12 ether;
+        else if (lv == 4) usd = 48 ether;
+        else if (lv == 5) usd = 240 ether;
+        else revert("E18");
+        uint price = IPriceOracle(priceOracle).getTokenPriceInUSD();
+        require(price > 0, "E20");
+        uint cost = (usd * 1e18) / price;
+        require(cost > 0, "E21");
+        IToken t = IToken(tokenContract);
+        require(t.balanceOf(msg.sender) >= cost, "E8");
+        require(t.transferFrom(msg.sender, BLACK_HOLE, cost), "E9");
+        return _upgradeLevel(tokenId, lv);
+    }
+
+    function _upgradeLevel(uint id, uint8 oldLv) internal returns (uint8) {
+        ZodiacType t = tokenType[id];
+        uint8 newLv = oldLv+1;
+        tokenLevel[id] = newLv;
+        _removeTokenByLevel(msg.sender, t, oldLv, id);
+        userTokensByLevel[msg.sender][t][newLv].push(id);
+        userLatestTokenByLevel[msg.sender][t][newLv] = id;
+        emit CardUpgraded(id, t, oldLv, newLv, msg.sender, uint64(block.timestamp));
+        return newLv;
+    }
+
+    // ====================== 配置 ======================
+    function setAddresses(address tb, address rm) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "E10");
+        tokenBurner = tb; rewardManager = rm;
+        IRewardManager(rm).setAuthorizedNFTContract(address(this), true);
+    }
+
+    function setMetadataContract(address a) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "E10");
+        metadataContract = a;
+    }
+
+    function setTokenContract(address a) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "E10");
+        tokenContract = a;
+    }
+
+    function setPriceOracle(address a) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "E10");
+        priceOracle = a;
+    }
+
+    function authorizeMinter(address a) external onlyOwner { authorizedMinter[a] = true; }
+    function unauthorizedMinter(address a) external onlyOwner { authorizedMinter[a] = false; }
+    function setAuthorizer(address a) external onlyOwner { authorizer = a; }
+    function setBreedingContract(address a) external onlyOwner { breedingContract = a; }
+
+    // ====================== 查询 ======================
+    function getCardCount(address u, ZodiacType t) external view returns (uint) {
+        return IRewardManager(rewardManager).cardCount(u, t);
+    }
+
+    function calcUserWeight(address user) external view returns (uint256) {
+        uint w;
+        for (uint i; i<120; i++) {
+            ZodiacType t = ZodiacType(i);
+            uint256[] memory arr = userTokens[user][t];
+            for (uint j; j<arr.length; j++) { w += tokenLevel[arr[j]] + 2; }
+        }
+        return w;
+    }
+
+    // ====================== 事件 ======================
+    event CardMinted(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner, uint64 timestamp);
+    event CardBurned(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner);
+    event WuFuSynthesized(address indexed user, uint64 timestamp, uint256 wanNengUsed);
+    event CardUpgraded(uint256 indexed cardId, ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, address indexed owner, uint64 timestamp);
 }
