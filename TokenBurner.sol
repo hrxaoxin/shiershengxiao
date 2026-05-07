@@ -7,8 +7,9 @@ pragma solidity ^0.8.20;
  * 支持两种模式：销毁后铸造随机类型NFT，或销毁后铸造指定类型NFT
  * 基于OpenZeppelin可升级合约实现
  */
-import "./FTData.sol";
+import "./NFTData.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/IERC721Upgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
@@ -75,6 +76,35 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param newImplementation 新实现合约地址
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @dev 销毁代币用于铸造
+     * 用户需要先授权代币给合约，然后调用此函数销毁代币
+     * @return bool 是否成功
+     */
+    function burnTokenForMint() external whenNotPaused returns (bool) {
+        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
+        
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        require(token.transferFrom(msg.sender, BLACK_HOLE, BURN_MINT_FEE), "TokenBurner: Token transfer failed");
+        
+        return true;
+    }
+
+    /**
+     * @dev 销毁代币并铸造（由NFT合约调用）
+     * 用户需要先授权代币给合约
+     * @param user 用户地址
+     * @return bool 是否成功
+     */
+    function burnAndMint(address user) external whenNotPaused returns (bool) {
+        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
+        
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        require(token.transferFrom(user, BLACK_HOLE, BURN_MINT_FEE), "TokenBurner: Token transfer failed");
+        
+        return true;
+    }
 
     /**
      * @dev 销毁NFT并铸造新的随机类型NFT

@@ -8,7 +8,7 @@ pragma solidity ^0.8.20;
  * 基于OpenZeppelin UUPS可升级合约实现
  */
 
-import "./FTData.sol";
+import "./NFTData.sol";
 
 // 全部统一适配 OpenZeppelin Upgradeable v4.9
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";

@@ -117,28 +117,31 @@ interface INFTMint {
     function mintSpecificType(address to, NFTDataTypes.ZodiacType zodiacType) external returns (uint256);
     function mintLightDark(address to, bool isLight) external returns (uint256);
     function mintBreedResult(address to, NFTDataTypes.ZodiacType zodiacType) external returns (uint256);
-    function upgradeWithNFT(uint256 tokenId, uint256 sacrificeTokenId) external;
-    function upgradeWithToken(uint256 tokenId, uint256 tokenAmount) external;
+    function upgradeWithNFT(uint256 tokenId) external returns (uint8);
+    function upgradeWithToken(uint256 tokenId) external returns (uint8);
+    function upgradeWithUSDValue(uint256 tokenId) external returns (uint8);
     function ownerOf(uint256 tokenId) external view returns (address);
     function safeTransferFrom(address from, address to, uint256 tokenId) external;
     function isApprovedForAll(address owner, address operator) external view returns (bool);
     function getApproved(uint256 tokenId) external view returns (address);
     function approve(address to, uint256 tokenId) external;
     function supportsInterface(bytes4 interfaceId) external view returns (bool);
+    function transferFrom(address from, address to, uint256 tokenId) external;
 }
 
 // NFT权重接口
 interface INFTMintWeight {
-    function getWeight(NFTDataTypes.ZodiacType zodiacType) external view returns (uint256);
-    function getLevelBonus(uint8 level) external view returns (uint256);
+    function calcUserWeight(address user) external view returns (uint256);
 }
 
 // 奖励管理器接口
 interface IRewardManager {
     function royaltyWallet() external view returns (address);
     function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address, uint256);
-    function distributeRewards() external;
-    function claimDividend(address user) external;
+    function claimDividend() external;
+    function cardCount(address user, NFTDataTypes.ZodiacType zodiacType) external view returns (uint256);
+    function updateCardExternal(address user, NFTDataTypes.ZodiacType zodiacType, uint256 count) external returns (bool);
+    function setAuthorizedNFTContract(address nft, bool ok) external;
 }
 
 // NFT数据接口
@@ -148,6 +151,13 @@ interface INFTData {
     function getZodiacName(NFTDataTypes.BaseZodiac zodiac) external pure returns (string memory);
     function getGenderName(NFTDataTypes.GenderType gender) external pure returns (string memory);
     function getFullTypeName(NFTDataTypes.ZodiacType zodiacType) external pure returns (string memory);
+    function collName() external view returns (string memory);
+    function collDesc() external view returns (string memory);
+    function collImage() external view returns (string memory);
+    function sellerFeeBasisPoints() external view returns (uint256);
+    function getCardName(NFTDataTypes.ZodiacType zodiacType) external view returns (string memory);
+    function getCardDesc(NFTDataTypes.ZodiacType zodiacType) external view returns (string memory);
+    function getCardImage(NFTDataTypes.ZodiacType zodiacType) external view returns (string memory);
 }
 
 // NFT数据管理合约
@@ -232,5 +242,76 @@ contract NFTData is INFTData {
         string memory genderName = getGenderName(gender);
         
         return string(abi.encodePacked(elementName, zodiacName, "（", genderName, "）"));
+    }
+
+    /**
+     * @dev 获取集合名称
+     * @return 集合名称
+     */
+    function collName() external view override returns (string memory) {
+        return "Twelve Zodiacs";
+    }
+
+    /**
+     * @dev 获取集合描述
+     * @return 集合描述
+     */
+    function collDesc() external view override returns (string memory) {
+        return "十二生肖NFT系列 - 120种独特的生肖卡牌，包含5种属性（水、风、火、暗、光）和12种生肖";
+    }
+
+    /**
+     * @dev 获取集合图片URL
+     * @return 集合图片URL
+     */
+    function collImage() external view override returns (string memory) {
+        return "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/logo.png";
+    }
+
+    /**
+     * @dev 获取卖家手续费比例（basis points）
+     * @return 手续费比例（500 = 5%）
+     */
+    function sellerFeeBasisPoints() external view override returns (uint256) {
+        return 500;
+    }
+
+    /**
+     * @dev 获取卡牌名称
+     * @param zodiacType 生肖类型
+     * @return 卡牌名称
+     */
+    function getCardName(NFTDataTypes.ZodiacType zodiacType) external view override returns (string memory) {
+        return getFullTypeName(zodiacType);
+    }
+
+    /**
+     * @dev 获取卡牌描述
+     * @param zodiacType 生肖类型
+     * @return 卡牌描述
+     */
+    function getCardDesc(NFTDataTypes.ZodiacType zodiacType) external view override returns (string memory) {
+        string memory fullName = getFullTypeName(zodiacType);
+        return string(abi.encodePacked("十二生肖NFT - ", fullName));
+    }
+
+    /**
+     * @dev 获取卡牌图片URL
+     * @param zodiacType 生肖类型
+     * @return 卡牌图片URL
+     */
+    function getCardImage(NFTDataTypes.ZodiacType zodiacType) external view override returns (string memory) {
+        NFTDataTypes.ElementType element = NFTDataTypes.getElement(zodiacType);
+        NFTDataTypes.BaseZodiac zodiac = NFTDataTypes.getBaseZodiac(zodiacType);
+        NFTDataTypes.GenderType gender = NFTDataTypes.getGender(zodiacType);
+        
+        string memory elementName = getElementName(element);
+        string memory zodiacName = getZodiacName(zodiac);
+        string memory genderSuffix = gender == NFTDataTypes.GenderType.MALE ? "_1" : "_0";
+        
+        return string(abi.encodePacked(
+            "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/",
+            elementName, zodiacName, genderSuffix, ".png"
+        ));
     }
 }

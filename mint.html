@@ -475,7 +475,7 @@
 
                 alert('即将铸造生肖NFT（将销毁1枚代币）\n\n请在MetaMask等web3钱包中确认交易');
 
-                const tx = await fiveBlessingsNFTContract.methods.mintOneStep().send({
+                const tx = await fiveBlessingsNFTContract.methods.mint(accounts[0]).send({
                     from: accounts[0],
                     gasPrice: adjustedGasPrice,
                     gas: gasLimit
@@ -525,7 +525,8 @@
 
                 alert('即将铸造光暗属性NFT（将销毁88888枚代币）\n\n请在MetaMask等web3钱包中确认交易');
 
-                const tx = await fiveBlessingsNFTContract.methods.mintLightDark().send({
+                const isLight = Math.random() >= 0.5;
+                const tx = await fiveBlessingsNFTContract.methods.mintLightDark(accounts[0], isLight).send({
                     from: accounts[0],
                     gasPrice: adjustedGasPrice,
                     gas: gasLimit

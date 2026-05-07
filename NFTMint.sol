@@ -7,7 +7,7 @@ pragma solidity ^0.8.20;
  * 实现120种生肖NFT类型（5属性x12生肖x2性别）
  * 基于OpenZeppelin UUPS可升级合约实现
  */
-import "./FTData.sol";
+import "./NFTData.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/ERC721Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
@@ -280,12 +280,13 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     /**
      * @dev 铸造NFT（通过销毁代币）
      * 用户需先授权并销毁代币，然后调用此函数铸造NFT
+     * @param to 接收NFT的地址
      * @return uint256 新铸造的NFT ID
      */
-    function mint() external nonReentrant returns (uint256) {
+    function mint(address to) external nonReentrant returns (uint256) {
         require(tokenBurner != address(0) && rewardManager != address(0), "E2");
-        require(ITokenBurner(tokenBurner).burnAndMint(msg.sender), "E6");
-        return _mintTo(msg.sender, _getRandomType(nextCardId));
+        require(ITokenBurner(tokenBurner).burnAndMint(to), "E6");
+        return _mintTo(to, _getRandomType(nextCardId));
     }
 
     /** @dev 铸造光/暗属性NFT所需的代币数量 */
@@ -294,17 +295,19 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     /**
      * @dev 铸造光/暗属性NFT
      * 需要燃烧88888个代币，只能铸造光或暗属性的NFT
+     * @param to 接收NFT的地址
+     * @param isLight 是否铸造光属性（true=光，false=暗）
      * @return uint256 新铸造的NFT ID
      */
-    function mintLightDark() external nonReentrant returns (uint256) {
+    function mintLightDark(address to, bool isLight) external nonReentrant returns (uint256) {
         require(tokenContract != address(0) && rewardManager != address(0), "E7");
         IToken t = IToken(tokenContract);
         require(t.balanceOf(msg.sender) >= LIGHT_DARK_COST, "E8");
         require(t.transferFrom(msg.sender, BLACK_HOLE, LIGHT_DARK_COST), "E9");
         _nonce.increment();
         uint rand = uint(keccak256(abi.encodePacked(blockhash(block.number-1), msg.sender, nextCardId, block.timestamp, _nonce.current(), gasleft())));
-        NFTDataTypes.ZodiacType z = rand % 2 == 0 ? NFTDataTypes.ZodiacType(72 + rand % 24) : NFTDataTypes.ZodiacType(96 + rand % 24);
-        return _mintTo(msg.sender, z);
+        NFTDataTypes.ZodiacType z = isLight ? NFTDataTypes.ZodiacType(96 + rand % 24) : NFTDataTypes.ZodiacType(72 + rand % 24);
+        return _mintTo(to, z);
     }
 
     /**
@@ -605,6 +608,33 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     }
 
     /**
+     * @dev 获取总供应量
+     * @return uint256 总NFT数量
+     */
+    function totalSupply() external view returns (uint256) {
+        return nextCardId - 1;
+    }
+
+    /**
+     * @dev 获取用户持有的NFT列表（按索引）
+     * @param owner 持有者地址
+     * @param index 索引
+     * @return uint256 NFT ID
+     */
+    function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256) {
+        uint256 count = 0;
+        for (uint i = 0; i < 120; i++) {
+            NFTDataTypes.ZodiacType t = NFTDataTypes.ZodiacType(i);
+            uint256[] storage arr = userTokens[owner][t];
+            if (index < count + arr.length) {
+                return arr[index - count];
+            }
+            count += arr.length;
+        }
+        revert("NFTMint: index out of bounds");
+    }
+
+    /**
      * @dev 铸造事件
      * @param cardId NFT ID
      * @param cardType NFT类型
@@ -621,13 +651,6 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      */
     event CardBurned(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, address indexed owner);
 
-    /**
-     * @dev 五符合成事件
-     * @param user 用户地址
-     * @param timestamp 时间戳
-     * @param wanNengUsed 使用的万能卡牌数量
-     */
-    event WuFuSynthesized(address indexed user, uint64 timestamp, uint256 wanNengUsed);
 
     /**
      * @dev 升级事件

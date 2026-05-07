@@ -7,7 +7,7 @@ pragma solidity ^0.8.20;
  * 奖励根据质押时间和NFT等级计算，每日有最大奖励上限
  * 基于OpenZeppelin可升级合约实现
  */
-import "./FTData.sol";
+import "./NFTData.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/IERC721Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
