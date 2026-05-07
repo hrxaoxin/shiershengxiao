@@ -1,34 +1,40 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// 👇 全部统一适配 OpenZeppelin Upgradeable v4.9
+/**
+ * @title RewardManager
+ * @dev 奖励管理器合约，负责管理NFT持有者的分红和权重计算
+ * 支持添加/移除持有者、计算用户权重、分配分红等功能
+ * 基于OpenZeppelin UUPS可升级合约实现
+ */
+
+import "./FTData.sol";
+
+// 全部统一适配 OpenZeppelin Upgradeable v4.9
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 
+/**
+ * @dev IERC2981接口：NFT版税标准接口
+ */
 interface IERC2981 {
+    /**
+     * @dev 获取NFT版税信息
+     * @param tokenId NFT ID
+     * @param salePrice 销售价格
+     * @return receiver 版税接收地址
+     * @return royaltyAmount 版税金额
+     */
     function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address receiver, uint256 royaltyAmount);
 }
 
-interface IFiveBlessingsNFTWeight {
-    function calcUserWeight(address user) external view returns (uint256);
-}
-
-enum ZodiacType {
-    ShuiShu_1, ShuiNiu_1, ShuiHu_1, ShuiTu_1, ShuiLong_1, ShuiShe_1, ShuiMa_1, ShuiYang_1, ShuiHou_1, ShuiJi_1, ShuiGou_1, ShuiZhu_1,
-    ShuiShu_0, ShuiNiu_0, ShuiHu_0, ShuiTu_0, ShuiLong_0, ShuiShe_0, ShuiMa_0, ShuiYang_0, ShuiHou_0, ShuiJi_0, ShuiGou_0, ShuiZhu_0,
-    FengShu_1, FengNiu_1, FengHu_1, FengTu_1, FengLong_1, FengShe_1, FengMa_1, FengYang_1, FengHou_1, FengJi_1, FengGou_1, FengZhu_1,
-    FengShu_0, FengNiu_0, FengHu_0, FengTu_0, FengLong_0, FengShe_0, FengMa_0, FengYang_0, FengHou_0, FengJi_0, FengGou_0, FengZhu_0,
-    HuoShu_1, HuoNiu_1, HuoHu_1, HuoTu_1, HuoLong_1, HuoShe_1, HuoMa_1, HuoYang_1, HuoHou_1, HuoJi_1, HuoGou_1, HuoZhu_1,
-    HuoShu_0, HuoNiu_0, HuoHu_0, HuoTu_0, HuoLong_0, HuoShe_0, HuoMa_0, HuoYang_0, HuoHou_0, HuoJi_0, HuoGou_0, HuoZhu_0,
-    AnShu_1, AnNiu_1, AnHu_1, AnTu_1, AnLong_1, AnShe_1, AnMa_1, AnYang_1, AnHou_1, AnJi_1, AnGou_1, AnZhu_1,
-    AnShu_0, AnNiu_0, AnHu_0, AnTu_0, AnLong_0, AnShe_0, AnMa_0, AnYang_0, AnHou_0, AnJi_0, AnGou_0, AnZhu_0,
-    GuangShu_1, GuangNiu_1, GuangHu_1, GuangTu_1, GuangLong_1, GuangShe_1, GuangMa_1, GuangYang_1, GuangHou_1, GuangJi_1, GuangGou_1, GuangZhu_1,
-    GuangShu_0, GuangNiu_0, GuangHu_0, GuangTu_0, GuangLong_0, GuangShe_0, GuangMa_0, GuangYang_0, GuangHou_0, GuangJi_0, GuangGou_0, GuangZhu_0
-}
-
+/**
+ * @title RewardManager
+ * @dev 奖励管理器合约，负责管理NFT持有者的分红和权重计算
+ */
 contract RewardManager is
     Initializable,
     Ownable2StepUpgradeable,
@@ -37,50 +43,146 @@ contract RewardManager is
     PausableUpgradeable,
     IERC2981
 {
+    /** @dev 合约版本号 */
     uint256 public constant VERSION = 2;
+    /** @dev 每张卡牌的权重值 */
     uint256 public constant WEIGHT_PER_CARD = 8;
+    /** @dev 最低所有者权重 */
     uint256 public constant MIN_OWNER_WEIGHT = 1000;
+    /** @dev 最大版税比例（5000 = 50%） */
     uint256 public constant MAX_ROYALTY_FEE = 5000;
 
+    /** @dev 当前持有者总数 */
     uint256 public holdersCount;
+    /** @dev 分红池余额 */
     uint256 public dividendPool;
+    /** @dev 已分发的分红总量 */
     uint256 public totalDistributed;
+    /** @dev 运营者地址 */
     address public operator;
+    /** @dev NFT合约地址 */
     address public nftContract;
+    /** @dev 授权合约地址 */
     address public authorizer;
+    /** @dev 所有者权重 */
     uint256 public ownerWeight;
+    /** @dev 版税接收钱包地址 */
     address public royaltyWallet;
+    /** @dev 版税比例（默认500 = 5%） */
     uint256 public royaltyFee = 500;
 
+    /** @dev 授权的NFT合约映射 */
     mapping(address => bool) public authorizedNFTContracts;
-    mapping(address => mapping(ZodiacType => uint256)) public cardCount;
+    /** @dev 用户卡牌数量映射（用户地址 => 生肖类型 => 数量） */
+    mapping(address => mapping(NFTDataTypes.ZodiacType => uint256)) public cardCount;
+    /** @dev 是否为持有者映射 */
     mapping(address => bool) public isHolder;
+    /** @dev 用户已领取分红映射 */
     mapping(address => uint256) public claimedDividend;
+    /** @dev 用户精度累积映射 */
     mapping(address => uint256) public precisionAcc;
+    /** @dev 用户权重映射 */
     mapping(address => uint256) public userWeight;
+    /** @dev 总权重 */
     uint256 public totalWeight;
 
+    /** @dev 符合资格用户链表前驱映射 */
     mapping(address => address) public eligibleUserPrev;
+    /** @dev 符合资格用户链表后继映射 */
     mapping(address => address) public eligibleUserNext;
+    /** @dev 符合资格用户链表头 */
     address public eligibleUserHead;
+    /** @dev 符合资格用户链表尾 */
     address public eligibleUserTail;
+    /** @dev 用户是否在资格列表中 */
     mapping(address => bool) public inEligibleList;
 
+    /** @dev 用户操作时间映射（用户地址 => 函数选择器 => 时间戳） */
     mapping(address => mapping(bytes4 => uint256)) public lastOperationTime;
+    /** @dev 操作冷却时间（默认1秒） */
     uint256 public operationCooldown = 1 seconds;
 
-    event CardUpdated(address indexed user, ZodiacType t, uint256 c, uint256 ts);
+    /**
+     * @dev 卡牌更新事件
+     * @param user 用户地址
+     * @param t 生肖类型
+     * @param c 卡牌数量
+     * @param ts 时间�?
+     */
+    event CardUpdated(address indexed user, NFTDataTypes.ZodiacType t, uint256 c, uint256 ts);
+    /**
+     * @dev 分红领取事件
+     * @param user 用户地址
+     * @param amt 领取金额
+     * @param prec 精度�?
+     * @param ts 时间�?
+     */
     event DividendClaimed(address indexed user, uint256 amt, uint256 prec, uint256 ts);
+    /**
+     * @dev 分红存入事件
+     * @param amt 存入金额
+     * @param sender 发送者地址
+     * @param ts 时间�?
+     */
     event DividendDeposited(uint256 amt, address indexed sender, uint256 ts);
+    /**
+     * @dev 用户权重更新事件
+     * @param user 用户地址
+     * @param oldWeight 旧权�?
+     * @param newWeight 新权�?
+     * @param ts 时间�?
+     */
     event UserWeightUpdated(address indexed user, uint256 oldWeight, uint256 newWeight, uint256 ts);
+    /**
+     * @dev 总权重更新事�?
+     * @param oldTotal 旧总权�?
+     * @param newTotal 新总权�?
+     * @param ts 时间�?
+     */
     event TotalWeightUpdated(uint256 oldTotal, uint256 newTotal, uint256 ts);
+    /**
+     * @dev NFT合约授权事件
+     * @param nftContract NFT合约地址
+     * @param authorized 是否授权
+     * @param timestamp 时间�?
+     */
     event NFTContractAuthorized(address indexed nftContract, bool authorized, uint256 timestamp);
+    /**
+     * @dev 紧急暂停事�?
+     * @param owner 所有者地址
+     * @param timestamp 时间�?
+     */
     event EmergencyPause(address indexed owner, uint256 timestamp);
+    /**
+     * @dev NFT合约更新事件
+     * @param oldNFTContract 旧NFT合约地址
+     * @param newNFTContract 新NFT合约地址
+     * @param timestamp 时间�?
+     */
     event NFTContractUpdated(address indexed oldNFTContract, address indexed newNFTContract, uint256 timestamp);
+    /**
+     * @dev 版税钱包更新事件
+     * @param oldWallet 旧钱包地址
+     * @param newWallet 新钱包地址
+     * @param timestamp 时间�?
+     */
     event RoyaltyWalletUpdated(address indexed oldWallet, address indexed newWallet, uint256 timestamp);
+    /**
+     * @dev 额外资金提取事件
+     * @param owner 所有者地址
+     * @param amount 提取金额
+     * @param timestamp 时间�?
+     */
     event ExtraFundsWithdrawn(address indexed owner, uint256 amount, uint256 timestamp);
+    /**
+     * @dev 全部资金提取事件
+     * @param owner 所有者地址
+     * @param amount 提取金额
+     * @param timestamp 时间�?
+     */
     event FullFundsWithdrawn(address indexed owner, uint256 amount, uint256 timestamp);
 
+    /** @dev 存储间隙，用于合约升级兼容�?*/
     uint256[90] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -88,6 +190,10 @@ contract RewardManager is
         _disableInitializers();
     }
 
+    /**
+     * @dev 授权检查修饰器
+     * 只有owner、operator、nftContract、authorizer或已授权的合约才能调�?
+     */
     modifier onlyAuthorized() {
         require(
             msg.sender == owner() ||
@@ -100,16 +206,27 @@ contract RewardManager is
         _;
     }
 
+    /**
+     * @dev 非零地址检查修饰器
+     * @param _addr 检查的地址
+     */
     modifier nonZeroAddress(address _addr) {
         require(_addr != address(0), "RewardManager: Zero address");
         _;
     }
 
+    /**
+     * @dev 紧急所有者检查修饰器
+     */
     modifier onlyEmergencyOwner() {
         require(msg.sender == owner(), "RewardManager: Only owner");
         _;
     }
 
+    /**
+     * @dev 速率限制检查修饰器
+     * @param funcSig 函数选择�?
+     */
     modifier rateLimited(bytes4 funcSig) {
         require(
             block.timestamp >= lastOperationTime[msg.sender][funcSig] + operationCooldown,
@@ -119,6 +236,14 @@ contract RewardManager is
         _;
     }
 
+    /**
+     * @dev 初始化合�?
+     * @param initialOwner 初始所有者地址
+     * @param _royaltyWallet 版税接收钱包地址
+     * @param _operator 运营者地址
+     * @param _nftContract NFT合约地址
+     * @param _authorizer 授权合约地址
+     */
     function initialize(
         address initialOwner,
         address _royaltyWallet,
@@ -147,6 +272,10 @@ contract RewardManager is
         emit TotalWeightUpdated(0, totalWeight, block.timestamp);
     }
 
+    /**
+     * @dev 升级授权函数
+     * @param newImplementation 新实现合约地址
+     */
     function _authorizeUpgrade(address newImplementation)
         internal
         override
@@ -154,16 +283,32 @@ contract RewardManager is
         nonZeroAddress(newImplementation)
     {}
 
+    /**
+     * @dev 获取NFT版税信息（ERC2981接口实现�?
+     * @param tokenId NFT ID
+     * @param salePrice 销售价�?
+     * @return receiver 版税接收地址
+     * @return royaltyAmount 版税金额
+     */
     function royaltyInfo(uint256, uint256 salePrice) external view override returns (address, uint256) {
         return (royaltyWallet, (salePrice * royaltyFee) / 10000);
     }
 
+    /**
+     * @dev 设置授权的NFT合约
+     * @param nft NFT合约地址
+     * @param ok 是否授权
+     */
     function setAuthorizedNFTContract(address nft, bool ok) external nonZeroAddress(nft) {
         require(msg.sender == owner() || msg.sender == operator || msg.sender == nftContract || msg.sender == authorizer || authorizedNFTContracts[msg.sender], "RewardManager: Unauthorized");
         authorizedNFTContracts[nft] = ok;
         emit NFTContractAuthorized(nft, ok, block.timestamp);
     }
 
+    /**
+     * @dev 设置NFT合约地址
+     * @param _newNFTContract 新NFT合约地址
+     */
     function setNFTContract(address _newNFTContract) external onlyOwner nonZeroAddress(_newNFTContract) {
         address oldNFTContract = nftContract;
         require(oldNFTContract != _newNFTContract, "RM: same nft contract");
@@ -171,10 +316,18 @@ contract RewardManager is
         emit NFTContractUpdated(oldNFTContract, _newNFTContract, block.timestamp);
     }
 
+    /**
+     * @dev 设置运营者地址
+     * @param _op 新运营者地址
+     */
     function setOperator(address _op) external onlyOwner nonZeroAddress(_op) {
         operator = _op;
     }
 
+    /**
+     * @dev 设置所有者权�?
+     * @param _w 新权重�?
+     */
     function setOwnerWeight(uint256 _w) external onlyOwner {
         require(_w >= MIN_OWNER_WEIGHT, "RM: w low");
 
@@ -185,6 +338,10 @@ contract RewardManager is
         emit TotalWeightUpdated(totalWeight + oldOwnerWeight - _w, totalWeight, block.timestamp);
     }
 
+    /**
+     * @dev 设置版税接收钱包
+     * @param _newRoyaltyWallet 新钱包地址
+     */
     function setRoyaltyWallet(address _newRoyaltyWallet) external onlyOwner nonZeroAddress(_newRoyaltyWallet) {
         address oldRoyaltyWallet = royaltyWallet;
         require(oldRoyaltyWallet != _newRoyaltyWallet, "RM: same royalty wallet");
@@ -192,28 +349,49 @@ contract RewardManager is
         emit RoyaltyWalletUpdated(oldRoyaltyWallet, _newRoyaltyWallet, block.timestamp);
     }
 
+    /**
+     * @dev 设置版税比例
+     * @param _f 新版税比�?
+     */
     function setRoyaltyFee(uint256 _f) external onlyOwner {
         require(_f >= 0 && _f <= MAX_ROYALTY_FEE, "RM: fee invalid");
         royaltyFee = _f;
     }
 
+    /**
+     * @dev 设置操作冷却时间
+     * @param _cooldown 新的冷却时间
+     */
     function setOperationCooldown(uint256 _cooldown) external onlyOwner {
         operationCooldown = _cooldown;
     }
 
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 授权合约地址
+     */
     function setAuthorizer(address _authorizer) external onlyOwner {
         authorizer = _authorizer;
     }
 
+    /**
+     * @dev 紧急暂停合�?
+     */
     function emergencyPause() external onlyEmergencyOwner {
         _pause();
         emit EmergencyPause(msg.sender, block.timestamp);
     }
 
+    /**
+     * @dev 紧急恢复合�?
+     */
     function emergencyUnpause() external onlyEmergencyOwner {
         _unpause();
     }
 
+    /**
+     * @dev 运营者检查修饰器
+     */
     modifier onlyOp() {
         bool isAuthorized = (msg.sender == operator) || (msg.sender == owner()) ||
                             (authorizedNFTContracts[msg.sender]) || (msg.sender == nftContract) || (msg.sender == authorizer);
@@ -221,12 +399,21 @@ contract RewardManager is
         _;
     }
 
+    /**
+     * @dev 计算用户权重
+     * @param user 用户地址
+     * @return 用户权重
+     */
     function _calcUserWeight(address user) internal view returns (uint256) {
         if (user == owner()) return 0;
         if (nftContract == address(0)) return 0;
-        return IFiveBlessingsNFTWeight(nftContract).calcUserWeight(user);
+        return INFTMintWeight(nftContract).calcUserWeight(user);
     }
 
+    /**
+     * @dev 更新用户权重
+     * @param user 用户地址
+     */
     function _updateUserWeight(address user) internal {
         if (user == owner()) return;
 
@@ -243,17 +430,31 @@ contract RewardManager is
         }
     }
 
+    /**
+     * @dev 获取用户总卡牌数�?
+     * @param user 用户地址
+     * @return 总卡牌数�?
+     */
     function _getTotalCardCount(address user) internal view returns (uint256 cnt) {
         for (uint i = 0; i < 120; i++) {
-            cnt += cardCount[user][ZodiacType(i)];
+            cnt += cardCount[user][NFTDataTypes.ZodiacType(i)];
         }
     }
 
+    /**
+     * @dev 检查用户是否有资格分红
+     * @param user 用户地址
+     * @return 是否有资�?
+     */
     function _hasEligibility(address user) internal view returns (bool) {
         if (user == owner()) return true;
         return _getTotalCardCount(user) > 0;
     }
 
+    /**
+     * @dev 管理符合资格用户链表
+     * @param user 用户地址
+     */
     function _manageEligibleList(address user) internal {
         bool eligible = _hasEligibility(user);
 
@@ -282,7 +483,14 @@ contract RewardManager is
         }
     }
 
-    function updateCard(address user, ZodiacType t, uint256 cnt) internal returns (bool) {
+    /**
+     * @dev 更新用户卡牌信息
+     * @param user 用户地址
+     * @param t 生肖类型
+     * @param cnt 卡牌数量
+     * @return 是否成功
+     */
+    function updateCard(address user, NFTDataTypes.ZodiacType t, uint256 cnt) internal returns (bool) {
         cardCount[user][t] = cnt;
         _manageEligibleList(user);
         _updateUserWeight(user);
@@ -290,10 +498,22 @@ contract RewardManager is
         return true;
     }
 
-    function updateCardExternal(address user, ZodiacType t, uint256 cnt) external onlyOp whenNotPaused returns (bool) {
+    /**
+     * @dev 外部更新用户卡牌信息
+     * @param user 用户地址
+     * @param t 生肖类型
+     * @param cnt 卡牌数量
+     * @return 是否成功
+     */
+    function updateCardExternal(address user, NFTDataTypes.ZodiacType t, uint256 cnt) external onlyOp whenNotPaused returns (bool) {
         return updateCard(user, t, cnt);
     }
 
+    /**
+     * @dev 添加持有�?
+     * @param user 用户地址
+     * @return 是否成功
+     */
     function addHolder(address user) external onlyOp whenNotPaused returns (bool) {
         if (!isHolder[user]) {
             isHolder[user] = true;
@@ -308,6 +528,10 @@ contract RewardManager is
         return true;
     }
 
+    /**
+     * @dev 移除持有�?
+     * @param user 用户地址
+     */
     function removeHolder(address user) external onlyOp whenNotPaused {
         if (isHolder[user]) {
             isHolder[user] = false;
@@ -319,6 +543,9 @@ contract RewardManager is
         }
     }
 
+    /**
+     * @dev 领取分红
+     */
     function claimDividend() external nonReentrant whenNotPaused rateLimited(msg.sig) {
         address user = msg.sender;
         require(_hasEligibility(user), "RM: no elig");
@@ -352,12 +579,18 @@ contract RewardManager is
         require(success, "RM: transfer fail");
     }
 
+    /**
+     * @dev 接收ETH分红
+     */
     receive() external payable {
         require(msg.value > 0, "RM: zero");
         unchecked { dividendPool += msg.value; }
         emit DividendDeposited(msg.value, msg.sender, block.timestamp);
     }
 
+    /**
+     * @dev 提取额外资金（超出分红池的余额）
+     */
     function withdrawExtraFunds() external onlyOwner nonReentrant whenNotPaused {
         uint256 contractBalance = address(this).balance;
         uint256 extraFunds = contractBalance - dividendPool;
@@ -369,6 +602,9 @@ contract RewardManager is
         require(success, "RM: extra funds transfer failed");
     }
 
+    /**
+     * @dev 提取所有资�?
+     */
     function withdrawAllFunds() external onlyOwner nonReentrant {
         uint256 bal = address(this).balance;
         require(bal > 0, "RM: no balance");
@@ -381,6 +617,12 @@ contract RewardManager is
         require(success, "RM: withdraw fail");
     }
 
+    /**
+     * @dev 计算用户可领取的分红
+     * @param user 用户地址
+     * @return base 基本分红金额
+     * @return precRemain 剩余精度�?
+     */
     function calcUserDividend(address user) external view returns (uint256, uint256) {
         uint256 totalW = totalWeight;
         if (totalW == 0 || dividendPool == 0) return (0, 0);
@@ -401,11 +643,19 @@ contract RewardManager is
         return (base + (acc / totalW), acc % totalW);
     }
 
+    /**
+     * @dev 刷新单个用户权重
+     * @param user 用户地址
+     */
     function refreshUserWeight(address user) external onlyOwner {
         _updateUserWeight(user);
     }
 
+    /**
+     * @dev 刷新总权�?
+     */
     function refreshTotalWeight() external onlyOwner {
         emit TotalWeightUpdated(totalWeight, totalWeight, block.timestamp);
     }
 }
+

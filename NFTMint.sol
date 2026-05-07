@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/**
+ * @title NFTMint
+ * @dev 十二生肖NFT合约，支持铸造、升级、繁殖等功能
+ * 实现120种生肖NFT类型（5属性x12生肖x2性别）
+ * 基于OpenZeppelin UUPS可升级合约实现
+ */
+import "./FTData.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/ERC721Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
@@ -10,64 +17,63 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/utils/Counters.sol";
 
-enum ZodiacType {
-    ShuiShu_1, ShuiNiu_1, ShuiHu_1, ShuiTu_1, ShuiLong_1, ShuiShe_1, ShuiMa_1, ShuiYang_1, ShuiHou_1, ShuiJi_1, ShuiGou_1, ShuiZhu_1,
-    ShuiShu_0, ShuiNiu_0, ShuiHu_0, ShuiTu_0, ShuiLong_0, ShuiShe_0, ShuiMa_0, ShuiYang_0, ShuiHou_0, ShuiJi_0, ShuiGou_0, ShuiZhu_0,
-    FengShu_1, FengNiu_1, FengHu_1, FengTu_1, FengLong_1, FengShe_1, FengMa_1, FengYang_1, FengHou_1, FengJi_1, FengGou_1, FengZhu_1,
-    FengShu_0, FengNiu_0, FengHu_0, FengTu_0, FengLong_0, FengShe_0, FengMa_0, FengYang_0, FengHou_0, FengJi_0, FengGou_0, FengZhu_0,
-    HuoShu_1, HuoNiu_1, HuoHu_1, HuoTu_1, HuoLong_1, HuoShe_1, HuoMa_1, HuoYang_1, HuoHou_1, HuoJi_1, HuoGou_1, HuoZhu_1,
-    HuoShu_0, HuoNiu_0, HuoHu_0, HuoTu_0, HuoLong_0, HuoShe_0, HuoMa_0, HuoYang_0, HuoHou_0, HuoJi_0, HuoGou_0, HuoZhu_0,
-    AnShu_1, AnNiu_1, AnHu_1, AnTu_1, AnLong_1, AnShe_1, AnMa_1, AnYang_1, AnHou_1, AnJi_1, AnGou_1, AnZhu_1,
-    AnShu_0, AnNiu_0, AnHu_0, AnTu_0, AnLong_0, AnShe_0, AnMa_0, AnYang_0, AnHou_0, AnJi_0, AnGou_0, AnZhu_0,
-    GuangShu_1, GuangNiu_1, GuangHu_1, GuangTu_1, GuangLong_1, GuangShe_1, GuangMa_1, GuangYang_1, GuangHou_1, GuangJi_1, GuangGou_1, GuangZhu_1,
-    GuangShu_0, GuangNiu_0, GuangHu_0, GuangTu_0, GuangLong_0, GuangShe_0, GuangMa_0, GuangYang_0, GuangHou_0, GuangJi_0, GuangGou_0, GuangZhu_0
-}
-
+/**
+ * @dev ITokenBurner接口：代币销毁合约接口
+ */
 interface ITokenBurner {
-    function hasBurnedToken(address user) external view returns (bool);
-    function decreaseBurnCount(address user) external returns (bool);
-    function getBurnCount(address user) external view returns (uint256);
+    /**
+     * @dev 销毁代币用于铸造
+     * @return bool 是否成功
+     */
+    function burnTokenForMint() external returns (bool);
+    /**
+     * @dev 销毁代币并铸造
+     * @param user 用户地址
+     * @return bool 是否成功
+     */
     function burnAndMint(address user) external returns (bool);
 }
 
+/**
+ * @dev IToken接口：ERC20代币接口
+ */
 interface IToken {
+    /**
+     * @dev 转账
+     * @param from 转出地址
+     * @param to 转入地址
+     * @param amount 数量
+     * @return bool 是否成功
+     */
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    /**
+     * @dev 获取余额
+     * @param account 账户地址
+     * @return uint256 余额
+     */
     function balanceOf(address account) external view returns (uint256);
 }
 
+/**
+ * @dev IPriceOracle接口：价格预言机接口
+ */
 interface IPriceOracle {
+    /**
+     * @dev 获取代币的USD价格
+     * @return uint256 代币价格（精度8位）
+     */
     function getTokenPriceInUSD() external view returns (uint256);
 }
 
-interface IRewardManager {
-    function updateCardExternal(address user, ZodiacType t, uint256 cnt) external returns (bool);
-    function addWuFu(address user) external returns (bool);
-    function _hasAllBasic(address user) external view returns (bool);
-    function isWuFuHolder(address user) external view returns (bool);
-    function cardCount(address user, ZodiacType t) external view returns (uint256);
-    function resetWuFuHolder(address user) external returns (bool);
-    function setAuthorizedNFTContract(address nft, bool ok) external;
-    function royaltyWallet() external view returns (address);
-}
-
-interface IFiveBlessingsMetadata {
-    function getCardImage(ZodiacType t) external view returns (string memory);
-    function getCardName(ZodiacType t) external view returns (string memory);
-    function getCardDesc(ZodiacType t) external view returns (string memory);
-    function getNFTName(ZodiacType t, uint256 tokenId) external view returns (string memory);
-    function contractURI() external view returns (string memory);
-    function collName() external view returns (string memory);
-    function collDesc() external view returns (string memory);
-    function collImage() external view returns (string memory);
-    function sellerFeeBasisPoints() external view returns (uint256);
-}
-
-interface IFiveBlessingsNFTWeight {
-    function calcUserWeight(address user) external view returns (uint256);
-}
-
-// ====================== 工具库（大幅减小合约尺寸）======================
+/**
+ * @dev NFTLib工具库：用于NFT合约的辅助函数
+ */
 library NFTLib {
+    /**
+     * @dev 整数转字符串
+     * @param n 整数
+     * @return string 字符串
+     */
     function uint2str(uint256 n) internal pure returns (string memory) {
         if (n == 0) return "0";
         uint256 temp = n;
@@ -78,6 +84,11 @@ library NFTLib {
         return string(buf);
     }
 
+    /**
+     * @dev 地址转字符串
+     * @param _addr 地址
+     * @return string 十六进制字符串
+     */
     function addressToString(address _addr) internal pure returns (string memory) {
         bytes32 value = bytes32(uint256(uint160(_addr)));
         bytes memory alphabet = "0123456789abcdef";
@@ -90,6 +101,11 @@ library NFTLib {
         return string(str);
     }
 
+    /**
+     * @dev Base64编码
+     * @param data 原始数据
+     * @return string Base64编码字符串
+     */
     function base64Encode(bytes memory data) internal pure returns (string memory) {
         bytes memory base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         bytes memory result = new bytes((data.length + 2) / 3 * 4);
@@ -109,6 +125,11 @@ library NFTLib {
         return string(result);
     }
 
+    /**
+     * @dev 转义字符串（处理特殊字符）
+     * @param input 输入字符串
+     * @return string 转义后的字符串
+     */
     function escapeString(string memory input) internal pure returns (string memory) {
         bytes memory b = bytes(input);
         uint esc;
@@ -124,37 +145,65 @@ library NFTLib {
     }
 }
 
-contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, ERC721HolderUpgradeable {
+/**
+ * @title NFTMint
+ * @dev 十二生肖NFT合约
+ */
+contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, ERC721HolderUpgradeable {
     using Counters for Counters.Counter;
     using NFTLib for uint256;
     using NFTLib for address;
     using NFTLib for bytes;
     using NFTLib for string;
 
+    /** @dev 用于生成随机数的计数器 */
     Counters.Counter private _nonce;
-    uint256 public constant MAX_SUPPLY = 1000000;
+    /** @dev 黑洞地址，用于永久销毁NFT */
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
+    /** @dev 下一个可铸造的NFT ID */
     uint256 public nextCardId;
+    /** @dev TokenBurner代币销毁合约地址 */
     address public tokenBurner;
+    /** @dev RewardManager奖励管理器地址 */
     address public rewardManager;
+    /** @dev 元数据合约地址 */
     address public metadataContract;
+    /** @dev 授权合约地址 */
     address public authorizer;
+    /** @dev 代币合约地址 */
     address public tokenContract;
+    /** @dev 价格预言机地址 */
     address public priceOracle;
+    /** @dev 繁殖合约地址 */
     address public breedingContract;
 
+    /** @dev 授权铸造者映射 */
     mapping(address => bool) public authorizedMinter;
-    mapping(uint256 => ZodiacType) public tokenType;
+    /** @dev NFT类型映射（tokenId => 类型） */
+    mapping(uint256 => NFTDataTypes.ZodiacType) public tokenType;
+    /** @dev NFT等级映射（tokenId => 等级） */
     mapping(uint256 => uint8) public tokenLevel;
-    mapping(address => mapping(ZodiacType => uint256[])) public userTokens;
-    mapping(address => mapping(ZodiacType => uint256)) public userLatestToken;
-    mapping(address => mapping(ZodiacType => mapping(uint8 => uint256[]))) public userTokensByLevel;
-    mapping(address => mapping(ZodiacType => mapping(uint8 => uint256))) public userLatestTokenByLevel;
+    /** @dev 用户NFT列表（用户地址 => 类型 => ID数组） */
+    mapping(address => mapping(NFTDataTypes.ZodiacType => uint256[])) public userTokens;
+    /** @dev 用户最新NFT（用户地址 => 类型 => 最新ID） */
+    mapping(address => mapping(NFTDataTypes.ZodiacType => uint256)) public userLatestToken;
+    /** @dev 用户NFT按等级分类（用户地址 => 类型 => 等级 => ID数组） */
+    mapping(address => mapping(NFTDataTypes.ZodiacType => mapping(uint8 => uint256[]))) public userTokensByLevel;
+    /** @dev 用户最新NFT按等级（用户地址 => 类型 => 等级 => 最新ID） */
+    mapping(address => mapping(NFTDataTypes.ZodiacType => mapping(uint8 => uint256))) public userLatestTokenByLevel;
 
+    /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[50] private __gap;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
 
+    /**
+     * @dev 初始化合约
+     * @param initialOwner 初始所有者地址
+     * @param _metadataContract 元数据合约地址
+     * @param _authorizer 授权合约地址
+     */
     function initialize(address initialOwner, address _metadataContract, address _authorizer) external initializer {
         __ERC721_init("Twelve Zodiacs", "12ZODIAC");
         __Ownable_init();
@@ -168,23 +217,40 @@ contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeabl
         _nonce.increment();
     }
 
+    /**
+     * @dev 升级授权函数
+     * @param newImplementation 新实现合约地址
+     */
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     // ====================== 随机类型 ======================
-    function _getRandomType(uint256 salt) internal returns (ZodiacType) {
+
+    /**
+     * @dev 生成随机生肖类型
+     * 概率分布：水/风属性各48%，光/暗属性各2%
+     * @param salt 随机种子
+     * @return NFTDataTypes.ZodiacType 随机生成的生肖类型
+     */
+    function _getRandomType(uint256 salt) internal returns (NFTDataTypes.ZodiacType) {
         _nonce.increment();
         uint rand = uint(keccak256(abi.encodePacked(blockhash(block.number-1), msg.sender, salt, block.timestamp, _nonce.current(), gasleft())));
         uint r = rand % 100;
-        if (r < 2) return ZodiacType(72 + (rand % 24));
-        else if (r < 4) return ZodiacType(96 + (rand % 24));
-        else return ZodiacType(rand % 48);
+        if (r < 2) return NFTDataTypes.ZodiacType(72 + (rand % 24));      // 光属性(2%)
+        else if (r < 4) return NFTDataTypes.ZodiacType(96 + (rand % 24));  // 暗属性(2%)
+        else return NFTDataTypes.ZodiacType(rand % 48);                     // 水/风属性(96%)
     }
 
     // ====================== URI ======================
+
+    /**
+     * @dev 获取NFT的元数据URI
+     * @param tokenId NFT ID
+     * @return string JSON格式的元数据URI
+     */
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_ownerOf(tokenId) != address(0), "E0");
-        IFiveBlessingsMetadata m = IFiveBlessingsMetadata(metadataContract);
-        ZodiacType t = tokenType[tokenId];
+        INFTData m = INFTData(metadataContract);
+        NFTDataTypes.ZodiacType t = tokenType[tokenId];
         string memory json = string(abi.encodePacked(
             '{"name":"', m.getCardName(t), " #", tokenId.uint2str(), '",',
             '"description":"', m.getCardDesc(t).escapeString(), '",',
@@ -193,9 +259,13 @@ contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeabl
         return string(abi.encodePacked("data:application/json;base64,", bytes(json).base64Encode()));
     }
 
+    /**
+     * @dev 获取合约级别的元数据URI（用于OpenSea等平台）
+     * @return string JSON格式的合约元数据URI
+     */
     function contractURI() public view returns (string memory) {
         require(metadataContract != address(0), "E1");
-        IFiveBlessingsMetadata m = IFiveBlessingsMetadata(metadataContract);
+        INFTData m = INFTData(metadataContract);
         IRewardManager rm = IRewardManager(rewardManager);
         string memory json = string(abi.encodePacked(
             '{"name":"', m.collName().escapeString(), '",',
@@ -207,50 +277,68 @@ contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeabl
         return string(abi.encodePacked("data:application/json;base64,", bytes(json).base64Encode()));
     }
 
-    // ====================== 核心MINT ======================
+    /**
+     * @dev 铸造NFT（通过销毁代币）
+     * 用户需先授权并销毁代币，然后调用此函数铸造NFT
+     * @return uint256 新铸造的NFT ID
+     */
     function mint() external nonReentrant returns (uint256) {
         require(tokenBurner != address(0) && rewardManager != address(0), "E2");
-        require(nextCardId < MAX_SUPPLY, "E3");
-        ITokenBurner tb = ITokenBurner(tokenBurner);
-        require(tb.hasBurnedToken(msg.sender) && tb.getBurnCount(msg.sender) > 0, "E4");
-        require(tb.decreaseBurnCount(msg.sender), "E5");
-        return _mintTo(msg.sender, _getRandomType(nextCardId));
-    }
-
-    function mintOneStep() external nonReentrant returns (uint256) {
-        require(tokenBurner != address(0) && rewardManager != address(0), "E2");
-        require(nextCardId < MAX_SUPPLY, "E3");
         require(ITokenBurner(tokenBurner).burnAndMint(msg.sender), "E6");
         return _mintTo(msg.sender, _getRandomType(nextCardId));
     }
 
+    /** @dev 铸造光/暗属性NFT所需的代币数量 */
     uint256 public constant LIGHT_DARK_COST = 88888;
+
+    /**
+     * @dev 铸造光/暗属性NFT
+     * 需要燃烧88888个代币，只能铸造光或暗属性的NFT
+     * @return uint256 新铸造的NFT ID
+     */
     function mintLightDark() external nonReentrant returns (uint256) {
         require(tokenContract != address(0) && rewardManager != address(0), "E7");
-        require(nextCardId < MAX_SUPPLY, "E3");
         IToken t = IToken(tokenContract);
         require(t.balanceOf(msg.sender) >= LIGHT_DARK_COST, "E8");
         require(t.transferFrom(msg.sender, BLACK_HOLE, LIGHT_DARK_COST), "E9");
         _nonce.increment();
         uint rand = uint(keccak256(abi.encodePacked(blockhash(block.number-1), msg.sender, nextCardId, block.timestamp, _nonce.current(), gasleft())));
-        ZodiacType z = rand % 2 == 0 ? ZodiacType(72 + rand % 24) : ZodiacType(96 + rand % 24);
+        NFTDataTypes.ZodiacType z = rand % 2 == 0 ? NFTDataTypes.ZodiacType(72 + rand % 24) : NFTDataTypes.ZodiacType(96 + rand % 24);
         return _mintTo(msg.sender, z);
     }
 
-    function mintSpecificType(address to, ZodiacType t) external nonReentrant returns (uint256) {
+    /**
+     * @dev 铸造指定类型的NFT（仅限授权地址）
+     * 用于白名单铸造或特殊活动铸造
+     * @param to 接收NFT的地址
+     * @param t NFT的类型
+     * @return uint256 新铸造的NFT ID
+     */
+    function mintSpecificType(address to, NFTDataTypes.ZodiacType t) external nonReentrant returns (uint256) {
         require(authorizedMinter[msg.sender] || msg.sender == owner(), "E10");
-        require(to != address(0) && nextCardId < MAX_SUPPLY, "E11");
+        require(to != address(0), "E11");
         return _mintTo(to, t);
     }
 
-    function mintBreedResult(address to, ZodiacType t) external returns (uint256) {
+    /**
+     * @dev 铸造繁殖结果NFT（仅限繁殖合约调用）
+     * 繁殖完成后调用此函数铸造新的NFT
+     * @param to 接收NFT的地址
+     * @param t NFT的类型
+     * @return uint256 新铸造的NFT ID
+     */
+    function mintBreedResult(address to, NFTDataTypes.ZodiacType t) external returns (uint256) {
         require(msg.sender == breedingContract, "E12");
-        require(nextCardId < MAX_SUPPLY, "E3");
         return _mintTo(to, t);
     }
 
-    // 统一Mint逻辑（大幅减码）
-    function _mintTo(address to, ZodiacType t) internal returns (uint256) {
+    /**
+     * @dev 统一铸造逻辑（内部函数）
+     * @param to 接收NFT的地址
+     * @param t NFT的类型
+     * @return uint256 新铸造的NFT ID
+     */
+    function _mintTo(address to, NFTDataTypes.ZodiacType t) internal returns (uint256) {
         uint id = nextCardId++;
         tokenType[id] = t;
         tokenLevel[id] = 1;
@@ -263,10 +351,17 @@ contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeabl
         return id;
     }
 
-    // ====================== 转账钩子 ======================
+    /**
+     * @dev 转账前的钩子函数
+     * 在转账时自动更新用户的NFT列表和奖励管理器
+     * @param from 转出地址
+     * @param to 转入地址
+     * @param tokenId NFT ID
+     * @param batchSize 批量转账数量
+     */
     function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
-        ZodiacType t = tokenType[tokenId];
+        NFTDataTypes.ZodiacType t = tokenType[tokenId];
         uint8 lv = tokenLevel[tokenId];
         if (from != address(0) && from != BLACK_HOLE) {
             _removeToken(from, t, tokenId);
@@ -282,19 +377,37 @@ contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeabl
         }
     }
 
-    // ====================== 工具 ======================
-    function _removeToken(address u, ZodiacType t, uint id) internal {
+    /**
+     * @dev 从用户的NFT列表中移除指定NFT（内部函数）
+     * @param u 用户地址
+     * @param t NFT类型
+     * @param id NFT ID
+     */
+    function _removeToken(address u, NFTDataTypes.ZodiacType t, uint id) internal {
         uint256[] storage arr = userTokens[u][t];
         for (uint i; i<arr.length; i++) { if (arr[i] == id) { arr[i] = arr[arr.length-1]; arr.pop(); break; } }
     }
 
-    function _removeTokenByLevel(address u, ZodiacType t, uint8 lv, uint id) internal {
+    /**
+     * @dev 从用户的NFT等级列表中移除指定NFT（内部函数）
+     * @param u 用户地址
+     * @param t NFT类型
+     * @param lv NFT等级
+     * @param id NFT ID
+     */
+    function _removeTokenByLevel(address u, NFTDataTypes.ZodiacType t, uint8 lv, uint id) internal {
         uint256[] storage arr = userTokensByLevel[u][t][lv];
         for (uint i; i<arr.length; i++) { if (arr[i] == id) { arr[i] = arr[arr.length-1]; arr.pop(); break; } }
         userLatestTokenByLevel[u][t][lv] = arr.length > 0 ? arr[arr.length-1] : 0;
     }
 
-    function _updateReward(address u, ZodiacType t, bool add) internal {
+    /**
+     * @dev 更新奖励管理器中的用户卡牌计数（内部函数）
+     * @param u 用户地址
+     * @param t NFT类型
+     * @param add 是否增加计数（true增加，false减少）
+     */
+    function _updateReward(address u, NFTDataTypes.ZodiacType t, bool add) internal {
         if (rewardManager == address(0)) return;
         IRewardManager rm = IRewardManager(rewardManager);
         uint cnt = rm.cardCount(u, t);
@@ -302,10 +415,15 @@ contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeabl
         require(rm.updateCardExternal(u, t, n), add ? "E13" : "E14");
     }
 
-    // ====================== 升级 ======================
+    /**
+     * @dev 使用NFT升级（消耗同类型同等级的其他NFT）
+     * 升级需要消耗lv个同类型同等级的NFT
+     * @param tokenId 要升级的NFT ID
+     * @return uint8 新等级
+     */
     function upgradeWithNFT(uint256 tokenId) external nonReentrant returns (uint8) {
         require(_ownerOf(tokenId) == msg.sender, "E15");
-        ZodiacType t = tokenType[tokenId];
+        NFTDataTypes.ZodiacType t = tokenType[tokenId];
         uint8 lv = tokenLevel[tokenId];
         require(lv < 6, "E16");
         uint req = lv;
@@ -329,6 +447,12 @@ contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeabl
         return newLv;
     }
 
+    /**
+     * @dev 使用代币升级
+     * 各级别所需代币数量：1->2需10000, 2->3需40000, 3->4需120000, 4->5需480000, 5->6需2400000
+     * @param tokenId 要升级的NFT ID
+     * @return uint8 新等级
+     */
     function upgradeWithToken(uint256 tokenId) external nonReentrant returns (uint8) {
         require(_ownerOf(tokenId) == msg.sender, "E15");
         require(tokenContract != address(0), "E7");
@@ -347,6 +471,12 @@ contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeabl
         return _upgradeLevel(tokenId, lv);
     }
 
+    /**
+     * @dev 使用USD价值升级（通过价格预言机计算所需代币数量）
+     * 各级别所需USD价值：1->2需1USD, 2->3需4USD, 3->4需12USD, 4->5需48USD, 5->6需240USD
+     * @param tokenId 要升级的NFT ID
+     * @return uint8 新等级
+     */
     function upgradeWithUSDValue(uint256 tokenId) external nonReentrant returns (uint8) {
         require(_ownerOf(tokenId) == msg.sender, "E15");
         require(tokenContract != address(0) && priceOracle != address(0), "E19");
@@ -369,8 +499,14 @@ contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeabl
         return _upgradeLevel(tokenId, lv);
     }
 
+    /**
+     * @dev 升级等级的内部函数
+     * @param id NFT ID
+     * @param oldLv 旧等级
+     * @return uint8 新等级
+     */
     function _upgradeLevel(uint id, uint8 oldLv) internal returns (uint8) {
-        ZodiacType t = tokenType[id];
+        NFTDataTypes.ZodiacType t = tokenType[id];
         uint8 newLv = oldLv+1;
         tokenLevel[id] = newLv;
         _removeTokenByLevel(msg.sender, t, oldLv, id);
@@ -380,51 +516,127 @@ contract FiveBlessingsNFT is Initializable, ERC721Upgradeable, OwnableUpgradeabl
         return newLv;
     }
 
-    // ====================== 配置 ======================
+    /**
+     * @dev 设置TokenBurner和RewardManager地址
+     * @param tb TokenBurner合约地址
+     * @param rm RewardManager合约地址
+     */
     function setAddresses(address tb, address rm) external {
         require(msg.sender == owner() || msg.sender == authorizer, "E10");
         tokenBurner = tb; rewardManager = rm;
         IRewardManager(rm).setAuthorizedNFTContract(address(this), true);
     }
 
+    /**
+     * @dev 设置元数据合约地址
+     * @param a 元数据合约地址
+     */
     function setMetadataContract(address a) external {
         require(msg.sender == owner() || msg.sender == authorizer, "E10");
         metadataContract = a;
     }
 
+    /**
+     * @dev 设置代币合约地址
+     * @param a 代币合约地址
+     */
     function setTokenContract(address a) external {
         require(msg.sender == owner() || msg.sender == authorizer, "E10");
         tokenContract = a;
     }
 
+    /**
+     * @dev 设置价格预言机地址
+     * @param a 价格预言机地址
+     */
     function setPriceOracle(address a) external {
         require(msg.sender == owner() || msg.sender == authorizer, "E10");
         priceOracle = a;
     }
 
+    /**
+     * @dev 授权铸造者
+     * @param a 铸造者地址
+     */
     function authorizeMinter(address a) external onlyOwner { authorizedMinter[a] = true; }
+
+    /**
+     * @dev 取消铸造者授权
+     * @param a 铸造者地址
+     */
     function unauthorizedMinter(address a) external onlyOwner { authorizedMinter[a] = false; }
+
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
     function setAuthorizer(address a) external onlyOwner { authorizer = a; }
+
+    /**
+     * @dev 设置繁殖合约地址
+     * @param a 繁殖合约地址
+     */
     function setBreedingContract(address a) external onlyOwner { breedingContract = a; }
 
-    // ====================== 查询 ======================
-    function getCardCount(address u, ZodiacType t) external view returns (uint) {
+    /**
+     * @dev 获取用户拥有的指定类型NFT数量
+     * @param u 用户地址
+     * @param t NFT类型
+     * @return uint NFT数量
+     */
+    function getCardCount(address u, NFTDataTypes.ZodiacType t) external view returns (uint) {
         return IRewardManager(rewardManager).cardCount(u, t);
     }
 
+    /**
+     * @dev 计算用户权重（用于分红计算）
+     * 权重 = 每个NFT的等级+ 2 的总和
+     * @param user 用户地址
+     * @return uint256 用户权重
+     */
     function calcUserWeight(address user) external view returns (uint256) {
         uint w;
         for (uint i; i<120; i++) {
-            ZodiacType t = ZodiacType(i);
+            NFTDataTypes.ZodiacType t = NFTDataTypes.ZodiacType(i);
             uint256[] memory arr = userTokens[user][t];
             for (uint j; j<arr.length; j++) { w += tokenLevel[arr[j]] + 2; }
         }
         return w;
     }
 
-    // ====================== 事件 ======================
-    event CardMinted(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner, uint64 timestamp);
-    event CardBurned(uint256 indexed cardId, ZodiacType indexed cardType, address indexed owner);
+    /**
+     * @dev 铸造事件
+     * @param cardId NFT ID
+     * @param cardType NFT类型
+     * @param owner 持有者地址
+     * @param timestamp 时间戳
+     */
+    event CardMinted(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, address indexed owner, uint64 timestamp);
+
+    /**
+     * @dev 销毁事件
+     * @param cardId NFT ID
+     * @param cardType NFT类型
+     * @param owner 持有者地址
+     */
+    event CardBurned(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, address indexed owner);
+
+    /**
+     * @dev 五符合成事件
+     * @param user 用户地址
+     * @param timestamp 时间戳
+     * @param wanNengUsed 使用的万能卡牌数量
+     */
     event WuFuSynthesized(address indexed user, uint64 timestamp, uint256 wanNengUsed);
-    event CardUpgraded(uint256 indexed cardId, ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, address indexed owner, uint64 timestamp);
+
+    /**
+     * @dev 升级事件
+     * @param cardId NFT ID
+     * @param cardType NFT类型
+     * @param oldLevel 旧等级
+     * @param newLevel 新等级
+     * @param owner 持有者地址
+     * @param timestamp 时间戳
+     */
+    event CardUpgraded(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, address indexed owner, uint64 timestamp);
 }

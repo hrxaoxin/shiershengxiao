@@ -1,30 +1,54 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/**
+ * @title Staking
+ * @dev NFT质押合约，允许用户质押等级6以上的NFT来获取代币奖励
+ * 奖励根据质押时间和NFT等级计算，每日有最大奖励上限
+ * 基于OpenZeppelin可升级合约实现
+ */
+import "./FTData.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/IERC721Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/utils/introspection/ERC165Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 
-// 修正：继承 可升级合约 + 初始化合约
+/**
+ * @title Staking
+ * @dev NFT质押合约，支持质押NFT获取代币奖励
+ */
 contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
-    // 常量定义
+    /** @dev 最小质押等级：必须达到6级才能质押 */
     uint8 public constant MIN_STAKING_LEVEL = 6;
+    /** @dev 奖励间隔时间：每分钟计算一次奖励 */
     uint256 public constant REWARD_INTERVAL = 1 minutes;
+    /** @dev 每分钟基础代币奖励数量 */
     uint256 public constant BASE_TOKEN_PER_MINUTE = 10 * 10**18;
+    /** @dev 每日最大奖励上限 */
     uint256 public constant MAX_DAILY_REWARD = 14400 * 10**18;
 
-    // 合约地址
+    /** @dev NFT合约地址 */
     address public nftContract;
+    /** @dev 代币合约地址 */
     address public tokenContract;
+    /** @dev 授权合约地址 */
+    address public authorizer;
 
-    // 状态变量
+    /** @dev 当前质押的NFT总数量 */
     uint256 public totalStakedNFTs;
+    /** @dev 上次奖励更新时间戳 */
     uint256 public lastRewardUpdate;
+    /** @dev 当日已分配的奖励总量 */
     uint256 public dailyRewardDistributed;
 
-    // 质押信息结构
+    /**
+     * @dev 质押信息结构体
+     * @param tokenId NFT ID
+     * @param level NFT等级
+     * @param lastRewardTime 上次领取奖励时间
+     * @param accumulatedRewards 累计未领取奖励
+     */
     struct StakeInfo {
         uint256 tokenId;
         uint8 level;
@@ -32,41 +56,71 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         uint256 accumulatedRewards;
     }
 
-    // 用户质押映射
+    /** @dev 用户质押信息映射（用户地址 => 质押信息数组） */
     mapping(address => StakeInfo[]) public userStakes;
+    /** @dev NFT是否已质押映射（tokenId => 是否已质押） */
     mapping(uint256 => bool) public isStaked;
 
-    // 事件定义
+    /**
+     * @dev NFT质押事件
+     * @param user 用户地址
+     * @param tokenId NFT ID
+     * @param level NFT等级
+     */
     event NFTStaked(address indexed user, uint256 indexed tokenId, uint8 level);
+    /**
+     * @dev NFT解除质押事件
+     * @param user 用户地址
+     * @param tokenId NFT ID
+     */
     event NFTUnstaked(address indexed user, uint256 indexed tokenId);
+    /**
+     * @dev 奖励领取事件
+     * @param user 用户地址
+     * @param amount 领取奖励数量
+     */
     event RewardsClaimed(address indexed user, uint256 amount);
+    /**
+     * @dev 代币存入事件
+     * @param amount 存入数量
+     */
     event TokensDeposited(uint256 amount);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _disableInitializers(); // 可升级合约安全规范
+        _disableInitializers();
     }
 
-    // 初始化函数：添加initializable修饰符，可升级合约必须
-    function initialize(address _nftContract, address _tokenContract) external initializer onlyOwner {
-        // 初始化父合约
+    /**
+     * @dev 初始化合约
+     * @param _nftContract NFT合约地址
+     * @param _tokenContract 代币合约地址
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _nftContract, address _tokenContract, address _authorizer) external initializer {
         __Ownable2Step_init();
         __ERC165_init();
 
         nftContract = _nftContract;
         tokenContract = _tokenContract;
+        authorizer = _authorizer;
         lastRewardUpdate = block.timestamp;
         dailyRewardDistributed = 0;
     }
 
-    // 质押NFT
+    /**
+     * @dev 质押NFT
+     * 用户将NFT质押到合约中，开始累积奖励
+     * 只有等级达到6级以上的NFT才能质押
+     * @param tokenId 要质押的NFT ID
+     */
     function stakeNFT(uint256 tokenId) external {
         require(!isStaked[tokenId], "NFT already staked");
 
         IERC721Upgradeable nft = IERC721Upgradeable(nftContract);
         require(nft.ownerOf(tokenId) == msg.sender, "Not NFT owner");
 
-        (, uint8 level) = _getNFTInfo(tokenId);
+        uint8 level = _getNFTLevel(tokenId);
         require(level >= MIN_STAKING_LEVEL, "NFT level too low");
 
         nft.transferFrom(msg.sender, address(this), tokenId);
@@ -84,13 +138,16 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         emit NFTStaked(msg.sender, tokenId, level);
     }
 
-    // 解除质押
+    /**
+     * @dev 解除质押
+     * 用户解除NFT质押，领取累计奖励，NFT转回用户钱包
+     * @param tokenId 要解除质押的NFT ID
+     */
     function unstakeNFT(uint256 tokenId) external {
         uint256 index = _findStakeIndex(msg.sender, tokenId);
         require(index < userStakes[msg.sender].length, "NFT not staked by user");
 
         _updateRewards(msg.sender, index);
-        // StakeInfo memory stake = userStakes[msg.sender][index];
 
         _removeStake(msg.sender, index);
         isStaked[tokenId] = false;
@@ -102,7 +159,10 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         emit NFTUnstaked(msg.sender, tokenId);
     }
 
-    // 领取奖励
+    /**
+     * @dev 领取奖励
+     * 用户领取所有质押NFT的累计奖励
+     */
     function claimRewards() external {
         uint256 totalRewards = 0;
 
@@ -122,10 +182,13 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         emit RewardsClaimed(msg.sender, totalRewards);
     }
 
-    // 计算用户可领取的奖励
+    /**
+     * @dev 计算用户可领取的奖励
+     * @param user 用户地址
+     * @return 可领取的奖励总数
+     */
     function calculateRewards(address user) external view returns (uint256) {
         uint256 totalRewards = 0;
-        // uint256 currentTime = block.timestamp;
 
         for (uint256 i = 0; i < userStakes[user].length; i++) {
             StakeInfo memory stake = userStakes[user][i];
@@ -135,27 +198,55 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         return totalRewards;
     }
 
-    // 获取用户质押的NFT数量
+    /**
+     * @dev 获取用户质押的NFT数量
+     * @param user 用户地址
+     * @return 质押的NFT数量
+     */
     function getUserStakeCount(address user) external view returns (uint256) {
         return userStakes[user].length;
     }
 
-    // 获取用户质押的NFT列表
+    /**
+     * @dev 获取用户质押的NFT列表
+     * @param user 用户地址
+     * @return 质押信息数组
+     */
     function getUserStakes(address user) external view returns (StakeInfo[] memory) {
         return userStakes[user];
     }
 
-    // 管理函数：设置NFT合约地址
-    function setNFTContract(address _nftContract) external onlyOwner {
+    /**
+     * @dev 设置NFT合约地址
+     * @param _nftContract NFT合约地址
+     */
+    function setNFTContract(address _nftContract) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "Staking: Unauthorized");
         nftContract = _nftContract;
     }
 
-    // 管理函数：设置代币合约地址
-    function setTokenContract(address _tokenContract) external onlyOwner {
+    /**
+     * @dev 设置代币合约地址
+     * @param _tokenContract 代币合约地址
+     */
+    function setTokenContract(address _tokenContract) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "Staking: Unauthorized");
         tokenContract = _tokenContract;
     }
 
-    // 内部函数：更新奖励
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 授权合约地址
+     */
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        authorizer = _authorizer;
+    }
+
+    /**
+     * @dev 更新用户指定质押的奖励
+     * @param user 用户地址
+     * @param index 质押索引
+     */
     function _updateRewards(address user, uint256 index) internal {
         StakeInfo storage stake = userStakes[user][index];
         uint256 currentTime = block.timestamp;
@@ -171,7 +262,10 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         }
     }
 
-    // 内部函数：计算每日奖励总量
+    /**
+     * @dev 计算每日奖励总量
+     * @return 当日剩余可分配的奖励数量
+     */
     function _calculateDailyReward() internal returns (uint256) {
         uint256 dayStart = block.timestamp - (block.timestamp % 86400);
         if (lastRewardUpdate < dayStart) {
@@ -187,8 +281,10 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
             availableReward = MAX_DAILY_REWARD;
         }
 
-        uint256 remainingDailyReward = availableReward - dailyRewardDistributed;
-        if (remainingDailyReward < 0) {
+        uint256 remainingDailyReward;
+        if (availableReward > dailyRewardDistributed) {
+            remainingDailyReward = availableReward - dailyRewardDistributed;
+        } else {
             remainingDailyReward = 0;
         }
 
@@ -196,7 +292,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         return remainingDailyReward;
     }
 
-    // 内部函数：计算每分钟每个NFT的奖励
+    /**
+     * @dev 计算每分钟每个NFT的奖励
+     * @param dailyReward 当日可用奖励总量
+     * @return 每分钟每个NFT的奖励数量
+     */
     function _calculateRewardPerMinute(uint256 dailyReward) internal view returns (uint256) {
         if (totalStakedNFTs == 0) {
             return 0;
@@ -217,7 +317,12 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         return rewardPerMinute;
     }
 
-    // 内部函数：查找质押索引
+    /**
+     * @dev 查找用户在质押列表中的索引
+     * @param user 用户地址
+     * @param tokenId NFT ID
+     * @return 质押索引，如果未找到返回type(uint256).max
+     */
     function _findStakeIndex(address user, uint256 tokenId) internal view returns (uint256) {
         for (uint256 i = 0; i < userStakes[user].length; i++) {
             if (userStakes[user][i].tokenId == tokenId) {
@@ -227,7 +332,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         return type(uint256).max;
     }
 
-    // 内部函数：移除质押
+    /**
+     * @dev 从用户质押列表中移除质押
+     * @param user 用户地址
+     * @param index 要移除的质押索引
+     */
     function _removeStake(address user, uint256 index) internal {
         if (index < userStakes[user].length - 1) {
             userStakes[user][index] = userStakes[user][userStakes[user].length - 1];
@@ -235,24 +344,20 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         userStakes[user].pop();
     }
 
-    // 内部函数：获取NFT信息
-    function _getNFTInfo(uint256 tokenId) internal view returns (uint8, uint8) {
-        (bool success, bytes memory data) = nftContract.staticcall(
-            abi.encodeWithSignature("tokenType(uint256)", tokenId)
-        );
-        require(success, "Failed to get token type");
-        uint8 tokenType = abi.decode(data, (uint8));
-
-        (success, data) = nftContract.staticcall(
-            abi.encodeWithSignature("tokenLevel(uint256)", tokenId)
-        );
-        require(success, "Failed to get token level");
-        uint8 level = abi.decode(data, (uint8));
-
-        return (tokenType, level);
+    /**
+     * @dev 获取NFT等级
+     * @param tokenId NFT ID
+     * @return level NFT等级
+     */
+    function _getNFTLevel(uint256 tokenId) internal view returns (uint8) {
+        return INFTMint(nftContract).tokenLevel(tokenId);
     }
 
-    // 实现ERC165接口
+    /**
+     * @dev 实现ERC165接口
+     * @param interfaceId 接口ID
+     * @return 是否支持该接口
+     */
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC165Upgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
+import "./FTData.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/ERC721Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
@@ -8,21 +9,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/utils/Counters.sol";
-
-// NFT类型枚举
-enum BlessingType { AiGuo, FuQiang, HeXie, YouShan, JingYe, WanNeng, WuFuLinMen }
-
-// 自定义NFT接口
-interface IFiveBlessingsNFT is IERC721Upgradeable {
-    function tokenType(uint256 tokenId) external view returns (BlessingType);
-    function ownerOf(uint256 tokenId) external view returns (address);
-}
-
-// 奖励管理器接口
-interface IRewardManager {
-    function royaltyWallet() external view returns (address);
-    function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address, uint256);
-}
 
 // NFT上架结构体
 struct NFTListing {
@@ -207,7 +193,7 @@ contract NFTTrading is
         }
 
         // 检查自定义NFT接口（使用try/catch处理Revert）
-        try IFiveBlessingsNFT(_nftContract).tokenType(1) returns (BlessingType) {
+        try INFTMint(_nftContract).tokenType(1) returns (NFTDataTypes.ZodiacType) {
             // 接口存在
         } catch {
             return (false, "NFT contract does not support tokenType");
@@ -231,7 +217,7 @@ contract NFTTrading is
 
     // ========== 自定义修饰器 ==========
     modifier onlyValidToken(uint256 tokenId) {
-        IFiveBlessingsNFT nft = IFiveBlessingsNFT(_nftContract);
+        INFTMint nft = INFTMint(_nftContract);
         require(nft.ownerOf(tokenId) != address(0), "NFTTrading: token does not exist");
         _;
     }
@@ -245,7 +231,7 @@ contract NFTTrading is
 
     // ========== 核心功能：上架NFT ==========
     function listNFT(uint256 tokenId, uint256 priceWEI) external nonReentrant whenNotPaused onlyValidToken(tokenId) {
-        IFiveBlessingsNFT nft = IFiveBlessingsNFT(_nftContract);
+        INFTMint nft = INFTMint(_nftContract);
 
         // 基础校验：直接校验wei单位价格
         require(nft.ownerOf(tokenId) == msg.sender, "NFTTrading: not the owner");
@@ -254,8 +240,8 @@ contract NFTTrading is
         require(priceWEI >= MIN_LISTING_PRICE_WEI && priceWEI <= _maxListingPrice, "NFTTrading: invalid WEI price");
 
         // 校验NFT类型合法性
-        BlessingType tokenType = nft.tokenType(tokenId);
-        require(tokenType <= BlessingType.WuFuLinMen, "NFTTrading: invalid BlessingType");
+        NFTDataTypes.ZodiacType zodiacType = nft.tokenType(tokenId);
+        require(uint256(zodiacType) < 120, "NFTTrading: invalid ZodiacType");
 
         // 转移NFT到合约托管
         nft.safeTransferFrom(msg.sender, address(this), tokenId);
@@ -297,7 +283,7 @@ contract NFTTrading is
             _markToken(tokenId);
         }
 
-        IFiveBlessingsNFT nft = IFiveBlessingsNFT(_nftContract);
+        INFTMint nft = INFTMint(_nftContract);
 
         // 3. 预校验所有条件（无状态修改）
         for (uint256 i = 0; i < tokenIds.length; i++) {
@@ -310,8 +296,8 @@ contract NFTTrading is
             require(priceWEI >= MIN_LISTING_PRICE_WEI && priceWEI <= _maxListingPrice, string(abi.encodePacked("NFTTrading: invalid WEI price ", tokenId)));
             
             // 校验NFT类型
-            BlessingType tokenType = nft.tokenType(tokenId);
-            require(tokenType <= BlessingType.WuFuLinMen, string(abi.encodePacked("NFTTrading: invalid type ", tokenId)));
+            NFTDataTypes.ZodiacType zodiacType = nft.tokenType(tokenId);
+            require(uint256(zodiacType) < 120, string(abi.encodePacked("NFTTrading: invalid type ", tokenId)));
         }
 
         // 4. 原子性执行：先转移所有NFT，再更新状态（失败则全部回滚）
@@ -365,7 +351,7 @@ contract NFTTrading is
         _removeListing(tokenId, seller);
 
         // 安全退回NFT
-        IFiveBlessingsNFT(_nftContract).safeTransferFrom(address(this), seller, tokenId);
+        INFTMint(_nftContract).safeTransferFrom(address(this), seller, tokenId);
 
         emit NFTUnlisted(tokenId, seller, block.timestamp, block.number);
         emit NFTReturned(tokenId, seller, block.timestamp, block.number);
@@ -385,7 +371,7 @@ contract NFTTrading is
             _markToken(tokenId);
         }
 
-        IFiveBlessingsNFT nft = IFiveBlessingsNFT(_nftContract);
+        INFTMint nft = INFTMint(_nftContract);
 
         // 3. 预校验所有条件
         for (uint256 i = 0; i < tokenIds.length; i++) {
@@ -428,7 +414,7 @@ contract NFTTrading is
         require(listing.isActive, "NFTTrading: NFT not listed or already sold");
         require(msg.sender != listing.seller, "NFTTrading: cannot buy own NFT");
         
-        IFiveBlessingsNFT nft = IFiveBlessingsNFT(_nftContract);
+        INFTMint nft = INFTMint(_nftContract);
         // 修复1：先校验合约是否持有NFT（最核心的前置条件）
         require(nft.ownerOf(tokenId) == address(this), "NFTTrading: contract does not hold NFT");
         
@@ -528,7 +514,7 @@ contract NFTTrading is
     // ========== 合约拥有者专属：提取NFT ==========
     function ownerWithdrawNFT(address to, uint256 tokenId) external onlyOwner nonReentrant {
         require(to != address(0), "NFTTrading: invalid recipient");
-        IFiveBlessingsNFT nft = IFiveBlessingsNFT(_nftContract);
+        INFTMint nft = INFTMint(_nftContract);
 
         // 校验合约持有NFT
         require(nft.ownerOf(tokenId) == address(this), "NFTTrading: contract does not own NFT");
@@ -590,7 +576,7 @@ contract NFTTrading is
         NFTListing storage listing = listings[tokenId];
         if (listing.isActive) {
             address seller = listing.seller;
-            IFiveBlessingsNFT nft = IFiveBlessingsNFT(_nftContract);
+            INFTMint nft = INFTMint(_nftContract);
 
             // 增加NFT持有校验
             require(nft.ownerOf(tokenId) == address(this), "NFTTrading: contract does not hold NFT");
@@ -715,7 +701,7 @@ contract NFTTrading is
     ) {
         // 检查NFT合约是否可调用
         nftContractAlive = false;
-        try IFiveBlessingsNFT(_nftContract).supportsInterface(0x80ac58cd) returns (bool) {
+        try INFTMint(_nftContract).supportsInterface(0x80ac58cd) returns (bool) {
             nftContractAlive = true;
         } catch {}
 

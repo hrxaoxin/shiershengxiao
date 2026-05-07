@@ -1,311 +1,213 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-// 修复：使用标准库路径，移除远程GitHub链接，解决依赖拉取失败
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
+/**
+ * @title TokenBurner
+ * @dev NFT销毁合约，用于销毁NFT并立即铸造新的NFT
+ * 支持两种模式：销毁后铸造随机类型NFT，或销毁后铸造指定类型NFT
+ * 基于OpenZeppelin可升级合约实现
+ */
+import "./FTData.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/IERC721Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
 
-// 修复：继承接口使用升级兼容版本
-interface IERC20Extended is IERC20Upgradeable {
-    function decimals() external view returns (uint8);
-}
+/**
+ * @title TokenBurner
+ * @dev NFT销毁合约
+ */
+contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, PausableUpgradeable {
+    /** @dev 黑洞地址，用于销毁NFT */
+    address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
+    
+    /** @dev 销毁铸造费用 */
+    uint256 public constant BURN_MINT_FEE = 50000 * 10**18;
 
-contract TokenBurner is 
-    Initializable, 
-    Ownable2StepUpgradeable, 
-    UUPSUpgradeable, 
-    PausableUpgradeable, 
-    ReentrancyGuardUpgradeable 
-{
-    // 修复：使用正确的升级版SafeERC20
-    using SafeERC20Upgradeable for IERC20Upgradeable;
-
-    // 常量定义
-    address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
-    uint256 public constant MAX_BATCH_SIZE = 100;
-    uint8 public constant MAX_DECIMALS = 18;
-    uint256 public constant MAX_BURN_PER_TX = 5;
-
-    // 可修改的基础销毁金额
-    uint256 public BURN_AMOUNT_BASE;
-
-    // 状态变量
+    /** @dev NFT合约地址 */
+    address public nftContract;
+    /** @dev 代币合约地址 */
     address public tokenContract;
+    /** @dev 授权合约地址 */
     address public authorizer;
-    uint8 public tokenDecimals;
-    uint256 public BURN_AMOUNT;
-    mapping(address => uint256) public burnCount;
-    mapping(address => bool) public authorizedNFTContracts;
 
-    // 事件
-    event TokenBurned(address indexed user, uint256 indexed amount, uint256 newBurnCount, uint256 timestamp);
-    event BurnCountDecreased(address indexed user, uint256 newBurnCount, uint256 timestamp);
-    event BatchBurnCountDecreased(uint256 indexed successCount, uint256 indexed totalProcessed, uint256 timestamp);
-    event TokenDecimalsUpdated(uint8 oldDecimals, uint8 newDecimals, uint256 newBurnAmount, uint256 timestamp);
-    event BurnAmountManuallySet(uint256 oldAmount, uint256 newAmount, address indexed operator, uint256 timestamp);
-    event ContractPaused(address indexed operator, bool paused, uint256 timestamp);
-    event NFTContractAuthorized(address indexed nftContract, bool authorized, uint256 timestamp);
+    /** @dev 销毁铸造事件 */
+    event NFTBurnedAndMinted(
+        address indexed user, 
+        uint256 indexed burnedTokenId, 
+        NFTDataTypes.ZodiacType burnedType,
+        uint256 indexed newTokenId, 
+        NFTDataTypes.ZodiacType newType,
+        uint256 timestamp
+    );
+    /** @dev 销毁失败事件 */
+    event BurnFailed(
+        address indexed user, 
+        uint256 indexed tokenId, 
+        string reason, 
+        uint256 timestamp
+    );
 
-    // 存储间隙
-    uint256[45] private __gap;
-
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    // 修饰器
-    modifier onlyAuthorized() {
-        require(
-            msg.sender == owner() || 
-            authorizedNFTContracts[msg.sender],
-            "TokenBurner: Unauthorized"
-        );
-        _;
-    }
-
-    modifier nonZeroAddress(address _addr) {
-        require(_addr != address(0), "TokenBurner: Zero address");
-        _;
-    }
-
-    // 初始化函数
-    function initialize(
-        address initialOwner,
-        address _tokenContract,
-        address _authorizer
-    ) external initializer nonZeroAddress(initialOwner) nonZeroAddress(_tokenContract) {
+    /**
+     * @dev 初始化合约
+     * @param _nftContract NFT合约地址
+     * @param _tokenContract 代币合约地址
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _nftContract, address _tokenContract, address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __Pausable_init();
-        __ReentrancyGuard_init();
 
-        BURN_AMOUNT_BASE = 1;
+        nftContract = _nftContract;
         tokenContract = _tokenContract;
         authorizer = _authorizer;
-        tokenDecimals = _safeGetTokenDecimals();
-        BURN_AMOUNT = _calculateBurnAmount(tokenDecimals);
-
-        emit TokenDecimalsUpdated(0, tokenDecimals, BURN_AMOUNT, block.timestamp);
     }
 
-    // 核心业务函数
-    function burnTokenForMint() external whenNotPaused nonReentrant returns (bool) {
-        address user = msg.sender;
+    /**
+     * @dev 升级授权函数
+     * @param newImplementation 新实现合约地址
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @dev 销毁NFT并铸造新的随机类型NFT
+     * 用户销毁一个NFT，支付费用后获得一个新的随机类型NFT
+     * @param tokenId 要销毁的NFT ID
+     * @return uint256 新铸造的NFT ID
+     */
+    function burnAndMintRandom(uint256 tokenId) external whenNotPaused returns (uint256) {
+        INFTMint nft = INFTMint(nftContract);
         
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        uint256 req = BURN_AMOUNT;
-        require(token.balanceOf(user) >= req, "Insufficient balance");
-        require(token.allowance(user, address(this)) >= req, "Insufficient allowance");
+        // 验证用户拥有NFT
+        require(nft.ownerOf(tokenId) == msg.sender, "TokenBurner: Not owner of NFT");
+        
+        // 验证授权
+        require(nft.isApprovedForAll(msg.sender, address(this)) || 
+                nft.getApproved(tokenId) == address(this), "TokenBurner: Contract not approved");
 
-        token.safeTransferFrom(user, BURN_ADDRESS, req);
-        unchecked {
-            burnCount[user]++;
-        }
-        emit TokenBurned(user, req, burnCount[user], block.timestamp);
-        return true;
+        // 获取销毁的NFT类型
+        NFTDataTypes.ZodiacType burnedType = nft.tokenType(tokenId);
+
+        // 销毁NFT
+        nft.transferFrom(msg.sender, BLACK_HOLE, tokenId);
+
+        // 铸造新的随机类型NFT
+        uint256 newTokenId = nft.mint(msg.sender);
+        
+        // 获取新NFT类型
+        NFTDataTypes.ZodiacType newType = nft.tokenType(newTokenId);
+
+        emit NFTBurnedAndMinted(msg.sender, tokenId, burnedType, newTokenId, newType, block.timestamp);
+        return newTokenId;
     }
 
-    function burnAndMint(address user) 
-        external 
-        onlyAuthorized 
-        whenNotPaused 
-        nonReentrant 
-        nonZeroAddress(user) 
-        returns (bool) 
-    {
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        uint256 req = BURN_AMOUNT;
-        require(token.balanceOf(user) >= req, "Insufficient balance");
-        require(token.allowance(user, address(this)) >= req, "Insufficient allowance");
+    /**
+     * @dev 销毁NFT并铸造指定类型的新NFT
+     * 用户销毁一个NFT，支付费用后获得一个指定类型的新NFT
+     * @param tokenId 要销毁的NFT ID
+     * @param targetType 目标NFT类型
+     * @return uint256 新铸造的NFT ID
+     */
+    function burnAndMintSpecific(uint256 tokenId, NFTDataTypes.ZodiacType targetType) external whenNotPaused returns (uint256) {
+        INFTMint nft = INFTMint(nftContract);
+        
+        // 验证用户拥有NFT
+        require(nft.ownerOf(tokenId) == msg.sender, "TokenBurner: Not owner of NFT");
+        
+        // 验证授权
+        require(nft.isApprovedForAll(msg.sender, address(this)) || 
+                nft.getApproved(tokenId) == address(this), "TokenBurner: Contract not approved");
 
-        token.safeTransferFrom(user, BURN_ADDRESS, req);
-        emit TokenBurned(user, req, burnCount[user], block.timestamp);
-        return true;
+        // 获取销毁的NFT类型
+        NFTDataTypes.ZodiacType burnedType = nft.tokenType(tokenId);
+
+        // 销毁NFT
+        nft.transferFrom(msg.sender, BLACK_HOLE, tokenId);
+
+        // 铸造指定类型的NFT
+        uint256 newTokenId = nft.mintSpecificType(msg.sender, targetType);
+
+        emit NFTBurnedAndMinted(msg.sender, tokenId, burnedType, newTokenId, targetType, block.timestamp);
+        return newTokenId;
     }
 
-    function decreaseBurnCount(address user) 
-        external onlyAuthorized whenNotPaused nonZeroAddress(user) returns (bool) 
-    {
-        require(burnCount[user] > 0, "No mint count left");
-        unchecked { burnCount[user]--; }
-        emit BurnCountDecreased(user, burnCount[user], block.timestamp);
-        return true;
+    /**
+     * @dev 销毁NFT并铸造光/暗属性的新NFT
+     * 用户销毁一个NFT，支付费用后获得一个光或暗属性的新NFT
+     * @param tokenId 要销毁的NFT ID
+     * @param isLight 是否铸造光属性（true=光，false=暗）
+     * @return uint256 新铸造的NFT ID
+     */
+    function burnAndMintLightDark(uint256 tokenId, bool isLight) external whenNotPaused returns (uint256) {
+        INFTMint nft = INFTMint(nftContract);
+        
+        // 验证用户拥有NFT
+        require(nft.ownerOf(tokenId) == msg.sender, "TokenBurner: Not owner of NFT");
+        
+        // 验证授权
+        require(nft.isApprovedForAll(msg.sender, address(this)) || 
+                nft.getApproved(tokenId) == address(this), "TokenBurner: Contract not approved");
+
+        // 获取销毁的NFT类型
+        NFTDataTypes.ZodiacType burnedType = nft.tokenType(tokenId);
+
+        // 销毁NFT
+        nft.transferFrom(msg.sender, BLACK_HOLE, tokenId);
+
+        // 铸造光/暗属性的NFT
+        uint256 newTokenId = nft.mintLightDark(msg.sender, isLight);
+        
+        // 获取新NFT类型
+        NFTDataTypes.ZodiacType newType = nft.tokenType(newTokenId);
+
+        emit NFTBurnedAndMinted(msg.sender, tokenId, burnedType, newTokenId, newType, block.timestamp);
+        return newTokenId;
     }
 
-    function batchDecreaseBurnCount(address[] calldata users) 
-        external 
-        onlyAuthorized 
-        whenNotPaused 
-        returns (uint256 successCount) 
-    {
-        uint256 totalUsers = users.length;
-        require(totalUsers > 0 && totalUsers <= MAX_BATCH_SIZE, "TokenBurner: Invalid batch size");
-
-        address[] memory processedUsers = new address[](totalUsers);
-        uint256 processedIndex = 0;
-
-        for (uint256 i = 0; i < totalUsers; ) {
-            address user = users[i];
-            
-            if (user == address(0)) {
-                unchecked { i++; }
-                continue;
-            }
-
-            bool isProcessed = false;
-            for (uint256 j = 0; j < processedIndex; j++) {
-                if (processedUsers[j] == user) {
-                    isProcessed = true;
-                    break;
-                }
-            }
-            if (isProcessed) {
-                unchecked { i++; }
-                continue;
-            }
-
-            uint256 currentCount = burnCount[user];
-            if (currentCount > 0) {
-                unchecked {
-                    burnCount[user] = currentCount - 1;
-                    successCount++;
-                }
-                emit BurnCountDecreased(user, currentCount - 1, block.timestamp);
-            }
-
-            processedUsers[processedIndex] = user;
-            processedIndex++;
-            unchecked { i++; }
-        }
-
-        emit BatchBurnCountDecreased(successCount, totalUsers, block.timestamp);
-        return successCount;
-    }
-
-    function updateTokenDecimals(uint8 newDecimals) external onlyAuthorized returns (bool success) {
-        require(newDecimals <= MAX_DECIMALS, "TokenBurner: Decimals exceed max");
-        require(newDecimals != tokenDecimals, "TokenBurner: Same decimals");
-
-        uint8 oldDecimals = tokenDecimals;
-        uint256 newBurnAmount = _calculateBurnAmount(newDecimals);
-
-        tokenDecimals = newDecimals;
-        BURN_AMOUNT = newBurnAmount;
-
-        emit TokenDecimalsUpdated(oldDecimals, newDecimals, newBurnAmount, block.timestamp);
-        return true;
-    }
-
-    function setBurnAmountManually(uint256 newAmount) external onlyAuthorized returns (bool success) {
-        require(newAmount > 0, "TokenBurner: Amount must be >0");
-
-        uint256 oldAmount = BURN_AMOUNT;
-        address operator = msg.sender;
-
-        BURN_AMOUNT = newAmount;
-
-        emit BurnAmountManuallySet(oldAmount, newAmount, operator, block.timestamp);
-        return true;
-    }
-
-    function togglePause() external onlyAuthorized returns (bool success) {
-        if (paused()) {
-            _unpause();
-        } else {
-            _pause();
-        }
-        emit ContractPaused(msg.sender, paused(), block.timestamp);
-        return true;
-    }
-
-    function setAuthorizedNFTContract(address nft, bool ok) external nonZeroAddress(nft) {
+    /**
+     * @dev 设置NFT合约地址
+     * @param _nftContract NFT合约地址
+     */
+    function setNFTContract(address _nftContract) external {
         require(msg.sender == owner() || msg.sender == authorizer, "TokenBurner: Unauthorized");
-        authorizedNFTContracts[nft] = ok;
-        emit NFTContractAuthorized(nft, ok, block.timestamp);
+        nftContract = _nftContract;
     }
 
-    function updateTokenContract(address newTokenContract) external onlyOwner nonZeroAddress(newTokenContract) {
-        tokenContract = newTokenContract;
-        
-        uint8 oldDecimals = tokenDecimals;
-        tokenDecimals = _safeGetTokenDecimals();
-        uint256 newBurnAmount = _calculateBurnAmount(tokenDecimals);
-        BURN_AMOUNT = newBurnAmount;
-        
-        emit TokenDecimalsUpdated(oldDecimals, tokenDecimals, BURN_AMOUNT, block.timestamp);
+    /**
+     * @dev 设置代币合约地址
+     * @param _tokenContract 代币合约地址
+     */
+    function setTokenContract(address _tokenContract) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "TokenBurner: Unauthorized");
+        tokenContract = _tokenContract;
     }
 
-    function setBurnAmountBase(uint256 newBaseAmount) external onlyOwner returns (bool success) {
-        require(newBaseAmount > 0, "TokenBurner: Base amount must be >0");
-
-        uint256 oldBaseAmount = BURN_AMOUNT_BASE;
-        address operator = msg.sender;
-
-        BURN_AMOUNT_BASE = newBaseAmount;
-        
-        uint256 newBurnAmount = _calculateBurnAmount(tokenDecimals);
-        BURN_AMOUNT = newBurnAmount;
-
-        emit BurnAmountManuallySet(oldBaseAmount, newBurnAmount, operator, block.timestamp);
-        return true;
-    }
-
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 授权合约地址
+     */
     function setAuthorizer(address _authorizer) external onlyOwner {
         authorizer = _authorizer;
     }
 
-    function checkBurnTokenStatus() 
-        external 
-        view 
-        returns (uint256 balance, uint256 allowance, bool ready) 
-    {
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        address user = msg.sender;
-        
-        balance = token.balanceOf(user);
-        allowance = token.allowance(user, address(this));
-        ready = (balance >= BURN_AMOUNT) && (allowance >= BURN_AMOUNT) && !paused();
+    /**
+     * @dev 暂停合约
+     */
+    function pause() external onlyOwner {
+        _pause();
     }
 
-    function getBurnCount(address user) external view returns (uint256 count) {
-        return burnCount[user];
+    /**
+     * @dev 恢复合约
+     */
+    function unpause() external onlyOwner {
+        _unpause();
     }
-
-    function hasBurnedToken(address user) external view returns (bool hasCount) {
-        return burnCount[user] > 0;
-    }
-
-    function _safeGetTokenDecimals() internal view returns (uint8 decimals) {
-        bytes4 decimalsSelector = IERC20Extended.decimals.selector;
-        
-        (bool success, bytes memory data) = tokenContract.staticcall(
-            abi.encodeWithSelector(decimalsSelector)
-        );
-        
-        if (success && data.length > 0) {
-            uint256 decodedDecimals = abi.decode(data, (uint256));
-            decimals = decodedDecimals <= MAX_DECIMALS ? uint8(decodedDecimals) : MAX_DECIMALS;
-        } else {
-            decimals = MAX_DECIMALS;
-        }
-    }
-
-    function _calculateBurnAmount(uint8 decimals) internal view returns (uint256 burnAmount) {
-        unchecked {
-            burnAmount = BURN_AMOUNT_BASE * (10 ** uint256(decimals));
-        }
-    }
-
-    function _authorizeUpgrade(address newImplementation) 
-        internal 
-        override 
-        onlyOwner 
-        nonZeroAddress(newImplementation) 
-    {}
 }
