@@ -440,14 +440,14 @@
         // 合约ABI和地址（从abis.js引入）
         const NFTTradingABI = window.NFTTradingABI;
         const NFTTradingAddress = window.NFTTradingAddress;
-        const FiveBlessingsNFTABI = window.fiveBlessingsNFTABI;
-        const FiveBlessingsNFTAddress = window.fiveBlessingsNFTAddress;
+        const FiveBlessingsNFTABI = window.nftMintABI;
+        const FiveBlessingsNFTAddress = window.nftMintAddress;
 
         // 全局变量
         let web3 = null;
         let accounts = [];
         let nftTradingContract = null;
-        let fiveBlessingsNFTContract = null;
+        let nftMintContract = null;
         let currentTokenIdToBuy;
 
         // 使用共享工具函数获取NFT类型名称
@@ -622,7 +622,7 @@
                         // 重置状态
                         web3 = null;
                         nftTradingContract = null;
-                        fiveBlessingsNFTContract = null;
+                        nftMintContract = null;
                         accounts = [];
                         walletAddress.textContent = '未连接钱包';
                         connectionStatus.textContent = '钱包已断开连接';
@@ -669,7 +669,7 @@
                     // 初始化合约
                     try {
                         nftTradingContract = new web3.eth.Contract(NFTTradingABI, NFTTradingAddress);
-                        fiveBlessingsNFTContract = new web3.eth.Contract(FiveBlessingsNFTABI, FiveBlessingsNFTAddress);
+                        nftMintContract = new web3.eth.Contract(FiveBlessingsNFTABI, FiveBlessingsNFTAddress);
                         console.log('合约初始化完成');
                     } catch (error) {
                         connectionStatus.textContent = '钱包已连接，但部分合约初始化失败';
@@ -696,7 +696,7 @@
                     // 重置状态
                     web3 = null;
                     nftTradingContract = null;
-                    fiveBlessingsNFTContract = null;
+                    nftMintContract = null;
                     accounts = [];
                     walletAddress.textContent = '未连接钱包';
                     
@@ -720,7 +720,7 @@
                 // 重置状态
                 web3 = null;
                 nftTradingContract = null;
-                fiveBlessingsNFTContract = null;
+                nftMintContract = null;
                 accounts = [];
                 walletAddress.textContent = '未连接钱包';
                 connectionStatus.textContent = '请安装Web3钱包插件';
@@ -760,7 +760,7 @@
         
         // 更新授权状态
         async function updateApprovalStatus() {
-            if (!accounts || accounts.length === 0 || !fiveBlessingsNFTContract) {
+            if (!accounts || accounts.length === 0 || !nftMintContract) {
                 return;
             }
             
@@ -794,7 +794,7 @@
             marketplaceGrid.innerHTML = '<div class="col-span-full text-center py-12"><i class="fa fa-spinner fa-spin text-4xl text-primary mb-4"></i><p class="text-gray-600">加载市场数据中...</p></div>';
             
             try {
-                if (!nftTradingContract || !fiveBlessingsNFTContract) {
+                if (!nftTradingContract || !nftMintContract) {
                     showMessage('请先连接钱包', 'error');
                     marketplaceGrid.innerHTML = '<div class="col-span-full text-center py-12"><i class="fa fa-wallet text-gray-400 mb-4"></i><p class="text-gray-600">请连接钱包</p></div>';
                     return;
@@ -902,23 +902,31 @@
                 marketplaceGrid.innerHTML = '<div class="col-span-full text-center py-12"><i class="fa fa-spinner fa-spin text-4xl text-primary mb-4"></i><p class="text-gray-600">加载市场数据中...</p></div>';
                 
                 // 使用批量查询方法获取所有活跃上架
-                const rawListings = await nftTradingContract.methods.getAllActiveListings().call();
-                console.log('批量查询返回', rawListings.length, '个上架NFT');
+                const [tokenIdArray, sellerArray, priceArray, activeArray] = await nftTradingContract.methods.getAllListings().call();
+                console.log('批量查询返回', tokenIdArray.length, '个上架NFT');
+                
+                // 过滤活跃的上架
+                const activeIndices = [];
+                for (let i = 0; i < activeArray.length; i++) {
+                    if (activeArray[i]) {
+                        activeIndices.push(i);
+                    }
+                }
                 
                 // 获取NFT类型信息（并行调用）
-                const typePromises = rawListings.map(listing => 
-                    fiveBlessingsNFTContract.methods.tokenType(listing.tokenId).call()
+                const typePromises = activeIndices.map(idx => 
+                    nftMintContract.methods.tokenType(tokenIdArray[idx]).call()
                 );
                 const types = await Promise.all(typePromises);
                 
                 // 整理数据
-                for (let i = 0; i < rawListings.length; i++) {
-                    const listing = rawListings[i];
+                for (let i = 0; i < activeIndices.length; i++) {
+                    const idx = activeIndices[i];
                     listings.push({
-                        tokenId: parseInt(listing.tokenId),
-                        price: web3.utils.fromWei(listing.priceWEI, 'ether'),
-                        priceWei: listing.priceWEI,
-                        seller: listing.seller,
+                        tokenId: parseInt(tokenIdArray[idx]),
+                        price: web3.utils.fromWei(priceArray[idx], 'ether'),
+                        priceWei: priceArray[idx],
+                        seller: sellerArray[idx],
                         type: types[i]
                     });
                 }
@@ -1084,7 +1092,7 @@
                 console.log('开始加载市场数据，页码:', page);
                 
                 // 检查合约实例
-                if (!nftTradingContract || !fiveBlessingsNFTContract) {
+                if (!nftTradingContract || !nftMintContract) {
                     console.log('合约实例不存在');
                     showMessage('请先连接钱包', 'error');
                     marketplaceGrid.innerHTML = '<div class="col-span-full text-center py-12"><i class="fa fa-wallet text-gray-400 mb-4"></i><p class="text-gray-600">请连接钱包</p></div>';
@@ -1115,7 +1123,7 @@
                             const result = await nftTradingContract.methods.getListing(tokenId).call();
                             const listing = result[0];
                             if (listing.isActive) {
-                                const type = await fiveBlessingsNFTContract.methods.tokenType(tokenId).call();
+                                const type = await nftMintContract.methods.tokenType(tokenId).call();
                                 const price = web3.utils.fromWei(listing.price, 'ether');
                                 
                                 return {
@@ -1141,7 +1149,7 @@
                     // 获取NFT总数
                     let totalSupply = 0;
                     try {
-                        totalSupply = await fiveBlessingsNFTContract.methods.totalSupply().call();
+                        totalSupply = await nftMintContract.methods.totalSupply().call();
                     } catch (e) {
                         totalSupply = 100;
                     }
@@ -1166,7 +1174,7 @@
                                         const result = await nftTradingContract.methods.getListing(id).call();
                                         const listing = result[0];
                                         if (listing.isActive) {
-                                            const type = await fiveBlessingsNFTContract.methods.tokenType(id).call();
+                                            const type = await nftMintContract.methods.tokenType(id).call();
                                             const price = web3.utils.fromWei(listing.price, 'ether');
                                             
                                             return {
@@ -1225,7 +1233,7 @@
                     return;
                 }
                 
-                if (!nftTradingContract || !fiveBlessingsNFTContract) {
+                if (!nftTradingContract || !nftMintContract) {
                     showMessage('请先连接钱包', 'error');
                     myListingsGrid.innerHTML = '<div class="col-span-full text-center py-12"><i class="fa fa-wallet text-gray-400 mb-4"></i><p class="text-gray-600">请连接钱包</p></div>';
                     return;
@@ -1241,7 +1249,7 @@
                         const result = await nftTradingContract.methods.getListing(tokenId).call();
                         const listing = result[0];
                         if (listing.isActive) {
-                            const type = await fiveBlessingsNFTContract.methods.tokenType(tokenId).call();
+                            const type = await nftMintContract.methods.tokenType(tokenId).call();
                             const price = web3.utils.fromWei(listing.price, 'ether');
                             
                             activeListings.push({
@@ -1386,7 +1394,7 @@
         // 检查是否已授权整个NFT系列给交易合约
         async function checkApprovalForAll() {
             try {
-                const isApproved = await fiveBlessingsNFTContract.methods.isApprovedForAll(accounts[0], NFTTradingAddress).call();
+                const isApproved = await nftMintContract.methods.isApprovedForAll(accounts[0], NFTTradingAddress).call();
                 return isApproved;
             } catch (error) {
                 console.error('检查授权失败:', error);
@@ -1397,7 +1405,7 @@
         // 授权整个NFT系列给交易合约
         async function approveForAll() {
             try {
-                const tx = await fiveBlessingsNFTContract.methods.setApprovalForAll(NFTTradingAddress, true).send({
+                const tx = await nftMintContract.methods.setApprovalForAll(NFTTradingAddress, true).send({
                     from: accounts[0]
                 });
                 showMessage('NFT系列授权成功！', 'success');
@@ -1473,8 +1481,8 @@
         // 检查NFT
         async function checkNFT(tokenId) {
             try {
-                const owner = await fiveBlessingsNFTContract.methods.ownerOf(tokenId).call();
-                const type = await fiveBlessingsNFTContract.methods.tokenType(tokenId).call();
+                const owner = await nftMintContract.methods.ownerOf(tokenId).call();
+                const type = await nftMintContract.methods.tokenType(tokenId).call();
                 
                 if (owner.toLowerCase() !== accounts[0].toLowerCase()) {
                     showMessage('你不是该NFT的所有者', 'error');

@@ -194,14 +194,14 @@
     <link rel="stylesheet" href="styles.css">
     <script>
         const rewardManagerABI = window.rewardManagerABI;
-        const fiveBlessingsNFTABI = window.fiveBlessingsNFTABI;
+        const nftMintABI = window.nftMintABI;
 
         const rewardManagerAddress = window.contractAddresses.rewardManager;
-        const fiveBlessingsNFTAddress = window.contractAddresses.fiveBlessingsNFT;
+        const nftMintAddress = window.contractAddresses.nftMint;
 
         let web3 = null;
         let rewardManagerContract = null;
-        let fiveBlessingsNFTContract = null;
+        let nftMintContract = null;
         let accounts = [];
         let userTokens = [];
         let currentFilter = 'all';
@@ -219,7 +219,7 @@
                     document.getElementById('walletAddress').textContent = shortAddress;
 
                     rewardManagerContract = new web3.eth.Contract(rewardManagerABI, rewardManagerAddress);
-                    fiveBlessingsNFTContract = new web3.eth.Contract(fiveBlessingsNFTABI, fiveBlessingsNFTAddress);
+                    nftMintContract = new web3.eth.Contract(nftMintABI, nftMintAddress);
 
                     await loadUserTokens();
                     await updateDividends();
@@ -235,15 +235,22 @@
 
         async function loadUserTokens() {
             userTokens = [];
-            for (let typeId = 0; typeId < 120; typeId++) {
-                try {
-                    const count = await rewardManagerContract.methods.cardCount(accounts[0], typeId).call();
-                    if (count > 0) {
-                        userTokens.push({ typeId: typeId, count: parseInt(count) });
-                    }
-                } catch (error) {
-                    console.error('Error loading token type', typeId, error);
+            try {
+                const promises = [];
+                for (let typeId = 0; typeId < 120; typeId++) {
+                    promises.push(rewardManagerContract.methods.cardCount(accounts[0], typeId).call());
                 }
+                
+                const results = await Promise.all(promises);
+                
+                for (let typeId = 0; typeId < 120; typeId++) {
+                    const count = parseInt(results[typeId]);
+                    if (count > 0) {
+                        userTokens.push({ typeId: typeId, count: count });
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading user tokens:', error);
             }
             updateStats();
             renderTokens();

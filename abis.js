@@ -77,20 +77,54 @@ window.contractAddresses = {
     tokenContract: '0xd06994d9ff24dc4a579f53c91f65d95b6be97777', // 代币合约地址
     rewardManager: '0x3aAe06CC813ED61B5BF46ef89A26721cb83F9d14', // RewardManager代理合约地址
     tokenBurner: '0x8a6437e1F2A8b7F07f5F383B36fDf4D640f81E1a', // TokenBurner代理合约地址
-    fiveBlessingsNFT: '0xaBf66eee8a02bCEe1a94e1c04B7b2705966B0523', // FiveBlessingsNFT代理合约地址
+    nftMint: '0xaBf66eee8a02bCEe1a94e1c04B7b2705966B0523', // NFTMint代理合约地址（十二生肖NFT核心合约）
     nftTrading: '0x97fFAb23e26b45F8bab80E4A64Ac51369f4Ff5E4', // NFTTrading代理合约地址
     breeding: '0x0000000000000000000000000000000000000000', // Breeding合约地址（需部署后填写）
     staking: '0x0000000000000000000000000000000000000000' // Staking合约地址（需部署后填写）
 };
 
-// 兼容旧版本的单独地址变量
+// 单独地址变量
 window.tokenContractAddress = window.contractAddresses.tokenContract;
 window.rewardManagerAddress = window.contractAddresses.rewardManager;
 window.tokenBurnerAddress = window.contractAddresses.tokenBurner;
-window.fiveBlessingsNFTAddress = window.contractAddresses.fiveBlessingsNFT;
+window.nftMintAddress = window.contractAddresses.nftMint;
 window.NFTTradingAddress = window.contractAddresses.nftTrading;
 window.breedingAddress = window.contractAddresses.breeding;
 window.stakingAddress = window.contractAddresses.staking;
+
+// 兼容旧版本的地址变量（保持向后兼容）
+window.fiveBlessingsNFTAddress = window.contractAddresses.nftMint;
+
+// TokenBurner合约ABI - 基于TokenBurner.sol
+window.tokenBurnerABI = [
+	{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
+	{"inputs":[{"internalType":"address","name":"_tokenContract","type":"address"},{"internalType":"address","name":"_authorizer","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"normalMintCost","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"rareMintCost","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"burnTokenForMint","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"burnTokenForRareMint","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"bool","name":"isRare","type":"bool"}],"name":"burnAndMint","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}
+];
+
+// NFTMint合约ABI - 基于NFTMint.sol
+window.nftMintABI = [
+	{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
+	{"inputs":[{"internalType":"address","name":"initialOwner","type":"address"},{"internalType":"address","name":"_metadataContract","type":"address"},{"internalType":"address","name":"_authorizer","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"nextCardId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenType","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenLevel","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"getApproved","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenOfOwnerByIndex","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"to","type":"address"}],"name":"mintNormal","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"to","type":"address"}],"name":"mintRare","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithNFT","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithToken","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithUSDValue","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"approve","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"bool","name":"approved","type":"bool"}],"name":"setApprovalForAll","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"isApprovedForAll","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
+];
 
 // ERC20代币合约ABI
 window.tokenABI = [
@@ -1084,6 +1118,19 @@ window.rewardManagerABI = [
 		"stateMutability": "nonpayable",
 		"type": "function"
 	}
+];
+
+// NFTTrading合约ABI
+window.NFTTradingABI = [
+	{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
+	{"inputs":[{"internalType":"address","name":"initialOwner","type":"address"},{"internalType":"address","name":"_nftContract","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"LISTING_FEE","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"},{"internalType":"uint256","name":"price","type":"uint256"}],"name":"listNFT","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"cancelListing","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"buyNFT","outputs":[],"stateMutability":"payable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"getListing","outputs":[{"internalType":"address","name":"seller","type":"address"},{"internalType":"uint256","name":"price","type":"uint256"},{"internalType":"bool","name":"active","type":"bool"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"getAllListings","outputs":[{"internalType":"uint256[]","name":"tokenIds","type":"uint256[]"},{"internalType":"address[]","name":"sellers","type":"address[]"},{"internalType":"uint256[]","name":"prices","type":"uint256[]"},{"internalType":"bool[]","name":"actives","type":"bool[]"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"isListed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
 ];
 
 // Breeding合约ABI

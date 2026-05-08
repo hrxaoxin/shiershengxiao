@@ -401,7 +401,7 @@
 
                     document.getElementById('walletBtn').textContent = account.slice(0, 6) + '...' + account.slice(-4);
 
-                    nftContract = new ethers.Contract(fiveBlessingsNFTAddress, fiveBlessingsNFTABI, signer);
+                    nftContract = new ethers.Contract(nftMintAddress, window.nftMintABI, signer);
                     breedingContract = new ethers.Contract(breedingAddress, breedingABI, signer);
 
                     await loadNFTs();

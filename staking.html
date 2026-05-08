@@ -303,7 +303,7 @@
         }
 
         function initContracts() {
-            nftContract = new web3.eth.Contract(window.fiveBlessingsNFTABI, window.contractAddresses.fiveBlessingsNFT);
+            nftContract = new web3.eth.Contract(window.nftMintABI, window.contractAddresses.nftMint);
             tokenContract = new web3.eth.Contract(window.tokenABI, window.contractAddresses.tokenContract);
             stakingContract = new web3.eth.Contract(window.stakingABI, window.contractAddresses.staking);
         }

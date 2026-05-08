@@ -106,14 +106,7 @@
                     <span class="text-gray-600">铸造价格</span>
                     <span class="text-lg font-semibold text-gray-800">1 代币</span>
                 </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600">可铸造次数（基于余额）</span>
-                    <span class="text-lg font-semibold text-gray-800" id="mintCount">0</span>
-                </div>
-                <div class="flex justify-between items-center">
-                    <span class="text-gray-600">剩余铸造次数（已销毁）</span>
-                    <span class="text-lg font-semibold text-green-600" id="remainingBurnCount">0</span>
-                </div>
+
                 <div class="flex justify-between items-center">
                     <span class="text-gray-600">授权状态</span>
                     <span class="text-lg font-semibold text-gray-800" id="approvalStatus">未授权</span>
@@ -179,17 +172,17 @@
         const tokenABI = window.tokenABI;
         const rewardManagerABI = window.rewardManagerABI;
         const tokenBurnerABI = window.tokenBurnerABI;
-        const fiveBlessingsNFTABI = window.fiveBlessingsNFTABI;
+        const nftMintABI = window.nftMintABI;
 
         const rewardManagerAddress = window.contractAddresses.rewardManager;
         const tokenBurnerAddress = window.contractAddresses.tokenBurner;
-        const fiveBlessingsNFTAddress = window.contractAddresses.fiveBlessingsNFT;
+        const nftMintAddress = window.contractAddresses.nftMint;
         const tokenContractAddress = window.contractAddresses.tokenContract;
 
         let web3 = null;
         let rewardManagerContract = null;
         let tokenBurnerContract = null;
-        let fiveBlessingsNFTContract = null;
+        let nftMintContract = null;
         let tokenContract = null;
         let accounts = [];
         let MINT_PRICE = 1;
@@ -198,8 +191,7 @@
         const walletAddress = document.getElementById('walletAddress');
         const connectionStatus = document.getElementById('connectionStatus');
         const tokenBalance = document.getElementById('tokenBalance');
-        const mintCount = document.getElementById('mintCount');
-        const remainingBurnCount = document.getElementById('remainingBurnCount');
+
         const approvalStatus = document.getElementById('approvalStatus');
         const refreshWallet = document.getElementById('refreshWallet');
         const connectWalletBtn = document.getElementById('connectWalletBtn');
@@ -235,7 +227,7 @@
                     try {
                         rewardManagerContract = new web3.eth.Contract(rewardManagerABI, rewardManagerAddress);
                         tokenBurnerContract = new web3.eth.Contract(tokenBurnerABI, tokenBurnerAddress);
-                        fiveBlessingsNFTContract = new web3.eth.Contract(fiveBlessingsNFTABI, fiveBlessingsNFTAddress);
+                        nftMintContract = new web3.eth.Contract(nftMintABI, nftMintAddress);
                         await fetchMintCosts();
                         await checkApprovalStatus();
                     } catch (error) {
@@ -243,8 +235,6 @@
                         connectionStatus.style.color = '#ff9800';
                     }
 
-                    updateMintCount();
-                    await getRemainingBurnCount();
                     await updateMintStatus();
 
                     connectionStatus.textContent = '钱包已连接';
@@ -282,23 +272,9 @@
             } catch (error) {
                 tokenBalance.textContent = '0';
             }
-            updateMintCount();
         }
 
-        function updateMintCount() {
-            try {
-                if (web3 && accounts.length > 0) {
-                    const balanceStr = tokenBalance.textContent || '0';
-                    const balance = parseInt(balanceStr);
-                    const count = Math.floor(balance / MINT_PRICE);
-                    mintCount.textContent = count;
-                } else {
-                    mintCount.textContent = '0';
-                }
-            } catch (error) {
-                mintCount.textContent = '0';
-            }
-        }
+
 
         connectWalletBtn.addEventListener('click', function() { connectWallet(); });
         refreshWallet.addEventListener('click', function() { connectWallet(); });
@@ -346,22 +322,6 @@
             } catch (error) {
                 approvalStatus.textContent = '检查失败';
                 approvalStatus.style.color = '#ff9800';
-            }
-        }
-
-        async function getRemainingBurnCount() {
-            try {
-                if (web3 && tokenBurnerContract && accounts.length > 0) {
-                    const burnCount = await tokenBurnerContract.methods.burnCount(accounts[0]).call();
-                    remainingBurnCount.textContent = burnCount;
-                    return burnCount;
-                } else {
-                    remainingBurnCount.textContent = '0';
-                    return 0;
-                }
-            } catch (error) {
-                remainingBurnCount.textContent = '0';
-                return 0;
             }
         }
 
@@ -461,9 +421,9 @@
         }
 
         mintBtn.addEventListener('click', async function() {
-            if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
+            if (!web3 || !nftMintContract || accounts.length === 0) {
                 await connectWallet();
-                if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
+                if (!web3 || !nftMintContract || accounts.length === 0) {
                     alert('请先连接钱包');
                     mintBtn.innerHTML = '<i class="fas fa-magic mr-2"></i> 铸造生肖NFT';
                     mintBtn.disabled = false;
@@ -479,17 +439,17 @@
                 const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.5);
                 const gasLimit = 3000000;
 
-                alert('即将铸造生肖NFT（将销毁8888枚代币）\n\n请在MetaMask等web3钱包中确认交易');
+                alert(`即将铸造生肖NFT（将销毁${MINT_PRICE}枚代币）\n\n请在MetaMask等web3钱包中确认交易`);
 
-                const tx = await fiveBlessingsNFTContract.methods.mintNormal(accounts[0]).send({
+                const tx = await nftMintContract.methods.mintNormal(accounts[0]).send({
                     from: accounts[0],
                     gasPrice: adjustedGasPrice,
                     gas: gasLimit
                 });
 
-                const currentNextCardId = await fiveBlessingsNFTContract.methods.nextCardId().call();
+                const currentNextCardId = await nftMintContract.methods.nextCardId().call();
                 const actualCardId = (parseInt(currentNextCardId) - 1).toString();
-                const cardType = await fiveBlessingsNFTContract.methods.tokenType(actualCardId).call();
+                const cardType = await nftMintContract.methods.tokenType(actualCardId).call();
 
                 const cardInfo = { cardId: actualCardId, cardType: cardType };
                 displayCardInfo(cardInfo);
@@ -511,9 +471,9 @@
         });
 
         mintLightDarkBtn.addEventListener('click', async function() {
-            if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
+            if (!web3 || !nftMintContract || accounts.length === 0) {
                 await connectWallet();
-                if (!web3 || !fiveBlessingsNFTContract || accounts.length === 0) {
+                if (!web3 || !nftMintContract || accounts.length === 0) {
                     alert('请先连接钱包');
                     mintLightDarkBtn.innerHTML = '<i class="fas fa-star mr-2"></i> 光暗铸造（消耗88888代币）';
                     mintLightDarkBtn.disabled = false;
@@ -531,15 +491,15 @@
 
                 alert('即将铸造稀有光暗属性NFT（将销毁88888枚代币）\n\n请在MetaMask等web3钱包中确认交易');
 
-                const tx = await fiveBlessingsNFTContract.methods.mintRare(accounts[0]).send({
+                const tx = await nftMintContract.methods.mintRare(accounts[0]).send({
                     from: accounts[0],
                     gasPrice: adjustedGasPrice,
                     gas: gasLimit
                 });
 
-                const currentNextCardId = await fiveBlessingsNFTContract.methods.nextCardId().call();
+                const currentNextCardId = await nftMintContract.methods.nextCardId().call();
                 const actualCardId = (parseInt(currentNextCardId) - 1).toString();
-                const cardType = await fiveBlessingsNFTContract.methods.tokenType(actualCardId).call();
+                const cardType = await nftMintContract.methods.tokenType(actualCardId).call();
 
                 const cardInfo = { cardId: actualCardId, cardType: cardType };
                 displayCardInfo(cardInfo);

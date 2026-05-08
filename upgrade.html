@@ -386,7 +386,7 @@
         }
 
         function initContracts() {
-            nftContract = new web3.eth.Contract(window.fiveBlessingsNFTABI, window.contractAddresses.fiveBlessingsNFT);
+            nftContract = new web3.eth.Contract(window.nftMintABI, window.contractAddresses.nftMint);
             tokenContract = new web3.eth.Contract(window.tokenABI, window.contractAddresses.tokenContract);
         }
 
@@ -517,9 +517,9 @@
                 }
 
                 // 检查授权
-                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.fiveBlessingsNFT).call();
+                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.nftMint).call();
                 if (parseInt(allowance) < requiredTokens) {
-                    await tokenContract.methods.approve(window.contractAddresses.fiveBlessingsNFT, requiredTokens).send({ from: account });
+                    await tokenContract.methods.approve(window.contractAddresses.nftMint, requiredTokens).send({ from: account });
                 }
 
                 const result = await nftContract.methods.upgradeWithToken(selectedNft.id).send({ from: account });
@@ -537,21 +537,6 @@
             if (selectedNft.level >= 5) return;
 
             try {
-                // 首先检查代币余额
-                const requiredTokens = getRequiredTokens(selectedNft.level);
-                const balance = await tokenContract.methods.balanceOf(account).call();
-                
-                if (parseInt(balance) < requiredTokens) {
-                    alert(`代币不足，需要 ${requiredTokens} 枚代币（价值 ${getUSDValue(selectedNft.level)} USDT）`);
-                    return;
-                }
-
-                // 检查授权
-                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.fiveBlessingsNFT).call();
-                if (parseInt(allowance) < requiredTokens) {
-                    await tokenContract.methods.approve(window.contractAddresses.fiveBlessingsNFT, requiredTokens).send({ from: account });
-                }
-
                 const result = await nftContract.methods.upgradeWithUSDValue(selectedNft.id).send({ from: account });
                 alert(`升级成功！NFT ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 阶`);
                 loadUserNFTs();
