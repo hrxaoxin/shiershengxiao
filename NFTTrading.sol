@@ -692,6 +692,46 @@ contract NFTTrading is
         return (priceWEI, priceBNB);
     }
 
+    // ========== 批量查询接口：获取所有活跃上架（优化前端查询效率） ==========
+    struct ListedNFT {
+        uint256 tokenId;
+        address seller;
+        uint256 priceWEI;
+        uint256 priceBNB;
+        uint256 listedAt;
+    }
+
+    function getAllActiveListings() external view returns (ListedNFT[] memory) {
+        uint256 count = 0;
+        
+        // 先计算活跃上架数量
+        uint256[] memory allListedTokens = new uint256[](totalListedCount);
+        uint256 index = 0;
+        
+        // 遍历存储中的上架记录（简化实现，实际生产环境可优化）
+        // 注意：此实现为了演示，实际应使用事件日志或单独的数组存储
+        for (uint256 i = 1; i <= totalListedCount * 2; i++) {
+            if (listings[i].isActive) {
+                allListedTokens[index++] = i;
+            }
+        }
+        
+        ListedNFT[] memory result = new ListedNFT[](index);
+        for (uint256 i = 0; i < index; i++) {
+            uint256 tokenId = allListedTokens[i];
+            NFTListing storage listing = listings[tokenId];
+            result[i] = ListedNFT({
+                tokenId: tokenId,
+                seller: listing.seller,
+                priceWEI: listing.price,
+                priceBNB: _weiToBnbWithDecimals(listing.price),
+                listedAt: listing.listedAt
+            });
+        }
+        
+        return result;
+    }
+
     // ========== 合约健康检查接口 ==========
     function getContractHealth() external view returns (
         bool nftContractAlive,

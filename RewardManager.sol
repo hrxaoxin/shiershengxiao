@@ -400,14 +400,28 @@ contract RewardManager is
     }
 
     /**
-     * @dev 计算用户权重
+     * @dev 计算用户权重（非所有者）
+     * 合约所有者的权重单独存储在ownerWeight中，初始值为1000
+     * 普通用户的权重通过NFT合约的calcUserWeight函数计算
      * @param user 用户地址
-     * @return 用户权重
+     * @return 用户权重（所有者返回0，因为所有者权重单独处理）
      */
     function _calcUserWeight(address user) internal view returns (uint256) {
         if (user == owner()) return 0;
         if (nftContract == address(0)) return 0;
         return INFTMintWeight(nftContract).calcUserWeight(user);
+    }
+
+    /**
+     * @dev 获取用户的实际权重（包括所有者）
+     * @param user 用户地址
+     * @return 用户权重
+     */
+    function getUserWeight(address user) external view returns (uint256) {
+        if (user == owner()) {
+            return ownerWeight;
+        }
+        return userWeight[user];
     }
 
     /**

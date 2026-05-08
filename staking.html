@@ -10,6 +10,8 @@
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
     <script src="abis.js"></script>
+    <script src="utils.js"></script>
+    <link rel="stylesheet" href="styles.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
         body {
@@ -148,7 +150,7 @@
             <h1 class="text-2xl font-bold text-gray-800">质押挖矿</h1>
         </div>
 
-        <p class="text-lg text-gray-600 mb-8">质押6阶及以上的NFT来挖矿，每分钟获得代币奖励</p>
+        <p class="text-lg text-gray-600 mb-8">质押5阶及以上的NFT来挖矿，每分钟获得代币奖励</p>
 
         <!-- 钱包区域框 -->
         <div class="bg-white rounded-xl p-6 shadow-md mb-8">
@@ -179,7 +181,7 @@
         <div class="info-box mb-8">
             <h3 class="text-xl font-bold text-gray-800 mb-4">🌟 挖矿规则</h3>
             <ul class="text-gray-600 space-y-2">
-                <li>• 质押6阶及以上的NFT来挖矿</li>
+                <li>• 质押5阶及以上的NFT来挖矿</li>
                 <li>• 每分钟自动挖矿，奖励根据合约余额和质押数量动态调整</li>
                 <li>• 每日最大奖励总量为14400代币，确保长期可持续挖矿</li>
                 <li>• 每个NFT每分钟奖励不低于1个代币，不超过10个代币</li>
@@ -191,7 +193,7 @@
 
         <!-- 我的可质押NFT -->
         <div class="mb-8">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">我的可质押NFT（6阶及以上）</h3>
+            <h3 class="text-xl font-bold text-gray-800 mb-4">我的可质押NFT（5阶及以上）</h3>
             <div id="eligibleNFTs" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 <div class="col-span-full text-center text-gray-500 py-8">加载中...</div>
             </div>
@@ -311,7 +313,7 @@
             eligibleNFTs.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">加载中...</div>';
 
             try {
-                const MIN_LEVEL = 6;
+                const MIN_LEVEL = 5;
                 const eligible = [];
 
                 const balance = await nftContract.methods.balanceOf(account).call();
@@ -336,7 +338,7 @@
                 }
 
                 if (eligible.length === 0) {
-                    eligibleNFTs.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">没有可质押的NFT（需要6阶及以上）</div>';
+                    eligibleNFTs.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">没有可质押的NFT（需要5阶及以上）</div>';
                     return;
                 }
 
@@ -547,47 +549,11 @@
         }
 
         function getNFTInfo(typeId) {
-            const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
-            const attrNames = { water: '水', wind: '风', fire: '火', dark: '暗', light: '光' };
-            const attrPrefixes = { water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang' };
-            const animalKeys = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
-            const ipfsBases = {
-                water: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
-                wind: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
-                fire: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
-                dark: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/',
-                light: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
-            };
-
-            const zodiacIndex = typeId % 12;
-            const attrIndex = Math.floor(typeId / 24);
-            const gender = typeId % 2 === 1 ? '公' : '母';
-            const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
-
-            if (attrIndex < 0 || attrIndex >= attrs.length) {
-                return { name: '未知', prefix: '', animal: '', gender: gender, attr: 'water', imagePath: 'images/fu-cards/shuishu_1.png' };
-            }
-
-            const attr = attrs[attrIndex];
-            const prefix = attrPrefixes[attr];
-            const animal = animalKeys[zodiacIndex];
-            const genderSuffix = typeId % 2 === 1 ? '_1' : '_0';
-            const ipfsBase = ipfsBases[attr];
-
-            return {
-                name: attrNames[attr] + zodiacNames[zodiacIndex] + '（' + gender + '）',
-                prefix: prefix,
-                animal: animal,
-                gender: gender,
-                attr: attr,
-                imagePath: ipfsBase + prefix + animal + genderSuffix + '.png',
-                ipfsBase: ipfsBase,
-                attrName: attrNames[attr]
-            };
+            return window.ZODIAC_UTILS.getNFTInfo(typeId);
         }
 
         function getStars(level) {
-            return '⭐'.repeat(level);
+            return window.ZODIAC_UTILS.getStars(parseInt(level));
         }
 
         function getStakingTime(timestamp) {

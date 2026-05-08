@@ -190,37 +190,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="abis.js"></script>
+    <script src="utils.js"></script>
+    <link rel="stylesheet" href="styles.css">
     <script>
-        const ZODIAC_DATA = {
-            water: {
-                name: '水', prefix: 'shui',
-                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
-                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
-            },
-            wind: {
-                name: '风', prefix: 'feng',
-                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
-                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
-            },
-            fire: {
-                name: '火', prefix: 'huo',
-                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
-                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
-            },
-            dark: {
-                name: '暗', prefix: 'an',
-                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
-                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
-            },
-            light: {
-                name: '光', prefix: 'guang',
-                animals: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
-                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
-            }
-        };
-
-        const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
-
         const rewardManagerABI = window.rewardManagerABI;
         const fiveBlessingsNFTABI = window.fiveBlessingsNFTABI;
 
@@ -346,25 +318,15 @@
 
             for (const token of filteredTokens) {
                 const typeId = token.typeId;
-                const zodiacIndex = typeId % 12;
-                const attrIndex = Math.floor(typeId / 24);
-                const gender = typeId % 2;
-                const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
-                const attr = attrs[attrIndex];
-                const attrData = ZODIAC_DATA[attr];
-                const prefix = attrData.prefix;
-                const animal = attrData.animals[zodiacIndex];
-                const genderSuffix = gender === 1 ? '_1' : '_0';
-                const imagePath = `${attrData.ipfsBase}${prefix}${animal}${genderSuffix}.png`;
-                const name = `${attrData.name}${ZODIAC_NAMES[zodiacIndex]}（${gender === 1 ? '公' : '母'}）`;
-
+                const nftInfo = window.ZODIAC_UTILS.getNFTInfo(typeId);
+                
                 // 模拟等级数据，实际应该从合约获取
-                const level = Math.min(6, Math.floor(Math.random() * 6) + 1);
+                const level = Math.min(5, Math.floor(Math.random() * 5) + 1);
 
                 html += `
                     <div class="zodiac-card" onclick="showCardModal(${typeId}, ${level})")>
-                        <img src="${imagePath}" alt="${name}" onerror="this.src='${attrData.ipfsBase}${prefix}shu_1.png'">
-                        <h4>${name}</h4>
+                        <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <h4>${nftInfo.name}</h4>
                         <p>等级: ${getStars(level)}</p>
                         <p>拥有 ${token.count} 张</p>
                     </div>
@@ -375,21 +337,11 @@
         }
 
         function showCardModal(typeId, level) {
-            const zodiacIndex = typeId % 12;
-            const attrIndex = Math.floor(typeId / 24);
-            const gender = typeId % 2;
-            const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
-            const attr = attrs[attrIndex];
-            const attrData = ZODIAC_DATA[attr];
-            const prefix = attrData.prefix;
-            const animal = attrData.animals[zodiacIndex];
-            const genderSuffix = gender === 1 ? '_1' : '_0';
-            const imagePath = `${attrData.ipfsBase}${prefix}${animal}${genderSuffix}.png`;
-            const name = `${attrData.name}${ZODIAC_NAMES[zodiacIndex]}（${gender === 1 ? '公' : '母'}）`;
-            const desc = `${attrData.name}属性生肖·${ZODIAC_NAMES[zodiacIndex]}·${gender === 1 ? '公' : '母'} · 持有可享受税收分红`;
+            const nftInfo = window.ZODIAC_UTILS.getNFTInfo(typeId);
+            const desc = `${nftInfo.attrName}属性生肖·${nftInfo.zodiac}·${nftInfo.gender} · 持有可享受税收分红`;
 
-            document.getElementById('modalCardImage').src = imagePath;
-            document.getElementById('modalCardName').textContent = name;
+            document.getElementById('modalCardImage').src = nftInfo.imagePath;
+            document.getElementById('modalCardName').textContent = nftInfo.name;
             document.getElementById('modalCardDesc').textContent = desc;
             document.getElementById('modalCardId').textContent = typeId + 1;
             document.getElementById('cardModal').classList.remove('hidden');
@@ -416,7 +368,7 @@
         });
 
         function getStars(level) {
-            return '⭐'.repeat(level);
+            return window.ZODIAC_UTILS.getStars(parseInt(level));
         }
 
         particlesJS('particles-js', {

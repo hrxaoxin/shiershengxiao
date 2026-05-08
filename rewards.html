@@ -198,10 +198,11 @@
                     <span class="text-gray-800 font-medium">3%</span>
                 </div>
                 <div class="border-t border-gray-200 pt-3">
-                    <p class="text-gray-600 mb-3">税收分配</p>
-                    <p class="text-gray-600 mb-2">每持有1种NFT享受 0.025% 税收分红</p>
-                    <p class="text-gray-600 mb-2">每种NFT权重：8（120种满权重1000）</p>
-                    <p class="text-gray-600">集齐全部120种NFT可获得100%用户权重</p>
+                    <p class="text-gray-600 mb-3">权重分配规则</p>
+                    <p class="text-gray-600 mb-2">• 1阶NFT权重：4</p>
+                    <p class="text-gray-600 mb-2">• 每升1阶权重加1</p>
+                    <p class="text-gray-600 mb-2">• 最高等级5阶时，权重为8</p>
+                    <p class="text-gray-600">• 所有用户根据所持NFT的总权重获得分红</p>
                 </div>
             </div>
         </div>
@@ -234,6 +235,8 @@
 
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="abis.js"></script>
+    <script src="utils.js"></script>
+    <link rel="stylesheet" href="styles.css">
     <script>
         // 粒子背景效果
         particlesJS('particles-js', {

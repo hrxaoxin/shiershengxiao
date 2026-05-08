@@ -21,8 +21,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  */
 contract Breeding is Initializable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     
-    /** @dev 最小繁殖等级：必须达到6级才能繁殖 */
-    uint8 public constant MIN_BREEDING_LEVEL = 6;
+    /** @dev 最小繁殖等级：必须达到5级才能繁殖 */
+    uint8 public constant MIN_BREEDING_LEVEL = 5;
     /** @dev 黑洞地址，用于销毁NFT */
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
 
@@ -61,7 +61,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, ReentrancyGuardUpgr
 
     /**
      * @dev 繁殖NFT
-     * 用户需要拥有两个等级为6的NFT才能进行繁殖（无需消耗代币）
+     * 用户需要拥有两个等级为5的NFT才能进行繁殖（无需消耗代币）
      * @param tokenId1 第一个NFT ID
      * @param tokenId2 第二个NFT ID
      * @return uint256 新生成的NFT ID
@@ -76,13 +76,13 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, ReentrancyGuardUpgr
         require(nft.ownerOf(tokenId1) == msg.sender, "Breeding: Not owner of first NFT");
         require(nft.ownerOf(tokenId2) == msg.sender, "Breeding: Not owner of second NFT");
 
-        // 验证两个NFT的等级都为6
+        // 验证两个NFT的等级都为5
         uint8 level1 = nft.tokenLevel(tokenId1);
         uint8 level2 = nft.tokenLevel(tokenId2);
         require(level1 >= MIN_BREEDING_LEVEL, "Breeding: First NFT level too low");
         require(level2 >= MIN_BREEDING_LEVEL, "Breeding: Second NFT level too low");
-        require(level1 == 6, "Breeding: First NFT must be level 6");
-        require(level2 == 6, "Breeding: Second NFT must be level 6");
+        require(level1 == 5, "Breeding: First NFT must be level 5");
+        require(level2 == 5, "Breeding: Second NFT must be level 5");
 
         // 验证用户授权
         require(nft.isApprovedForAll(msg.sender, address(this)) || 

@@ -203,12 +203,8 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     mapping(uint256 => uint8) public tokenLevel;
     /** @dev 用户NFT列表（用户地址 => 类型 => ID数组） */
     mapping(address => mapping(NFTDataTypes.ZodiacType => uint256[])) public userTokens;
-    /** @dev 用户最新NFT（用户地址 => 类型 => 最新ID） */
-    mapping(address => mapping(NFTDataTypes.ZodiacType => uint256)) public userLatestToken;
-    /** @dev 用户NFT按等级分类（用户地址 => 类型 => 等级 => ID数组） */
-    mapping(address => mapping(NFTDataTypes.ZodiacType => mapping(uint8 => uint256[]))) public userTokensByLevel;
-    /** @dev 用户最新NFT按等级（用户地址 => 类型 => 等级 => 最新ID） */
-    mapping(address => mapping(NFTDataTypes.ZodiacType => mapping(uint8 => uint256))) public userLatestTokenByLevel;
+    /** @dev 用户所有NFT列表（用户地址 => ID数组）- 优化tokenOfOwnerByIndex查询效率 */
+    mapping(address => uint256[]) public userAllTokens;
 
     /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[50] private __gap;
@@ -372,9 +368,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         tokenLevel[id] = 1;
         _safeMint(to, id);
         userTokens[to][t].push(id);
-        userLatestToken[to][t] = id;
-        userTokensByLevel[to][t][1].push(id);
-        userLatestTokenByLevel[to][t][1] = id;
+        userAllTokens[to].push(id);
         // 更新权重缓存
         _updateUserWeight(to, id, 1, true);
         emit CardMinted(id, t, to, uint64(block.timestamp));
@@ -395,16 +389,14 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         uint8 lv = tokenLevel[tokenId];
         if (from != address(0) && from != BLACK_HOLE) {
             _removeToken(from, t, tokenId);
-            _removeTokenByLevel(from, t, lv, tokenId);
+            _removeFromUserAllTokens(from, tokenId);
             _updateReward(from, t, false);
             // 更新权重缓存：减少转出方权重
             _updateUserWeight(from, tokenId, lv, false);
         }
         if (to != address(0) && to != BLACK_HOLE) {
             userTokens[to][t].push(tokenId);
-            userLatestToken[to][t] = tokenId;
-            userTokensByLevel[to][t][lv].push(tokenId);
-            userLatestTokenByLevel[to][t][lv] = tokenId;
+            userAllTokens[to].push(tokenId);
             _updateReward(to, t, true);
             // 更新权重缓存：增加转入方权重
             _updateUserWeight(to, tokenId, lv, true);
@@ -423,16 +415,13 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     }
 
     /**
-     * @dev 从用户的NFT等级列表中移除指定NFT（内部函数）
+     * @dev 从用户的所有NFT列表中移除指定NFT（内部函数）
      * @param u 用户地址
-     * @param t NFT类型
-     * @param lv NFT等级
      * @param id NFT ID
      */
-    function _removeTokenByLevel(address u, NFTDataTypes.ZodiacType t, uint8 lv, uint id) internal {
-        uint256[] storage arr = userTokensByLevel[u][t][lv];
+    function _removeFromUserAllTokens(address u, uint id) internal {
+        uint256[] storage arr = userAllTokens[u];
         for (uint i; i<arr.length; i++) { if (arr[i] == id) { arr[i] = arr[arr.length-1]; arr.pop(); break; } }
-        userLatestTokenByLevel[u][t][lv] = arr.length > 0 ? arr[arr.length-1] : 0;
     }
 
     /**
@@ -459,31 +448,42 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         require(_ownerOf(tokenId) == msg.sender, "E15");
         NFTDataTypes.ZodiacType t = tokenType[tokenId];
         uint8 lv = tokenLevel[tokenId];
-        require(lv < 6, "E16");
+        require(lv < 5, "E16");
         uint req = lv;
-        uint256[] storage arr = userTokensByLevel[msg.sender][t][lv];
-        require(arr.length >= req+1, "E17");
-        for (uint i; i<req; i++) {
-            uint burnId = arr[i];
-            if (burnId != tokenId) {
-                _transfer(msg.sender, BLACK_HOLE, burnId);
-                _removeToken(msg.sender, t, burnId);
-                _removeTokenByLevel(msg.sender, t, lv, burnId);
-                emit CardBurned(burnId, t, msg.sender);
+        
+        uint256[] storage arr = userTokens[msg.sender][t];
+        uint256 count = 0;
+        for (uint i = 0; i < arr.length; i++) {
+            if (tokenLevel[arr[i]] == lv) {
+                count++;
             }
         }
+        require(count >= req+1, "E17");
+        
+        uint256 burnCount = 0;
+        for (uint i = arr.length; i > 0; i--) {
+            uint burnId = arr[i-1];
+            if (burnId != tokenId && tokenLevel[burnId] == lv && burnCount < req) {
+                _transfer(msg.sender, BLACK_HOLE, burnId);
+                _removeToken(msg.sender, t, burnId);
+                _removeFromUserAllTokens(msg.sender, burnId);
+                emit CardBurned(burnId, t, msg.sender);
+                burnCount++;
+            }
+        }
+        
         uint8 newLv = lv+1;
         tokenLevel[tokenId] = newLv;
-        _removeTokenByLevel(msg.sender, t, lv, tokenId);
-        userTokensByLevel[msg.sender][t][newLv].push(tokenId);
-        userLatestTokenByLevel[msg.sender][t][newLv] = tokenId;
+        // 更新权重缓存：先减少旧等级权重，再增加新等级权重
+        _updateUserWeight(msg.sender, tokenId, lv, false);
+        _updateUserWeight(msg.sender, tokenId, newLv, true);
         emit CardUpgraded(tokenId, t, lv, newLv, msg.sender, uint64(block.timestamp));
         return newLv;
     }
 
     /**
      * @dev 使用代币升级
-     * 各级别所需代币数量：1->2需10000, 2->3需40000, 3->4需120000, 4->5需480000, 5->6需2400000
+     * 各级别所需代币数量：1->2需10000, 2->3需40000, 3->4需120000, 4->5需480000
      * @param tokenId 要升级的NFT ID
      * @return uint8 新等级
      */
@@ -491,13 +491,12 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         require(_ownerOf(tokenId) == msg.sender, "E15");
         require(tokenContract != address(0), "E7");
         uint8 lv = tokenLevel[tokenId];
-        require(lv < 6, "E16");
+        require(lv < 5, "E16");
         uint cost;
         if (lv == 1) cost = 10000;
         else if (lv == 2) cost = 40000;
         else if (lv == 3) cost = 120000;
         else if (lv == 4) cost = 480000;
-        else if (lv == 5) cost = 2400000;
         else revert("E18");
         IToken t = IToken(tokenContract);
         require(t.balanceOf(msg.sender) >= cost, "E8");
@@ -507,7 +506,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
 
     /**
      * @dev 使用USD价值升级（通过价格预言机计算所需代币数量）
-     * 各级别所需USD价值：1->2需1USD, 2->3需4USD, 3->4需12USD, 4->5需48USD, 5->6需240USD
+     * 各级别所需USD价值：1->2需1USD, 2->3需4USD, 3->4需12USD, 4->5需48USD
      * @param tokenId 要升级的NFT ID
      * @return uint8 新等级
      */
@@ -515,13 +514,12 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         require(_ownerOf(tokenId) == msg.sender, "E15");
         require(tokenContract != address(0) && priceOracle != address(0), "E19");
         uint8 lv = tokenLevel[tokenId];
-        require(lv < 6, "E16");
+        require(lv < 5, "E16");
         uint usd;
         if (lv == 1) usd = 1 ether;
         else if (lv == 2) usd = 4 ether;
         else if (lv == 3) usd = 12 ether;
         else if (lv == 4) usd = 48 ether;
-        else if (lv == 5) usd = 240 ether;
         else revert("E18");
         uint price = IPriceOracle(priceOracle).getTokenPriceInUSD();
         require(price > 0, "E20");
@@ -543,9 +541,6 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         NFTDataTypes.ZodiacType t = tokenType[id];
         uint8 newLv = oldLv+1;
         tokenLevel[id] = newLv;
-        _removeTokenByLevel(msg.sender, t, oldLv, id);
-        userTokensByLevel[msg.sender][t][newLv].push(id);
-        userLatestTokenByLevel[msg.sender][t][newLv] = id;
         // 更新权重缓存：先减少旧等级权重，再增加新等级权重
         _updateUserWeight(msg.sender, id, oldLv, false);
         _updateUserWeight(msg.sender, id, newLv, true);
@@ -627,7 +622,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
 
     /**
      * @dev 计算用户权重（用于分红计算）
-     * 权重 = 每个NFT的等级+ 2 的总和
+     * 权重 = 每个NFT的等级+ 3 的总和（1级权重为4，每级+1，最高5级权重为8）
      * 使用缓存机制减少Gas消耗
      * @param user 用户地址
      * @return uint256 用户权重
@@ -644,7 +639,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      * @param add 是否增加权重（true增加，false减少）
      */
     function _updateUserWeight(address user, uint256 tokenId, uint8 level, bool add) internal {
-        uint256 weightDelta = level + 2;
+        uint256 weightDelta = level + 3;
         if (add) {
             userWeightCache[user] += weightDelta;
         } else {
@@ -671,16 +666,18 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      * @return uint256 NFT ID
      */
     function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256) {
-        uint256 count = 0;
-        for (uint i = 0; i < 120; i++) {
-            NFTDataTypes.ZodiacType t = NFTDataTypes.ZodiacType(i);
-            uint256[] storage arr = userTokens[owner][t];
-            if (index < count + arr.length) {
-                return arr[index - count];
-            }
-            count += arr.length;
-        }
-        revert("NFTMint: index out of bounds");
+        uint256[] storage arr = userAllTokens[owner];
+        require(index < arr.length, "NFTMint: index out of bounds");
+        return arr[index];
+    }
+
+    /**
+     * @dev 获取用户持有的NFT总数
+     * @param owner 持有者地址
+     * @return uint256 NFT数量
+     */
+    function balanceOf(address owner) public view override returns (uint256) {
+        return userAllTokens[owner].length;
     }
 
     /**

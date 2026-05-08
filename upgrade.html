@@ -11,6 +11,8 @@
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
     <script src="abis.js"></script>
+    <script src="utils.js"></script>
+    <link rel="stylesheet" href="styles.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
@@ -209,7 +211,6 @@
                             <li>• 2阶 → 3阶：消耗2张相同生肖相同属性的2阶NFT</li>
                             <li>• 3阶 → 4阶：消耗3张相同生肖相同属性的3阶NFT</li>
                             <li>• 4阶 → 5阶：消耗4张相同生肖相同属性的4阶NFT</li>
-                            <li>• 5阶 → 6阶：消耗5张相同生肖相同属性的5阶NFT</li>
                         </ul>
                     </div>
                     <div class="bg-gray-50 p-6 rounded-lg">
@@ -219,7 +220,6 @@
                             <li>• 2阶 → 3阶：消耗40000枚代币</li>
                             <li>• 3阶 → 4阶：消耗120000枚代币</li>
                             <li>• 4阶 → 5阶：消耗480000枚代币</li>
-                            <li>• 5阶 → 6阶：消耗2400000枚代币</li>
                         </ul>
                     </div>
                     <div class="bg-gray-50 p-6 rounded-lg">
@@ -229,7 +229,6 @@
                             <li>• 2阶 → 3阶：消耗价值4 USDT的代币</li>
                             <li>• 3阶 → 4阶：消耗价值12 USDT的代币</li>
                             <li>• 4阶 → 5阶：消耗价值48 USDT的代币</li>
-                            <li>• 5阶 → 6阶：消耗价值240 USDT的代币</li>
                         </ul>
                     </div>
                 </div>
@@ -396,17 +395,31 @@
             nftGrid.innerHTML = '<div class="col-span-full text-center py-12">加载中...</div>';
 
             try {
-                // 这里需要实现获取用户NFT的逻辑
-                // 由于合约没有直接的balanceOf和tokenOfOwnerByIndex方法，我们需要使用其他方式
-                // 暂时使用模拟数据
-                const mockNFTs = [
-                    { id: 1, type: 0, level: 1, name: '水鼠（公）', image: 'images/fu-cards/shuishu_1.png' },
-                    { id: 2, type: 1, level: 3, name: '水牛（公）', image: 'images/fu-cards/shuiniu_1.png' },
-                    { id: 3, type: 12, level: 4, name: '水鼠（母）', image: 'images/fu-cards/shuishu_0.png' },
-                    { id: 4, type: 24, level: 6, name: '风鼠（公）', image: 'images/fu-cards/fengshu_1.png' },
-                ];
+                if (!account || !nftContract) {
+                    nftGrid.innerHTML = '<div class="col-span-full text-center py-12">请先连接钱包</div>';
+                    return;
+                }
 
-                renderNFTs(mockNFTs);
+                const balance = await nftContract.methods.balanceOf(account).call();
+                const userNFTs = [];
+
+                for (let i = 0; i < balance; i++) {
+                    const tokenId = await nftContract.methods.tokenOfOwnerByIndex(account, i).call();
+                    const tokenType = await nftContract.methods.tokenType(tokenId).call();
+                    const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
+                    
+                    const nftInfo = window.ZODIAC_UTILS.getNFTInfo(tokenType);
+                    
+                    userNFTs.push({
+                        id: tokenId.toString(),
+                        type: tokenType.toString(),
+                        level: tokenLevel.toString(),
+                        name: nftInfo.name,
+                        image: nftInfo.imagePath
+                    });
+                }
+
+                renderNFTs(userNFTs);
             } catch (error) {
                 console.error('加载NFT失败:', error);
                 nftGrid.innerHTML = '<div class="col-span-full text-center py-12 text-red-500">加载失败，请重试</div>';
@@ -446,7 +459,7 @@
                         <h4 class="text-lg font-bold">${name}</h4>
                         <p class="text-gray-600">等级: ${getStars(level)}</p>
                         <p class="text-gray-600">ID: ${id}</p>
-                        ${level < 6 ? `<p class="text-green-600 font-medium">可升级到 ${getStars(level + 1)}</p>` : `<p class="text-red-600 font-medium">已达到最高等级</p>`}
+                        ${level < 5 ? `<p class="text-green-600 font-medium">可升级到 ${getStars(level + 1)}</p>` : `<p class="text-red-600 font-medium">已达到最高等级</p>`}
                     </div>
                 </div>
             `;
@@ -455,7 +468,7 @@
             const upgradeWithTokenBtn = document.getElementById('upgradeWithTokenBtn');
             const upgradeWithUSDValueBtn = document.getElementById('upgradeWithUSDValueBtn');
 
-            if (level >= 6) {
+            if (level >= 5) {
                 upgradeWithNftBtn.disabled = true;
                 upgradeWithTokenBtn.disabled = true;
                 upgradeWithUSDValueBtn.disabled = true;
@@ -476,7 +489,7 @@
 
         document.getElementById('upgradeWithNftBtn').addEventListener('click', async function() {
             if (!selectedNft) return;
-            if (selectedNft.level >= 6) return;
+            if (selectedNft.level >= 5) return;
 
             try {
                 const result = await nftContract.methods.upgradeWithNFT(selectedNft.id).send({ from: account });
@@ -491,7 +504,7 @@
 
         document.getElementById('upgradeWithTokenBtn').addEventListener('click', async function() {
             if (!selectedNft) return;
-            if (selectedNft.level >= 6) return;
+            if (selectedNft.level >= 5) return;
 
             try {
                 // 首先检查代币余额
@@ -521,7 +534,7 @@
 
         document.getElementById('upgradeWithUSDValueBtn').addEventListener('click', async function() {
             if (!selectedNft) return;
-            if (selectedNft.level >= 6) return;
+            if (selectedNft.level >= 5) return;
 
             try {
                 // 首先检查代币余额
@@ -555,7 +568,6 @@
                 case 2: return 40000;
                 case 3: return 120000;
                 case 4: return 480000;
-                case 5: return 2400000;
                 default: return 0;
             }
         }
@@ -566,13 +578,12 @@
                 case 2: return 4;
                 case 3: return 12;
                 case 4: return 48;
-                case 5: return 240;
                 default: return 0;
             }
         }
 
         function getStars(level) {
-            return '⭐'.repeat(level);
+            return window.ZODIAC_UTILS.getStars(parseInt(level));
         }
 
         document.getElementById('walletBtn').addEventListener('click', function() {

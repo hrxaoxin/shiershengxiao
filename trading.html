@@ -10,6 +10,8 @@
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="abis.js"></script>
+    <script src="utils.js"></script>
+    <link rel="stylesheet" href="styles.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
@@ -207,13 +209,11 @@
                 <div class="flex space-x-4">
                     <select id="filterType" class="input-field w-48">
                         <option value="all">全部类型</option>
-                        <option value="0">爱国福</option>
-                        <option value="1">富强福</option>
-                        <option value="2">和谐福</option>
-                        <option value="3">友善福</option>
-                        <option value="4">敬业福</option>
-                        <option value="5">万能福</option>
-                        <option value="6">五福临门</option>
+                        <option value="water">水属性</option>
+                        <option value="wind">风属性</option>
+                        <option value="fire">火属性</option>
+                        <option value="dark">暗属性</option>
+                        <option value="light">光属性</option>
                     </select>
                     <button id="refreshBtn" class="btn-secondary">
                         <i class="fa fa-refresh mr-2"></i>刷新
@@ -343,6 +343,10 @@
     </footer>
 
     <script>
+        function getNFTTypeName(typeId) {
+            return window.ZODIAC_UTILS.getNFTInfo(typeId).name;
+        }
+
         // 粒子背景效果
         particlesJS('particles-js', {
             particles: {
@@ -446,16 +450,7 @@
         let fiveBlessingsNFTContract = null;
         let currentTokenIdToBuy;
 
-        // 祝福类型映射
-        const blessingTypes = {
-            0: '爱国福',
-            1: '富强福',
-            2: '和谐福',
-            3: '友善福',
-            4: '敬业福',
-            5: '万能福',
-            6: '五福临门'
-        };
+        // 使用共享工具函数获取NFT类型名称
 
         // DOM元素
         let walletAddress;
@@ -833,10 +828,10 @@
                                 <div class="p-6">
                                     <div class="flex justify-between items-start mb-4">
                                         <div>
-                                            <h3 class="text-xl font-bold text-dark">${blessingTypes[listing.type]}</h3>
+                                            <h3 class="text-xl font-bold text-dark">${getNFTTypeName(listing.type)}</h3>
                                             <p class="text-gray-600">NFT #${listing.tokenId}</p>
                                         </div>
-                                        <span class="bg-light text-primary px-3 py-1 rounded-full text-sm">${blessingTypes[listing.type]}</span>
+                                        <span class="bg-light text-primary px-3 py-1 rounded-full text-sm">${getNFTTypeName(listing.type)}</span>
                                     </div>
                                     
                                     <div class="mb-4">
@@ -898,79 +893,34 @@
                     return;
                 }
                 
-                // 从合约中获取所有上架的NFT
+                // 使用批量查询接口获取所有上架的NFT（优化效率）
                 const listings = [];
                 
-                console.log('开始加载市场数据，获取所有上架的NFT');
+                console.log('开始加载市场数据，使用批量查询接口');
                 
                 // 显示加载进度
                 marketplaceGrid.innerHTML = '<div class="col-span-full text-center py-12"><i class="fa fa-spinner fa-spin text-4xl text-primary mb-4"></i><p class="text-gray-600">加载市场数据中...</p></div>';
                 
-                // 首先获取NFT总数
-                let totalSupply = 0;
-                try {
-                    totalSupply = await fiveBlessingsNFTContract.methods.totalSupply().call();
-                    console.log('NFT总数:', totalSupply);
-                } catch (error) {
-                    console.error('获取NFT总数失败:', error);
-                    // 如果获取总数失败，使用默认值
-                    totalSupply = 1000;
-                }
+                // 使用批量查询方法获取所有活跃上架
+                const rawListings = await nftTradingContract.methods.getAllActiveListings().call();
+                console.log('批量查询返回', rawListings.length, '个上架NFT');
                 
-                // 分批次处理，避免一次性处理太多tokenId
-                const batchSize = 50;
-                const totalBatches = Math.ceil(totalSupply / batchSize);
+                // 获取NFT类型信息（并行调用）
+                const typePromises = rawListings.map(listing => 
+                    fiveBlessingsNFTContract.methods.tokenType(listing.tokenId).call()
+                );
+                const types = await Promise.all(typePromises);
                 
-                for (let batch = 0; batch < totalBatches; batch++) {
-                    const startId = batch * batchSize + 1;
-                    const endId = Math.min((batch + 1) * batchSize, totalSupply);
-                    console.log('处理批次:', batch + 1, '范围:', startId, '-', endId);
-                    
-                    // 使用并行调用优化加载速度
-                    const promises = [];
-                    for (let tokenId = startId; tokenId <= endId; tokenId++) {
-                        promises.push(
-                            (async (id) => {
-                                try {
-                                    // 确保合约实例存在
-                                    if (!nftTradingContract || !fiveBlessingsNFTContract) {
-                                        return null;
-                                    }
-                                    
-                                    const result = await nftTradingContract.methods.getListing(id).call();
-                                    const listing = result[0];
-                                    if (listing.isActive) {
-                                        // 获取NFT类型
-                                        const type = await fiveBlessingsNFTContract.methods.tokenType(id).call();
-                                        const price = web3.utils.fromWei(listing.price, 'ether');
-                                        
-                                        return {
-                                            tokenId: id,
-                                            price: price,
-                                            priceWei: listing.price, // 用于排序
-                                            seller: listing.seller,
-                                            type: type
-                                        };
-                                    }
-                                    return null;
-                                } catch (e) {
-                                    // 忽略不存在的token
-                                    return null;
-                                }
-                            })(tokenId)
-                        );
-                    }
-                    
-                    // 并行执行当前批次的检查
-                    const batchResults = await Promise.all(promises);
-                    
-                    // 处理当前批次的结果
-                    for (const result of batchResults) {
-                        if (result) {
-                            listings.push(result);
-                            console.log('发现活跃上架:', result.tokenId);
-                        }
-                    }
+                // 整理数据
+                for (let i = 0; i < rawListings.length; i++) {
+                    const listing = rawListings[i];
+                    listings.push({
+                        tokenId: parseInt(listing.tokenId),
+                        price: web3.utils.fromWei(listing.priceWEI, 'ether'),
+                        priceWei: listing.priceWEI,
+                        seller: listing.seller,
+                        type: types[i]
+                    });
                 }
                 
                 console.log('市场数据加载完成，找到', listings.length, '个上架NFT');
@@ -1021,10 +971,10 @@
                         <div class="p-6">
                             <div class="flex justify-between items-start mb-4">
                                 <div>
-                                    <h3 class="text-xl font-bold text-dark">${blessingTypes[listing.type]}</h3>
+                                    <h3 class="text-xl font-bold text-dark">${getNFTTypeName(listing.type)}</h3>
                                     <p class="text-gray-600">NFT #${listing.tokenId}</p>
                                 </div>
-                                <span class="bg-light text-primary px-3 py-1 rounded-full text-sm">${blessingTypes[listing.type]}</span>
+                                <span class="bg-light text-primary px-3 py-1 rounded-full text-sm">${getNFTTypeName(listing.type)}</span>
                             </div>
                             
                             <div class="mb-4">
@@ -1100,7 +1050,22 @@
             let filteredListings = marketplaceCache;
             
             if (filterType !== 'all') {
-                filteredListings = marketplaceCache.filter(item => item.type === filterType);
+                // 根据属性类型筛选
+                const attrIndexes = {
+                    water: 0,
+                    wind: 1,
+                    fire: 2,
+                    dark: 3,
+                    light: 4
+                };
+                const targetAttrIndex = attrIndexes[filterType];
+                if (targetAttrIndex !== undefined) {
+                    filteredListings = marketplaceCache.filter(item => {
+                        const typeId = parseInt(item.type);
+                        const itemAttrIndex = Math.floor(typeId / 24);
+                        return itemAttrIndex === targetAttrIndex;
+                    });
+                }
                 console.log('筛选后的数据数量:', filteredListings.length);
             }
             
@@ -1108,7 +1073,7 @@
             displayMarketplaceListings(filteredListings, 1);
         }
 
-        // 加载市场数据 (修改后的版本)
+        // 加载市场数据 (优化后的版本)
         async function loadMarketplace(page = 1) {
             const marketplaceGrid = document.getElementById('marketplaceGrid');
             
@@ -1136,58 +1101,92 @@
                 
                 console.log('缓存未命中，开始从合约加载数据');
                 
-                // 从合约中获取所有上架的NFT
+                // 从合约获取所有上架的tokenId列表（优化：使用合约方法直接获取）
                 const listings = [];
                 
-                // 进一步减少检查的tokenId范围，加快加载速度
-                const maxTokenIdToCheck = 30; // 减少到30个tokenId，更快加载
-                
-                console.log('开始检查tokenId，最多检查:', maxTokenIdToCheck);
-                
-                // 使用并行调用优化加载速度
-                const promises = [];
-                for (let tokenId = 1; tokenId <= maxTokenIdToCheck; tokenId++) {
-                    promises.push(
-                        (async (id) => {
-                            try {
-                                // 确保合约实例存在
-                                if (!nftTradingContract || !fiveBlessingsNFTContract) {
-                                    return null;
-                                }
+                try {
+                    // 尝试从合约获取所有上架的NFT（如果合约支持此方法）
+                    const listedTokenIds = await nftTradingContract.methods.getAllListedTokens().call();
+                    console.log('从合约获取到', listedTokenIds.length, '个上架的NFT');
+                    
+                    // 并行获取每个NFT的详细信息
+                    const promises = listedTokenIds.map(async (tokenId) => {
+                        try {
+                            const result = await nftTradingContract.methods.getListing(tokenId).call();
+                            const listing = result[0];
+                            if (listing.isActive) {
+                                const type = await fiveBlessingsNFTContract.methods.tokenType(tokenId).call();
+                                const price = web3.utils.fromWei(listing.price, 'ether');
                                 
-                                const result = await nftTradingContract.methods.getListing(id).call();
-                                const listing = result[0];
-                                if (listing.isActive) {
-                                    // 获取NFT类型
-                                    const type = await fiveBlessingsNFTContract.methods.tokenType(id).call();
-                                    const price = web3.utils.fromWei(listing.price, 'ether');
-                                    
-                                    return {
-                                        tokenId: id,
-                                        price: price,
-                                        priceWei: listing.price, // 用于排序
-                                        seller: listing.seller,
-                                        type: type
-                                    };
-                                }
-                                return null;
-                            } catch (e) {
-                                // 忽略不存在的token
-                                return null;
+                                return {
+                                    tokenId: parseInt(tokenId),
+                                    price: price,
+                                    priceWei: listing.price,
+                                    seller: listing.seller,
+                                    type: type
+                                };
                             }
-                        })(tokenId)
-                    );
-                }
-                
-                // 并行执行所有检查
-                const results = await Promise.all(promises);
-                console.log('并行调用完成，结果数量:', results.length);
-                
-                // 处理结果
-                for (const result of results) {
-                    if (result) {
-                        listings.push(result);
-                        console.log('发现活跃上架:', result.tokenId);
+                            return null;
+                        } catch (e) {
+                            return null;
+                        }
+                    });
+                    
+                    const results = await Promise.all(promises);
+                    listings.push(...results.filter(Boolean));
+                } catch (contractError) {
+                    // 如果合约不支持getAllListedTokens方法，使用备用方案
+                    console.log('合约不支持getAllListedTokens，使用备用方案');
+                    
+                    // 获取NFT总数
+                    let totalSupply = 0;
+                    try {
+                        totalSupply = await fiveBlessingsNFTContract.methods.totalSupply().call();
+                    } catch (e) {
+                        totalSupply = 100;
+                    }
+                    
+                    // 限制检查范围，避免过多请求
+                    const maxTokenIdToCheck = Math.min(totalSupply, 100);
+                    console.log('开始检查tokenId，最多检查:', maxTokenIdToCheck);
+                    
+                    // 分批并行处理
+                    const batchSize = 20;
+                    const batches = Math.ceil(maxTokenIdToCheck / batchSize);
+                    
+                    for (let batch = 0; batch < batches; batch++) {
+                        const startId = batch * batchSize + 1;
+                        const endId = Math.min((batch + 1) * batchSize, maxTokenIdToCheck);
+                        
+                        const promises = [];
+                        for (let tokenId = startId; tokenId <= endId; tokenId++) {
+                            promises.push(
+                                (async (id) => {
+                                    try {
+                                        const result = await nftTradingContract.methods.getListing(id).call();
+                                        const listing = result[0];
+                                        if (listing.isActive) {
+                                            const type = await fiveBlessingsNFTContract.methods.tokenType(id).call();
+                                            const price = web3.utils.fromWei(listing.price, 'ether');
+                                            
+                                            return {
+                                                tokenId: id,
+                                                price: price,
+                                                priceWei: listing.price,
+                                                seller: listing.seller,
+                                                type: type
+                                            };
+                                        }
+                                        return null;
+                                    } catch (e) {
+                                        return null;
+                                    }
+                                })(tokenId)
+                            );
+                        }
+                        
+                        const batchResults = await Promise.all(promises);
+                        listings.push(...batchResults.filter(Boolean));
                     }
                 }
                 
@@ -1281,10 +1280,10 @@
                             <div class="p-6">
                                 <div class="flex justify-between items-start mb-4">
                                     <div>
-                                        <h3 class="text-xl font-bold text-dark">${blessingTypes[listing.type]}</h3>
+                                        <h3 class="text-xl font-bold text-dark">${getNFTTypeName(listing.type)}</h3>
                                         <p class="text-gray-600">NFT #${listing.tokenId}</p>
                                     </div>
-                                    <span class="bg-light text-primary px-3 py-1 rounded-full text-sm">${blessingTypes[listing.type]}</span>
+                                    <span class="bg-light text-primary px-3 py-1 rounded-full text-sm">${getNFTTypeName(listing.type)}</span>
                                 </div>
                                 
                                 <div class="flex justify-between items-center mb-4">
@@ -1342,7 +1341,7 @@
             const total = (parseFloat(price) + parseFloat(fee)).toFixed(4);
             
             document.getElementById('modalTokenId').textContent = tokenId;
-            document.getElementById('modalTokenType').textContent = blessingTypes[type];
+            document.getElementById('modalTokenType').textContent = getNFTTypeName(type);
             document.getElementById('modalSeller').textContent = seller.substring(0, 6) + '...' + seller.substring(seller.length - 4);
             document.getElementById('modalPrice').textContent = price;
             document.getElementById('modalFee').textContent = fee;
@@ -1482,7 +1481,7 @@
                     return false;
                 }
                 
-                showMessage(`NFT检查成功！类型：${blessingTypes[type]}`, 'success');
+                showMessage(`NFT检查成功！类型：${getNFTTypeName(type)}`, 'success');
                 return true;
             } catch (error) {
                 console.error('检查NFT失败:', error);

@@ -19,8 +19,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * @dev NFT质押合约，支持质押NFT获取代币奖励
  */
 contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
-    /** @dev 最小质押等级：必须达到6级才能质押 */
-    uint8 public constant MIN_STAKING_LEVEL = 6;
+    /** @dev 最小质押等级：必须达到5级才能质押 */
+    uint8 public constant MIN_STAKING_LEVEL = 5;
     /** @dev 奖励间隔时间：每分钟计算一次奖励 */
     uint256 public constant REWARD_INTERVAL = 1 minutes;
     /** @dev 每分钟基础代币奖励数量 */
@@ -111,7 +111,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
     /**
      * @dev 质押NFT
      * 用户将NFT质押到合约中，开始累积奖励
-     * 只有等级达到6级以上的NFT才能质押
+     * 只有等级达到5级以上的NFT才能质押
      * @param tokenId 要质押的NFT ID
      */
     function stakeNFT(uint256 tokenId) external {
@@ -173,6 +173,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         }
 
         require(totalRewards > 0, "No rewards to claim");
+
+        _updateDailyRewardDistributed(totalRewards);
 
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         require(token.balanceOf(address(this)) >= totalRewards, "Insufficient tokens in contract");
@@ -253,26 +255,22 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         uint256 timeElapsed = currentTime - stake.lastRewardTime;
         
         if (timeElapsed > 0) {
-            uint256 dailyReward = _calculateDailyReward();
+            uint256 dailyReward = _getAvailableDailyReward();
             uint256 rewardPerMinute = _calculateRewardPerMinute(dailyReward);
             uint256 rewards = (timeElapsed / REWARD_INTERVAL) * rewardPerMinute;
             
-            stake.accumulatedRewards += rewards;
-            stake.lastRewardTime = currentTime;
+            if (rewards > 0) {
+                stake.accumulatedRewards += rewards;
+                stake.lastRewardTime = currentTime;
+            }
         }
     }
 
     /**
-     * @dev 计算每日奖励总量
-     * @return 当日剩余可分配的奖励数量
+     * @dev 获取当日可用奖励总量
+     * @return 当日可分配的奖励数量
      */
-    function _calculateDailyReward() internal returns (uint256) {
-        uint256 dayStart = block.timestamp - (block.timestamp % 86400);
-        if (lastRewardUpdate < dayStart) {
-            dailyRewardDistributed = 0;
-            lastRewardUpdate = block.timestamp;
-        }
-
+    function _getAvailableDailyReward() internal view returns (uint256) {
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         uint256 contractBalance = token.balanceOf(address(this));
 
@@ -281,15 +279,27 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
             availableReward = MAX_DAILY_REWARD;
         }
 
-        uint256 remainingDailyReward;
-        if (availableReward > dailyRewardDistributed) {
-            remainingDailyReward = availableReward - dailyRewardDistributed;
-        } else {
-            remainingDailyReward = 0;
-        }
+        return availableReward;
+    }
 
-        dailyRewardDistributed += remainingDailyReward;
-        return remainingDailyReward;
+    /**
+     * @dev 领取奖励时更新每日已分配奖励
+     * @param amount 领取的奖励数量
+     */
+    function _updateDailyRewardDistributed(uint256 amount) internal {
+        uint256 dayStart = block.timestamp - (block.timestamp % 86400);
+        if (lastRewardUpdate < dayStart) {
+            dailyRewardDistributed = 0;
+            lastRewardUpdate = block.timestamp;
+        }
+        
+        if (dailyRewardDistributed + amount > MAX_DAILY_REWARD) {
+            uint256 remaining = MAX_DAILY_REWARD - dailyRewardDistributed;
+            dailyRewardDistributed = MAX_DAILY_REWARD;
+            require(amount <= remaining, "Staking: Daily reward exceeded");
+        } else {
+            dailyRewardDistributed += amount;
+        }
     }
 
     /**

@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
     <script src="abis.js"></script>
+    <script src="utils.js"></script>
+    <link rel="stylesheet" href="styles.css">
     <style>
         body {
             font-family: 'Noto Sans SC', sans-serif;
@@ -374,33 +376,20 @@
         });
 
         function getStars(level) {
-            return '⭐'.repeat(level);
+            return window.ZODIAC_UTILS.getStars(parseInt(level));
         }
 
-        function getNFTImage(typeId, level) {
-            const zodiacIndex = typeId % 12;
-            const attrIndex = Math.floor(typeId / 24);
-            const gender = typeId % 2;
-            const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
-            const attr = attrs[attrIndex] || 'water';
-            const attrData = ZODIAC_DATA[attr];
-            const prefix = attrData.prefix;
-            const animal = attrData.animals[zodiacIndex];
-            const genderSuffix = gender === 1 ? '_1' : '_0';
-            return attrData.ipfsBase + prefix + animal + genderSuffix + '.png';
+        function getNFTImage(typeId) {
+            return window.ZODIAC_UTILS.getNFTInfo(typeId).imagePath;
         }
 
         function getNFTName(typeId) {
-            const zodiacIndex = typeId % 12;
-            const attrIndex = Math.floor(typeId / 24);
-            const gender = typeId % 2;
-            const attrs = ['水', '风', '火', '暗', '光'];
-            const attr = attrs[attrIndex] || '水';
-            const genderText = gender === 1 ? '公' : '母';
-            return `${attr}${ZODIAC_NAMES[zodiacIndex]}（${genderText}）`;
+            return window.ZODIAC_UTILS.getNFTInfo(typeId).name;
         }
 
-        document.getElementById('walletBtn').addEventListener('click', initWeb3);
+        window.addEventListener('load', function() {
+            initWeb3();
+        });
 
         async function initWeb3() {
             if (typeof window.ethereum !== 'undefined') {
