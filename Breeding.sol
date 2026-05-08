@@ -20,8 +20,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * @dev NFT繁殖合约
  */
 contract Breeding is Initializable, Ownable2StepUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    /** @dev 繁殖所需代币数量 */
-    uint256 public constant BREEDING_COST = 100000 * 10**18;
+    
     /** @dev 最小繁殖等级：必须达到6级才能繁殖 */
     uint8 public constant MIN_BREEDING_LEVEL = 6;
     /** @dev 黑洞地址，用于销毁NFT */
@@ -62,7 +61,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, ReentrancyGuardUpgr
 
     /**
      * @dev 繁殖NFT
-     * 用户需要拥有两个等级为6的NFT才能进行繁殖
+     * 用户需要拥有两个等级为6的NFT才能进行繁殖（无需消耗代币）
      * @param tokenId1 第一个NFT ID
      * @param tokenId2 第二个NFT ID
      * @return uint256 新生成的NFT ID
@@ -89,11 +88,6 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, ReentrancyGuardUpgr
         require(nft.isApprovedForAll(msg.sender, address(this)) || 
                 nft.getApproved(tokenId1) == address(this) && 
                 nft.getApproved(tokenId2) == address(this), "Breeding: Contract not approved");
-
-        // 扣除繁殖费用
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        require(token.balanceOf(msg.sender) >= BREEDING_COST, "Breeding: Insufficient tokens");
-        require(token.transferFrom(msg.sender, BLACK_HOLE, BREEDING_COST), "Breeding: Token transfer failed");
 
         // 获取父母NFT的类型
         NFTDataTypes.ZodiacType type1 = nft.tokenType(tokenId1);

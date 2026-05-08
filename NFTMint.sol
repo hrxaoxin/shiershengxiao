@@ -22,16 +22,32 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9
  */
 interface ITokenBurner {
     /**
-     * @dev 销毁代币用于铸造
+     * @dev 销毁普通铸造费用的代币
      * @return bool 是否成功
      */
     function burnTokenForMint() external returns (bool);
     /**
-     * @dev 销毁代币并铸造
-     * @param user 用户地址
+     * @dev 销毁稀有铸造费用的代币
      * @return bool 是否成功
      */
-    function burnAndMint(address user) external returns (bool);
+    function burnTokenForRareMint() external returns (bool);
+    /**
+     * @dev 销毁代币并铸造
+     * @param user 用户地址
+     * @param isRare 是否稀有铸造
+     * @return bool 是否成功
+     */
+    function burnAndMint(address user, bool isRare) external returns (bool);
+    /**
+     * @dev 获取普通铸造费用
+     * @return uint256 费用
+     */
+    function normalMintCost() external view returns (uint256);
+    /**
+     * @dev 获取稀有铸造费用
+     * @return uint256 费用
+     */
+    function rareMintCost() external view returns (uint256);
 }
 
 /**
@@ -181,6 +197,8 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     mapping(address => bool) public authorizedMinter;
     /** @dev NFT类型映射（tokenId => 类型） */
     mapping(uint256 => NFTDataTypes.ZodiacType) public tokenType;
+    /** @dev 用户权重缓存映射（地址 => 权重） */
+    mapping(address => uint256) public userWeightCache;
     /** @dev NFT等级映射（tokenId => 等级） */
     mapping(uint256 => uint8) public tokenLevel;
     /** @dev 用户NFT列表（用户地址 => 类型 => ID数组） */
@@ -226,18 +244,35 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     // ====================== 随机类型 ======================
 
     /**
-     * @dev 生成随机生肖类型
-     * 概率分布：水/风属性各48%，光/暗属性各2%
-     * @param salt 随机种子
+     * @dev 普通铸造随机类型生成：五种属性随机
+     * 概率分布：水(32%)、火(32%)、风(32%)、光(2%)、暗(2%)
      * @return NFTDataTypes.ZodiacType 随机生成的生肖类型
      */
-    function _getRandomType(uint256 salt) internal returns (NFTDataTypes.ZodiacType) {
+    function _getRandomNormalType() internal returns (NFTDataTypes.ZodiacType) {
         _nonce.increment();
-        uint rand = uint(keccak256(abi.encodePacked(blockhash(block.number-1), msg.sender, salt, block.timestamp, _nonce.current(), gasleft())));
+        uint rand = uint(keccak256(abi.encodePacked(blockhash(block.number-1), msg.sender, nextCardId, block.timestamp, _nonce.current(), gasleft())));
         uint r = rand % 100;
-        if (r < 2) return NFTDataTypes.ZodiacType(72 + (rand % 24));      // 光属性(2%)
-        else if (r < 4) return NFTDataTypes.ZodiacType(96 + (rand % 24));  // 暗属性(2%)
-        else return NFTDataTypes.ZodiacType(rand % 48);                     // 水/风属性(96%)
+        if (r < 2) return NFTDataTypes.ZodiacType(72 + (rand % 24));      // 暗属性(2%)
+        else if (r < 4) return NFTDataTypes.ZodiacType(96 + (rand % 24));  // 光属性(2%)
+        else if (r < 36) return NFTDataTypes.ZodiacType(rand % 24);        // 水属性(32%)
+        else if (r < 68) return NFTDataTypes.ZodiacType(24 + (rand % 24)); // 风属性(32%)
+        else return NFTDataTypes.ZodiacType(48 + (rand % 24));              // 火属性(32%)
+    }
+
+    /**
+     * @dev 稀有铸造随机类型生成：仅光/暗属性随机
+     * 概率分布：光(50%)、暗(50%)
+     * @return NFTDataTypes.ZodiacType 随机生成的生肖类型
+     */
+    function _getRandomRareType() internal returns (NFTDataTypes.ZodiacType) {
+        _nonce.increment();
+        uint rand = uint(keccak256(abi.encodePacked(blockhash(block.number-1), msg.sender, nextCardId, block.timestamp, _nonce.current(), gasleft())));
+        // 50%概率光属性，50%概率暗属性
+        if (rand % 2 == 0) {
+            return NFTDataTypes.ZodiacType(96 + (rand % 24));  // 光属性(50%)
+        } else {
+            return NFTDataTypes.ZodiacType(72 + (rand % 24));  // 暗属性(50%)
+        }
     }
 
     // ====================== URI ======================
@@ -278,49 +313,39 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     }
 
     /**
-     * @dev 铸造NFT（通过销毁代币）
-     * 用户需先授权并销毁代币，然后调用此函数铸造NFT
+     * @dev 普通铸造：销毁代币，随机铸造五种属性中的任意一个生肖
+     * 概率分布：水(32%)、火(32%)、风(32%)、光(2%)、暗(2%)
      * @param to 接收NFT的地址
      * @return uint256 新铸造的NFT ID
      */
-    function mint(address to) external nonReentrant returns (uint256) {
+    function mintNormal(address to) external nonReentrant returns (uint256) {
         require(tokenBurner != address(0) && rewardManager != address(0), "E2");
-        require(ITokenBurner(tokenBurner).burnAndMint(to), "E6");
-        return _mintTo(to, _getRandomType(nextCardId));
-    }
-
-    /** @dev 铸造光/暗属性NFT所需的代币数量 */
-    uint256 public constant LIGHT_DARK_COST = 88888;
-
-    /**
-     * @dev 铸造光/暗属性NFT
-     * 需要燃烧88888个代币，只能铸造光或暗属性的NFT
-     * @param to 接收NFT的地址
-     * @param isLight 是否铸造光属性（true=光，false=暗）
-     * @return uint256 新铸造的NFT ID
-     */
-    function mintLightDark(address to, bool isLight) external nonReentrant returns (uint256) {
-        require(tokenContract != address(0) && rewardManager != address(0), "E7");
-        IToken t = IToken(tokenContract);
-        require(t.balanceOf(msg.sender) >= LIGHT_DARK_COST, "E8");
-        require(t.transferFrom(msg.sender, BLACK_HOLE, LIGHT_DARK_COST), "E9");
-        _nonce.increment();
-        uint rand = uint(keccak256(abi.encodePacked(blockhash(block.number-1), msg.sender, nextCardId, block.timestamp, _nonce.current(), gasleft())));
-        NFTDataTypes.ZodiacType z = isLight ? NFTDataTypes.ZodiacType(96 + rand % 24) : NFTDataTypes.ZodiacType(72 + rand % 24);
-        return _mintTo(to, z);
+        require(ITokenBurner(tokenBurner).burnAndMint(to, false), "E6");
+        return _mintTo(to, _getRandomNormalType());
     }
 
     /**
-     * @dev 铸造指定类型的NFT（仅限授权地址）
-     * 用于白名单铸造或特殊活动铸造
+     * @dev 稀有铸造：销毁代币，随机铸造光或暗属性的生肖
+     * 概率分布：光(50%)、暗(50%)
      * @param to 接收NFT的地址
-     * @param t NFT的类型
      * @return uint256 新铸造的NFT ID
      */
-    function mintSpecificType(address to, NFTDataTypes.ZodiacType t) external nonReentrant returns (uint256) {
-        require(authorizedMinter[msg.sender] || msg.sender == owner(), "E10");
+    function mintRare(address to) external nonReentrant returns (uint256) {
+        require(tokenBurner != address(0) && rewardManager != address(0), "E2");
+        require(ITokenBurner(tokenBurner).burnAndMint(to, true), "E6");
+        return _mintTo(to, _getRandomRareType());
+    }
+
+    /**
+     * @dev 指定类型铸造：直接铸造指定类型的生肖（无需销毁代币）
+     * 仅限合约拥有者调用，用于特殊活动或白名单铸造
+     * @param to 接收NFT的地址
+     * @param zodiacType 指定的生肖类型
+     * @return uint256 新铸造的NFT ID
+     */
+    function mintCustom(address to, NFTDataTypes.ZodiacType zodiacType) external nonReentrant onlyOwner returns (uint256) {
         require(to != address(0), "E11");
-        return _mintTo(to, t);
+        return _mintTo(to, zodiacType);
     }
 
     /**
@@ -350,13 +375,15 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         userLatestToken[to][t] = id;
         userTokensByLevel[to][t][1].push(id);
         userLatestTokenByLevel[to][t][1] = id;
+        // 更新权重缓存
+        _updateUserWeight(to, id, 1, true);
         emit CardMinted(id, t, to, uint64(block.timestamp));
         return id;
     }
 
     /**
      * @dev 转账前的钩子函数
-     * 在转账时自动更新用户的NFT列表和奖励管理器
+     * 在转账时自动更新用户的NFT列表、奖励管理器和权重缓存
      * @param from 转出地址
      * @param to 转入地址
      * @param tokenId NFT ID
@@ -370,6 +397,8 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
             _removeToken(from, t, tokenId);
             _removeTokenByLevel(from, t, lv, tokenId);
             _updateReward(from, t, false);
+            // 更新权重缓存：减少转出方权重
+            _updateUserWeight(from, tokenId, lv, false);
         }
         if (to != address(0) && to != BLACK_HOLE) {
             userTokens[to][t].push(tokenId);
@@ -377,6 +406,8 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
             userTokensByLevel[to][t][lv].push(tokenId);
             userLatestTokenByLevel[to][t][lv] = tokenId;
             _updateReward(to, t, true);
+            // 更新权重缓存：增加转入方权重
+            _updateUserWeight(to, tokenId, lv, true);
         }
     }
 
@@ -515,6 +546,9 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         _removeTokenByLevel(msg.sender, t, oldLv, id);
         userTokensByLevel[msg.sender][t][newLv].push(id);
         userLatestTokenByLevel[msg.sender][t][newLv] = id;
+        // 更新权重缓存：先减少旧等级权重，再增加新等级权重
+        _updateUserWeight(msg.sender, id, oldLv, false);
+        _updateUserWeight(msg.sender, id, newLv, true);
         emit CardUpgraded(id, t, oldLv, newLv, msg.sender, uint64(block.timestamp));
         return newLv;
     }
@@ -594,17 +628,32 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     /**
      * @dev 计算用户权重（用于分红计算）
      * 权重 = 每个NFT的等级+ 2 的总和
+     * 使用缓存机制减少Gas消耗
      * @param user 用户地址
      * @return uint256 用户权重
      */
     function calcUserWeight(address user) external view returns (uint256) {
-        uint w;
-        for (uint i; i<120; i++) {
-            NFTDataTypes.ZodiacType t = NFTDataTypes.ZodiacType(i);
-            uint256[] memory arr = userTokens[user][t];
-            for (uint j; j<arr.length; j++) { w += tokenLevel[arr[j]] + 2; }
+        return userWeightCache[user];
+    }
+
+    /**
+     * @dev 更新用户权重缓存（内部函数）
+     * @param user 用户地址
+     * @param tokenId NFT ID
+     * @param level NFT等级
+     * @param add 是否增加权重（true增加，false减少）
+     */
+    function _updateUserWeight(address user, uint256 tokenId, uint8 level, bool add) internal {
+        uint256 weightDelta = level + 2;
+        if (add) {
+            userWeightCache[user] += weightDelta;
+        } else {
+            if (userWeightCache[user] >= weightDelta) {
+                userWeightCache[user] -= weightDelta;
+            } else {
+                userWeightCache[user] = 0;
+            }
         }
-        return w;
     }
 
     /**
