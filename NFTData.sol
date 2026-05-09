@@ -113,9 +113,9 @@ library NFTDataTypes {
 interface INFTMint {
     function tokenType(uint256 tokenId) external view returns (NFTDataTypes.ZodiacType);
     function tokenLevel(uint256 tokenId) external view returns (uint8);
-    function mint(address to) external returns (uint256);
-    function mintSpecificType(address to, NFTDataTypes.ZodiacType zodiacType) external returns (uint256);
-    function mintLightDark(address to, bool isLight) external returns (uint256);
+    function mintNormal(address to) external returns (uint256);
+    function mintRare(address to) external returns (uint256);
+    function mintCustom(address to, NFTDataTypes.ZodiacType zodiacType) external returns (uint256);
     function mintBreedResult(address to, NFTDataTypes.ZodiacType zodiacType) external returns (uint256);
     function upgradeWithNFT(uint256 tokenId) external returns (uint8);
     function upgradeWithToken(uint256 tokenId) external returns (uint8);
@@ -158,10 +158,25 @@ interface INFTData {
     function getCardName(NFTDataTypes.ZodiacType zodiacType) external view returns (string memory);
     function getCardDesc(NFTDataTypes.ZodiacType zodiacType) external view returns (string memory);
     function getCardImage(NFTDataTypes.ZodiacType zodiacType) external view returns (string memory);
+    
+    // NFT数据管理函数
+    function tokenType(uint256 tokenId) external view returns (NFTDataTypes.ZodiacType);
+    function tokenLevel(uint256 tokenId) external view returns (uint8);
+    function userTokens(address user, NFTDataTypes.ZodiacType type_) external view returns (uint256[] memory);
+    function userAllTokens(address user) external view returns (uint256[] memory);
+    function userWeightCache(address user) external view returns (uint256);
+    
+    function setTokenType(uint256 tokenId, NFTDataTypes.ZodiacType type_) external;
+    function setTokenLevel(uint256 tokenId, uint8 level) external;
+    function addUserToken(address user, NFTDataTypes.ZodiacType type_, uint256 tokenId) external;
+    function removeUserToken(address user, NFTDataTypes.ZodiacType type_, uint256 tokenId) external;
+    function updateUserWeightCache(address user, uint256 weight) external;
+    function getUserTokenCount(address user, NFTDataTypes.ZodiacType type_) external view returns (uint256);
+    function getUserTotalTokenCount(address user) external view returns (uint256);
 }
 
 // NFT数据管理合约
-contract NFTData is INFTData {
+contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INFTData {
     using NFTDataTypes for NFTDataTypes.ZodiacType;
 
     // 元素名称映射
@@ -175,6 +190,61 @@ contract NFTData is INFTData {
 
     // NFT信息存储
     mapping(uint256 => NFTDataTypes.NFTInfo) private _nftInfos;
+    
+    // NFT类型映射（tokenId => 类型）
+    mapping(uint256 => NFTDataTypes.ZodiacType) public tokenType;
+    
+    // NFT等级映射（tokenId => 等级）
+    mapping(uint256 => uint8) public tokenLevel;
+    
+    // 用户NFT列表（用户地址 => ID数组）- 优化查询效率
+    mapping(address => uint256[]) public userTokens;
+    
+    // 用户持有NFT映射（用户地址 => tokenId => 是否持有）- 用于去重检查
+    mapping(address => mapping(uint256 => bool)) public userTokenExists;
+    
+    // 用户NFT类型映射（tokenId => 类型）- 快速查询NFT类型
+    mapping(uint256 => NFTDataTypes.ZodiacType) public tokenTypeMap;
+    
+    // 用户NFT计数（用户地址 => 类型 => 数量）- 优化类型数量统计
+    mapping(address => mapping(NFTDataTypes.ZodiacType => uint256)) public userTokenCount;
+    
+    // 用户权重缓存映射（地址 => 权重）
+    mapping(address => uint256) public userWeightCache;
+    
+    // 授权的NFT合约地址
+    address public authorizedNFTContract;
+    
+    event AuthorizedNFTContractSet(address indexed nftContract, uint256 timestamp);
+    
+    /** @dev 存储间隙，用于合约升级兼容性 */
+    uint256[50] private __gap;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @dev 初始化合约
+     * @param initialOwner 初始所有者地址
+     */
+    function initialize(address initialOwner) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        transferOwnership(initialOwner);
+    }
+
+    /**
+     * @dev 升级授权函数
+     * @param newImplementation 新实现合约地址
+     */
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizedNFTContract, "NFTData: Unauthorized");
+        _;
+    }
 
     /**
      * @dev 获取NFT信息
@@ -186,12 +256,105 @@ contract NFTData is INFTData {
     }
 
     /**
-     * @dev 设置NFT信息
+     * @dev 设置NFT信息（仅限授权的NFT合约调用）
      * @param tokenId NFT代币ID
      * @param info NFT信息
      */
-    function setNFTInfo(uint256 tokenId, NFTDataTypes.NFTInfo memory info) external {
+    function setNFTInfo(uint256 tokenId, NFTDataTypes.NFTInfo memory info) external onlyAuthorized {
         _nftInfos[tokenId] = info;
+    }
+
+    /**
+     * @dev 设置NFT类型（仅限授权的NFT合约调用）
+     * @param tokenId NFT代币ID
+     * @param type_ 生肖类型
+     */
+    function setTokenType(uint256 tokenId, NFTDataTypes.ZodiacType type_) external onlyAuthorized {
+        tokenType[tokenId] = type_;
+    }
+
+    /**
+     * @dev 设置NFT等级（仅限授权的NFT合约调用）
+     * @param tokenId NFT代币ID
+     * @param level 等级
+     */
+    function setTokenLevel(uint256 tokenId, uint8 level) external onlyAuthorized {
+        tokenLevel[tokenId] = level;
+    }
+
+    /**
+     * @dev 添加用户NFT（仅限授权的NFT合约调用）
+     * @param user 用户地址
+     * @param type_ 生肖类型
+     * @param tokenId NFT代币ID
+     */
+    function addUserToken(address user, NFTDataTypes.ZodiacType type_, uint256 tokenId) external onlyAuthorized {
+        if (!userTokenExists[user][tokenId]) {
+            userTokens[user].push(tokenId);
+            userTokenExists[user][tokenId] = true;
+        }
+        tokenTypeMap[tokenId] = type_;
+        userTokenCount[user][type_]++;
+    }
+
+    /**
+     * @dev 移除用户NFT（仅限授权的NFT合约调用）
+     * @param user 用户地址
+     * @param type_ 生肖类型
+     * @param tokenId NFT代币ID
+     */
+    function removeUserToken(address user, NFTDataTypes.ZodiacType type_, uint256 tokenId) external onlyAuthorized {
+        uint256[] storage arr = userTokens[user];
+        for (uint256 i = 0; i < arr.length; i++) {
+            if (arr[i] == tokenId) {
+                arr[i] = arr[arr.length - 1];
+                arr.pop();
+                break;
+            }
+        }
+        delete tokenTypeMap[tokenId];
+        delete userTokenExists[user][tokenId];
+        if (userTokenCount[user][type_] > 0) {
+            userTokenCount[user][type_]--;
+        }
+    }
+
+    /**
+     * @dev 更新用户权重缓存（仅限授权的NFT合约调用）
+     * @param user 用户地址
+     * @param weight 权重值
+     */
+    function updateUserWeightCache(address user, uint256 weight) external onlyAuthorized {
+        userWeightCache[user] = weight;
+    }
+
+    /**
+     * @dev 获取用户NFT数量（按类型）
+     * @param user 用户地址
+     * @param type_ 生肖类型
+     * @return NFT数量
+     */
+    function getUserTokenCount(address user, NFTDataTypes.ZodiacType type_) external view returns (uint256) {
+        return userTokenCount[user][type_];
+    }
+
+    /**
+     * @dev 获取用户所有NFT数量
+     * @param user 用户地址
+     * @return NFT数量
+     */
+    function getUserTotalTokenCount(address user) external view returns (uint256) {
+        return userAllTokens[user].length;
+    }
+    
+    /**
+     * @dev 设置授权的NFT合约地址（仅限拥有者）
+     * @param nftContract NFT合约地址
+     */
+    function setAuthorizedNFTContract(address nftContract) external onlyOwner {
+        require(nftContract != address(0), "NFTData: Zero address");
+        authorizedNFTContract = nftContract;
+        emit AuthorizedNFTContractSet(nftContract, block.timestamp);
     }
 
     /**

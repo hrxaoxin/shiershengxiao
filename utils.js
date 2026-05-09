@@ -14,9 +14,10 @@ window.ZODIAC_UTILS = (function() {
     };
 
     function getNFTInfo(typeId) {
-        const zodiacIndex = typeId % 12;
         const attrIndex = Math.floor(typeId / 24);
-        const gender = typeId % 2 === 1 ? '公' : '母';
+        const zodiacIndex = Math.floor(typeId / 2) % 12;
+        const gender = typeId % 2 === 0 ? '公' : '母';
+        const genderSuffix = typeId % 2 === 0 ? '_1' : '_0';
         const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
 
         if (attrIndex < 0 || attrIndex >= attrs.length) {
@@ -33,7 +34,6 @@ window.ZODIAC_UTILS = (function() {
         const attr = attrs[attrIndex];
         const prefix = ATTR_PREFIXES[attr];
         const animal = ANIMAL_KEYS[zodiacIndex];
-        const genderSuffix = typeId % 2 === 1 ? '_1' : '_0';
         const ipfsBase = IPFS_BASES[attr];
 
         return {

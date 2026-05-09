@@ -236,19 +236,40 @@
         async function loadUserTokens() {
             userTokens = [];
             try {
+                const balance = await nftMintContract.methods.balanceOf(accounts[0]).call();
                 const promises = [];
-                for (let typeId = 0; typeId < 120; typeId++) {
-                    promises.push(rewardManagerContract.methods.cardCount(accounts[0], typeId).call());
+                
+                for (let i = 0; i < parseInt(balance); i++) {
+                    promises.push(nftMintContract.methods.tokenOfOwnerByIndex(accounts[0], i).call());
                 }
                 
-                const results = await Promise.all(promises);
+                const tokenIds = await Promise.all(promises);
                 
-                for (let typeId = 0; typeId < 120; typeId++) {
-                    const count = parseInt(results[typeId]);
-                    if (count > 0) {
-                        userTokens.push({ typeId: typeId, count: count });
+                const tokenInfoPromises = tokenIds.map(tokenId => {
+                    return Promise.all([
+                        nftMintContract.methods.tokenType(tokenId).call(),
+                        nftMintContract.methods.tokenLevel(tokenId).call()
+                    ]).then(([typeId, level]) => ({
+                        tokenId: tokenId,
+                        typeId: parseInt(typeId),
+                        level: parseInt(level)
+                    }));
+                });
+                
+                const tokenInfos = await Promise.all(tokenInfoPromises);
+                
+                const typeMap = {};
+                for (const info of tokenInfos) {
+                    if (!typeMap[info.typeId]) {
+                        typeMap[info.typeId] = { typeId: info.typeId, count: 0, level: info.level };
+                    }
+                    typeMap[info.typeId].count++;
+                    if (info.level > typeMap[info.typeId].level) {
+                        typeMap[info.typeId].level = info.level;
                     }
                 }
+                
+                userTokens = Object.values(typeMap);
             } catch (error) {
                 console.error('Error loading user tokens:', error);
             }
@@ -325,10 +346,8 @@
 
             for (const token of filteredTokens) {
                 const typeId = token.typeId;
+                const level = token.level || 1;
                 const nftInfo = window.ZODIAC_UTILS.getNFTInfo(typeId);
-                
-                // 模拟等级数据，实际应该从合约获取
-                const level = Math.min(5, Math.floor(Math.random() * 5) + 1);
 
                 html += `
                     <div class="zodiac-card" onclick="showCardModal(${typeId}, ${level})")>

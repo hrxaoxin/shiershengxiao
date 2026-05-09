@@ -6,7 +6,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 interface ITokenBurner {
-    function setAuthorizedNFTContract(address nft, bool ok) external;
+    function setAuthorizedNFTContract(address nftContract) external;
+    function setTokenContract(address tokenContract) external;
 }
 
 interface IRewardManager {
@@ -21,11 +22,11 @@ interface INFTTrading {
 
 interface IBreeding {
     function setNFTContract(address nftContract) external;
-    function setRewardManager(address rewardManager) external;
 }
 
 interface INFTData {
-    function setRewardManager(address rm) external;
+    function initialize(address initialOwner) external;
+    function setAuthorizedNFTContract(address nftContract) external;
 }
 
 interface INFTMint {
@@ -38,7 +39,7 @@ interface INFTMint {
 
 interface IStaking {
     function setNFTContract(address nftContract) external;
-    function setRewardManager(address rewardManager) external;
+    function setTokenContract(address tokenContract) external;
 }
 
 contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
@@ -61,8 +62,8 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     function initialize(address initialOwner) external initializer {
-        __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        __Ownable2Step_init();
         transferOwnership(initialOwner);
         permissions[initialOwner] = PermissionLevel.SUPER_ADMIN;
         emit AddressAuthorized(initialOwner, PermissionLevel.SUPER_ADMIN, block.timestamp);
@@ -128,14 +129,17 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         address nftData,
         address nftMint,
         address breeding,
-        address staking
+        address staking,
+        address tokenContract
     ) external onlyOwner {
         require(tokenBurner != address(0), "TokenBurner address cannot be zero");
         require(rewardManager != address(0), "RewardManager address cannot be zero");
         require(nftData != address(0), "NFTData address cannot be zero");
         require(nftMint != address(0), "NFTMint address cannot be zero");
+        require(tokenContract != address(0), "Token contract address cannot be zero");
 
-        ITokenBurner(tokenBurner).setAuthorizedNFTContract(nftMint, true);
+        ITokenBurner(tokenBurner).setAuthorizedNFTContract(nftMint);
+        ITokenBurner(tokenBurner).setTokenContract(tokenContract);
         IRewardManager(rewardManager).setAuthorizedNFTContract(nftMint, true);
         IRewardManager(rewardManager).setNFTContract(nftMint);
 
@@ -144,19 +148,19 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             INFTTrading(nftTrading).setRewardManager(rewardManager);
         }
 
-        INFTData(nftData).setRewardManager(rewardManager);
+        INFTData(nftData).setAuthorizedNFTContract(nftMint);
         INFTMint(nftMint).setAddresses(tokenBurner, rewardManager);
         INFTMint(nftMint).setMetadataContract(nftData);
+        INFTMint(nftMint).setTokenContract(tokenContract);
 
         if (breeding != address(0)) {
             IBreeding(breeding).setNFTContract(nftMint);
-            IBreeding(breeding).setRewardManager(rewardManager);
             INFTMint(nftMint).setBreedingContract(breeding);
         }
 
         if (staking != address(0)) {
             IStaking(staking).setNFTContract(nftMint);
-            IStaking(staking).setRewardManager(rewardManager);
+            IStaking(staking).setTokenContract(tokenContract);
         }
     }
 }

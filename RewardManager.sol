@@ -47,8 +47,8 @@ contract RewardManager is
     uint256 public constant VERSION = 2;
     /** @dev 每张卡牌的权重值 */
     uint256 public constant WEIGHT_PER_CARD = 8;
-    /** @dev 最低所有者权重 */
-    uint256 public constant MIN_OWNER_WEIGHT = 1000;
+    /** @dev 最低所有者权重（可修改） */
+    uint256 public minOwnerWeight = 100;
     /** @dev 最大版税比例（5000 = 50%） */
     uint256 public constant MAX_ROYALTY_FEE = 5000;
 
@@ -101,6 +101,13 @@ contract RewardManager is
     mapping(address => mapping(bytes4 => uint256)) public lastOperationTime;
     /** @dev 操作冷却时间（默认1秒） */
     uint256 public operationCooldown = 1 seconds;
+
+    /** @dev 用户权重缓存映射 */
+    mapping(address => uint256) public cachedUserWeight;
+    /** @dev 用户权重缓存时间戳映射 */
+    mapping(address => uint256) public cachedWeightTimestamp;
+    /** @dev 权重缓存有效期（默认5分钟） */
+    uint256 public weightCacheDuration = 5 minutes;
 
     /**
      * @dev 卡牌更新事件
@@ -237,7 +244,7 @@ contract RewardManager is
     }
 
     /**
-     * @dev 初始化合�?
+     * @dev 初始化合约
      * @param initialOwner 初始所有者地址
      * @param _royaltyWallet 版税接收钱包地址
      * @param _operator 运营者地址
@@ -251,17 +258,16 @@ contract RewardManager is
         address _nftContract,
         address _authorizer
     ) external initializer nonZeroAddress(initialOwner) nonZeroAddress(_operator) nonZeroAddress(_nftContract) {
-        __Ownable_init();
+        __UUPSUpgradeable_init();
         __Ownable2Step_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        __UUPSUpgradeable_init();
 
         royaltyWallet = _royaltyWallet == address(0) ? 0x55d398326f99059fF775485246999027B3197955 : _royaltyWallet;
         operator = _operator;
         nftContract = _nftContract;
         authorizer = _authorizer;
-        ownerWeight = MIN_OWNER_WEIGHT;
+        ownerWeight = minOwnerWeight;
         totalWeight = ownerWeight;
 
         eligibleUserHead = address(0);
@@ -329,13 +335,28 @@ contract RewardManager is
      * @param _w 新权重�?
      */
     function setOwnerWeight(uint256 _w) external onlyOwner {
-        require(_w >= MIN_OWNER_WEIGHT, "RM: w low");
+        require(_w >= minOwnerWeight, "RM: w low");
 
         uint256 oldOwnerWeight = ownerWeight;
         totalWeight = totalWeight - oldOwnerWeight + _w;
         ownerWeight = _w;
 
-        emit TotalWeightUpdated(totalWeight + oldOwnerWeight - _w, totalWeight, block.timestamp);
+        emit TotalWeightUpdated(oldOwnerWeight, totalWeight, block.timestamp);
+    }
+
+    /**
+     * @dev 设置最低所有者权重
+     * @param _minWeight 新的最低权重值
+     */
+    function setMinOwnerWeight(uint256 _minWeight) external onlyOwner {
+        require(_minWeight > 0, "RM: min weight must be > 0");
+        minOwnerWeight = _minWeight;
+        if (ownerWeight < minOwnerWeight) {
+            uint256 oldOwnerWeight = ownerWeight;
+            totalWeight = totalWeight - oldOwnerWeight + minOwnerWeight;
+            ownerWeight = minOwnerWeight;
+            emit TotalWeightUpdated(oldOwnerWeight, totalWeight, block.timestamp);
+        }
     }
 
     /**
@@ -409,7 +430,55 @@ contract RewardManager is
     function _calcUserWeight(address user) internal view returns (uint256) {
         if (user == owner()) return 0;
         if (nftContract == address(0)) return 0;
+        
         return INFTMintWeight(nftContract).calcUserWeight(user);
+    }
+
+    /**
+     * @dev 刷新用户权重缓存
+     * @param user 用户地址
+     */
+    function refreshUserWeightCache(address user) external onlyOp {
+        if (user == owner() || nftContract == address(0)) return;
+        
+        uint256 weight = INFTMintWeight(nftContract).calcUserWeight(user);
+        cachedUserWeight[user] = weight;
+        cachedWeightTimestamp[user] = block.timestamp;
+    }
+
+    /**
+     * @dev 批量刷新用户权重缓存
+     * @param users 用户地址列表
+     */
+    function batchRefreshUserWeightCache(address[] calldata users) external onlyOp {
+        if (nftContract == address(0)) return;
+        
+        INFTMintWeight nft = INFTMintWeight(nftContract);
+        for (uint256 i = 0; i < users.length; i++) {
+            address user = users[i];
+            if (user == owner()) continue;
+            
+            uint256 weight = nft.calcUserWeight(user);
+            cachedUserWeight[user] = weight;
+            cachedWeightTimestamp[user] = block.timestamp;
+        }
+    }
+
+    /**
+     * @dev 设置权重缓存有效期
+     * @param duration 缓存有效期（秒）
+     */
+    function setWeightCacheDuration(uint256 duration) external onlyOwner {
+        weightCacheDuration = duration;
+    }
+
+    /**
+     * @dev 清除用户权重缓存
+     * @param user 用户地址
+     */
+    function clearUserWeightCache(address user) external onlyOp {
+        delete cachedUserWeight[user];
+        delete cachedWeightTimestamp[user];
     }
 
     /**
@@ -436,7 +505,14 @@ contract RewardManager is
 
         if (oldWeight != newWeight) {
             uint256 oldTotal = totalWeight;
-            totalWeight = totalWeight - oldWeight + newWeight;
+            
+            unchecked {
+                if (oldWeight > 0 && newWeight == 0) {
+                    require(totalWeight >= oldWeight, "RM: totalWeight underflow");
+                }
+                totalWeight = totalWeight - oldWeight + newWeight;
+            }
+            
             userWeight[user] = newWeight;
 
             emit UserWeightUpdated(user, oldWeight, newWeight, block.timestamp);
@@ -570,26 +646,42 @@ contract RewardManager is
         uint256 userW = user == owner() ? ownerWeight : userWeight[user];
         require(userW > 0, "RM: no weight");
 
-        require(dividendPool <= type(uint256).max / userW, "RM: overflow");
+        uint256 contractBalance = address(this).balance;
+        require(contractBalance >= dividendPool, "RM: insufficient contract balance");
+
+        uint256 baseReward;
+        uint256 carryOver;
+        
         uint256 totalDiv = dividendPool * userW;
-        uint256 base = totalDiv / totalW;
-        uint256 precRemain = totalDiv % totalW;
+            baseReward = totalDiv / totalW;
+            carryOver = totalDiv % totalW;
+            
+            uint256 accumulated = precisionAcc[user] + carryOver;
+            
+            if (accumulated >= totalW) {
+                uint256 additionalReward = accumulated / totalW;
+                carryOver = accumulated % totalW;
+                
+                require(baseReward <= dividendPool - additionalReward, "RM: reward exceeds pool");
+                baseReward += additionalReward;
+            } else {
+                carryOver = accumulated;
+            }
+            
+            require(baseReward <= dividendPool, "RM: reward exceeds pool");
 
-        uint256 acc = precisionAcc[user] + precRemain;
-        uint256 precBonus = acc / totalW;
-        uint256 finalAmt = base + precBonus;
-        require(finalAmt > 0, "RM: no amt");
-        require(finalAmt <= address(this).balance, "RM: insufficient balance");
+        require(baseReward > 0, "RM: no amt");
+        require(baseReward <= dividendPool, "RM: reward exceeds dividend pool");
 
-        precisionAcc[user] = acc % totalW;
+        precisionAcc[user] = carryOver;
         unchecked {
-            dividendPool -= finalAmt;
-            claimedDividend[user] += finalAmt;
-            totalDistributed += finalAmt;
+            dividendPool -= baseReward;
+            claimedDividend[user] += baseReward;
+            totalDistributed += baseReward;
         }
-        emit DividendClaimed(user, finalAmt, precisionAcc[user], block.timestamp);
+        emit DividendClaimed(user, baseReward, precisionAcc[user], block.timestamp);
 
-        (bool success, ) = payable(user).call{value: finalAmt}("");
+        (bool success, ) = payable(user).call{value: baseReward}("");
         require(success, "RM: transfer fail");
     }
 
@@ -617,15 +709,13 @@ contract RewardManager is
     }
 
     /**
-     * @dev 提取所有资�?
+     * @dev 提取所有资金（仅在紧急情况下使用，需要暂停合约）
      */
-    function withdrawAllFunds() external onlyOwner nonReentrant {
+    function withdrawAllFunds() external onlyOwner nonReentrant whenPaused {
         uint256 bal = address(this).balance;
         require(bal > 0, "RM: no balance");
+        require(paused(), "RM: contract must be paused");
 
-        unchecked {
-            dividendPool = 0;
-        }
         emit FullFundsWithdrawn(owner(), bal, block.timestamp);
         (bool success, ) = payable(owner()).call{value: bal}("");
         require(success, "RM: withdraw fail");
@@ -644,7 +734,10 @@ contract RewardManager is
         if (user == owner()) {
             if (ownerWeight == 0) return (0, 0);
             uint256 ownerTotalDiv = dividendPool * ownerWeight;
-            return (ownerTotalDiv / totalW, ownerTotalDiv % totalW);
+            uint256 base = ownerTotalDiv / totalW;
+            uint256 carryOver = ownerTotalDiv % totalW;
+            uint256 accumulated = precisionAcc[user] + carryOver;
+            return (base + (accumulated / totalW), accumulated % totalW);
         }
 
         if (!_hasEligibility(user) || userWeight[user] == 0) return (0, 0);
@@ -652,9 +745,10 @@ contract RewardManager is
         uint256 userW = userWeight[user];
         uint256 userTotalDiv = dividendPool * userW;
         uint256 base = userTotalDiv / totalW;
-        uint256 acc = precisionAcc[user] + (userTotalDiv % totalW);
+        uint256 carryOver = userTotalDiv % totalW;
+        uint256 accumulated = precisionAcc[user] + carryOver;
 
-        return (base + (acc / totalW), acc % totalW);
+        return (base + (accumulated / totalW), accumulated % totalW);
     }
 
     /**

@@ -266,11 +266,11 @@
                     let decimals = 18;
                     try { decimals = await tokenContract.methods.decimals().call(); } catch (e) {}
                     const balanceInTokens = web3.utils.fromWei(balance, 'ether');
-                    const balanceInt = Math.floor(parseFloat(balanceInTokens));
-                    tokenBalance.textContent = balanceInt;
+                    const balanceFormatted = parseFloat(balanceInTokens).toFixed(4);
+                    tokenBalance.textContent = balanceFormatted;
                 }
             } catch (error) {
-                tokenBalance.textContent = '0';
+                tokenBalance.textContent = '0.0000';
             }
         }
 
@@ -285,12 +285,19 @@
                     MINT_PRICE = await tokenBurnerContract.methods.normalMintCost().call();
                     LIGHT_DARK_COST = await tokenBurnerContract.methods.rareMintCost().call();
                     
-                    MINT_PRICE = parseInt(MINT_PRICE) / 1e18;
-                    LIGHT_DARK_COST = parseInt(LIGHT_DARK_COST) / 1e18;
+                    MINT_PRICE = parseInt(MINT_PRICE);
+                    LIGHT_DARK_COST = parseInt(LIGHT_DARK_COST);
                     
                     document.querySelector('#mintBtn').innerHTML = `<i class="fas fa-magic mr-2"></i> 普通铸造（消耗${MINT_PRICE}代币）`;
                     document.querySelector('#mintLightDarkBtn').innerHTML = `<i class="fas fa-star mr-2"></i> 光暗铸造（消耗${LIGHT_DARK_COST}代币）`;
-                    document.querySelector('.text-lg.font-semibold.text-gray-800:contains("铸造价格")').nextElementSibling.textContent = `${MINT_PRICE} 代币`;
+                    const priceElements = document.querySelectorAll('.text-lg.font-semibold.text-gray-800');
+                    for (let el of priceElements) {
+                        const prevEl = el.previousElementSibling;
+                        if (prevEl && prevEl.textContent.includes('铸造价格')) {
+                            el.textContent = `${MINT_PRICE} 代币`;
+                            break;
+                        }
+                    }
                     
                     const tipsList = document.querySelectorAll('.bg-yellow-50.border-l-4.border-yellow-400 p, .bg-yellow-50.border-l-4.border-yellow-400 li');
                     tipsList.forEach(el => {
@@ -347,14 +354,13 @@
                 approveToken.textContent = '授权中...';
                 approveToken.disabled = true;
 
-                const amountInWei = web3.utils.toWei(MINT_PRICE.toString(), 'ether');
                 const gasPrice = await web3.eth.getGasPrice();
                 const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.2);
                 const gasLimit = 1000000;
 
-                alert('即将授权智能合约使用1枚代币\n\n请在MetaMask等web3钱包中确认授权交易');
+                alert('即将授权智能合约使用代币（无限授权）\n\n请在MetaMask等web3钱包中确认授权交易');
 
-                await tokenContract.methods.approve(tokenBurnerAddress, amountInWei).send({
+                await tokenContract.methods.approve(tokenBurnerAddress, '115792089237316195423570985008687907853269984665640564039457584007913129639935').send({
                     from: accounts[0],
                     gasPrice: adjustedGasPrice,
                     gas: gasLimit

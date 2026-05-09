@@ -231,8 +231,8 @@
                     <p class="text-lg font-bold text-gray-800" id="contractBalance">0.00</p>
                 </div>
                 <div class="p-4 bg-gray-50 rounded-lg">
-                    <span class="text-sm text-gray-600">总质押NFT数量</span>
-                    <p class="text-lg font-bold text-gray-800" id="totalStaked">0</p>
+                    <span class="text-sm text-gray-600">我的质押NFT数量</span>
+                    <p class="text-lg font-bold text-gray-800" id="myStakedCount">0</p>
                 </div>
                 <div class="p-4 bg-gray-50 rounded-lg col-span-2">
                     <span class="text-sm text-gray-600">每分钟预计奖励</span>
@@ -422,9 +422,9 @@
                 const balanceFormatted = web3.utils.fromWei(balance, 'ether');
                 document.getElementById('contractBalance').textContent = balanceFormatted.substring(0, 6);
 
-                // 获取总质押NFT数量
-                const totalStaked = await stakingContract.methods.totalStakedNFTs().call();
-                document.getElementById('totalStaked').textContent = totalStaked;
+                // 获取用户质押数量
+                const myStakedCount = await stakingContract.methods.getUserStakeCount(accounts[0]).call();
+                document.getElementById('myStakedCount').textContent = myStakedCount;
 
                 // 计算预计奖励
                 await loadEstimatedReward();
@@ -445,14 +445,14 @@
                     dailyReward = maxDailyReward;
                 }
                 
-                // 获取总质押数量
-                const totalStaked = await stakingContract.methods.totalStakedNFTs().call();
+                // 获取当前用户质押数量作为参考
+                const userStakeCount = await stakingContract.methods.getUserStakeCount(accounts[0]).call();
                 
-                // 计算每分钟每个NFT的奖励
+                // 计算每分钟每个NFT的奖励（假设最小奖励为1代币/分钟）
                 let estimatedReward = 0;
-                if (totalStaked > 0) {
-                    const totalMinuteReward = dailyReward / 1440; // 1440分钟/天
-                    estimatedReward = totalMinuteReward / totalStaked;
+                if (parseInt(userStakeCount) > 0) {
+                    const totalMinuteReward = dailyReward / 1440;
+                    estimatedReward = totalMinuteReward / Math.max(parseInt(userStakeCount), 1);
                     
                     // 确保奖励在1-10代币之间
                     const minReward = web3.utils.toWei('1', 'ether');

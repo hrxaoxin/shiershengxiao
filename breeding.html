@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>孕育系统 - 十二生肖</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="abis.js"></script>
     <script src="utils.js"></script>
     <link rel="stylesheet" href="styles.css">
@@ -311,7 +311,8 @@
 
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <script>
-        let provider, signer, account;
+        let web3 = null;
+        let accounts = [];
         let nftContract, breedingContract;
         let currentTab = 'self';
         let selectedMaleNFT = null;
@@ -394,15 +395,14 @@
         async function initWeb3() {
             if (typeof window.ethereum !== 'undefined') {
                 try {
-                    provider = new ethers.providers.Web3Provider(window.ethereum);
-                    await provider.send("eth_requestAccounts", []);
-                    signer = provider.getSigner();
-                    account = await signer.getAddress();
+                    web3 = new Web3(window.ethereum);
+                    accounts = await web3.eth.requestAccounts();
+                    const account = accounts[0];
 
                     document.getElementById('walletBtn').textContent = account.slice(0, 6) + '...' + account.slice(-4);
 
-                    nftContract = new ethers.Contract(nftMintAddress, window.nftMintABI, signer);
-                    breedingContract = new ethers.Contract(breedingAddress, breedingABI, signer);
+                    nftContract = new web3.eth.Contract(window.nftMintABI, nftMintAddress);
+                    breedingContract = new web3.eth.Contract(window.breedingABI, breedingAddress);
 
                     await loadNFTs();
                     await loadMarketOrders();
@@ -424,12 +424,13 @@
                 maleNFTs = [];
                 femaleNFTs = [];
                 breedableNFTs = [];
+                const account = accounts[0];
 
-                const balance = await nftContract.balanceOf(account);
+                const balance = await nftContract.methods.balanceOf(account).call();
                 for (let i = 0; i < balance; i++) {
-                    const tokenId = await nftContract.tokenOfOwnerByIndex(account, i);
-                    const tokenType = await nftContract.tokenType(tokenId);
-                    const tokenLevel = await nftContract.tokenLevel(tokenId);
+                    const tokenId = await nftContract.methods.tokenOfOwnerByIndex(account, i).call();
+                    const tokenType = await nftContract.methods.tokenType(tokenId).call();
+                    const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
                     const gender = tokenType % 2;
 
                     if (tokenLevel >= MIN_LEVEL) {
@@ -572,13 +573,21 @@
             const btn = document.getElementById('startSelfBreedingBtn');
             btn.disabled = true;
             btn.textContent = '处理中...';
+            const account = accounts[0];
 
             try {
-                const tx = await breedingContract.startSelfBreeding(
+                const gasPrice = await web3.eth.getGasPrice();
+                const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.5);
+                
+                const tx = await breedingContract.methods.startSelfBreeding(
                     selectedMaleNFT.id,
                     selectedFemaleNFT.id
-                );
-                await tx.wait();
+                ).send({
+                    from: account,
+                    gasPrice: adjustedGasPrice,
+                    gas: 3000000
+                });
+                
                 alert('自我孕育已开始！12小时后可以完成。');
                 await loadNFTs();
                 await checkActiveSelfOrder();
@@ -587,7 +596,7 @@
                 updateSelectedPair();
             } catch (error) {
                 console.error('开始自我孕育失败:', error);
-                alert('交易失败: ' + (error.reason || error.message));
+                alert('交易失败: ' + (error.message || '未知错误'));
             }
 
             btn.disabled = false;
@@ -596,9 +605,10 @@
 
         async function checkActiveSelfOrder() {
             try {
-                const orders = await breedingContract.getUserBreedingOrders(account);
+                const account = accounts[0];
+                const orders = await breedingContract.methods.getUserBreedingOrders(account).call();
                 for (const orderId of orders) {
-                    const order = await breedingContract.breedingOrders(orderId);
+                    const order = await breedingContract.methods.breedingOrders(orderId).call();
                     if (order.owner1 === order.owner2 && !order.completed) {
                         activeSelfOrder = {
                             id: orderId,
@@ -656,17 +666,25 @@
             const btn = document.getElementById('completeSelfBreedingBtn');
             btn.disabled = true;
             btn.textContent = '处理中...';
+            const account = accounts[0];
 
             try {
-                const tx = await breedingContract.completeSelfBreeding(activeSelfOrder.id);
-                await tx.wait();
+                const gasPrice = await web3.eth.getGasPrice();
+                const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.5);
+                
+                const tx = await breedingContract.methods.completeSelfBreeding(activeSelfOrder.id).send({
+                    from: account,
+                    gasPrice: adjustedGasPrice,
+                    gas: 3000000
+                });
+                
                 alert('恭喜！孕育完成！');
                 activeSelfOrder = null;
                 document.getElementById('selfBreedingStatus').classList.add('hidden');
                 await loadNFTs();
             } catch (error) {
                 console.error('完成自我孕育失败:', error);
-                alert('交易失败: ' + (error.reason || error.message));
+                alert('交易失败: ' + (error.message || '未知错误'));
                 btn.disabled = false;
                 btn.textContent = '完成孕育';
             }
@@ -681,10 +699,18 @@
             const btn = document.getElementById('listForBreedingBtn');
             btn.disabled = true;
             btn.textContent = '处理中...';
+            const account = accounts[0];
 
             try {
-                const tx = await breedingContract.listForBreeding(selectedListNFT.id);
-                await tx.wait();
+                const gasPrice = await web3.eth.getGasPrice();
+                const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.5);
+                
+                const tx = await breedingContract.methods.listForBreeding(selectedListNFT.id).send({
+                    from: account,
+                    gasPrice: adjustedGasPrice,
+                    gas: 3000000
+                });
+                
                 alert('已上架到市场！');
                 await loadNFTs();
                 await loadMarketOrders();
@@ -693,7 +719,7 @@
                 document.getElementById('listForBreedingBtn').disabled = true;
             } catch (error) {
                 console.error('上架失败:', error);
-                alert('交易失败: ' + (error.reason || error.message));
+                alert('交易失败: ' + (error.message || '未知错误'));
             }
 
             btn.disabled = false;
@@ -702,14 +728,14 @@
 
         async function loadMarketOrders() {
             try {
-                const orderIds = await breedingContract.getMarketBreedingOrders();
+                const orderIds = await breedingContract.methods.getMarketBreedingOrders().call();
                 marketOrders = [];
 
                 for (const orderId of orderIds) {
-                    const order = await breedingContract.breedingOrders(orderId);
+                    const order = await breedingContract.methods.breedingOrders(orderId).call();
                     if (order.owner2 === '0x0000000000000000000000000000000000000000' && !order.completed) {
-                        const token1Type = await nftContract.tokenType(order.tokenId1);
-                        const token1Level = await nftContract.tokenLevel(order.tokenId1);
+                        const token1Type = await nftContract.methods.tokenType(order.tokenId1).call();
+                        const token1Level = await nftContract.methods.tokenLevel(order.tokenId1).call();
                         marketOrders.push({
                             id: orderId,
                             owner1: order.owner1,
@@ -737,7 +763,7 @@
 
             let html = '';
             marketOrders.forEach(order => {
-                const isMyOrder = order.owner1.toLowerCase() === account.toLowerCase();
+                const isMyOrder = order.owner1.toLowerCase() === accounts[0].toLowerCase();
                 html += `
                     <div class="market-card">
                         <div class="flex items-center gap-4 mb-3">
@@ -766,14 +792,15 @@
 
         async function loadMyMarketOrders() {
             try {
-                const orderIds = await breedingContract.getUserBreedingOrders(account);
+                const account = accounts[0];
+                const orderIds = await breedingContract.methods.getUserBreedingOrders(account).call();
                 myMarketOrders = [];
 
                 for (const orderId of orderIds) {
-                    const order = await breedingContract.breedingOrders(orderId);
+                    const order = await breedingContract.methods.breedingOrders(orderId).call();
                     if (order.owner1.toLowerCase() === account.toLowerCase() && order.owner2 === '0x0000000000000000000000000000000000000000') {
-                        const token1Type = await nftContract.tokenType(order.tokenId1);
-                        const token1Level = await nftContract.tokenLevel(order.tokenId1);
+                        const token1Type = await nftContract.methods.tokenType(order.tokenId1).call();
+                        const token1Level = await nftContract.methods.tokenLevel(order.tokenId1).call();
                         myMarketOrders.push({
                             id: orderId,
                             tokenId1: order.tokenId1.toString(),
@@ -785,9 +812,10 @@
                             completed: order.completed
                         });
                     } else if (order.owner2.toLowerCase() === account.toLowerCase() && !order.completed) {
-                        const token2Type = await nftContract.tokenType(order.tokenId2);
-                        const token2Level = await nftContract.tokenLevel(order.tokenId2);
-                        const token1Type = await nftContract.tokenType(order.tokenId1);
+                        const token2Type = await nftContract.methods.tokenType(order.tokenId2).call();
+                        const token2Level = await nftContract.methods.tokenLevel(order.tokenId2).call();
+                        const token1Type = await nftContract.methods.tokenType(order.tokenId1).call();
+                        const token1Level = await nftContract.methods.tokenLevel(order.tokenId1).call();
                         myMarketOrders.push({
                             id: orderId,
                             role: 'participant',
@@ -925,10 +953,18 @@
             const btn = document.getElementById('joinBreedingBtn');
             btn.disabled = true;
             btn.textContent = '处理中...';
+            const account = accounts[0];
 
             try {
-                const tx = await breedingContract.joinBreeding(selectedJoinOrderId, selectedJoinNFT.id);
-                await tx.wait();
+                const gasPrice = await web3.eth.getGasPrice();
+                const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.5);
+                
+                const tx = await breedingContract.methods.joinBreeding(selectedJoinOrderId, selectedJoinNFT.id).send({
+                    from: account,
+                    gasPrice: adjustedGasPrice,
+                    gas: 3000000
+                });
+                
                 alert('成功加入孕育！24小时后可以完成。');
                 closeJoinModal();
                 await loadNFTs();
@@ -936,7 +972,7 @@
                 await loadMyMarketOrders();
             } catch (error) {
                 console.error('加入孕育失败:', error);
-                alert('交易失败: ' + (error.reason || error.message));
+                alert('交易失败: ' + (error.message || '未知错误'));
             }
 
             btn.disabled = false;
@@ -945,17 +981,25 @@
 
         async function cancelMyListing(orderId) {
             if (!confirm('确定要取消上架吗？')) return;
+            const account = accounts[0];
 
             try {
-                const tx = await breedingContract.cancelBreedingListing(orderId);
-                await tx.wait();
+                const gasPrice = await web3.eth.getGasPrice();
+                const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.5);
+                
+                const tx = await breedingContract.methods.cancelBreedingListing(orderId).send({
+                    from: account,
+                    gasPrice: adjustedGasPrice,
+                    gas: 3000000
+                });
+                
                 alert('已取消上架');
                 await loadNFTs();
                 await loadMarketOrders();
                 await loadMyMarketOrders();
             } catch (error) {
                 console.error('取消上架失败:', error);
-                alert('交易失败: ' + (error.reason || error.message));
+                alert('交易失败: ' + (error.message || '未知错误'));
             }
         }
 
@@ -963,17 +1007,25 @@
             const btn = event.target;
             btn.disabled = true;
             btn.textContent = '处理中...';
+            const account = accounts[0];
 
             try {
-                const tx = await breedingContract.completeMarketBreeding(orderId);
-                await tx.wait();
+                const gasPrice = await web3.eth.getGasPrice();
+                const adjustedGasPrice = Math.floor(parseInt(gasPrice) * 1.5);
+                
+                const tx = await breedingContract.methods.completeMarketBreeding(orderId).send({
+                    from: account,
+                    gasPrice: adjustedGasPrice,
+                    gas: 3000000
+                });
+                
                 alert('恭喜！双方都完成了孕育！');
                 await loadNFTs();
                 await loadMarketOrders();
                 await loadMyMarketOrders();
             } catch (error) {
                 console.error('完成市场孕育失败:', error);
-                alert('交易失败: ' + (error.reason || error.message));
+                alert('交易失败: ' + (error.message || '未知错误'));
                 btn.disabled = false;
                 btn.textContent = '完成孕育';
             }

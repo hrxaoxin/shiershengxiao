@@ -19,7 +19,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  */
 contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /** @dev 黑洞地址，用于销毁代币 */
-    address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
+    address public constant BLACK_HOLE = address(0);
     
     /** @dev 普通铸造费用（默认8888代币） */
     uint256 public normalMintCost = 8888;
@@ -30,6 +30,8 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     address public tokenContract;
     /** @dev 授权合约地址 */
     address public authorizer;
+    /** @dev 授权的NFT合约地址 */
+    address public authorizedNFTContract;
 
     /** @dev 代币销毁事件 */
     event TokenBurned(address indexed user, uint256 amount, uint256 timestamp);
@@ -47,8 +49,8 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      * @param _authorizer 授权合约地址
      */
     function initialize(address _tokenContract, address _authorizer) external initializer {
-        __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        __Ownable2Step_init();
 
         tokenContract = _tokenContract;
         authorizer = _authorizer;
@@ -61,50 +63,34 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /**
-     * @dev 销毁普通铸造费用的代币
-     * 用户需要先授权代币给合约，然后调用此函数销毁代币
-     * @return bool 是否成功
-     */
-    function burnTokenForMint() external returns (bool) {
-        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
-        
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        require(token.transferFrom(msg.sender, BLACK_HOLE, normalMintCost), "TokenBurner: Token transfer failed");
-        
-        emit TokenBurned(msg.sender, normalMintCost, block.timestamp);
-        return true;
-    }
-
-    /**
-     * @dev 销毁稀有铸造费用的代币
-     * 用户需要先授权代币给合约，然后调用此函数销毁代币
-     * @return bool 是否成功
-     */
-    function burnTokenForRareMint() external returns (bool) {
-        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
-        
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        require(token.transferFrom(msg.sender, BLACK_HOLE, rareMintCost), "TokenBurner: Token transfer failed");
-        
-        emit TokenBurned(msg.sender, rareMintCost, block.timestamp);
-        return true;
-    }
-
-    /**
-     * @dev 销毁代币用于铸造（由NFT合约调用）
+     * @dev 销毁代币用于铸造（仅限授权的NFT合约调用）
      * @param user 用户地址
      * @param isRare 是否稀有铸造
      * @return bool 是否成功
      */
     function burnAndMint(address user, bool isRare) external returns (bool) {
         require(tokenContract != address(0), "TokenBurner: tokenContract not set");
+        require(msg.sender == authorizedNFTContract, "TokenBurner: Unauthorized caller");
+        require(user != address(0), "TokenBurner: Zero user address");
         
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         uint256 cost = isRare ? rareMintCost : normalMintCost;
+        require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
+        require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
         require(token.transferFrom(user, BLACK_HOLE, cost), "TokenBurner: Token transfer failed");
         
         emit TokenBurned(user, cost, block.timestamp);
         return true;
+    }
+    
+    /**
+     * @dev 设置授权的NFT合约地址
+     * @param nftContract NFT合约地址
+     */
+    function setAuthorizedNFTContract(address nftContract) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "TokenBurner: Unauthorized");
+        require(nftContract != address(0), "TokenBurner: Zero address");
+        authorizedNFTContract = nftContract;
     }
 
     /**

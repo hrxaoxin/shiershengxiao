@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
  * @title Staking
  * @dev NFT质押合约，允许用户质押等级6以上的NFT来获取代币奖励
  * 奖励根据质押时间和NFT等级计算，每日有最大奖励上限
- * 基于OpenZeppelin可升级合约实现
+ * 基于OpenZeppelin UUPS可升级合约实现
  */
 import "./NFTData.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/IERC721Upgradeable.sol";
@@ -13,12 +13,14 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/utils/introspection/ERC165Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 
 /**
  * @title Staking
  * @dev NFT质押合约，支持质押NFT获取代币奖励
  */
-contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
+contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC165Upgradeable, ReentrancyGuardUpgradeable {
     /** @dev 最小质押等级：必须达到5级才能质押 */
     uint8 public constant MIN_STAKING_LEVEL = 5;
     /** @dev 奖励间隔时间：每分钟计算一次奖励 */
@@ -27,6 +29,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
     uint256 public constant BASE_TOKEN_PER_MINUTE = 10 * 10**18;
     /** @dev 每日最大奖励上限 */
     uint256 public constant MAX_DAILY_REWARD = 14400 * 10**18;
+    /** @dev 最小质押锁定时间（30分钟） */
+    uint256 public constant MIN_STAKING_DURATION = 30 minutes;
 
     /** @dev NFT合约地址 */
     address public nftContract;
@@ -48,12 +52,14 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
      * @param level NFT等级
      * @param lastRewardTime 上次领取奖励时间
      * @param accumulatedRewards 累计未领取奖励
+     * @param stakedAt 质押时间（用于锁定检查）
      */
     struct StakeInfo {
         uint256 tokenId;
         uint8 level;
         uint256 lastRewardTime;
         uint256 accumulatedRewards;
+        uint256 stakedAt;
     }
 
     /** @dev 用户质押信息映射（用户地址 => 质押信息数组） */
@@ -86,6 +92,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
      */
     event TokensDeposited(uint256 amount);
 
+    /** @dev 存储间隙，用于合约升级兼容性 */
+    uint256[50] private __gap;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -99,7 +108,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
      */
     function initialize(address _nftContract, address _tokenContract, address _authorizer) external initializer {
         __Ownable2Step_init();
+        __UUPSUpgradeable_init();
         __ERC165_init();
+        __ReentrancyGuard_init();
 
         nftContract = _nftContract;
         tokenContract = _tokenContract;
@@ -109,31 +120,38 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
     }
 
     /**
+     * @dev 升级授权函数
+     * @param newImplementation 新实现合约地址
+     */
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    /**
      * @dev 质押NFT
      * 用户将NFT质押到合约中，开始累积奖励
-     * 只有等级达到5级以上的NFT才能质押
+     * 只有等级达到5级的NFT才能质押
      * @param tokenId 要质押的NFT ID
      */
-    function stakeNFT(uint256 tokenId) external {
+    function stakeNFT(uint256 tokenId) external nonReentrant {
         require(!isStaked[tokenId], "NFT already staked");
 
         IERC721Upgradeable nft = IERC721Upgradeable(nftContract);
         require(nft.ownerOf(tokenId) == msg.sender, "Not NFT owner");
 
-        uint8 level = _getNFTLevel(tokenId);
+        uint8 level = INFTMint(nftContract).tokenLevel(tokenId);
         require(level >= MIN_STAKING_LEVEL, "NFT level too low");
-
-        nft.transferFrom(msg.sender, address(this), tokenId);
 
         userStakes[msg.sender].push(StakeInfo({
             tokenId: tokenId,
             level: level,
             lastRewardTime: block.timestamp,
-            accumulatedRewards: 0
+            accumulatedRewards: 0,
+            stakedAt: block.timestamp
         }));
 
         isStaked[tokenId] = true;
         totalStakedNFTs++;
+
+        nft.transferFrom(msg.sender, address(this), tokenId);
 
         emit NFTStaked(msg.sender, tokenId, level);
     }
@@ -143,20 +161,59 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
      * 用户解除NFT质押，领取累计奖励，NFT转回用户钱包
      * @param tokenId 要解除质押的NFT ID
      */
-    function unstakeNFT(uint256 tokenId) external {
+    function unstakeNFT(uint256 tokenId) external nonReentrant {
         uint256 index = _findStakeIndex(msg.sender, tokenId);
-        require(index < userStakes[msg.sender].length, "NFT not staked by user");
+        require(index < userStakes[msg.sender].length, "Staking: NFT not staked by user");
+
+        StakeInfo storage stake = userStakes[msg.sender][index];
+        
+        require(stake.stakedAt > 0, "Staking: Invalid stake timestamp");
+        require(block.timestamp >= stake.stakedAt + MIN_STAKING_DURATION, 
+                "Staking: Must stake for at least 30 minutes");
 
         _updateRewards(msg.sender, index);
 
+        uint256 userReward = stake.accumulatedRewards;
+        
         _removeStake(msg.sender, index);
         isStaked[tokenId] = false;
         totalStakedNFTs--;
 
+        if (userReward > 0) {
+            _updateDailyRewardDistributed(userReward);
+            require(IERC20Upgradeable(tokenContract).balanceOf(address(this)) >= userReward, "Staking: Insufficient tokens");
+        }
+
         IERC721Upgradeable nft = IERC721Upgradeable(nftContract);
         nft.transferFrom(address(this), msg.sender, tokenId);
 
+        if (userReward > 0) {
+            IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+            token.transfer(msg.sender, userReward);
+            emit RewardsClaimed(msg.sender, userReward);
+        }
+
         emit NFTUnstaked(msg.sender, tokenId);
+    }
+
+    /**
+     * @dev 管理员提取全部代币（仅限所有者）
+     * 用于提取合约中的全部代币
+     */
+    function withdrawTokens() external onlyOwner nonReentrant {
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        uint256 contractBalance = token.balanceOf(address(this));
+        require(contractBalance > 0, "Staking: No tokens to withdraw");
+        
+        token.transfer(msg.sender, contractBalance);
+    }
+
+    /**
+     * @dev 获取合约代币余额
+     * @return 合约持有的代币数量
+     */
+    function getContractTokenBalance() external view returns (uint256) {
+        return IERC20Upgradeable(tokenContract).balanceOf(address(this));
     }
 
     /**
@@ -164,20 +221,30 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
      * 用户领取所有质押NFT的累计奖励
      */
     function claimRewards() external {
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        uint256 contractBalance = token.balanceOf(address(this));
+        require(contractBalance > 0, "Staking: No tokens available for rewards");
+
         uint256 totalRewards = 0;
 
         for (uint256 i = 0; i < userStakes[msg.sender].length; i++) {
             _updateRewards(msg.sender, i);
             totalRewards += userStakes[msg.sender][i].accumulatedRewards;
+        }
+
+        require(totalRewards > 0, "Staking: No rewards to claim");
+        
+        uint256 availableReward = _getAvailableDailyReward();
+        uint256 remainingReward = availableReward - dailyRewardDistributed;
+        require(totalRewards <= remainingReward, "Staking: Daily reward limit exceeded");
+        
+        require(totalRewards <= contractBalance, "Staking: Insufficient tokens in contract");
+
+        for (uint256 i = 0; i < userStakes[msg.sender].length; i++) {
             userStakes[msg.sender][i].accumulatedRewards = 0;
         }
 
-        require(totalRewards > 0, "No rewards to claim");
-
         _updateDailyRewardDistributed(totalRewards);
-
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        require(token.balanceOf(address(this)) >= totalRewards, "Insufficient tokens in contract");
 
         token.transfer(msg.sender, totalRewards);
 
@@ -254,14 +321,17 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
         uint256 currentTime = block.timestamp;
         uint256 timeElapsed = currentTime - stake.lastRewardTime;
         
-        if (timeElapsed > 0) {
+        if (timeElapsed > 0 && totalStakedNFTs > 0) {
             uint256 dailyReward = _getAvailableDailyReward();
             uint256 rewardPerMinute = _calculateRewardPerMinute(dailyReward);
-            uint256 rewards = (timeElapsed / REWARD_INTERVAL) * rewardPerMinute;
             
-            if (rewards > 0) {
-                stake.accumulatedRewards += rewards;
-                stake.lastRewardTime = currentTime;
+            uint256 intervals = timeElapsed / REWARD_INTERVAL;
+            if (intervals > 0) {
+                uint256 rewards = intervals * rewardPerMinute;
+                if (rewards > 0) {
+                    stake.accumulatedRewards += rewards;
+                    stake.lastRewardTime = currentTime;
+                }
             }
         }
     }
@@ -287,19 +357,24 @@ contract Staking is Initializable, Ownable2StepUpgradeable, ERC165Upgradeable {
      * @param amount 领取的奖励数量
      */
     function _updateDailyRewardDistributed(uint256 amount) internal {
-        uint256 dayStart = block.timestamp - (block.timestamp % 86400);
-        if (lastRewardUpdate < dayStart) {
-            dailyRewardDistributed = 0;
+        uint256 currentDayStart = block.timestamp - (block.timestamp % 86400);
+        
+        if (lastRewardUpdate == 0) {
             lastRewardUpdate = block.timestamp;
         }
         
-        if (dailyRewardDistributed + amount > MAX_DAILY_REWARD) {
-            uint256 remaining = MAX_DAILY_REWARD - dailyRewardDistributed;
-            dailyRewardDistributed = MAX_DAILY_REWARD;
-            require(amount <= remaining, "Staking: Daily reward exceeded");
-        } else {
-            dailyRewardDistributed += amount;
+        uint256 lastDayStart = lastRewardUpdate - (lastRewardUpdate % 86400);
+        
+        if (currentDayStart > lastDayStart) {
+            dailyRewardDistributed = 0;
         }
+        
+        lastRewardUpdate = block.timestamp;
+        
+        uint256 remaining = MAX_DAILY_REWARD - dailyRewardDistributed;
+        require(amount <= remaining, "Staking: Daily reward exceeded");
+        
+        dailyRewardDistributed += amount;
     }
 
     /**

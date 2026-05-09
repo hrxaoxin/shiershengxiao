@@ -30,43 +30,7 @@ window.ZodiacType = {
 };
 
 window.getZodiacInfo = function(typeId) {
-    const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
-    const attrNames = { water: '水', wind: '风', fire: '火', dark: '暗', light: '光' };
-    const attrPrefixes = { water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang' };
-    const animalKeys = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
-    const ipfsBases = {
-        water: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
-        wind: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
-        fire: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
-        dark: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/',
-        light: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
-    };
-
-    const zodiacIndex = typeId % 12;
-    const attrIndex = Math.floor(typeId / 24);
-    const gender = typeId % 2 === 1 ? '公' : '母';
-    const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
-
-    if (attrIndex < 0 || attrIndex >= attrs.length) {
-        return { name: '未知', prefix: '', animal: '', gender: gender, attr: 'water' };
-    }
-
-    const attr = attrs[attrIndex];
-    const prefix = attrPrefixes[attr];
-    const animal = animalKeys[zodiacIndex];
-    const genderSuffix = typeId % 2 === 1 ? '_1' : '_0';
-    const ipfsBase = ipfsBases[attr];
-
-    return {
-        name: attrNames[attr] + zodiacNames[zodiacIndex] + '（' + gender + '）',
-        prefix: prefix,
-        animal: animal,
-        gender: gender,
-        attr: attr,
-        imagePath: ipfsBase + prefix + animal + genderSuffix + '.png',
-        ipfsBase: ipfsBase,
-        attrName: attrNames[attr]
-    };
+    return window.ZODIAC_UTILS.getNFTInfo(typeId);
 };
 
 // 兼容旧版本的BlessingType映射
@@ -92,9 +56,6 @@ window.NFTTradingAddress = window.contractAddresses.nftTrading;
 window.breedingAddress = window.contractAddresses.breeding;
 window.stakingAddress = window.contractAddresses.staking;
 
-// 兼容旧版本的地址变量（保持向后兼容）
-window.fiveBlessingsNFTAddress = window.contractAddresses.nftMint;
-
 // TokenBurner合约ABI - 基于TokenBurner.sol
 window.tokenBurnerABI = [
 	{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
@@ -106,7 +67,7 @@ window.tokenBurnerABI = [
 	{"inputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"bool","name":"isRare","type":"bool"}],"name":"burnAndMint","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}
 ];
 
-// NFTMint合约ABI - 基于NFTMint.sol
+// NFTMint合约ABI - 基于NFTMint.sol（使用PancakeSwap获取实时价格）
 window.nftMintABI = [
 	{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
 	{"inputs":[{"internalType":"address","name":"initialOwner","type":"address"},{"internalType":"address","name":"_metadataContract","type":"address"},{"internalType":"address","name":"_authorizer","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},
@@ -121,6 +82,11 @@ window.nftMintABI = [
 	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithNFT","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithToken","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithUSDValue","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"getTokenPriceFromPancakeSwap","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"pair","type":"address"}],"name":"setPancakeSwapPair","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"wbnb","type":"address"}],"name":"setWBNBAddress","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"stablecoin","type":"address"}],"name":"setStablecoinAddress","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"pancakeSwapPair","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"approve","outputs":[],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"bool","name":"approved","type":"bool"}],"name":"setApprovalForAll","outputs":[],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"isApprovedForAll","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
@@ -128,7 +94,7 @@ window.nftMintABI = [
 
 // ERC20代币合约ABI
 window.tokenABI = [
-	{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"bytes","name":"reason","type":"bytes"}],"name":"DividendShareUpdateFailed","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[],"name":"EIP712DomainChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint8","name":"version","type":"uint8"}],"name":"Initialized","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint8","name":"fromState","type":"uint8"},{"indexed":false,"internalType":"uint8","name":"toState","type":"uint8"}],"name":"PoolStateChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"bytes","name":"reason","type":"bytes"}],"name":"TaxLiquidationError","type":"error"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"TokensBurned","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","n[... 8925 chars omitted ...]"
+	
 ];
 
 // RewardManager合约ABI
@@ -2068,7 +2034,23 @@ window.stakingABI = [
 		"type": "function"
 	},
 	{
-		"stateMutability": "payable",
-		"type": "receive"
+		"inputs": [],
+		"name": "withdrawTokens",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getContractTokenBalance",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
 	}
 ];
