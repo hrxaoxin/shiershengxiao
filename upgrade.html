@@ -12,6 +12,8 @@
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
     <script src="abis.js"></script>
     <script src="utils.js"></script>
+    <script src="web3-utils.js"></script>
+    <script src="ui-utils.js"></script>
     <link rel="stylesheet" href="styles.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
@@ -199,7 +201,7 @@
             </div>
         </header>
 
-        <main class="container mx-auto px-4 pb-24">
+        <main class="container mx-auto px-4 pb-24 md:ml-72">
             <div class="bg-white rounded-xl p-6 shadow-md mb-8">
                 <h2 class="text-2xl font-bold mb-4">为你的生肖NFT升阶，提升等级获得更多权益</h2>
                 <p class="text-gray-600 mb-6">选择一种升阶方式，提升你的生肖NFT等级，获得更高的分红权重</p>
@@ -237,7 +239,6 @@
             <div class="mb-8">
                 <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">我的生肖NFT</h3>
                 <div id="nftGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    <!-- NFT卡片将通过JavaScript动态生成 -->
                 </div>
             </div>
 
@@ -245,7 +246,6 @@
                 <div class="upgrade-card">
                     <h3 class="text-xl font-bold text-gray-800 mb-4">升阶操作</h3>
                     <div id="selectedNftInfo" class="mb-6">
-                        <!-- 选中的NFT信息 -->
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <button id="upgradeWithNftBtn" class="btn-primary w-full">使用NFT升阶</button>
@@ -256,13 +256,13 @@
             </div>
         </main>
 
-        <footer class="text-center py-8 text-black/70 footer">
+        <footer class="text-center py-8 text-black/70 footer md:ml-72">
             <p>© 2026 十二生肖NFT系列 · Twelve Zodiacs Collection</p>
             <p class="mt-2">祝你心想事成，生肖大旺 🀄✨</p>
         </footer>
     </div>
 
-    <nav class="navbar fixed bottom-0 left-0 right-0 z-10">
+    <nav class="navbar fixed bottom-0 left-0 right-0 z-10 md:hidden">
         <div class="flex justify-around items-center py-2 px-4">
             <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-gray-100">
                 <div class="text-2xl mb-1">🏠</div>
@@ -299,36 +299,56 @@
         </div>
     </nav>
 
-    <nav class="hidden md:block fixed left-6 top-1/2 -translate-y-1/2 z-50 desktop-nav">
-        <div class="p-3 space-y-3">
-            <a href="index.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="首页">
-                <div class="text-3xl">🏠</div>
-                <span class="text-xs font-bold mt-1 text-gray-700">首页</span>
-            </a>
-            <a href="mint.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="铸造">
-                <div class="text-3xl">🃏</div>
-                <span class="text-xs font-bold mt-1 text-gray-700">铸造</span>
-            </a>
-            <a href="collection.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="我的生肖">
-                <div class="text-3xl">🎁</div>
-                <span class="text-xs font-bold mt-1 text-gray-700">生肖</span>
-            </a>
-            <a href="rewards.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="奖励">
-                <div class="text-3xl">🏆</div>
-                <span class="text-xs font-bold mt-1 text-gray-700">奖励</span>
-            </a>
-            <a href="trading.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="交易">
-                <div class="text-3xl">💰</div>
-                <span class="text-xs font-bold mt-1 text-gray-700">交易</span>
-            </a>
-            <a href="breeding.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="孕育">
-                <div class="text-3xl">🐾</div>
-                <span class="text-xs font-bold mt-1 text-gray-700">孕育</span>
-            </a>
-            <a href="staking.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 hover:bg-gray-100" title="挖矿">
-                <div class="text-3xl">⚡</div>
-                <span class="text-xs font-bold mt-1 text-gray-700">挖矿</span>
-            </a>
+    <nav class="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-white shadow-lg z-20">
+        <div class="p-6">
+            <div class="text-center mb-8">
+                <div class="text-4xl mb-2">🀄</div>
+                <h1 class="text-xl font-bold text-gray-800">十二生肖</h1>
+                <p class="text-sm text-gray-500">Twelve Zodiacs</p>
+            </div>
+            <div class="space-y-2">
+                <a href="index.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-home w-5 h-5 mr-3 text-gray-500"></i>
+                    <span class="text-gray-700">首页</span>
+                </a>
+                <a href="mint.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-coins w-5 h-5 mr-3 text-gray-500"></i>
+                    <span class="text-gray-700">铸造</span>
+                </a>
+                <a href="collection.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-gem w-5 h-5 mr-3 text-gray-500"></i>
+                    <span class="text-gray-700">收藏</span>
+                </a>
+                <a href="rewards.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-trophy w-5 h-5 mr-3 text-gray-500"></i>
+                    <span class="text-gray-700">奖励</span>
+                </a>
+                <a href="upgrade.html" class="flex items-center px-4 py-3 rounded-lg bg-purple-50 text-purple-600">
+                    <i class="fas fa-star w-5 h-5 mr-3"></i>
+                    <span class="font-medium">升阶</span>
+                </a>
+                <a href="trading.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-shopping-cart w-5 h-5 mr-3 text-gray-500"></i>
+                    <span class="text-gray-700">交易</span>
+                </a>
+                <a href="breeding.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-heart w-5 h-5 mr-3 text-gray-500"></i>
+                    <span class="text-gray-700">孕育</span>
+                </a>
+                <a href="staking.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <i class="fas fa-bolt w-5 h-5 mr-3 text-gray-500"></i>
+                    <span class="text-gray-700">挖矿</span>
+                </a>
+            </div>
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm text-gray-500">钱包</span>
+                    <span id="walletAddressDesktop" class="text-sm font-medium text-gray-700">未连接</span>
+                </div>
+                <button id="connectWalletBtnDesktop" class="w-full wallet-button py-2 rounded-lg text-white font-medium" onclick="handleConnectWallet()">
+                    <i class="fas fa-plug mr-2"></i> 连接钱包
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -359,44 +379,59 @@
             });
 
             initWeb3();
+            initWalletUI();
         });
 
+        function initWalletUI() {
+            ZODIAC_UI.initWalletButton('walletBtn', null, null);
+            ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddressDesktop', null);
+            ZODIAC_UI.on('walletConnected', async () => {
+                await initContracts();
+                await loadUserNFTs();
+            });
+        }
+
+        function handleConnectWallet() {
+            ZODIAC_UI.emitEvent('walletConnectRequested');
+        }
+
         async function initWeb3() {
-            if (typeof window.ethereum !== 'undefined') {
-                web3 = new Web3(window.ethereum);
-                try {
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    account = accounts[0];
-                    updateWalletButton();
-                    initContracts();
-                    loadUserNFTs();
-                } catch (error) {
-                    console.error('Web3 init failed:', error);
-                }
+            const connected = await window.ZODIAC_WEB3.initWeb3();
+            if (connected) {
+                account = window.ZODIAC_WEB3.getAccount();
+                web3 = window.ZODIAC_WEB3.getWeb3();
+                updateWalletButton();
+                await initContracts();
+                await loadUserNFTs();
             }
         }
 
         function updateWalletButton() {
             const walletBtn = document.getElementById('walletBtn');
+            const walletBtnDesktop = document.getElementById('connectWalletBtnDesktop');
             if (account) {
                 const shortAddress = account.substring(0, 4) + '...' + account.substring(account.length - 4);
                 walletBtn.textContent = shortAddress;
                 walletBtn.style.background = 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)';
+                walletBtnDesktop.textContent = shortAddress;
+                walletBtnDesktop.disabled = true;
+                walletBtnDesktop.style.background = 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)';
             }
         }
 
         function initContracts() {
-            nftContract = new web3.eth.Contract(window.nftMintABI, window.contractAddresses.nftMint);
-            tokenContract = new web3.eth.Contract(window.tokenABI, window.contractAddresses.tokenContract);
+            nftContract = window.ZODIAC_WEB3.getContract('nftMint');
+            tokenContract = window.ZODIAC_WEB3.getContract('tokenContract');
         }
 
         async function loadUserNFTs() {
+            ZODIAC_UI.showLoading('加载NFT中...');
             const nftGrid = document.getElementById('nftGrid');
-            nftGrid.innerHTML = '<div class="col-span-full text-center py-12">加载中...</div>';
 
             try {
                 if (!account || !nftContract) {
                     nftGrid.innerHTML = '<div class="col-span-full text-center py-12">请先连接钱包</div>';
+                    ZODIAC_UI.hideLoading();
                     return;
                 }
 
@@ -423,7 +458,9 @@
             } catch (error) {
                 console.error('加载NFT失败:', error);
                 nftGrid.innerHTML = '<div class="col-span-full text-center py-12 text-red-500">加载失败，请重试</div>';
+                ZODIAC_UI.showToast('加载NFT失败: ' + error.message, 'error');
             }
+            ZODIAC_UI.hideLoading();
         }
 
         function renderNFTs(nfts) {
@@ -491,14 +528,32 @@
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
 
+            const confirm = await ZODIAC_UI.showConfirmModal(
+                '确认升级',
+                `将消耗相同属性相同生肖的NFT来升级 ${selectedNft.name}，确定继续？`
+            );
+
+            if (!confirm) return;
+
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = '升级中...';
+
             try {
-                const result = await nftContract.methods.upgradeWithNFT(selectedNft.id).send({ from: account });
-                alert(`升级成功！NFT ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 阶`);
-                loadUserNFTs();
+                const gas = await ZODIAC_UI.estimateGas(nftContract, 'upgradeWithNFT', [selectedNft.id], account);
+                const result = await nftContract.methods.upgradeWithNFT(selectedNft.id).send({ 
+                    from: account,
+                    gas: gas
+                });
+                ZODIAC_UI.showToast(`升级成功！NFT ${selectedNft.id} 已升级到 ${parseInt(selectedNft.level) + 1} 阶`, 'success');
+                await loadUserNFTs();
                 document.getElementById('upgradeSection').classList.add('hidden');
             } catch (error) {
                 console.error('升级失败:', error);
-                alert('升级失败，请检查是否有足够的相同NFT');
+                ZODIAC_UI.showToast('升级失败，请检查是否有足够的相同NFT', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '使用NFT升阶';
             }
         });
 
@@ -506,29 +561,52 @@
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
 
+            const requiredTokens = getRequiredTokens(selectedNft.level);
+
+            const confirm = await ZODIAC_UI.showConfirmModal(
+                '确认升级',
+                `将消耗 ${requiredTokens.toLocaleString()} 代币来升级 ${selectedNft.name}，确定继续？`
+            );
+
+            if (!confirm) return;
+
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = '升级中...';
+
             try {
-                // 首先检查代币余额
-                const requiredTokens = getRequiredTokens(selectedNft.level);
                 const balance = await tokenContract.methods.balanceOf(account).call();
                 
-                if (parseInt(balance) < requiredTokens) {
-                    alert(`代币不足，需要 ${requiredTokens} 枚代币`);
+                if (parseInt(balance) < web3.utils.toWei(requiredTokens.toString(), 'ether')) {
+                    ZODIAC_UI.showToast(`代币不足，需要 ${requiredTokens} 枚代币`, 'error');
+                    btn.disabled = false;
+                    btn.textContent = '使用代币升阶';
                     return;
                 }
 
-                // 检查授权
                 const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.nftMint).call();
-                if (parseInt(allowance) < requiredTokens) {
-                    await tokenContract.methods.approve(window.contractAddresses.nftMint, requiredTokens).send({ from: account });
+                if (parseInt(allowance) < web3.utils.toWei(requiredTokens.toString(), 'ether')) {
+                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [window.contractAddresses.nftMint, web3.utils.toWei(requiredTokens.toString(), 'ether')], account);
+                    await tokenContract.methods.approve(window.contractAddresses.nftMint, web3.utils.toWei(requiredTokens.toString(), 'ether')).send({ 
+                        from: account,
+                        gas: approveGas
+                    });
                 }
 
-                const result = await nftContract.methods.upgradeWithToken(selectedNft.id).send({ from: account });
-                alert(`升级成功！NFT ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 阶`);
-                loadUserNFTs();
+                const gas = await ZODIAC_UI.estimateGas(nftContract, 'upgradeWithToken', [selectedNft.id], account);
+                const result = await nftContract.methods.upgradeWithToken(selectedNft.id).send({ 
+                    from: account,
+                    gas: gas
+                });
+                ZODIAC_UI.showToast(`升级成功！NFT ${selectedNft.id} 已升级到 ${parseInt(selectedNft.level) + 1} 阶`, 'success');
+                await loadUserNFTs();
                 document.getElementById('upgradeSection').classList.add('hidden');
             } catch (error) {
                 console.error('升级失败:', error);
-                alert('升级失败，请检查代币余额和授权');
+                ZODIAC_UI.showToast('升级失败: ' + (error.message || '未知错误'), 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '使用代币升阶';
             }
         });
 
@@ -536,16 +614,94 @@
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
 
+            const btn = this;
+            btn.disabled = true;
+            btn.textContent = '查询价格中...';
+
             try {
-                const result = await nftContract.methods.upgradeWithUSDValue(selectedNft.id).send({ from: account });
-                alert(`升级成功！NFT ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 阶`);
-                loadUserNFTs();
+                const requiredUSD = getUSDValue(selectedNft.level);
+                const tokenPrice = await getTokenPriceFromPancakeSwap();
+                
+                if (!tokenPrice || tokenPrice <= 0) {
+                    ZODIAC_UI.showToast('无法获取代币价格，请稍后重试', 'error');
+                    btn.disabled = false;
+                    btn.textContent = '使用USDT价值代币升阶';
+                    return;
+                }
+
+                const requiredTokens = Math.ceil((requiredUSD / tokenPrice) * 1e18);
+                const balance = await tokenContract.methods.balanceOf(account).call();
+                
+                if (parseInt(balance) < requiredTokens) {
+                    ZODIAC_UI.showToast(`代币不足，需要 ${(requiredTokens / 1e18).toFixed(4)} 枚代币（当前价格: $${tokenPrice.toFixed(4)}）`, 'error');
+                    btn.disabled = false;
+                    btn.textContent = '使用USDT价值代币升阶';
+                    return;
+                }
+
+                const confirm = await ZODIAC_UI.showConfirmModal(
+                    '确认升级',
+                    `将消耗价值 ${requiredUSD} USDT 的代币来升级 ${selectedNft.name}，当前价格: $${tokenPrice.toFixed(4)}，确定继续？`
+                );
+
+                if (!confirm) {
+                    btn.disabled = false;
+                    btn.textContent = '使用USDT价值代币升阶';
+                    return;
+                }
+
+                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.nftMint).call();
+                if (parseInt(allowance) < requiredTokens) {
+                    btn.textContent = '授权中...';
+                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [window.contractAddresses.nftMint, requiredTokens], account);
+                    await tokenContract.methods.approve(window.contractAddresses.nftMint, requiredTokens).send({ 
+                        from: account,
+                        gas: approveGas
+                    });
+                }
+
+                btn.textContent = '升级中...';
+                const gas = await ZODIAC_UI.estimateGas(nftContract, 'upgradeWithUSDValue', [selectedNft.id], account);
+                const result = await nftContract.methods.upgradeWithUSDValue(selectedNft.id).send({ 
+                    from: account,
+                    gas: gas
+                });
+                ZODIAC_UI.showToast(`升级成功！NFT ${selectedNft.id} 已升级到 ${parseInt(selectedNft.level) + 1} 阶`, 'success');
+                await loadUserNFTs();
                 document.getElementById('upgradeSection').classList.add('hidden');
             } catch (error) {
                 console.error('升级失败:', error);
-                alert('升级失败，请检查代币余额和授权');
+                ZODIAC_UI.showToast('升级失败: ' + (error.message || '未知错误'), 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '使用USDT价值代币升阶';
             }
         });
+
+        async function getTokenPriceFromPancakeSwap() {
+            try {
+                const pancakeSwapABI = [{"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"getAmountOut","outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"},{"inputs":[{"internalType":"address[]","name":"path","type":"address[]"}],"name":"getAmountsOut","outputs":[{"internalType":"uint256[]","name":"amounts","type":"uint256[]"}],"stateMutability":"view","type":"function"}];
+                const pancakeSwapRouter = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
+                const wbnbAddress = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
+                
+                const router = new web3.eth.Contract(pancakeSwapABI, pancakeSwapRouter);
+                const amountIn = web3.utils.toWei('1', 'ether');
+                const path = [window.contractAddresses.tokenContract, wbnbAddress];
+                
+                const amounts = await router.methods.getAmountsOut(amountIn, path).call();
+                const wbnbAmount = parseFloat(web3.utils.fromWei(amounts[1], 'ether'));
+                
+                const ethUsdtABI = [{"inputs":[],"name":"latestAnswer","outputs":[{"internalType":"int256","name":"","type":"int256"}],"stateMutability":"view","type":"function"}];
+                const ethUsdtPriceFeed = '0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE';
+                const priceFeed = new web3.eth.Contract(ethUsdtABI, ethUsdtPriceFeed);
+                const ethPrice = parseFloat((await priceFeed.methods.latestAnswer().call()) / 1e8);
+                
+                return wbnbAmount * ethPrice;
+            } catch (error) {
+                console.error('获取价格失败:', error);
+                return null;
+            }
+        }
 
         function getRequiredTokens(level) {
             switch (level) {
@@ -570,10 +726,6 @@
         function getStars(level) {
             return window.ZODIAC_UTILS.getStars(parseInt(level));
         }
-
-        document.getElementById('walletBtn').addEventListener('click', function() {
-            initWeb3();
-        });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
 </body>

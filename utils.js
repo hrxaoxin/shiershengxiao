@@ -5,6 +5,47 @@ window.ZODIAC_UTILS = (function() {
     const ATTR_PREFIXES = { water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang' };
     const ANIMAL_KEYS = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
     
+    function showLoading(message = '加载中...') {
+        let loadingOverlay = document.getElementById('loadingOverlay');
+        if (!loadingOverlay) {
+            loadingOverlay = document.createElement('div');
+            loadingOverlay.id = 'loadingOverlay';
+            loadingOverlay.className = 'loading-overlay';
+            loadingOverlay.innerHTML = `
+                <div class="flex flex-col items-center">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">${message}</div>
+                </div>
+            `;
+            document.body.appendChild(loadingOverlay);
+        }
+        loadingOverlay.classList.add('active');
+    }
+
+    function hideLoading() {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+            loadingOverlay.classList.remove('active');
+        }
+    }
+
+    function showToast(message, type = 'info', duration = 3000) {
+        let toast = document.getElementById('toastNotification');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'toastNotification';
+            toast.className = 'toast';
+            document.body.appendChild(toast);
+        }
+        
+        toast.textContent = message;
+        toast.className = `toast ${type} active`;
+        
+        setTimeout(() => {
+            toast.classList.remove('active');
+        }, duration);
+    }
+    
     const IPFS_BASES = {
         water: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
         wind: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
@@ -84,6 +125,9 @@ window.ZODIAC_UTILS = (function() {
         getWeight: getWeight,
         formatAddress: formatAddress,
         formatWeiToEther: formatWeiToEther,
+        showLoading: showLoading,
+        hideLoading: hideLoading,
+        showToast: showToast,
         ZODIAC_NAMES: ZODIAC_NAMES,
         ATTR_NAMES: ATTR_NAMES,
         ATTR_PREFIXES: ATTR_PREFIXES,
