@@ -70,6 +70,12 @@ contract RewardManager is
     address public royaltyWallet;
     /** @dev 版税比例（默认500 = 5%） */
     uint256 public royaltyFee = 500;
+    /** @dev 用户分红比例（240 = 2.4%）*/
+    uint256 public constant USER_SHARE = 240;
+    /** @dev 所有者分红比例（60 = 0.6%）*/
+    uint256 public constant OWNER_SHARE = 60;
+    /** @dev 所有者资金池 */
+    uint256 public ownerPool;
 
     /** @dev 授权的NFT合约映射 */
     mapping(address => bool) public authorizedNFTContracts;
@@ -690,7 +696,14 @@ contract RewardManager is
      */
     receive() external payable {
         require(msg.value > 0, "RM: zero");
-        unchecked { dividendPool += msg.value; }
+        
+        uint256 userDividend = (msg.value * USER_SHARE) / 10000;
+        uint256 ownerDividend = (msg.value * OWNER_SHARE) / 10000;
+        
+        unchecked { 
+            dividendPool += userDividend;
+            ownerPool += ownerDividend;
+        }
         emit DividendDeposited(msg.value, msg.sender, block.timestamp);
     }
 
@@ -699,13 +712,30 @@ contract RewardManager is
      */
     function withdrawExtraFunds() external onlyOwner nonReentrant whenNotPaused {
         uint256 contractBalance = address(this).balance;
-        uint256 extraFunds = contractBalance - dividendPool;
+        uint256 extraFunds = contractBalance - dividendPool - ownerPool;
         require(extraFunds > 0, "RM: no extra funds to withdraw");
-        require(contractBalance >= dividendPool, "RM: insufficient balance for dividend pool");
+        require(contractBalance >= dividendPool + ownerPool, "RM: insufficient balance for dividend and owner pool");
 
         emit ExtraFundsWithdrawn(owner(), extraFunds, block.timestamp);
         (bool success, ) = payable(owner()).call{value: extraFunds}("");
         require(success, "RM: extra funds transfer failed");
+    }
+
+    /**
+     * @dev 提取所有者分红
+     */
+    function withdrawOwnerDividend() external onlyOwner nonReentrant whenNotPaused {
+        uint256 amount = ownerPool;
+        require(amount > 0, "RM: no owner dividend to withdraw");
+        
+        uint256 contractBalance = address(this).balance;
+        require(contractBalance >= amount, "RM: insufficient contract balance");
+        
+        ownerPool = 0;
+        
+        emit ExtraFundsWithdrawn(owner(), amount, block.timestamp);
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        require(success, "RM: owner dividend transfer failed");
     }
 
     /**

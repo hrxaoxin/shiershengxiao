@@ -219,10 +219,31 @@
             <div class="bg-white p-6 rounded-lg shadow-md">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6">上架NFT</h2>
                 
+                <div id="selectedNftInfo" class="hidden mb-6 p-4 bg-blue-50 rounded-lg border-2 border-blue-300">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div id="selectedNftIcon" class="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center text-3xl mr-4"></div>
+                            <div>
+                                <h3 id="selectedNftName" class="text-xl font-bold text-gray-800"></h3>
+                                <p id="selectedNftId" class="text-gray-600"></p>
+                            </div>
+                        </div>
+                        <button type="button" id="clearSelectionBtn" class="btn-secondary text-sm">
+                            <i class="fas fa-times mr-1"></i> 清除选择
+                        </button>
+                    </div>
+                </div>
+                
                 <form id="listForm" class="space-y-6">
                     <div>
-                        <label class="block text-gray-700 font-medium mb-2">NFT ID</label>
-                        <input type="number" id="tokenId" class="input-field" placeholder="输入要上架的NFT ID" required>
+                        <label class="block text-gray-700 font-medium mb-2">选择NFT</label>
+                        <div id="userNftGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-h-96 overflow-y-auto p-2 border-2 border-dashed border-gray-300 rounded-lg">
+                            <div class="col-span-full text-center py-8">
+                                <i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
+                                <p class="text-gray-600">加载用户NFT中...</p>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-2">点击选择要上架的NFT</p>
                     </div>
                     
                     <div>
@@ -238,13 +259,13 @@
                     </div>
                     
                     <div class="flex justify-end space-x-4">
-                        <button type="button" id="checkTokenBtn" class="btn-secondary">
-                            <i class="fa fa-search mr-2"></i>检查NFT
+                        <button type="button" id="refreshUserNfts" class="btn-secondary">
+                            <i class="fa fa-refresh mr-2"></i>刷新列表
                         </button>
                         <button type="button" id="approveBtn" class="btn-secondary" disabled>
                             <i class="fas fa-key mr-1"></i> 授权NFT系列
                         </button>
-                        <button type="submit" class="btn-primary">
+                        <button type="submit" id="listNftBtn" class="btn-primary" disabled>
                             <i class="fa fa-upload mr-2"></i>上架NFT
                         </button>
                     </div>
@@ -330,6 +351,8 @@
         let nftTradingContract;
         let nftMintContract;
         let currentTokenIdToBuy;
+        let selectedTokenId = null;
+        let userNftCache = null;
 
         document.addEventListener('DOMContentLoaded', function() {
             initWeb3();
@@ -357,6 +380,7 @@
                 document.getElementById('browseTab').classList.remove('text-primary', 'border-b-2', 'border-primary');
                 document.getElementById('myListingsTab').classList.add('text-gray-500');
                 document.getElementById('myListingsTab').classList.remove('text-primary', 'border-b-2', 'border-primary');
+                loadUserNftsForListing();
             });
 
             document.getElementById('myListingsTab').addEventListener('click', () => {
@@ -380,26 +404,25 @@
                 filterMarketplace();
             });
 
-            document.getElementById('checkTokenBtn').addEventListener('click', async () => {
-                const tokenId = document.getElementById('tokenId').value;
-                if (!tokenId) {
-                    ZODIAC_UI.showToast('请输入NFT ID', 'warning');
-                    return;
-                }
-                await checkNFT(tokenId);
+            document.getElementById('refreshUserNfts').addEventListener('click', () => {
+                userNftCache = null;
+                loadUserNftsForListing();
+            });
+
+            document.getElementById('clearSelectionBtn').addEventListener('click', () => {
+                clearNftSelection();
             });
 
             document.getElementById('listForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const tokenId = document.getElementById('tokenId').value;
                 const price = document.getElementById('listingPrice').value;
-                
-                if (!tokenId || !price) {
-                    ZODIAC_UI.showToast('请填写完整信息', 'warning');
+
+                if (!selectedTokenId || !price) {
+                    ZODIAC_UI.showToast('请选择NFT并填写价格', 'warning');
                     return;
                 }
-                
-                await listNFT(parseInt(tokenId), price);
+
+                await listNFT(selectedTokenId, price);
             });
 
             document.getElementById('closeBuyModal').addEventListener('click', () => {
@@ -783,39 +806,42 @@
 
         async function listNFT(tokenId, price) {
             if (!account || !nftTradingContract || !nftMintContract) return;
-            
+
             const isValid = await checkNFT(tokenId);
             if (!isValid) return;
-            
+
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认上架',
                 `将NFT #${tokenId} 以 ${price} BNB 的价格上架，确定继续？`
             );
-            
+
             if (!confirm) return;
-            
-            const btn = document.querySelector('#listForm button[type="submit"]');
+
+            const btn = document.getElementById('listNftBtn');
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 上架中...';
             btn.disabled = true;
-            
+
             try {
                 const isApproved = await checkApprovalForAll();
                 if (!isApproved) {
                     await approveForAll();
                 }
-                
+
                 const priceWei = web3.utils.toWei(price, 'ether');
                 const gas = await ZODIAC_UI.estimateGas(nftTradingContract, 'listNFT', [tokenId, priceWei], account);
-                
+
                 await nftTradingContract.methods.listNFT(tokenId, priceWei).send({
                     from: account,
                     gas: gas
                 });
-                
+
                 ZODIAC_UI.showToast('上架成功！', 'success');
-                marketplaceCache = null;
-                document.getElementById('tokenId').value = '';
+
+                clearNftSelection();
+                userNftCache = null;
                 document.getElementById('listingPrice').value = '';
+                await loadUserNftsForListing();
+                marketplaceCache = null;
             } catch (error) {
                 let errorMsg = '上架失败';
                 if (error.code === 4001) {
@@ -826,7 +852,7 @@
                 ZODIAC_UI.showToast(errorMsg, 'error');
             } finally {
                 btn.innerHTML = '<i class="fa fa-upload mr-2"></i>上架NFT';
-                btn.disabled = false;
+                updateListButtonState();
             }
         }
 
@@ -913,21 +939,21 @@
 
         async function cancelListing(tokenId) {
             if (!account || !nftTradingContract) return;
-            
+
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认取消上架',
                 '确定要取消此NFT的上架吗？'
             );
-            
+
             if (!confirm) return;
-            
+
             try {
                 const gas = await ZODIAC_UI.estimateGas(nftTradingContract, 'cancelListing', [tokenId], account);
                 await nftTradingContract.methods.cancelListing(tokenId).send({
                     from: account,
                     gas: gas
                 });
-                
+
                 ZODIAC_UI.showToast('取消成功！', 'success');
                 marketplaceCache = null;
                 loadMyListings();
@@ -935,6 +961,157 @@
                 ZODIAC_UI.showToast('取消失败: ' + (error.message || '未知错误'), 'error');
             }
         }
+
+        async function loadUserNftsForListing() {
+            const userNftGrid = document.getElementById('userNftGrid');
+
+            if (!account || !nftMintContract || !nftTradingContract) {
+                userNftGrid.innerHTML = '<div class="col-span-full text-center py-8"><p class="text-gray-600">请先连接钱包</p></div>';
+                return;
+            }
+
+            if (userNftCache) {
+                displayUserNftsForListing(userNftCache);
+                return;
+            }
+
+            userNftGrid.innerHTML = '<div class="col-span-full text-center py-8"><i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i><p class="text-gray-600">加载用户NFT中...</p></div>';
+
+            try {
+                const nfts = [];
+                const pageSize = 20;
+                let hasMore = true;
+                let page = 0;
+
+                while (hasMore) {
+                    try {
+                        const [tokenIds, hasMoreTokens] = await nftMintContract.methods.getTokenDetailsByPage(account, page, pageSize).call();
+
+                        if (tokenIds.length === 0) {
+                            hasMore = false;
+                            break;
+                        }
+
+                        const listingPromises = tokenIds.map(async (tokenId, idx) => {
+                            try {
+                                const listing = await nftTradingContract.methods.getListing(tokenId).call();
+                                const isListed = listing[0] && listing[0].isActive;
+                                if (!isListed) {
+                                    return {
+                                        tokenId: parseInt(tokenId),
+                                        type: parseInt(tokenIds[idx]),
+                                        level: parseInt(tokenIds[idx])
+                                    };
+                                }
+                            } catch (e) {}
+                            return null;
+                        });
+
+                        const batchResults = await Promise.all(listingPromises);
+                        nfts.push(...batchResults.filter(Boolean));
+
+                        hasMore = hasMoreTokens;
+                        page++;
+                    } catch (error) {
+                        console.error('加载NFT失败:', error);
+                        break;
+                    }
+                }
+
+                if (nfts.length === 0) {
+                    userNftGrid.innerHTML = '<div class="col-span-full text-center py-8"><p class="text-gray-600">暂无可上架的NFT</p></div>';
+                    return;
+                }
+
+                userNftCache = nfts;
+                displayUserNftsForListing(nfts);
+            } catch (error) {
+                console.error('加载用户NFT失败:', error);
+                userNftGrid.innerHTML = '<div class="col-span-full text-center py-8"><p class="text-red-500">加载失败，请重试</p></div>';
+            }
+        }
+
+        function displayUserNftsForListing(nfts) {
+            const userNftGrid = document.getElementById('userNftGrid');
+            let html = '';
+
+            for (const nft of nfts) {
+                const nftInfo = window.ZODIAC_UTILS.getNFTInfo(nft.type);
+                const isSelected = selectedTokenId === nft.tokenId;
+                const elementName = nftInfo.element.toLowerCase();
+                const imagePath = `images/fu-cards/${elementName}${nftInfo.zodiac}_${nft.level >= 3 ? '1' : '0'}.png`;
+
+                html += `
+                    <div class="nft-card cursor-pointer rounded-lg border-2 ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'} transition-all duration-200 p-3 text-center" 
+                         data-tokenid="${nft.tokenId}" data-type="${nft.type}">
+                        <div class="w-full aspect-square rounded-lg bg-gray-100 mb-2 overflow-hidden flex items-center justify-center">
+                            <img src="${imagePath}" alt="${nftInfo.name}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\\'text-3xl\\'>🐾</span>';">
+                        </div>
+                        <p class="text-sm font-bold text-gray-800 truncate">${nftInfo.name}</p>
+                        <p class="text-xs text-gray-500">#${nft.tokenId}</p>
+                        <p class="text-xs text-gray-400">等级 ${nft.level}</p>
+                    </div>
+                `;
+            }
+
+            userNftGrid.innerHTML = html;
+
+            document.querySelectorAll('.nft-card').forEach(card => {
+                card.addEventListener('click', function() {
+                    const tokenId = parseInt(this.getAttribute('data-tokenid'));
+                    const type = parseInt(this.getAttribute('data-type'));
+                    selectNft(tokenId, type);
+                });
+            });
+        }
+
+        function selectNft(tokenId, type) {
+            const nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
+            const elementName = nftInfo.element.toLowerCase();
+            const imagePath = `images/fu-cards/${elementName}${nftInfo.zodiac}_${nftInfo.level >= 3 ? '1' : '0'}.png`;
+
+            selectedTokenId = tokenId;
+
+            document.getElementById('selectedNftInfo').classList.remove('hidden');
+            document.getElementById('selectedNftIcon').innerHTML = `<img src="${imagePath}" alt="${nftInfo.name}" class="w-full h-full object-cover rounded-lg" onerror="this.parentElement.innerHTML='<span class=\\'text-3xl\\'>🐾</span>';">`;
+            document.getElementById('selectedNftName').textContent = nftInfo.name;
+            document.getElementById('selectedNftId').textContent = `NFT #${tokenId} · 等级 ${nftInfo.level}`;
+
+            document.querySelectorAll('.nft-card').forEach(card => {
+                if (parseInt(card.getAttribute('data-tokenid')) === tokenId) {
+                    card.classList.add('border-blue-500', 'bg-blue-50');
+                    card.classList.remove('border-gray-200');
+                } else {
+                    card.classList.remove('border-blue-500', 'bg-blue-50');
+                    card.classList.add('border-gray-200');
+                }
+            });
+
+            updateListButtonState();
+        }
+
+        function clearNftSelection() {
+            selectedTokenId = null;
+            document.getElementById('selectedNftInfo').classList.add('hidden');
+            document.getElementById('selectedNftIcon').innerHTML = '';
+            document.getElementById('selectedNftName').textContent = '';
+            document.getElementById('selectedNftId').textContent = '';
+
+            document.querySelectorAll('.nft-card').forEach(card => {
+                card.classList.remove('border-blue-500', 'bg-blue-50');
+                card.classList.add('border-gray-200');
+            });
+
+            updateListButtonState();
+        }
+
+        function updateListButtonState() {
+            const listBtn = document.getElementById('listNftBtn');
+            const price = document.getElementById('listingPrice').value;
+            listBtn.disabled = !selectedTokenId || !price;
+        }
+
+        document.getElementById('listingPrice').addEventListener('input', updateListButtonState);
 
         document.getElementById('refreshWallet').addEventListener('click', initWeb3);
     </script>
