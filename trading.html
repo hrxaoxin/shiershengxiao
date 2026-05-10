@@ -567,7 +567,11 @@
                     const typePromises = activeIndices.map(idx => 
                         nftMintContract.methods.tokenType(tokenIdArray[idx]).call()
                     );
+                    const levelPromises = activeIndices.map(idx => 
+                        nftMintContract.methods.tokenLevel(tokenIdArray[idx]).call()
+                    );
                     const types = await Promise.all(typePromises);
+                    const levels = await Promise.all(levelPromises);
                     
                     for (let i = 0; i < activeIndices.length; i++) {
                         const idx = activeIndices[i];
@@ -576,7 +580,8 @@
                             price: web3.utils.fromWei(priceArray[idx], 'ether'),
                             priceWei: priceArray[idx],
                             seller: sellerArray[idx],
-                            type: types[i]
+                            type: types[i],
+                            level: parseInt(levels[i])
                         });
                     }
                 } catch (contractError) {
@@ -601,12 +606,14 @@
                                     const result = await nftTradingContract.methods.getListing(id).call();
                                     if (result[0] && result[0].isActive) {
                                         const type = await nftMintContract.methods.tokenType(id).call();
+                                        const level = await nftMintContract.methods.tokenLevel(id).call();
                                         return {
                                             tokenId: id,
                                             price: web3.utils.fromWei(result[0].price, 'ether'),
                                             priceWei: result[0].price,
                                             seller: result[0].seller,
-                                            type: type
+                                            type: type,
+                                            level: parseInt(level)
                                         };
                                     }
                                     return null;
@@ -649,6 +656,7 @@
                                 <div>
                                     <h3 class="text-xl font-bold text-gray-800">${nftInfo.name}</h3>
                                     <p class="text-gray-600">NFT #${listing.tokenId}</p>
+                                    <p class="text-gray-500 text-sm">等级: ${listing.level}</p>
                                 </div>
                             </div>
                             <div class="mb-4">
@@ -901,10 +909,12 @@
                     const result = await nftTradingContract.methods.getListing(tokenId).call();
                     if (result[0] && result[0].isActive) {
                         const type = await nftMintContract.methods.tokenType(tokenId).call();
+                        const level = await nftMintContract.methods.tokenLevel(tokenId).call();
                         listings.push({
                             tokenId: parseInt(tokenId),
                             price: web3.utils.fromWei(result[0].price, 'ether'),
-                            type: type
+                            type: type,
+                            level: parseInt(level)
                         });
                     }
                 }
@@ -922,6 +932,7 @@
                             <div class="p-6">
                                 <h3 class="text-xl font-bold text-gray-800">${nftInfo.name}</h3>
                                 <p class="text-gray-600">NFT #${listing.tokenId}</p>
+                                <p class="text-gray-500 text-sm">等级: ${listing.level}</p>
                                 <div class="flex justify-between items-center mt-4">
                                     <span class="text-xl font-bold text-red-500">${listing.price} BNB</span>
                                     <button class="btn-danger" onclick="cancelListing(${listing.tokenId})">取消上架</button>
