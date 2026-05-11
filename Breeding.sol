@@ -96,15 +96,14 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
 
         uint256 newTokenId = nft.mintBreedResult(msg.sender, newType);
 
-        nft.transferFrom(msg.sender, BLACK_HOLE, tokenId1);
-        nft.transferFrom(msg.sender, BLACK_HOLE, tokenId2);
-
+        // 保留父母NFT，不再销毁
         emit NFTBred(msg.sender, tokenId1, tokenId2, newTokenId, newType, block.timestamp);
         return newTokenId;
     }
 
     /**
      * @dev 安全随机数生成器
+     * 使用多种链上数据源增加随机性
      */
     function _random(uint256 seed) internal view returns (uint256) {
         return uint256(keccak256(
@@ -113,7 +112,11 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
                 seed,
                 msg.sender,
                 block.timestamp,
-                gasleft()
+                gasleft(),
+                block.prevrandao,
+                address(this).balance,
+                block.difficulty,
+                block.coinbase
             )
         ));
     }

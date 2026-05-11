@@ -17,7 +17,6 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
     mapping(uint256 => uint8) public override tokenLevel;
     mapping(address => uint256[]) public _userTokens;
     mapping(address => mapping(uint256 => bool)) public userTokenExists;
-    mapping(uint256 => NFTDataTypes.ZodiacType) public tokenTypeMap;
     mapping(address => mapping(NFTDataTypes.ZodiacType => uint256)) public userTokenCount;
     mapping(address => uint256) public override userWeightCache;
 
@@ -63,26 +62,45 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
             _userTokens[user].push(tokenId);
             userTokenExists[user][tokenId] = true;
         }
-        tokenTypeMap[tokenId] = type_;
+        tokenType[tokenId] = type_;
         userTokenCount[user][type_]++;
     }
 
     function removeUserToken(address user, NFTDataTypes.ZodiacType type_, uint256 tokenId) external override onlyAuthorized {
         uint256[] storage arr = _userTokens[user];
-        for (uint i = 0; i < arr.length; i++) {
+        uint256 length = arr.length;
+        for (uint i = 0; i < length; i++) {
             if (arr[i] == tokenId) {
-                arr[i] = arr[arr.length - 1];
+                if (length > 1) {
+                    arr[i] = arr[length - 1];
+                }
                 arr.pop();
                 break;
             }
         }
-        delete tokenTypeMap[tokenId];
+        delete tokenType[tokenId];
         delete userTokenExists[user][tokenId];
         if (userTokenCount[user][type_] > 0) userTokenCount[user][type_]--;
     }
 
     function updateUserWeightCache(address user, uint256 weight) external override onlyAuthorized {
         userWeightCache[user] = weight;
+    }
+
+    /** @dev 统一的权重更新函数（由NFTMint、NFTUpdate等调用） */
+    function updateUserWeight(address user, uint8 level, bool add) external override onlyAuthorized {
+        uint256 currentWeight = userWeightCache[user];
+        uint256 newWeight = _calcWeight(currentWeight, level, add);
+        userWeightCache[user] = newWeight;
+    }
+
+    /** @dev 计算权重（内部函数） */
+    function _calcWeight(uint256 currentWeight, uint8 level, bool add) internal pure returns (uint256) {
+        if (add) {
+            return currentWeight + (level * level);
+        } else {
+            return currentWeight - (level * level);
+        }
     }
 
     function getUserTokenCount(address user, NFTDataTypes.ZodiacType type_) external view override returns (uint256) {
@@ -96,10 +114,10 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
     function userTokens(address user, NFTDataTypes.ZodiacType type_) external view override returns (uint256[] memory) {
         uint256[] memory all = _userTokens[user];
         uint cnt;
-        for (uint i = 0; i < all.length; i++) if (tokenTypeMap[all[i]] == type_) cnt++;
+        for (uint i = 0; i < all.length; i++) if (tokenType[all[i]] == type_) cnt++;
         uint256[] memory res = new uint256[](cnt);
         uint idx;
-        for (uint i = 0; i < all.length; i++) if (tokenTypeMap[all[i]] == type_) res[idx++] = all[i];
+        for (uint i = 0; i < all.length; i++) if (tokenType[all[i]] == type_) res[idx++] = all[i];
         return res;
     }
 
@@ -144,5 +162,18 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
             t.getGender() == NFTDataTypes.GenderType.MALE ? "_1" : "_0",
             ".png"
         ));
+    }
+
+    function hasEligibility(address user) external view returns (bool) {
+        return _userTokens[user].length > 0;
+    }
+
+    function getUserTokenTypes(address user) external view returns (NFTDataTypes.ZodiacType[] memory) {
+        uint256[] memory tokens = _userTokens[user];
+        NFTDataTypes.ZodiacType[] memory types = new NFTDataTypes.ZodiacType[](tokens.length);
+        for (uint i = 0; i < tokens.length; i++) {
+            types[i] = tokenType[tokens[i]];
+        }
+        return types;
     }
 }

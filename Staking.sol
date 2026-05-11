@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 /**
  * @title Staking
- * @dev NFT质押合约，允许用户质押等级6以上的NFT来获取代币奖励
+ * @dev NFT质押合约，允许用户质押等级5以上的NFT来获取代币奖励
  * 奖励根据质押时间和NFT等级计算，每日有最大奖励上限
  * 基于OpenZeppelin UUPS可升级合约实现
  */
@@ -174,14 +174,14 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
 
         uint256 userReward = stake.accumulatedRewards;
         
+        if (userReward > 0) {
+            require(IERC20Upgradeable(tokenContract).balanceOf(address(this)) >= userReward, "Staking: Insufficient tokens");
+            _updateDailyRewardDistributed(userReward);
+        }
+
         _removeStake(msg.sender, index);
         isStaked[tokenId] = false;
         totalStakedNFTs--;
-
-        if (userReward > 0) {
-            _updateDailyRewardDistributed(userReward);
-            require(IERC20Upgradeable(tokenContract).balanceOf(address(this)) >= userReward, "Staking: Insufficient tokens");
-        }
 
         IERC721Upgradeable nft = IERC721Upgradeable(nftContract);
         nft.transferFrom(address(this), msg.sender, tokenId);
@@ -233,10 +233,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
 
         require(totalRewards > 0, "Staking: No rewards to claim");
         
-        uint256 availableReward = _getAvailableDailyReward();
-        uint256 remainingReward = availableReward - dailyRewardDistributed;
-        require(totalRewards <= remainingReward, "Staking: Daily reward limit exceeded");
-        
+        // 移除每日奖励限制检查，奖励累积不受天数限制
         require(totalRewards <= contractBalance, "Staking: Insufficient tokens in contract");
 
         for (uint256 i = 0; i < userStakes[msg.sender].length; i++) {
@@ -325,12 +322,12 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
             uint256 rewardPerMinute = _calculateRewardPerMinute(dailyReward);
             
             uint256 intervals = timeElapsed / REWARD_INTERVAL;
-            if (intervals > 0) {
+            if (intervals > 0 && rewardPerMinute > 0) {
+                require(intervals <= type(uint256).max / rewardPerMinute, "Staking: intervals overflow");
                 uint256 rewards = intervals * rewardPerMinute;
-                if (rewards > 0) {
-                    stake.accumulatedRewards += rewards;
-                    stake.lastRewardTime = currentTime;
-                }
+                require(stake.accumulatedRewards <= type(uint256).max - rewards, "Staking: rewards overflow");
+                stake.accumulatedRewards += rewards;
+                stake.lastRewardTime = currentTime;
             }
         }
     }
@@ -352,28 +349,14 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
     }
 
     /**
-     * @dev 领取奖励时更新每日已分配奖励
-     * @param amount 领取的奖励数量
+     * @dev 领取奖励时不重置奖励累积（用户要求累积到领取才清空）
+     * @param amount 领取的奖励数量（仅用于验证，不再限制每日额度）
      */
     function _updateDailyRewardDistributed(uint256 amount) internal {
-        uint256 currentDayStart = block.timestamp - (block.timestamp % 86400);
-        
-        if (lastRewardUpdate == 0) {
-            lastRewardUpdate = block.timestamp;
-        }
-        
-        uint256 lastDayStart = lastRewardUpdate - (lastRewardUpdate % 86400);
-        
-        if (currentDayStart > lastDayStart) {
-            dailyRewardDistributed = 0;
-        }
-        
+        // 移除每日限制逻辑，奖励累积不受天数限制
+        // 只要用户不领取，奖励会一直累积
         lastRewardUpdate = block.timestamp;
-        
-        uint256 remaining = MAX_DAILY_REWARD - dailyRewardDistributed;
-        require(amount <= remaining, "Staking: Daily reward exceeded");
-        
-        dailyRewardDistributed += amount;
+        // 不再检查MAX_DAILY_REWARD限制，改为自由累积
     }
 
     /**
@@ -382,20 +365,26 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
      * @return 每分钟每个NFT的奖励数量
      */
     function _calculateRewardPerMinute(uint256 dailyReward) internal view returns (uint256) {
-        if (totalStakedNFTs == 0) {
+        if (totalStakedNFTs == 0 || dailyReward == 0) {
             return 0;
         }
 
-        uint256 totalMinuteReward = dailyReward / 1440;
-        uint256 rewardPerMinute = totalMinuteReward / totalStakedNFTs;
+        uint256 perMinuteTotal = dailyReward / 1440;
+        if (perMinuteTotal == 0) {
+            return 0;
+        }
+        
+        uint256 rewardPerMinute = perMinuteTotal / totalStakedNFTs;
         
         uint256 minReward = BASE_TOKEN_PER_MINUTE / 10;
+        uint256 maxReward = BASE_TOKEN_PER_MINUTE;
+        
         if (rewardPerMinute < minReward) {
             rewardPerMinute = minReward;
         }
         
-        if (rewardPerMinute > BASE_TOKEN_PER_MINUTE) {
-            rewardPerMinute = BASE_TOKEN_PER_MINUTE;
+        if (rewardPerMinute > maxReward) {
+            rewardPerMinute = maxReward;
         }
         
         return rewardPerMinute;

@@ -120,6 +120,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         ITokenBurner(tokenBurner).setTokenContract(tokenContract);
         IRewardManager(rewardManager).setAuthorizedNFTContract(nftMint, true);
         IRewardManager(rewardManager).setNFTContract(nftMint);
+        IRewardManager(rewardManager).setNFTDataContract(nftData);
 
         if (nftTrading != address(0)) {
             INFTTrading(nftTrading).setNFTContract(nftMint);

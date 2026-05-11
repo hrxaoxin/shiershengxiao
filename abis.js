@@ -68,6 +68,7 @@ window.tokenBurnerABI = [
 ];
 
 // NFTMint合约ABI - 基于NFTMint.sol（使用PancakeSwap获取实时价格）
+// 注意：升级功能已移至NFTUpdate合约
 window.nftMintABI = [
 	{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
 	{"inputs":[{"internalType":"address","name":"initialOwner","type":"address"},{"internalType":"address","name":"_metadataContract","type":"address"},{"internalType":"address","name":"_authorizer","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},
@@ -79,9 +80,7 @@ window.nftMintABI = [
 	{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"address","name":"to","type":"address"}],"name":"mintNormal","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[{"internalType":"address","name":"to","type":"address"}],"name":"mintRare","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
-	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithNFT","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
-	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithToken","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
-	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithUSDValue","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
+	// 升级函数已移除，请使用NFTUpdate合约的upgradeWithNFT/upgradeWithToken/upgradeWithUSDValue
 	{"inputs":[],"name":"getTokenPriceFromPancakeSwap","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"address","name":"pair","type":"address"}],"name":"setPancakeSwapPair","outputs":[],"stateMutability":"nonpayable","type":"function"},
 
@@ -89,6 +88,25 @@ window.nftMintABI = [
 	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"approve","outputs":[],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"bool","name":"approved","type":"bool"}],"name":"setApprovalForAll","outputs":[],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"isApprovedForAll","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
+];
+
+// NFTUpdate合约ABI - 升级功能
+window.nftUpdateABI = [
+	{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
+	{"inputs":[{"internalType":"address","name":"initialOwner","type":"address"},{"internalType":"address","name":"_nftContract","type":"address"},{"internalType":"address","name":"_metadataContract","type":"address"},{"internalType":"address","name":"_tokenContract","type":"address"},{"internalType":"address","name":"_authorizer","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithNFT","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithToken","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithUSDValue","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"nftContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"tokenContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"pancakeSwapPair","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"pair","type":"address"}],"name":"setPancakeSwapPair","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"}
 ];
 
 // ERC20代币合约ABI

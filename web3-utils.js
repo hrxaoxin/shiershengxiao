@@ -7,7 +7,8 @@ window.ZODIAC_WEB3 = (function() {
     const eventListeners = {
         'connect': [],
         'disconnect': [],
-        'accountChange': []
+        'accountChange': [],
+        'chainChange': []
     };
 
     function emitEvent(eventName, data) {
@@ -167,8 +168,9 @@ window.ZODIAC_WEB3 = (function() {
         }
     });
 
-    window.ethereum?.on('chainChanged', () => {
-        window.location.reload();
+    window.ethereum?.on('chainChanged', (chainId) => {
+        console.warn(`Chain changed to ${chainId}. Please refresh the page to continue.`);
+        emitEvent('chainChange', { chainId });
     });
 
     return {

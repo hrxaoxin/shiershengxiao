@@ -74,6 +74,7 @@ interface IRewardManager {
     function updateCardExternal(address user, NFTDataTypes.ZodiacType zodiacType, uint256 count) external returns (bool);
     function setAuthorizedNFTContract(address nft, bool ok) external;
     function setNFTContract(address _newNFTContract) external;
+    function setNFTDataContract(address _nftDataContract) external;
 }
 
 interface INFTDataInterface {
@@ -101,11 +102,15 @@ interface INFTDataInterface {
     function addUserToken(address user, NFTDataTypes.ZodiacType type_, uint256 tokenId) external;
     function removeUserToken(address user, NFTDataTypes.ZodiacType type_, uint256 tokenId) external;
     function updateUserWeightCache(address user, uint256 weight) external;
+    /** @dev 统一的权重更新函数（计算并更新用户权重） */
+    function updateUserWeight(address user, uint8 level, bool add) external;
     function getUserTokenCount(address user, NFTDataTypes.ZodiacType type_) external view returns (uint256);
     function getUserTotalTokenCount(address user) external view returns (uint256);
 
     function initialize(address initialOwner) external;
     function setAuthorizedNFTContract(address nftContract) external;
+    function hasEligibility(address user) external view returns (bool);
+    function getUserTokenTypes(address user) external view returns (NFTDataTypes.ZodiacType[] memory);
 }
 
 interface INFTTrading {
@@ -120,4 +125,22 @@ interface IBreeding {
 interface IStaking {
     function setNFTContract(address nftContract) external;
     function setTokenContract(address tokenContract) external;
+}
+
+interface INFTUpdate {
+    function upgradeWithNFT(uint256 tokenId) external returns (uint8);
+    function upgradeWithToken(uint256 tokenId) external returns (uint8);
+    function upgradeWithUSDValue(uint256 tokenId) external returns (uint8);
+    function getTokenPriceFromPancakeSwap() external view returns (uint256);
+    function setNFTContract(address a) external;
+    function setMetadataContract(address a) external;
+    function setTokenContract(address a) external;
+    function setPancakeSwapPair(address pair) external;
+    function setPriceExpirySeconds(uint256 seconds_) external;
+    function setPriceDeviationThreshold(uint256 threshold) external;
+    function resetPriceCache() external;
+    function setLevel1UpgradeCost(uint256 cost) external;
+    function setLevel2UpgradeCost(uint256 cost) external;
+    function setLevel3UpgradeCost(uint256 cost) external;
+    function setLevel4UpgradeCost(uint256 cost) external;
 }

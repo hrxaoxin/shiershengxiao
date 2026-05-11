@@ -56,9 +56,11 @@ window.ZODIAC_UTILS = (function() {
 
     function getNFTInfo(typeId) {
         const attrIndex = Math.floor(typeId / 24);
-        const zodiacIndex = Math.floor(typeId / 2) % 12;
-        const gender = typeId % 2 === 0 ? '公' : '母';
-        const genderSuffix = typeId % 2 === 0 ? '_1' : '_0';
+        const remainder = typeId % 24;
+        const zodiacIndex = Math.floor(remainder / 2);
+        const genderValue = remainder % 2;
+        const gender = genderValue === 0 ? '母' : '公';
+        const genderSuffix = genderValue === 0 ? '_0' : '_1';
         const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
 
         if (attrIndex < 0 || attrIndex >= attrs.length) {

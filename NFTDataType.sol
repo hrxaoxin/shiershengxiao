@@ -49,19 +49,31 @@ library NFTDataTypes {
     }
 
     function getElement(ZodiacType zodiacType) internal pure returns (ElementType) {
-        return ElementType(uint256(zodiacType) / 24);
+        uint256 typeValue = uint256(zodiacType);
+        require(typeValue < 120, "NFTDataTypes: Invalid ZodiacType");
+        return ElementType(typeValue / 24);
     }
 
     function getGender(ZodiacType zodiacType) internal pure returns (GenderType) {
-        return GenderType(uint256(zodiacType) % 2);
+        uint256 typeValue = uint256(zodiacType);
+        require(typeValue < 120, "NFTDataTypes: Invalid ZodiacType");
+        return GenderType(typeValue % 2);
     }
 
     function getBaseZodiac(ZodiacType zodiacType) internal pure returns (BaseZodiac) {
-        return BaseZodiac((uint256(zodiacType) / 2) % 12);
+        uint256 typeValue = uint256(zodiacType);
+        require(typeValue < 120, "NFTDataTypes: Invalid ZodiacType");
+        return BaseZodiac((typeValue / 2) % 12);
     }
 
     function createZodiacType(ElementType element, BaseZodiac zodiac, GenderType gender) internal pure returns (ZodiacType) {
+        require(uint256(element) < 5, "NFTDataTypes: Invalid ElementType");
+        require(uint256(zodiac) < 12, "NFTDataTypes: Invalid BaseZodiac");
         return ZodiacType(uint256(element) * 24 + uint256(zodiac) * 2 + uint256(gender));
+    }
+
+    function isValidZodiacType(ZodiacType zodiacType) internal pure returns (bool) {
+        return uint256(zodiacType) < 120;
     }
 
     function getElementTypeValue(ElementType element) internal pure returns (uint256) {

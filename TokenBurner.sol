@@ -19,7 +19,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  */
 contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /** @dev 黑洞地址，用于销毁代币 */
-    address public constant BLACK_HOLE = address(0);
+    address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
     
     /** @dev 普通铸造费用（默认8888代币） */
     uint256 public normalMintCost = 8888;
@@ -70,14 +70,18 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      */
     function burnAndMint(address user, bool isRare) external returns (bool) {
         require(tokenContract != address(0), "TokenBurner: tokenContract not set");
+        require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
         require(msg.sender == authorizedNFTContract, "TokenBurner: Unauthorized caller");
         require(user != address(0), "TokenBurner: Zero user address");
         
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         uint256 cost = isRare ? rareMintCost : normalMintCost;
+        require(cost > 0, "TokenBurner: Invalid cost");
         require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
-        require(token.transferFrom(user, BLACK_HOLE, cost), "TokenBurner: Token transfer failed");
+        
+        bool success = token.transferFrom(user, BLACK_HOLE, cost);
+        require(success, "TokenBurner: Token transfer failed");
         
         emit TokenBurned(user, cost, block.timestamp);
         return true;

@@ -56,4 +56,49 @@ library NFTLib {
         }
         return string(o);
     }
+
+    function concat(string memory a, string memory b) internal pure returns (string memory) {
+        return string(abi.encodePacked(a, b));
+    }
+
+    function concat3(string memory a, string memory b, string memory c) internal pure returns (string memory) {
+        return string(abi.encodePacked(a, b, c));
+    }
+
+    function safeSub(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(a >= b, "NFTLib: Underflow in subtraction");
+        return a - b;
+    }
+
+    function safeAdd(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(a <= type(uint256).max - b, "NFTLib: Overflow in addition");
+        return a + b;
+    }
+
+    function safeMul(uint256 a, uint256 b) internal pure returns (uint256) {
+        if (a == 0 || b == 0) return 0;
+        require(a <= type(uint256).max / b, "NFTLib: Overflow in multiplication");
+        return a * b;
+    }
+
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
+    }
+
+    function max(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a > b ? a : b;
+    }
+
+    function calculateWeightDelta(uint8 level) internal pure returns (uint256) {
+        return level + 3;
+    }
+
+    function updateUserWeightValue(uint256 currentWeight, uint8 level, bool add) internal pure returns (uint256) {
+        uint256 weightDelta = calculateWeightDelta(level);
+        if (add) {
+            return currentWeight + weightDelta;
+        } else {
+            return currentWeight >= weightDelta ? currentWeight - weightDelta : 0;
+        }
+    }
 }

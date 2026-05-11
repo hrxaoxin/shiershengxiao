@@ -62,17 +62,21 @@ contract RewardManager is
     uint256 public constant OWNER_SHARE = 60;
     /** @dev 所有者资金池 */
     uint256 public ownerPool;
+    /** @dev 分红池最大容量（1000 ETH/BNB）*/
+    uint256 public constant MAX_DIVIDEND_POOL = 1000 ether;
 
     /** @dev 授权的NFT合约映射 */
     mapping(address => bool) public authorizedNFTContracts;
-    /** @dev 用户卡牌数量映射（用户地址 => 生肖类型 => 数量） */
-    mapping(address => mapping(NFTDataTypes.ZodiacType => uint256)) public cardCount;
+    /** @dev NFT数据合约地址 */
+    address public nftDataContract;
     /** @dev 是否为持有者映射 */
     mapping(address => bool) public isHolder;
     /** @dev 用户已领取分红映射 */
     mapping(address => uint256) public claimedDividend;
     /** @dev 用户精度累积映射 */
     mapping(address => uint256) public precisionAcc;
+    /** @dev 用户精度累积次数（用于解决长期累积导致的精度丢失问题） */
+    mapping(address => uint256) public precisionAccumulationCount;
     /** @dev 用户权重映射 */
     mapping(address => uint256) public userWeight;
     /** @dev 总权重 */
@@ -248,6 +252,7 @@ contract RewardManager is
         address _royaltyWallet,
         address _operator,
         address _nftContract,
+        address _nftDataContract,
         address _authorizer
     ) external initializer nonZeroAddress(initialOwner) nonZeroAddress(_operator) nonZeroAddress(_nftContract) {
         __UUPSUpgradeable_init();
@@ -255,9 +260,10 @@ contract RewardManager is
         __ReentrancyGuard_init();
         __Pausable_init();
 
-        royaltyWallet = _royaltyWallet == address(0) ? 0x55d398326f99059fF775485246999027B3197955 : _royaltyWallet;
+        royaltyWallet = _royaltyWallet == address(0) ? initialOwner : _royaltyWallet;
         operator = _operator;
         nftContract = _nftContract;
+        nftDataContract = _nftDataContract;
         authorizer = _authorizer;
         ownerWeight = minOwnerWeight;
         totalWeight = ownerWeight;
@@ -308,7 +314,7 @@ contract RewardManager is
      */
     function setNFTContract(address _newNFTContract) external onlyOwner nonZeroAddress(_newNFTContract) {
         address oldNFTContract = nftContract;
-        require(oldNFTContract != _newNFTContract, "RM: same nft contract");
+        require(oldNFTContract != _newNFTContract, "RewardManager: Cannot set same NFT contract");
         nftContract = _newNFTContract;
         emit NFTContractUpdated(oldNFTContract, _newNFTContract, block.timestamp);
     }
@@ -326,7 +332,7 @@ contract RewardManager is
      * @param _w 新权重�?
      */
     function setOwnerWeight(uint256 _w) external onlyOwner {
-        require(_w >= minOwnerWeight, "RM: w low");
+        require(_w >= minOwnerWeight, "RewardManager: Owner weight must be >= minimum weight");
 
         uint256 oldOwnerWeight = ownerWeight;
         totalWeight = totalWeight - oldOwnerWeight + _w;
@@ -340,7 +346,7 @@ contract RewardManager is
      * @param _minWeight 新的最低权重值
      */
     function setMinOwnerWeight(uint256 _minWeight) external onlyOwner {
-        require(_minWeight > 0, "RM: min weight must be > 0");
+        require(_minWeight > 0, "RewardManager: Minimum weight must be greater than 0");
         minOwnerWeight = _minWeight;
         if (ownerWeight < minOwnerWeight) {
             uint256 oldOwnerWeight = ownerWeight;
@@ -384,6 +390,15 @@ contract RewardManager is
      */
     function setAuthorizer(address _authorizer) external onlyOwner {
         authorizer = _authorizer;
+    }
+
+    /**
+     * @dev 设置NFT数据合约地址
+     * @param _nftDataContract NFT数据合约地址
+     */
+    function setNFTDataContract(address _nftDataContract) external nonZeroAddress(_nftDataContract) {
+        require(msg.sender == owner() || msg.sender == operator || msg.sender == nftContract || msg.sender == authorizer || authorizedNFTContracts[msg.sender], "RewardManager: Unauthorized");
+        nftDataContract = _nftDataContract;
     }
 
     /**
@@ -497,11 +512,13 @@ contract RewardManager is
         if (oldWeight != newWeight) {
             uint256 oldTotal = totalWeight;
             
-            unchecked {
-                if (oldWeight > 0 && newWeight == 0) {
-                    require(totalWeight >= oldWeight, "RM: totalWeight underflow");
-                }
-                totalWeight = totalWeight - oldWeight + newWeight;
+            if (oldWeight > newWeight) {
+                uint256 diff = oldWeight - newWeight;
+                require(totalWeight >= diff, "RewardManager: Total weight would underflow");
+                totalWeight -= diff;
+            } else {
+                require(totalWeight <= type(uint256).max - (newWeight - oldWeight), "RewardManager: Total weight would overflow");
+                totalWeight += (newWeight - oldWeight);
             }
             
             userWeight[user] = newWeight;
@@ -517,9 +534,8 @@ contract RewardManager is
      * @return cnt 总卡牌数
      */
     function _getTotalCardCount(address user) internal view returns (uint256 cnt) {
-        for (uint i = 0; i < 120; i++) {
-            cnt += cardCount[user][NFTDataTypes.ZodiacType(i)];
-        }
+        if (nftDataContract == address(0)) return 0;
+        return INFTDataInterface(nftDataContract).getUserTotalTokenCount(user);
     }
 
     /**
@@ -572,7 +588,6 @@ contract RewardManager is
      * @return 是否成功
      */
     function updateCard(address user, NFTDataTypes.ZodiacType t, uint256 cnt) internal returns (bool) {
-        cardCount[user][t] = cnt;
         _manageEligibleList(user);
         _updateUserWeight(user);
         emit CardUpdated(user, t, cnt, block.timestamp);
@@ -629,42 +644,61 @@ contract RewardManager is
      */
     function claimDividend() external nonReentrant whenNotPaused rateLimited(msg.sig) {
         address user = msg.sender;
-        require(_hasEligibility(user), "RM: no elig");
+        require(_hasEligibility(user), "RewardManager: User not eligible for dividend");
 
         uint256 totalW = totalWeight;
-        require(totalW > 0 && dividendPool > 0, "RM: no div");
+        require(totalW > 0 && dividendPool > 0, "RewardManager: No dividends available");
 
         uint256 userW = user == owner() ? ownerWeight : userWeight[user];
-        require(userW > 0, "RM: no weight");
+        require(userW > 0, "RewardManager: User weight is zero");
 
         uint256 contractBalance = address(this).balance;
-        require(contractBalance >= dividendPool, "RM: insufficient contract balance");
+        require(contractBalance >= dividendPool, "RewardManager: Insufficient contract balance");
 
         uint256 baseReward;
         uint256 carryOver;
         
+        require(dividendPool <= type(uint256).max / userW, "RewardManager: Multiplication overflow risk");
         uint256 totalDiv = dividendPool * userW;
-            baseReward = totalDiv / totalW;
-            carryOver = totalDiv % totalW;
-            
-            uint256 accumulated = precisionAcc[user] + carryOver;
-            
-            if (accumulated >= totalW) {
-                uint256 additionalReward = accumulated / totalW;
-                carryOver = accumulated % totalW;
-                
-                require(baseReward <= dividendPool - additionalReward, "RM: reward exceeds pool");
-                baseReward += additionalReward;
-            } else {
-                carryOver = accumulated;
-            }
-            
-            require(baseReward <= dividendPool, "RM: reward exceeds pool");
+        baseReward = totalDiv / totalW;
+        carryOver = totalDiv % totalW;
+        
+        // 修复精度累积问题：使用累积计数器避免长期累积导致精度丢失
+        uint256 accCount = precisionAccumulationCount[user];
+        if (accCount == 0) {
+            accCount = 1;
+        }
+        
+        // 将历史累积的precisionAcc转换为额外奖励
+        uint256 historicalAccumulated = precisionAcc[user] * accCount;
+        uint256 additionalFromHistory = 0;
+        if (historicalAccumulated >= totalW) {
+            additionalFromHistory = historicalAccumulated / totalW;
+        }
+        
+        // 加上本次的carryOver
+        uint256 accumulated = carryOver + (historicalAccumulated % totalW);
+        uint256 additionalReward = additionalFromHistory;
+        
+        if (accumulated >= totalW) {
+            additionalReward += accumulated / totalW;
+            carryOver = accumulated % totalW;
+        } else {
+            carryOver = accumulated;
+        }
+        
+        require(baseReward <= dividendPool, "RewardManager: Base reward exceeds dividend pool");
+        require(additionalReward <= dividendPool - baseReward, "RewardManager: Additional reward exceeds remaining pool");
+        
+        baseReward += additionalReward;
+        
+        require(baseReward > 0, "RewardManager: No reward amount to claim");
+        require(baseReward <= dividendPool, "RewardManager: Total reward exceeds dividend pool");
 
-        require(baseReward > 0, "RM: no amt");
-        require(baseReward <= dividendPool, "RM: reward exceeds dividend pool");
-
+        // 重置精度累积：只保留本次剩余的carryOver，计数器归1
         precisionAcc[user] = carryOver;
+        precisionAccumulationCount[user] = 1;
+        
         unchecked {
             dividendPool -= baseReward;
             claimedDividend[user] += baseReward;
@@ -673,17 +707,35 @@ contract RewardManager is
         emit DividendClaimed(user, baseReward, precisionAcc[user], block.timestamp);
 
         (bool success, ) = payable(user).call{value: baseReward}("");
-        require(success, "RM: transfer fail");
+        require(success, "RewardManager: Failed to transfer dividend");
+    }
+    
+    function clearPrecisionAcc(address user) external onlyOwner {
+        precisionAcc[user] = 0;
+        precisionAccumulationCount[user] = 1;
+    }
+    
+    function withdrawAllPrecisionAcc() external onlyOwner nonReentrant whenPaused {
+        uint256 contractBalance = address(this).balance;
+        require(contractBalance > 0 && paused(), "RM: no balance or not paused");
+        
+        (bool success, ) = payable(owner()).call{value: contractBalance}("");
+        require(success, "RewardManager: Failed to withdraw precision accumulator");
     }
 
     /**
      * @dev 接收ETH分红
      */
     receive() external payable {
-        require(msg.value > 0, "RM: zero");
+        require(msg.value > 0, "RewardManager: Cannot deposit zero value");
         
         uint256 userDividend = (msg.value * USER_SHARE) / 10000;
         uint256 ownerDividend = (msg.value * OWNER_SHARE) / 10000;
+        
+        require(dividendPool + userDividend <= MAX_DIVIDEND_POOL, 
+            "RewardManager: Dividend pool would exceed maximum capacity");
+        require(ownerPool + ownerDividend <= MAX_DIVIDEND_POOL, 
+            "RewardManager: Owner pool would exceed maximum capacity");
         
         unchecked { 
             dividendPool += userDividend;

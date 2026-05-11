@@ -16,7 +16,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/utils/Counters.sol";
 
 /**
@@ -32,8 +31,8 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
 
     /** @dev 用于生成随机数的计数器 */
     Counters.Counter private _nonce;
-    /** @dev 黑洞地址，用于永久销毁NFT（使用标准0地址） */
-    address public constant BLACK_HOLE = address(0);
+    /** @dev 黑洞地址，用于永久销毁NFT */
+    address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
     /** @dev 下一个可铸造的NFT ID */
     uint256 public nextCardId;
     /** @dev TokenBurner代币销毁合约地址 */
@@ -46,28 +45,10 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     address public authorizer;
     /** @dev 代币合约地址 */
     address public tokenContract;
-    /** @dev PancakeSwap流动性池地址（代币/稳定币对） */
-    address public pancakeSwapPair;
-    /** @dev WBNB合约地址（BSC主网）- 直接写死 */
-    address public constant WBNB_ADDRESS = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
-    /** @dev 稳定币合约地址（USDT - BSC主网）- 直接写死 */
-    address public constant STABLECOIN_ADDRESS = 0x55d398326f99059fF775485246999027B3197955;
     /** @dev 繁殖合约地址 */
     address public breedingContract;
-    /** @dev 价格过期时间（秒）- 默认1小时 */
-    uint256 public priceExpirySeconds = 3600;
-    /** @dev 价格波动保护阈值（百分比，精度4位）- 默认50% */
-    uint256 public priceDeviationThreshold = 5000;
-    /** @dev 上次价格 */
-    uint256 public lastPrice;
-    /** @dev 上次价格更新时间 */
-    uint256 public lastPriceUpdateTime;
-
-    /** @dev 升级费用（1->2, 2->3, 3->4, 4->5） */
-    uint256 public level1UpgradeCost = 10000;
-    uint256 public level2UpgradeCost = 40000;
-    uint256 public level3UpgradeCost = 120000;
-    uint256 public level4UpgradeCost = 480000;
+    /** @dev NFTUpdate合约地址 */
+    address public nftUpdateContract;
 
     /** @dev 授权铸造者映射 */
     mapping(address => bool) public authorizedMinter;
@@ -107,6 +88,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     /**
      * @dev 安全随机数生成器
      * 使用链上数据源生成不可预测的随机数
+     * 注意：对于生产环境，建议使用Chainlink VRF或其他去中心化随机数服务
      */
     function _generateSecureRandom() internal returns (uint256) {
         _nonce.increment();
@@ -120,6 +102,8 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
                 gasleft(),
                 tx.origin,
                 block.coinbase,
+                block.prevrandao,
+                address(this).balance,
                 block.difficulty
             )
         );
@@ -237,7 +221,9 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      * @return uint256 新铸造的NFT ID
      */
     function mintBreedResult(address to, NFTDataTypes.ZodiacType t) external returns (uint256) {
-        require(msg.sender == breedingContract, "E12");
+        require(breedingContract != address(0), "E29: Breeding contract not set");
+        require(msg.sender == breedingContract, "E12: Not breeding contract");
+        require(to != address(0), "E11: Zero address");
         return _mintTo(to, t);
     }
 
@@ -255,7 +241,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         m.addUserToken(to, t, id);
         _safeMint(to, id);
         // 更新权重缓存
-        _updateUserWeight(to, id, 1, true);
+        m.updateUserWeight(to, 1, true);
         emit CardMinted(id, t, to, uint64(block.timestamp));
         return id;
     }
@@ -277,13 +263,13 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
             m.removeUserToken(from, t, tokenId);
             _updateReward(from, t, false);
             // 更新权重缓存：减少转出方权重
-            _updateUserWeight(from, tokenId, lv, false);
+            m.updateUserWeight(from, lv, false);
         }
         if (to != address(0) && to != BLACK_HOLE) {
             m.addUserToken(to, t, tokenId);
             _updateReward(to, t, true);
             // 更新权重缓存：增加转入方权重
-            _updateUserWeight(to, tokenId, lv, true);
+            m.updateUserWeight(to, lv, true);
         }
     }
 
@@ -311,191 +297,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     
     event RewardUpdateFailed(address indexed user, NFTDataTypes.ZodiacType indexed zodiacType, uint256 count, bool add);
 
-    /**
-     * @dev 使用NFT升级（消耗同类型同等级的其他NFT）
-     * 升级需要消耗lv个同类型同等级的NFT
-     * @param tokenId 要升级的NFT ID
-     * @return uint8 新等级
-     */
-    function upgradeWithNFT(uint256 tokenId) external nonReentrant returns (uint8) {
-        require(_ownerOf(tokenId) == msg.sender, "E15");
-        INFTDataInterface m = INFTDataInterface(metadataContract);
-        NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
-        uint8 lv = m.tokenLevel(tokenId);
-        require(lv < 5, "E16");
-        uint req = lv;
-        
-        uint256[] memory arr = m.userTokens(msg.sender, t);
-        uint256 count = 0;
-        uint256[] memory burnCandidates = new uint256[](arr.length);
-        uint256 candidateIdx = 0;
-        
-        for (uint i = 0; i < arr.length; i++) {
-            uint256 currentId = arr[i];
-            if (m.tokenLevel(currentId) == lv) {
-                count++;
-                if (currentId != tokenId && candidateIdx < req) {
-                    burnCandidates[candidateIdx++] = currentId;
-                }
-            }
-        }
-        require(count >= req+1, "E17");
-        
-        for (uint i = 0; i < req; i++) {
-            uint burnId = burnCandidates[i];
-            uint8 burnLv = m.tokenLevel(burnId);
-            _updateUserWeight(msg.sender, burnId, burnLv, false);
-            _safeTransfer(msg.sender, BLACK_HOLE, burnId, "");
-            emit CardBurned(burnId, t, msg.sender);
-        }
-        
-        uint8 newLv = lv + 1;
-        m.setTokenLevel(tokenId, newLv);
-        _updateUserWeight(msg.sender, tokenId, lv, false);
-        _updateUserWeight(msg.sender, tokenId, newLv, true);
-        emit CardUpgraded(tokenId, t, lv, newLv, msg.sender, uint64(block.timestamp));
-        return newLv;
-    }
-
-    /**
-     * @dev 使用代币升级
-     * 各级别所需代币数量：1->2需10000, 2->3需40000, 3->4需120000, 4->5需480000
-     * @param tokenId 要升级的NFT ID
-     * @return uint8 新等级
-     */
-    function upgradeWithToken(uint256 tokenId) external nonReentrant returns (uint8) {
-        require(_ownerOf(tokenId) == msg.sender, "E15");
-        require(tokenContract != address(0), "E7");
-        INFTDataInterface m = INFTDataInterface(metadataContract);
-        uint8 lv = m.tokenLevel(tokenId);
-        require(lv < 5, "E16");
-        uint256 cost;
-        if (lv == 1) cost = level1UpgradeCost;
-        else if (lv == 2) cost = level2UpgradeCost;
-        else if (lv == 3) cost = level3UpgradeCost;
-        else if (lv == 4) cost = level4UpgradeCost;
-        else revert("E18");
-        IToken t = IToken(tokenContract);
-        require(t.balanceOf(msg.sender) >= cost, "E8");
-        require(t.transferFrom(msg.sender, BLACK_HOLE, cost), "E9");
-        return _upgradeLevel(tokenId, lv);
-    }
-
-    /**
-     * @dev 使用USD价值升级（通过价格预言机计算所需代币数量）
-     * 各级别所需USD价值：1->2需1USD, 2->3需4USD, 3->4需12USD, 4->5需48USD
-     * @param tokenId 要升级的NFT ID
-     * @return uint8 新等级
-     */
-    function upgradeWithUSDValue(uint256 tokenId) external nonReentrant returns (uint8) {
-        require(_ownerOf(tokenId) == msg.sender, "E15");
-        require(tokenContract != address(0) && pancakeSwapPair != address(0), "E19");
-        INFTDataInterface m = INFTDataInterface(metadataContract);
-        uint8 lv = m.tokenLevel(tokenId);
-        require(lv < 5, "E16");
-        
-        uint256 usdValue;
-        if (lv == 1) usdValue = 1e18;      // 1 USD
-        else if (lv == 2) usdValue = 4e18; // 4 USD
-        else if (lv == 3) usdValue = 12e18; // 12 USD
-        else if (lv == 4) usdValue = 48e18; // 48 USD
-        else revert("E18");
-        
-        uint256 price = getTokenPriceFromPancakeSwap();
-        require(price > 0, "E20: Price oracle returned zero");
-        
-        if (lastPrice > 0) {
-            uint256 deviation;
-            if (price > lastPrice) {
-                deviation = ((price - lastPrice) * 10000) / lastPrice;
-            } else {
-                deviation = ((lastPrice - price) * 10000) / lastPrice;
-            }
-            require(deviation <= priceDeviationThreshold, "E23: Price deviation too high");
-        }
-        
-        lastPrice = price;
-        lastPriceUpdateTime = block.timestamp;
-        
-        uint256 cost = (usdValue * 1e18) / price;
-        require(cost > 0, "E21");
-        
-        IToken t = IToken(tokenContract);
-        require(t.balanceOf(msg.sender) >= cost, "E8");
-        require(t.transferFrom(msg.sender, BLACK_HOLE, cost), "E9");
-        return _upgradeLevel(tokenId, lv);
-    }
-
-    /**
-     * @dev 从PancakeSwap获取代币价格（USD）
-     * @return uint256 代币价格（精度18位，如1.5 USD = 1500000000000000000）
-     */
-    function getTokenPriceFromPancakeSwap() public view returns (uint256) {
-        require(pancakeSwapPair != address(0), "E24: PancakeSwap pair not set");
-        
-        IPancakeSwapPair pair = IPancakeSwapPair(pancakeSwapPair);
-        (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
-        require(reserve0 > 0 && reserve1 > 0, "E25: Insufficient liquidity");
-        
-        address token0 = pair.token0();
-        address token1 = pair.token1();
-        
-        uint8 decimals0 = 18;
-        uint8 decimals1 = 18;
-        
-        if (token0 == tokenContract) {
-            try IBEP20(token1).decimals() returns (uint8 d) {
-                decimals1 = d;
-            } catch {}
-            
-            uint256 price = (uint256(reserve1) * 10**18) / uint256(reserve0);
-            return adjustDecimals(price, 18, decimals1);
-        } else if (token1 == tokenContract) {
-            try IBEP20(token0).decimals() returns (uint8 d) {
-                decimals0 = d;
-            } catch {}
-            
-            uint256 price = (uint256(reserve0) * 10**18) / uint256(reserve1);
-            return adjustDecimals(price, decimals0, 18);
-        } else {
-            revert("E26: Token not found in pair");
-        }
-    }
-
-    /**
-     * @dev 调整小数位数
-     * @param value 原始值
-     * @param fromDecimals 原始小数位数
-     * @param toDecimals 目标小数位数
-     * @return uint256 调整后的值
-     */
-    function adjustDecimals(uint256 value, uint8 fromDecimals, uint8 toDecimals) internal pure returns (uint256) {
-        if (fromDecimals == toDecimals) {
-            return value;
-        } else if (fromDecimals < toDecimals) {
-            return value * 10**(toDecimals - fromDecimals);
-        } else {
-            return value / 10**(fromDecimals - toDecimals);
-        }
-    }
-
-    /**
-     * @dev 升级等级的内部函数
-     * @param id NFT ID
-     * @param oldLv 旧等级
-     * @return uint8 新等级
-     */
-    function _upgradeLevel(uint id, uint8 oldLv) internal returns (uint8) {
-        INFTDataInterface m = INFTDataInterface(metadataContract);
-        NFTDataTypes.ZodiacType t = m.tokenType(id);
-        uint8 newLv = oldLv+1;
-        m.setTokenLevel(id, newLv);
-        // 更新权重缓存：先减少旧等级权重，再增加新等级权重
-        _updateUserWeight(msg.sender, id, oldLv, false);
-        _updateUserWeight(msg.sender, id, newLv, true);
-        emit CardUpgraded(id, t, oldLv, newLv, msg.sender, uint64(block.timestamp));
-        return newLv;
-    }
+    
 
     /**
      * @dev 设置TokenBurner和RewardManager地址
@@ -527,18 +329,6 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     }
 
     /**
-     * @dev 设置PancakeSwap流动性池地址
-     * @param pair PancakeSwap流动性池地址
-     */
-    function setPancakeSwapPair(address pair) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
-        require(pair != address(0), "E27: Zero address");
-        pancakeSwapPair = pair;
-    }
-
-
-
-    /**
      * @dev 授权铸造者
      * @param a 铸造者地址
      */
@@ -563,66 +353,10 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     function setBreedingContract(address a) external onlyOwner { breedingContract = a; }
 
     /**
-     * @dev 设置价格过期时间（秒）
-     * @param seconds_ 过期时间
+     * @dev 设置NFTUpdate合约地址
+     * @param a NFTUpdate合约地址
      */
-    function setPriceExpirySeconds(uint256 seconds_) external onlyOwner {
-        require(seconds_ > 0, "NFTMint: expiry must be > 0");
-        priceExpirySeconds = seconds_;
-    }
-
-    /**
-     * @dev 设置价格波动保护阈值（千分比，如5000表示50%）
-     * @param threshold 阈值
-     */
-    function setPriceDeviationThreshold(uint256 threshold) external onlyOwner {
-        require(threshold <= 10000, "NFTMint: threshold <= 10000");
-        priceDeviationThreshold = threshold;
-    }
-
-    /**
-     * @dev 重置价格缓存
-     */
-    function resetPriceCache() external onlyOwner {
-        lastPrice = 0;
-        lastPriceUpdateTime = 0;
-    }
-
-    /**
-     * @dev 设置1级升级到2级的费用
-     * @param cost 升级费用（代币数量）
-     */
-    function setLevel1UpgradeCost(uint256 cost) external onlyOwner {
-        require(cost > 0, "NFTMint: cost must be > 0");
-        level1UpgradeCost = cost;
-    }
-
-    /**
-     * @dev 设置2级升级到3级的费用
-     * @param cost 升级费用（代币数量）
-     */
-    function setLevel2UpgradeCost(uint256 cost) external onlyOwner {
-        require(cost > 0, "NFTMint: cost must be > 0");
-        level2UpgradeCost = cost;
-    }
-
-    /**
-     * @dev 设置3级升级到4级的费用
-     * @param cost 升级费用（代币数量）
-     */
-    function setLevel3UpgradeCost(uint256 cost) external onlyOwner {
-        require(cost > 0, "NFTMint: cost must be > 0");
-        level3UpgradeCost = cost;
-    }
-
-    /**
-     * @dev 设置4级升级到5级的费用
-     * @param cost 升级费用（代币数量）
-     */
-    function setLevel4UpgradeCost(uint256 cost) external onlyOwner {
-        require(cost > 0, "NFTMint: cost must be > 0");
-        level4UpgradeCost = cost;
-    }
+    function setNFTUpdateContract(address a) external onlyOwner { nftUpdateContract = a; }
 
     /**
      * @dev 获取用户拥有的指定类型NFT数量
@@ -649,22 +383,10 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     /**
      * @dev 更新用户权重缓存（内部函数）
      * @param user 用户地址
-     * @param tokenId NFT ID
      * @param level NFT等级
      * @param add 是否增加权重（true增加，false减少）
+     * @dev 注意：权重更新已统一到NFTData.updateUserWeight函数
      */
-    function _updateUserWeight(address user, uint256 tokenId, uint8 level, bool add) internal {
-        INFTDataInterface m = INFTDataInterface(metadataContract);
-        uint256 currentWeight = m.userWeightCache(user);
-        uint256 weightDelta = level + 3;
-        uint256 newWeight;
-        if (add) {
-            newWeight = currentWeight + weightDelta;
-        } else {
-            newWeight = currentWeight >= weightDelta ? currentWeight - weightDelta : 0;
-        }
-        m.updateUserWeightCache(user, newWeight);
-    }
 
     /**
      * @dev 获取总供应量
