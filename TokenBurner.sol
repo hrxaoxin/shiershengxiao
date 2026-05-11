@@ -7,7 +7,7 @@ pragma solidity ^0.8.20;
  * 支持修改销毁费用，仅限合约拥有者操作
  * 基于OpenZeppelin可升级合约实现
  */
-import "./NFTData.sol";
+import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";

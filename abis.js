@@ -84,8 +84,7 @@ window.nftMintABI = [
 	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithUSDValue","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[],"name":"getTokenPriceFromPancakeSwap","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"address","name":"pair","type":"address"}],"name":"setPancakeSwapPair","outputs":[],"stateMutability":"nonpayable","type":"function"},
-	{"inputs":[{"internalType":"address","name":"wbnb","type":"address"}],"name":"setWBNBAddress","outputs":[],"stateMutability":"nonpayable","type":"function"},
-	{"inputs":[{"internalType":"address","name":"stablecoin","type":"address"}],"name":"setStablecoinAddress","outputs":[],"stateMutability":"nonpayable","type":"function"},
+
 	{"inputs":[],"name":"pancakeSwapPair","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"approve","outputs":[],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"bool","name":"approved","type":"bool"}],"name":"setApprovalForAll","outputs":[],"stateMutability":"nonpayable","type":"function"},

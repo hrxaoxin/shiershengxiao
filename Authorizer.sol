@@ -4,43 +4,7 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
-
-interface ITokenBurner {
-    function setAuthorizedNFTContract(address nftContract) external;
-    function setTokenContract(address tokenContract) external;
-}
-
-interface IRewardManager {
-    function setAuthorizedNFTContract(address nft, bool ok) external;
-    function setNFTContract(address _newNFTContract) external;
-}
-
-interface INFTTrading {
-    function setNFTContract(address newNFTContract) external;
-    function setRewardManager(address newRewardManager) external;
-}
-
-interface IBreeding {
-    function setNFTContract(address nftContract) external;
-}
-
-interface INFTData {
-    function initialize(address initialOwner) external;
-    function setAuthorizedNFTContract(address nftContract) external;
-}
-
-interface INFTMint {
-    function setAddresses(address tb, address rm) external;
-    function setMetadataContract(address a) external;
-    function setTokenContract(address a) external;
-    function setPriceOracle(address a) external;
-    function setBreedingContract(address a) external;
-}
-
-interface IStaking {
-    function setNFTContract(address nftContract) external;
-    function setTokenContract(address tokenContract) external;
-}
+import "./NFTInterface.sol";
 
 contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     enum PermissionLevel {
@@ -71,7 +35,8 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    function authorize(address addr, PermissionLevel level) external onlyOwner {
+    // 【内部核心函数】无权限校验，仅处理逻辑
+    function _authorize(address addr, PermissionLevel level) internal {
         require(addr != address(0), "Authorizer: Zero address");
         PermissionLevel oldLevel = permissions[addr];
         permissions[addr] = level;
@@ -82,22 +47,35 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
     }
 
+    // 外部授权函数：保留onlyOwner权限校验
+    function authorize(address addr, PermissionLevel level) external onlyOwner {
+        _authorize(addr, level);
+    }
+
+    // 批量授权：直接调用内部函数
     function batchAuthorize(address[] calldata addrs, PermissionLevel[] calldata levels) external onlyOwner {
         require(addrs.length == levels.length, "Authorizer: Array length mismatch");
         for (uint256 i = 0; i < addrs.length; i++) {
-            authorize(addrs[i], levels[i]);
+            _authorize(addrs[i], levels[i]);
         }
     }
 
-    function unauthorize(address addr) external onlyOwner {
+    // 【内部核心函数】无权限校验，仅处理逻辑
+    function _unauthorize(address addr) internal {
         require(permissions[addr] != PermissionLevel.NONE, "Authorizer: Address not authorized");
         permissions[addr] = PermissionLevel.NONE;
         emit AddressUnauthorized(addr, block.timestamp);
     }
 
+    // 外部取消授权函数：保留onlyOwner权限校验
+    function unauthorize(address addr) external onlyOwner {
+        _unauthorize(addr);
+    }
+
+    // 批量取消授权：直接调用内部函数
     function batchUnauthorize(address[] calldata addrs) external onlyOwner {
         for (uint256 i = 0; i < addrs.length; i++) {
-            unauthorize(addrs[i]);
+            _unauthorize(addrs[i]);
         }
     }
 
@@ -148,7 +126,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             INFTTrading(nftTrading).setRewardManager(rewardManager);
         }
 
-        INFTData(nftData).setAuthorizedNFTContract(nftMint);
+        INFTDataInterface(nftData).setAuthorizedNFTContract(nftMint);
         INFTMint(nftMint).setAddresses(tokenBurner, rewardManager);
         INFTMint(nftMint).setMetadataContract(nftData);
         INFTMint(nftMint).setTokenContract(tokenContract);

@@ -8,7 +8,7 @@ pragma solidity ^0.8.20;
  * 基于OpenZeppelin UUPS可升级合约实现
  */
 
-import "./NFTData.sol";
+import "./NFTInterface.sol";
 
 // 全部统一适配 OpenZeppelin Upgradeable v4.9
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -16,20 +16,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
-
-/**
- * @dev IERC2981接口：NFT版税标准接口
- */
-interface IERC2981 {
-    /**
-     * @dev 获取NFT版税信息
-     * @param tokenId NFT ID
-     * @param salePrice 销售价格
-     * @return receiver 版税接收地址
-     * @return royaltyAmount 版税金额
-     */
-    function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address receiver, uint256 royaltyAmount);
-}
 
 /**
  * @title RewardManager
@@ -296,9 +282,8 @@ contract RewardManager is
     {}
 
     /**
-     * @dev 获取NFT版税信息（ERC2981接口实现�?
-     * @param tokenId NFT ID
-     * @param salePrice 销售价�?
+     * @dev 获取NFT版税信息（ERC2981接口实现）
+     * @param salePrice 销售价格
      * @return receiver 版税接收地址
      * @return royaltyAmount 版税金额
      */
@@ -527,9 +512,9 @@ contract RewardManager is
     }
 
     /**
-     * @dev 获取用户总卡牌数�?
+     * @dev 获取用户总卡牌数
      * @param user 用户地址
-     * @return 总卡牌数�?
+     * @return cnt 总卡牌数
      */
     function _getTotalCardCount(address user) internal view returns (uint256 cnt) {
         for (uint i = 0; i < 120; i++) {

@@ -7,7 +7,9 @@ pragma solidity ^0.8.20;
  * 实现120种生肖NFT类型（5属性x12生肖x2性别）
  * 基于OpenZeppelin UUPS可升级合约实现
  */
-import "./NFTData.sol";
+import "./NFTDataType.sol";
+import "./NFTInterface.sol";
+import "./NFTLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/ERC721Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
@@ -16,163 +18,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/utils/Counters.sol";
-
-/**
- * @dev ITokenBurner接口：代币销毁合约接口
- */
-interface ITokenBurner {
-    /**
-     * @dev 销毁普通铸造费用的代币
-     * @return bool 是否成功
-     */
-    function burnTokenForMint() external returns (bool);
-    /**
-     * @dev 销毁稀有铸造费用的代币
-     * @return bool 是否成功
-     */
-    function burnTokenForRareMint() external returns (bool);
-    /**
-     * @dev 销毁代币并铸造
-     * @param user 用户地址
-     * @param isRare 是否稀有铸造
-     * @return bool 是否成功
-     */
-    function burnAndMint(address user, bool isRare) external returns (bool);
-    /**
-     * @dev 获取普通铸造费用
-     * @return uint256 费用
-     */
-    function normalMintCost() external view returns (uint256);
-    /**
-     * @dev 获取稀有铸造费用
-     * @return uint256 费用
-     */
-    function rareMintCost() external view returns (uint256);
-}
-
-/**
- * @dev IToken接口：ERC20代币接口
- */
-interface IToken {
-    /**
-     * @dev 转账
-     * @param from 转出地址
-     * @param to 转入地址
-     * @param amount 数量
-     * @return bool 是否成功
-     */
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    /**
-     * @dev 获取余额
-     * @param account 账户地址
-     * @return uint256 余额
-     */
-    function balanceOf(address account) external view returns (uint256);
-}
-
-/**
- * @dev IPriceOracle接口：价格预言机接口（保留兼容）
- */
-interface IPriceOracle {
-    function getTokenPriceInUSD() external view returns (uint256);
-    function getPriceTimestamp() external view returns (uint256);
-}
-
-/**
- * @dev IPancakeSwapPair接口：PancakeSwap流动性池接口
- */
-interface IPancakeSwapPair {
-    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-    function token0() external view returns (address);
-    function token1() external view returns (address);
-}
-
-/**
- * @dev IBEP20接口：BEP20代币接口
- */
-interface IBEP20 {
-    function decimals() external view returns (uint8);
-}
-
-/**
- * @dev NFTLib工具库：用于NFT合约的辅助函数
- */
-library NFTLib {
-    /**
-     * @dev 整数转字符串
-     * @param n 整数
-     * @return string 字符串
-     */
-    function uint2str(uint256 n) internal pure returns (string memory) {
-        if (n == 0) return "0";
-        uint256 temp = n;
-        uint256 len;
-        while (temp != 0) { len++; temp /= 10; }
-        bytes memory buf = new bytes(len);
-        while (n != 0) { len--; buf[len] = bytes1(uint8(48 + n % 10)); n /= 10; }
-        return string(buf);
-    }
-
-    /**
-     * @dev 地址转字符串
-     * @param _addr 地址
-     * @return string 十六进制字符串
-     */
-    function addressToString(address _addr) internal pure returns (string memory) {
-        bytes32 value = bytes32(uint256(uint160(_addr)));
-        bytes memory alphabet = "0123456789abcdef";
-        bytes memory str = new bytes(42);
-        str[0] = '0'; str[1] = 'x';
-        for (uint i = 0; i < 20; i++) {
-            str[2+i*2] = alphabet[uint8(value[i+12] >> 4)];
-            str[3+i*2] = alphabet[uint8(value[i+12] & 0x0f)];
-        }
-        return string(str);
-    }
-
-    /**
-     * @dev Base64编码
-     * @param data 原始数据
-     * @return string Base64编码字符串
-     */
-    function base64Encode(bytes memory data) internal pure returns (string memory) {
-        bytes memory base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        bytes memory result = new bytes((data.length + 2) / 3 * 4);
-        uint cursor = 0;
-        for (uint i = 0; i < data.length; i += 3) {
-            uint b0 = uint8(data[i]);
-            uint b1 = i+1 < data.length ? uint8(data[i+1]) : 0;
-            uint b2 = i+2 < data.length ? uint8(data[i+2]) : 0;
-            uint chunk = (b0 << 16) | (b1 << 8) | b2;
-            result[cursor++] = base64[(chunk >> 18) & 0x3F];
-            result[cursor++] = base64[(chunk >> 12) & 0x3F];
-            result[cursor++] = base64[(chunk >> 6) & 0x3F];
-            result[cursor++] = base64[chunk & 0x3F];
-        }
-        if (data.length % 3 == 1) { result[cursor-2] = '='; result[cursor-1] = '='; }
-        else if (data.length % 3 == 2) { result[cursor-1] = '='; }
-        return string(result);
-    }
-
-    /**
-     * @dev 转义字符串（处理特殊字符）
-     * @param input 输入字符串
-     * @return string 转义后的字符串
-     */
-    function escapeString(string memory input) internal pure returns (string memory) {
-        bytes memory b = bytes(input);
-        uint esc;
-        for (uint i; i<b.length; i++) { if (b[i] == '"' || b[i] == '\\') esc++; }
-        if (esc == 0) return input;
-        bytes memory o = new bytes(b.length + esc);
-        uint j;
-        for (uint i; i<b.length; i++) {
-            if (b[i] == '"' || b[i] == '\\') o[j++] = '\\';
-            o[j++] = b[i];
-        }
-        return string(o);
-    }
-}
 
 /**
  * @title NFTMint
@@ -203,10 +48,10 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     address public tokenContract;
     /** @dev PancakeSwap流动性池地址（代币/稳定币对） */
     address public pancakeSwapPair;
-    /** @dev WBNB合约地址 */
-    address public wbnbAddress;
-    /** @dev 稳定币合约地址（如USDT/USDC/BUSD） */
-    address public stablecoinAddress;
+    /** @dev WBNB合约地址（BSC主网）- 直接写死 */
+    address public constant WBNB_ADDRESS = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    /** @dev 稳定币合约地址（USDT - BSC主网）- 直接写死 */
+    address public constant STABLECOIN_ADDRESS = 0x55d398326f99059fF775485246999027B3197955;
     /** @dev 繁殖合约地址 */
     address public breedingContract;
     /** @dev 价格过期时间（秒）- 默认1小时 */
@@ -254,7 +99,6 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
 
     /**
      * @dev 升级授权函数
-     * @param newImplementation 新实现合约地址
      */
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -321,7 +165,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      */
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_ownerOf(tokenId) != address(0), "E0");
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
         string memory json = string(abi.encodePacked(
             '{"name":"', m.getCardName(t), " #", tokenId.uint2str(), '",',
@@ -337,7 +181,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      */
     function contractURI() public view returns (string memory) {
         require(metadataContract != address(0), "E1");
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         IRewardManager rm = IRewardManager(rewardManager);
         string memory json = string(abi.encodePacked(
             '{"name":"', m.collName().escapeString(), '",',
@@ -405,7 +249,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      */
     function _mintTo(address to, NFTDataTypes.ZodiacType t) internal returns (uint256) {
         uint id = nextCardId++;
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         m.setTokenType(id, t);
         m.setTokenLevel(id, 1);
         m.addUserToken(to, t, id);
@@ -426,7 +270,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      */
     function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
         uint8 lv = m.tokenLevel(tokenId);
         if (from != address(0) && from != BLACK_HOLE) {
@@ -475,7 +319,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      */
     function upgradeWithNFT(uint256 tokenId) external nonReentrant returns (uint8) {
         require(_ownerOf(tokenId) == msg.sender, "E15");
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
         uint8 lv = m.tokenLevel(tokenId);
         require(lv < 5, "E16");
@@ -501,7 +345,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
             uint burnId = burnCandidates[i];
             uint8 burnLv = m.tokenLevel(burnId);
             _updateUserWeight(msg.sender, burnId, burnLv, false);
-            _safeTransfer(msg.sender, BLACK_HOLE, burnId);
+            _safeTransfer(msg.sender, BLACK_HOLE, burnId, "");
             emit CardBurned(burnId, t, msg.sender);
         }
         
@@ -522,7 +366,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     function upgradeWithToken(uint256 tokenId) external nonReentrant returns (uint8) {
         require(_ownerOf(tokenId) == msg.sender, "E15");
         require(tokenContract != address(0), "E7");
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         uint8 lv = m.tokenLevel(tokenId);
         require(lv < 5, "E16");
         uint256 cost;
@@ -546,7 +390,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     function upgradeWithUSDValue(uint256 tokenId) external nonReentrant returns (uint8) {
         require(_ownerOf(tokenId) == msg.sender, "E15");
         require(tokenContract != address(0) && pancakeSwapPair != address(0), "E19");
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         uint8 lv = m.tokenLevel(tokenId);
         require(lv < 5, "E16");
         
@@ -642,7 +486,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      * @return uint8 新等级
      */
     function _upgradeLevel(uint id, uint8 oldLv) internal returns (uint8) {
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         NFTDataTypes.ZodiacType t = m.tokenType(id);
         uint8 newLv = oldLv+1;
         m.setTokenLevel(id, newLv);
@@ -692,23 +536,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         pancakeSwapPair = pair;
     }
 
-    /**
-     * @dev 设置WBNB合约地址
-     * @param wbnb WBNB合约地址
-     */
-    function setWBNBAddress(address wbnb) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
-        wbnbAddress = wbnb;
-    }
 
-    /**
-     * @dev 设置稳定币合约地址
-     * @param stablecoin 稳定币合约地址
-     */
-    function setStablecoinAddress(address stablecoin) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
-        stablecoinAddress = stablecoin;
-    }
 
     /**
      * @dev 授权铸造者
@@ -814,7 +642,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      * @return uint256 用户权重
      */
     function calcUserWeight(address user) external view returns (uint256) {
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         return m.userWeightCache(user);
     }
 
@@ -826,7 +654,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      * @param add 是否增加权重（true增加，false减少）
      */
     function _updateUserWeight(address user, uint256 tokenId, uint8 level, bool add) internal {
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         uint256 currentWeight = m.userWeightCache(user);
         uint256 weightDelta = level + 3;
         uint256 newWeight;
@@ -853,7 +681,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      * @return uint256 NFT ID
      */
     function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256) {
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         uint256[] memory arr = m.userAllTokens(owner);
         require(index < arr.length, "NFTMint: index out of bounds");
         return arr[index];
@@ -865,7 +693,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      * @return uint256 NFT数量
      */
     function balanceOf(address owner) public view override returns (uint256) {
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         return m.userAllTokens(owner).length;
     }
 
@@ -878,7 +706,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      * @return bool 是否还有更多
      */
     function getTokensByPage(address owner, uint256 page, uint256 pageSize) external view returns (uint256[] memory, bool) {
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         uint256[] memory arr = m.userAllTokens(owner);
         uint256 total = arr.length;
         uint256 start = page * pageSize;
@@ -918,7 +746,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         uint8[] memory,
         bool
     ) {
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         uint256[] memory arr = m.userAllTokens(owner);
         uint256 total = arr.length;
         uint256 start = page * pageSize;
