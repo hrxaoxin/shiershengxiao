@@ -25,10 +25,20 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
     uint8 public constant MIN_STAKING_LEVEL = 5;
     /** @dev 奖励间隔时间：每分钟计算一次奖励 */
     uint256 public constant REWARD_INTERVAL = 1 minutes;
-    /** @dev 每分钟基础代币奖励数量 */
+    /** @dev 每分钟基础代币奖励数量（保底） */
     uint256 public constant BASE_TOKEN_PER_MINUTE = 10 * 10**18;
-    /** @dev 每日最大奖励上限 */
-    uint256 public constant MAX_DAILY_REWARD = 14400 * 10**18;
+    /** @dev 每日奖励释放比例（千分之1.5 = 0.15%） */
+    uint256 public dailyReleaseRatio = 15;
+    uint256 public constant RELEASE_RATIO_DENOMINATOR = 10000;
+    /** @dev 弹性比例上限增量（千分之0.5 = 0.05%） */
+    uint256 public constant MAX_ELASTIC_INCREMENT = 5;
+    /** @dev 当日转入代币量（用于弹性调控）*/
+    uint256 public dailyDeposited;
+    /** @dev 倍数阈值（超过此倍数触发弹性调控）*/
+    uint256 public multipleThreshold = 2;
+    /** @dev 上次日期重置时间戳 */
+    uint256 public lastDateReset;
+    
     /** @dev 最小质押锁定时间（30分钟） */
     uint256 public constant MIN_STAKING_DURATION = 30 minutes;
 
@@ -216,6 +226,28 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
     }
 
     /**
+     * @dev 存入代币（用于接收外部转入的代币）
+     * @param amount 存入的代币数量
+     */
+    function depositToken(uint256 amount) external nonReentrant {
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        require(token.transferFrom(msg.sender, address(this), amount), "Staking: Token transfer failed");
+        
+        _updateDailyDeposited(amount);
+        
+        emit TokensDeposited(amount);
+    }
+
+    function _updateDailyDeposited(uint256 amount) internal {
+        if (block.timestamp >= lastDateReset + 1 days) {
+            dailyDeposited = amount;
+            lastDateReset = block.timestamp;
+        } else {
+            dailyDeposited += amount;
+        }
+    }
+
+    /**
      * @dev 领取奖励
      * 用户领取所有质押NFT的累计奖励
      */
@@ -320,6 +352,47 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
         authorizer = _authorizer;
     }
 
+    function setDailyReleaseRatio(uint256 _ratio) external onlyOwner {
+        require(_ratio > 0 && _ratio <= 1000, "Staking: Ratio must be between 1 and 1000 (0.01% to 10%)");
+        dailyReleaseRatio = _ratio;
+    }
+
+    function setMultipleThreshold(uint256 _threshold) external onlyOwner {
+        require(_threshold >= 1, "Staking: Multiple threshold must be >= 1");
+        multipleThreshold = _threshold;
+    }
+
+    function getCurrentReleaseRatio() external view returns (uint256) {
+        uint256 availableReward = _getAvailableDailyRewardInternal();
+        if (availableReward == 0) {
+            return dailyReleaseRatio;
+        }
+        
+        if (dailyDeposited <= availableReward * multipleThreshold) {
+            return dailyReleaseRatio;
+        }
+        
+        uint256 excessMultiple = (dailyDeposited / availableReward) - multipleThreshold;
+        uint256 additionalRatio = excessMultiple > MAX_ELASTIC_INCREMENT ? MAX_ELASTIC_INCREMENT : excessMultiple;
+        
+        return dailyReleaseRatio + additionalRatio;
+    }
+
+    function _getAvailableDailyRewardInternal() internal view returns (uint256) {
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        uint256 contractBalance = token.balanceOf(address(this));
+        
+        uint256 dynamicReward = (contractBalance * dailyReleaseRatio) / RELEASE_RATIO_DENOMINATOR;
+        
+        if (dynamicReward < MIN_DAILY_REWARD) {
+            return MIN_DAILY_REWARD;
+        } else if (dynamicReward > MAX_DAILY_REWARD) {
+            return MAX_DAILY_REWARD;
+        }
+        
+        return dynamicReward;
+    }
+
     /**
      * @dev 更新用户指定质押的奖励
      * @param user 用户地址
@@ -346,22 +419,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
     }
 
     /**
-     * @dev 获取当日可用奖励总量
-     * @return 当日可分配的奖励数量
-     */
-    function _getAvailableDailyReward() internal view returns (uint256) {
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        uint256 contractBalance = token.balanceOf(address(this));
-
-        uint256 availableReward = contractBalance / 100;
-        if (availableReward > MAX_DAILY_REWARD) {
-            availableReward = MAX_DAILY_REWARD;
-        }
-
-        return availableReward;
-    }
-
-    /**
      * @dev 领取奖励时不重置奖励累积（用户要求累积到领取才清空）
      * @param amount 领取的奖励数量（仅用于验证，不再限制每日额度）
      */
@@ -373,7 +430,30 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
     }
 
     /**
+     * @dev 计算当日可用奖励总量
+     * 根据合约剩余代币总量的一定比例计算
+     * 支持根据当日转入量弹性调控释放比例
+     * @return 当日可用奖励总量
+     */
+    function _getAvailableDailyReward() internal view returns (uint256) {
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        uint256 contractBalance = token.balanceOf(address(this));
+        
+        uint256 currentRatio = dailyReleaseRatio;
+        
+        uint256 availableReward = (contractBalance * dailyReleaseRatio) / RELEASE_RATIO_DENOMINATOR;
+        if (availableReward > 0 && dailyDeposited > availableReward * multipleThreshold) {
+            uint256 excessMultiple = (dailyDeposited / availableReward) - multipleThreshold;
+            uint256 additionalRatio = excessMultiple > MAX_ELASTIC_INCREMENT ? MAX_ELASTIC_INCREMENT : excessMultiple;
+            currentRatio += additionalRatio;
+        }
+        
+        return (contractBalance * currentRatio) / RELEASE_RATIO_DENOMINATOR;
+    }
+
+    /**
      * @dev 计算每分钟每个NFT的奖励
+     * 根据当日奖励总量和质押NFT数量计算，无保底和上限
      * @param dailyReward 当日可用奖励总量
      * @return 每分钟每个NFT的奖励数量
      */
@@ -382,17 +462,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
             return 0;
         }
 
-        uint256 rewardPerMinute = dailyReward / (1440 * totalStakedNFTs);
-        
-        if (rewardPerMinute == 0) {
-            rewardPerMinute = BASE_TOKEN_PER_MINUTE / 10;
-        } else if (rewardPerMinute < BASE_TOKEN_PER_MINUTE / 10) {
-            rewardPerMinute = BASE_TOKEN_PER_MINUTE / 10;
-        } else if (rewardPerMinute > BASE_TOKEN_PER_MINUTE) {
-            rewardPerMinute = BASE_TOKEN_PER_MINUTE;
-        }
-        
-        return rewardPerMinute;
+        return dailyReward / (1440 * totalStakedNFTs);
     }
 
     /**

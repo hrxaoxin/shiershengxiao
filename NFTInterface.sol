@@ -154,3 +154,26 @@ interface INFTUpdate {
     function setLevel3UpgradeCost(uint256 cost) external;
     function setLevel4UpgradeCost(uint256 cost) external;
 }
+
+interface ISwapRouter {
+    function swapExactETHForTokens(
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external payable returns (uint256[] memory amounts);
+}
+
+interface IPancakeFactory {
+    function getPair(address tokenA, address tokenB) external view returns (address);
+}
+
+interface IStakingContract {
+    function depositToken(uint256 amount) external;
+}
+
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}

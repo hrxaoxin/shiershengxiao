@@ -56,14 +56,24 @@ contract RewardManager is
     address public royaltyWallet;
     /** @dev 版税比例（默认500 = 5%） */
     uint256 public royaltyFee = 500;
-    /** @dev 用户分红比例（240 = 2.4%）*/
-    uint256 public constant USER_SHARE = 240;
-    /** @dev 所有者分红比例（60 = 0.6%）*/
-    uint256 public constant OWNER_SHARE = 60;
+    /** @dev 用户分红比例（7500 = 75%）*/
+    uint256 public constant USER_SHARE = 7500;
+    /** @dev 所有者分红比例（2500 = 25%）*/
+    uint256 public constant OWNER_SHARE = 2500;
     /** @dev 所有者资金池 */
     uint256 public ownerPool;
     /** @dev 分红池最大容量（1000 ETH/BNB）*/
     uint256 public constant MAX_DIVIDEND_POOL = 1000 ether;
+    /** @dev 自动兑换阈值（达到此金额自动兑换）*/
+    uint256 public autoSwapThreshold = 0.01 ether;
+    /** @dev 代币合约地址 */
+    address public rewardToken;
+    /** @dev 质押合约地址 */
+    address public stakingContract;
+    /** @dev SwapRouter 地址（PancakeSwap V2 Router）*/
+    address public swapRouter = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
+    /** @dev PancakeFactory 地址（用于检测交易池）*/
+    address public pancakeFactory = 0xcA143Ce32Fe78f1f7019d7d551a6402fC5350c73;
 
     /** @dev 授权的NFT合约映射 */
     mapping(address => bool) public authorizedNFTContracts;
@@ -253,7 +263,10 @@ contract RewardManager is
         address _operator,
         address _nftContract,
         address _nftDataContract,
-        address _authorizer
+        address _authorizer,
+        address _rewardToken,
+        address _stakingContract,
+        address _swapRouter
     ) external initializer nonZeroAddress(initialOwner) nonZeroAddress(_operator) nonZeroAddress(_nftContract) {
         __UUPSUpgradeable_init();
         __Ownable2Step_init();
@@ -265,6 +278,9 @@ contract RewardManager is
         nftContract = _nftContract;
         nftDataContract = _nftDataContract;
         authorizer = _authorizer;
+        rewardToken = _rewardToken;
+        stakingContract = _stakingContract;
+        swapRouter = _swapRouter;
         ownerWeight = minOwnerWeight;
         totalWeight = ownerWeight;
 
@@ -399,6 +415,23 @@ contract RewardManager is
     function setNFTDataContract(address _nftDataContract) external nonZeroAddress(_nftDataContract) {
         require(msg.sender == owner() || msg.sender == operator || msg.sender == nftContract || msg.sender == authorizer || authorizedNFTContracts[msg.sender], "RewardManager: Unauthorized");
         nftDataContract = _nftDataContract;
+    }
+
+    function setRewardToken(address _rewardToken) external onlyOwner nonZeroAddress(_rewardToken) {
+        rewardToken = _rewardToken;
+    }
+
+    function setStakingContract(address _stakingContract) external onlyOwner nonZeroAddress(_stakingContract) {
+        stakingContract = _stakingContract;
+    }
+
+    function setSwapRouter(address _swapRouter) external onlyOwner nonZeroAddress(_swapRouter) {
+        swapRouter = _swapRouter;
+    }
+
+    function setAutoSwapThreshold(uint256 _threshold) external onlyOwner {
+        require(_threshold > 0, "RM: threshold must be > 0");
+        autoSwapThreshold = _threshold;
     }
 
     /**
@@ -727,6 +760,60 @@ contract RewardManager is
             ownerPool += ownerDividend;
         }
         emit DividendDeposited(msg.value, msg.sender, block.timestamp);
+        
+        if (ownerPool >= autoSwapThreshold && rewardToken != address(0) && stakingContract != address(0) && swapRouter != address(0)) {
+            _tryAutoSwapAndStake();
+        }
+    }
+
+    function _hasLiquidityPool() internal view returns (bool) {
+        if (rewardToken == address(0) || pancakeFactory == address(0)) {
+            return false;
+        }
+        address wbnb = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+        address pair = IPancakeFactory(pancakeFactory).getPair(wbnb, rewardToken);
+        return pair != address(0);
+    }
+
+    function _tryAutoSwapAndStake() internal {
+        if (!_hasLiquidityPool()) {
+            return;
+        }
+        
+        uint256 amount = ownerPool;
+        ownerPool = 0;
+        
+        address[] memory path = new address[](2);
+        path[0] = address(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
+        path[1] = rewardToken;
+        
+        uint256 deadline = block.timestamp + 300;
+        
+        try ISwapRouter(swapRouter).swapExactETHForTokens{value: amount}(
+            0,
+            path,
+            address(this),
+            deadline
+        ) returns (uint256[] memory amounts) {
+            uint256 tokenAmount = amounts[1];
+            if (tokenAmount > 0) {
+                IERC20(rewardToken).approve(stakingContract, tokenAmount);
+                IStakingContract(stakingContract).depositToken(tokenAmount);
+            } else {
+                ownerPool += amount;
+            }
+        } catch {
+            ownerPool += amount;
+        }
+    }
+
+    function manualSwapAndStake() external onlyOwner nonReentrant whenNotPaused {
+        require(ownerPool > 0, "RM: no owner pool balance");
+        require(rewardToken != address(0), "RM: reward token not set");
+        require(stakingContract != address(0), "RM: staking contract not set");
+        require(swapRouter != address(0), "RM: swap router not set");
+        
+        _autoSwapAndStake();
     }
 
     /**
