@@ -11,6 +11,12 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
     string[] private _elementNames = [unicode"水", unicode"风", unicode"火", unicode"暗", unicode"光"];
     string[] private _zodiacNames = [unicode"鼠", unicode"牛", unicode"虎", unicode"兔", unicode"龙", unicode"蛇", unicode"马", unicode"羊", unicode"猴", unicode"鸡", unicode"狗", unicode"猪"];
     string[] private _genderNames = [unicode"母", unicode"公"];
+    // 拼音前缀数组，用于生成图片URL
+    string[] private _elementPrefixes = ["shui", "feng", "huo", "an", "guang"];
+    string[] private _zodiacPrefixes = ["shu", "niu", "hu", "tu", "long", "she", "ma", "yang", "hou", "ji", "gou", "zhu"];
+    // IPFS Base URL - 暗/光属性使用不同的CID
+    string private constant IPFS_BASE_COMMON = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/";
+    string private constant IPFS_BASE_RARE = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/";
 
     mapping(uint256 => NFTDataTypes.NFTInfo) private _nftInfos;
     mapping(uint256 => NFTDataTypes.ZodiacType) public override tokenType;
@@ -171,10 +177,15 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
     function getCardDesc(NFTDataTypes.ZodiacType t) external view override returns (string memory) { return string(abi.encodePacked(unicode"十二生肖NFT - ", _getFullTypeName(t))); }
 
     function getCardImage(NFTDataTypes.ZodiacType t) external view override returns (string memory) {
+        // 暗/光属性使用不同的IPFS CID
+        string memory baseUrl = t.getElement() == NFTDataTypes.ElementType.DARK || t.getElement() == NFTDataTypes.ElementType.LIGHT 
+            ? IPFS_BASE_RARE 
+            : IPFS_BASE_COMMON;
+        
         return string(abi.encodePacked(
-            "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/",
-            _elementNames[uint256(t.getElement())],
-            _zodiacNames[uint256(t.getBaseZodiac())],
+            baseUrl,
+            _elementPrefixes[uint256(t.getElement())],
+            _zodiacPrefixes[uint256(t.getBaseZodiac())],
             t.getGender() == NFTDataTypes.GenderType.MALE ? "_1" : "_0",
             ".png"
         ));
