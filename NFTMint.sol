@@ -67,7 +67,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      */
     function initialize(address initialOwner, address _metadataContract, address _authorizer) external initializer {
         __UUPSUpgradeable_init();
-        __Ownable_init();
+        __Ownable2Step_init();
         __ReentrancyGuard_init();
         __ERC721_init("Twelve Zodiacs", "12ZODIAC");
         __ERC721Holder_init();
@@ -358,6 +358,21 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      */
     function setNFTUpdateContract(address a) external onlyOwner { nftUpdateContract = a; }
 
+    function upgradeWithNFT(uint256 tokenId) external returns (uint8) {
+        require(nftUpdateContract != address(0), "E31: NFTUpdate contract not set");
+        return INFTUpdate(nftUpdateContract).upgradeWithNFT(tokenId);
+    }
+
+    function upgradeWithToken(uint256 tokenId) external returns (uint8) {
+        require(nftUpdateContract != address(0), "E31: NFTUpdate contract not set");
+        return INFTUpdate(nftUpdateContract).upgradeWithToken(tokenId);
+    }
+
+    function upgradeWithUSDValue(uint256 tokenId) external returns (uint8) {
+        require(nftUpdateContract != address(0), "E31: NFTUpdate contract not set");
+        return INFTUpdate(nftUpdateContract).upgradeWithUSDValue(tokenId);
+    }
+
     /**
      * @dev 获取用户拥有的指定类型NFT数量
      * @param u 用户地址
@@ -394,6 +409,16 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      */
     function totalSupply() external view returns (uint256) {
         return nextCardId - 1;
+    }
+
+    function tokenType(uint256 tokenId) external view returns (NFTDataTypes.ZodiacType) {
+        INFTDataInterface m = INFTDataInterface(metadataContract);
+        return m.tokenType(tokenId);
+    }
+
+    function tokenLevel(uint256 tokenId) external view returns (uint8) {
+        INFTDataInterface m = INFTDataInterface(metadataContract);
+        return m.tokenLevel(tokenId);
     }
 
     /**

@@ -281,6 +281,19 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
         return userStakes[user];
     }
 
+    function getUserStakesByPage(address user, uint256 offset, uint256 limit) external view returns (StakeInfo[] memory, uint256) {
+        uint256 total = userStakes[user].length;
+        if (offset >= total) {
+            return (new StakeInfo[](0), 0);
+        }
+        uint256 size = offset + limit > total ? total - offset : limit;
+        StakeInfo[] memory result = new StakeInfo[](size);
+        for (uint i = 0; i < size; i++) {
+            result[i] = userStakes[user][offset + i];
+        }
+        return (result, total);
+    }
+
     /**
      * @dev 设置NFT合约地址
      * @param _nftContract NFT合约地址
@@ -369,22 +382,14 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
             return 0;
         }
 
-        uint256 perMinuteTotal = dailyReward / 1440;
-        if (perMinuteTotal == 0) {
-            return 0;
-        }
+        uint256 rewardPerMinute = dailyReward / (1440 * totalStakedNFTs);
         
-        uint256 rewardPerMinute = perMinuteTotal / totalStakedNFTs;
-        
-        uint256 minReward = BASE_TOKEN_PER_MINUTE / 10;
-        uint256 maxReward = BASE_TOKEN_PER_MINUTE;
-        
-        if (rewardPerMinute < minReward) {
-            rewardPerMinute = minReward;
-        }
-        
-        if (rewardPerMinute > maxReward) {
-            rewardPerMinute = maxReward;
+        if (rewardPerMinute == 0) {
+            rewardPerMinute = BASE_TOKEN_PER_MINUTE / 10;
+        } else if (rewardPerMinute < BASE_TOKEN_PER_MINUTE / 10) {
+            rewardPerMinute = BASE_TOKEN_PER_MINUTE / 10;
+        } else if (rewardPerMinute > BASE_TOKEN_PER_MINUTE) {
+            rewardPerMinute = BASE_TOKEN_PER_MINUTE;
         }
         
         return rewardPerMinute;

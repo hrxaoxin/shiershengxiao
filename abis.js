@@ -42,6 +42,7 @@ window.contractAddresses = {
     rewardManager: '0x3aAe06CC813ED61B5BF46ef89A26721cb83F9d14', // RewardManager代理合约地址
     tokenBurner: '0x8a6437e1F2A8b7F07f5F383B36fDf4D640f81E1a', // TokenBurner代理合约地址
     nftMint: '0xaBf66eee8a02bCEe1a94e1c04B7b2705966B0523', // NFTMint代理合约地址（十二生肖NFT核心合约）
+    nftUpdate: '0x0000000000000000000000000000000000000000', // NFTUpdate合约地址（需部署后填写）
     nftTrading: '0x97fFAb23e26b45F8bab80E4A64Ac51369f4Ff5E4', // NFTTrading代理合约地址
     breeding: '0x0000000000000000000000000000000000000000', // Breeding合约地址（需部署后填写）
     staking: '0x0000000000000000000000000000000000000000' // Staking合约地址（需部署后填写）
@@ -52,6 +53,7 @@ window.tokenContractAddress = window.contractAddresses.tokenContract;
 window.rewardManagerAddress = window.contractAddresses.rewardManager;
 window.tokenBurnerAddress = window.contractAddresses.tokenBurner;
 window.nftMintAddress = window.contractAddresses.nftMint;
+window.nftUpdateAddress = window.contractAddresses.nftUpdate;
 window.NFTTradingAddress = window.contractAddresses.nftTrading;
 window.breedingAddress = window.contractAddresses.breeding;
 window.stakingAddress = window.contractAddresses.staking;
@@ -68,26 +70,28 @@ window.tokenBurnerABI = [
 ];
 
 // NFTMint合约ABI - 基于NFTMint.sol（使用PancakeSwap获取实时价格）
-// 注意：升级功能已移至NFTUpdate合约
+// 升级函数通过代理调用转发到NFTUpdate合约
 window.nftMintABI = [
 	{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
 	{"inputs":[{"internalType":"address","name":"initialOwner","type":"address"},{"internalType":"address","name":"_metadataContract","type":"address"},{"internalType":"address","name":"_authorizer","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[],"name":"nextCardId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenType","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenLevel","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
-	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"getApproved","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"getApproved","outputs":[{"internalType":"address","name","type":"address"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"uint256","name":"index","type":"uint256"}],"name":"tokenOfOwnerByIndex","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"address","name":"to","type":"address"}],"name":"mintNormal","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[{"internalType":"address","name":"to","type":"address"}],"name":"mintRare","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
-	// 升级函数已移除，请使用NFTUpdate合约的upgradeWithNFT/upgradeWithToken/upgradeWithUSDValue
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithNFT","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithToken","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"upgradeWithUSDValue","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[],"name":"getTokenPriceFromPancakeSwap","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"address","name":"pair","type":"address"}],"name":"setPancakeSwapPair","outputs":[],"stateMutability":"nonpayable","type":"function"},
-
 	{"inputs":[],"name":"pancakeSwapPair","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
 	{"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"approve","outputs":[],"stateMutability":"nonpayable","type":"function"},
 	{"inputs":[{"internalType":"address","name":"operator","type":"address"},{"internalType":"bool","name":"approved","type":"bool"}],"name":"setApprovalForAll","outputs":[],"stateMutability":"nonpayable","type":"function"},
-	{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"isApprovedForAll","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
+	{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"isApprovedForAll","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"setNFTUpdateContract","outputs":[],"stateMutability":"nonpayable","type":"function"}
 ];
 
 // NFTUpdate合约ABI - 升级功能
@@ -1127,7 +1131,12 @@ window.breedingABI = [
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "initialOwner",
+				"name": "_nftContract",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_authorizer",
 				"type": "address"
 			}
 		],
@@ -1141,28 +1150,9 @@ window.breedingABI = [
 		"inputs": [
 			{
 				"indexed": true,
-				"internalType": "bytes32",
+				"internalType": "uint256",
 				"name": "orderId",
-				"type": "bytes32"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			}
-		],
-		"name": "BreedingCancelled",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "bytes32",
-				"name": "orderId",
-				"type": "bytes32"
+				"type": "uint256"
 			},
 			{
 				"indexed": true,
@@ -1173,42 +1163,23 @@ window.breedingABI = [
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "newTokenId",
+				"name": "tokenId1",
 				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint8",
-				"name": "newType",
-				"type": "uint8"
-			}
-		],
-		"name": "BreedingCompleted",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "bytes32",
-				"name": "orderId",
-				"type": "bytes32"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "participant",
-				"type": "address"
 			},
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "tokenId",
+				"name": "tokenId2",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "startTime",
 				"type": "uint256"
 			}
 		],
-		"name": "BreedingJoined",
+		"name": "SelfBreedingStarted",
 		"type": "event"
 	},
 	{
@@ -1216,9 +1187,9 @@ window.breedingABI = [
 		"inputs": [
 			{
 				"indexed": true,
-				"internalType": "bytes32",
+				"internalType": "uint256",
 				"name": "orderId",
-				"type": "bytes32"
+				"type": "uint256"
 			},
 			{
 				"indexed": true,
@@ -1241,36 +1212,93 @@ window.breedingABI = [
 		"inputs": [
 			{
 				"indexed": true,
-				"internalType": "bytes32",
+				"internalType": "uint256",
 				"name": "orderId",
-				"type": "bytes32"
+				"type": "uint256"
 			},
 			{
 				"indexed": true,
 				"internalType": "address",
-				"name": "breeder",
+				"name": "joiner",
 				"type": "address"
 			},
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "tokenId1",
+				"name": "tokenId",
 				"type": "uint256"
+			}
+		],
+		"name": "BreedingJoined",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "orderId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint8",
+				"name": "resultType1",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint8",
+				"name": "resultType2",
+				"type": "uint8"
+			}
+		],
+		"name": "BreedingCompleted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "orderId",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
 			},
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "tokenId2",
+				"name": "newTokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "BreedingClaimed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "orderId",
 				"type": "uint256"
 			},
 			{
-				"indexed": false,
-				"internalType": "bool",
-				"name": "isSelf",
-				"type": "bool"
+				"indexed": true,
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
 			}
 		],
-		"name": "BreedingStarted",
+		"name": "BreedingCancelled",
 		"type": "event"
 	},
 	{
@@ -1306,50 +1334,11 @@ window.breedingABI = [
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "BREEDING_DURATION_MARKET",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "BREEDING_DURATION_SELF",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "MIN_BREEDING_LEVEL",
-		"outputs": [
-			{
-				"internalType": "uint8",
-				"name": "",
-				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
-				"internalType": "bytes32",
+				"internalType": "uint256",
 				"name": "orderId",
-				"type": "bytes32"
+				"type": "uint256"
 			}
 		],
 		"name": "breedingOrders",
@@ -1375,141 +1364,32 @@ window.breedingABI = [
 				"type": "uint256"
 			},
 			{
-				"internalType": "uint64",
+				"internalType": "uint256",
 				"name": "startTime",
-				"type": "uint64"
+				"type": "uint256"
 			},
 			{
 				"internalType": "bool",
 				"name": "completed",
 				"type": "bool"
+			},
+			{
+				"internalType": "bool",
+				"name": "cancelled",
+				"type": "bool"
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "bytes32",
-				"name": "orderId",
-				"type": "bytes32"
-			}
-		],
-		"name": "cancelBreedingListing",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "bytes32",
-				"name": "orderId",
-				"type": "bytes32"
-			}
-		],
-		"name": "completeMarketBreeding",
-		"outputs": [
-			{
-				"internalType": "uint256[2]",
-				"name": "",
-				"type": "uint256[2]"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "bytes32",
-				"name": "orderId",
-				"type": "bytes32"
-			}
-		],
-		"name": "completeSelfBreeding",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
 		"inputs": [],
-		"name": "getMarketBreedingOrders",
+		"name": "MIN_BREEDING_LEVEL",
 		"outputs": [
 			{
-				"internalType": "bytes32[]",
+				"internalType": "uint8",
 				"name": "",
-				"type": "bytes32[]"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "bytes32",
-				"name": "orderId",
-				"type": "bytes32"
-			}
-		],
-		"name": "getMarketBreedingOrder",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "owner1",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "owner2",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "tokenId1",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "tokenId2",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint64",
-				"name": "startTime",
-				"type": "uint64"
-			},
-			{
-				"internalType": "bool",
-				"name": "completed",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			}
-		],
-		"name": "getUserBreedingOrders",
-		"outputs": [
-			{
-				"internalType": "bytes32[]",
-				"name": "",
-				"type": "bytes32[]"
+				"type": "uint8"
 			}
 		],
 		"stateMutability": "view",
@@ -1529,11 +1409,108 @@ window.breedingABI = [
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "nextOrderId",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
-				"internalType": "bytes32",
+				"internalType": "uint256",
 				"name": "orderId",
-				"type": "bytes32"
+				"type": "uint256"
+			}
+		],
+		"name": "cancelBreedingListing",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "orderId",
+				"type": "uint256"
+			}
+		],
+		"name": "completeMarketBreeding",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "orderId",
+				"type": "uint256"
+			}
+		],
+		"name": "completeSelfBreeding",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getMarketBreedingOrders",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getUserBreedingOrders",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "orderId",
+				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
@@ -1555,45 +1532,33 @@ window.breedingABI = [
 			}
 		],
 		"name": "listForBreeding",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
-			}
-		],
+		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
 		"inputs": [],
-		"name": "owner",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "proxiableUUID",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
-			}
-		],
-		"stateMutability": "view",
+		"name": "pause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
 		"inputs": [],
 		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_authorizer",
+				"type": "address"
+			}
+		],
+		"name": "setAuthorizer",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -1625,13 +1590,7 @@ window.breedingABI = [
 			}
 		],
 		"name": "startSelfBreeding",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
-			}
-		],
+		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
@@ -1644,6 +1603,13 @@ window.breedingABI = [
 			}
 		],
 		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "unpause",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -2057,10 +2023,65 @@ window.stakingABI = [
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
-	{
-		"inputs": [],
+	{"inputs": [],
 		"name": "getContractTokenBalance",
 		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "page",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pageSize",
+				"type": "uint256"
+			}
+		],
+		"name": "getUserStakesByPage",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint8",
+						"name": "level",
+						"type": "uint8"
+					},
+					{
+						"internalType": "uint256",
+						"name": "lastRewardTime",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "accumulatedRewards",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct Staking.StakeInfo[]",
+				"name": "",
+				"type": "tuple[]"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",

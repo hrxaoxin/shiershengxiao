@@ -37,7 +37,7 @@ contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reentr
     constructor() { _disableInitializers(); }
 
     function initialize(address initialOwner, address _nftContract, address _metadataContract) external initializer {
-        __Ownable_init();
+        __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         transferOwnership(initialOwner);
@@ -183,8 +183,6 @@ contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reentr
         
         for (uint i = 0; i < req; i++) {
             uint burnId = burnCandidates[i];
-            uint8 burnLv = m.tokenLevel(burnId);
-            m.updateUserWeight(msg.sender, burnLv, false);
             nft.safeTransferFrom(msg.sender, BLACK_HOLE, burnId);
             emit CardBurned(burnId, t, msg.sender);
         }

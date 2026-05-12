@@ -57,6 +57,7 @@ contract NFTTrading is
     mapping(uint256 => uint256) public tokenToListingIndex;  // tokenId => 在用户列表中的索引
     uint256[] public activeListingIds;                       // 活跃上架列表（优化查询效率）
     mapping(uint256 => uint256) public tokenToActiveIndex;   // tokenId => 在活跃列表中的索引
+    uint256[] public allListingIds;                         // 所有上架记录（包括已下架）
     uint256 public totalOverpaid;                            // 累计超额支付金额（作为合约运营费用）
 
     // 事件定义（新增block.number索引）
@@ -93,7 +94,7 @@ contract NFTTrading is
         // UUPSUpgradeable应优先初始化，确保代理上下文正确
         __UUPSUpgradeable_init();
         __ERC721Holder_init();
-        __Ownable_init();
+        __Ownable2Step_init();
         __ReentrancyGuard_init();
         __Pausable_init();
 
@@ -107,8 +108,6 @@ contract NFTTrading is
         _rewardManager = rewardManager;
         _maxListingPriceBNB = maxListingPriceBNB;
         _maxListingPrice = _bnbToWei(maxListingPriceBNB);
-        
-        // ========== 关键修复3：初始化_authorizer为0地址 ==========
         _authorizer = authorizer;
     }
 
@@ -231,6 +230,9 @@ contract NFTTrading is
         // 添加到活跃上架列表
         tokenToActiveIndex[tokenId] = activeListingIds.length;
         activeListingIds.push(tokenId);
+        
+        // 添加到所有上架记录列表
+        allListingIds.push(tokenId);
 
         // 更新统计数据
         activeListings++;
@@ -293,13 +295,19 @@ contract NFTTrading is
         uint256 priceWEI = listing.price;
         uint256 priceBNB = _weiToBnbWithDecimals(priceWEI);
 
+        uint256 minSellerAmountWEI = 1e14;
         uint256 feeWEI = (priceWEI * FEE_PERCENTAGE) / FEE_DENOMINATOR;
-        uint256 feeBNB = _weiToBnbWithDecimals(feeWEI);
         uint256 sellerAmountWEI = priceWEI - feeWEI;
-        if (sellerAmountWEI == 0) {
+        
+        if (sellerAmountWEI < minSellerAmountWEI && sellerAmountWEI > 0) {
+            feeWEI = priceWEI - minSellerAmountWEI;
+            sellerAmountWEI = minSellerAmountWEI;
+        } else if (sellerAmountWEI == 0) {
             sellerAmountWEI = priceWEI;
             feeWEI = 0;
         }
+        
+        uint256 feeBNB = _weiToBnbWithDecimals(feeWEI);
 
         IRewardManager rm = IRewardManager(_rewardManager);
         address royaltyWallet = rm.royaltyWallet();
@@ -570,6 +578,14 @@ contract NFTTrading is
         return userListedTokens[user];
     }
 
+    function getSellerListings(address seller) external view returns (uint256[] memory) {
+        return userListedTokens[seller];
+    }
+
+    function cancelListing(uint256 tokenId) external nonReentrant whenNotPaused {
+        unlistNFT(tokenId);
+    }
+
     function getUserActiveListingsCount(address user) external view returns (uint256) {
         uint256 count = 0;
         uint256[] storage tokens = userListedTokens[user];
@@ -596,6 +612,25 @@ contract NFTTrading is
         uint256 priceWEI;
         uint256 priceBNB;
         uint256 listedAt;
+    }
+
+    function getAllListings() external view returns (uint256[] memory, address[] memory, uint256[] memory, bool[] memory) {
+        uint256 count = allListingIds.length;
+        uint256[] memory tokenIds = new uint256[](count);
+        address[] memory sellers = new address[](count);
+        uint256[] memory prices = new uint256[](count);
+        bool[] memory actives = new bool[](count);
+        
+        for (uint256 i = 0; i < count; i++) {
+            uint256 tokenId = allListingIds[i];
+            NFTListing storage listing = listings[tokenId];
+            tokenIds[i] = tokenId;
+            sellers[i] = listing.seller;
+            prices[i] = listing.price;
+            actives[i] = listing.isActive;
+        }
+        
+        return (tokenIds, sellers, prices, actives);
     }
 
     function getAllActiveListings() external view returns (ListedNFT[] memory) {

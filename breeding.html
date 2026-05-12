@@ -360,6 +360,13 @@
                     <div class="text-center text-gray-500 py-8">暂无订单</div>
                 </div>
             </div>
+
+            <div id="pairBreedingStatus" class="hidden mt-8">
+                <div class="info-box">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4 text-center">🔄 市场孕育进行中</h3>
+                    <div id="pairBreedingList"></div>
+                </div>
+            </div>
         </div>
 
         <div id="joinBreedingModal" class="modal">
@@ -397,6 +404,7 @@
         let marketOrders = [];
         let myMarketOrders = [];
         let activeSelfOrder = null;
+        let activePairOrders = [];
 
         particlesJS('particles-js', {
             particles: {
@@ -869,6 +877,7 @@
                 const account = getAccount();
                 const orderIds = await breedingContract.methods.getUserBreedingOrders(account).call();
                 myMarketOrders = [];
+                activePairOrders = [];
 
                 for (const orderId of orderIds) {
                     const order = await breedingContract.methods.breedingOrders(orderId).call();
@@ -885,31 +894,58 @@
                             startTime: order.startTime.toString(),
                             completed: order.completed
                         });
-                    } else if (order.owner2.toLowerCase() === account.toLowerCase() && !order.completed) {
-                        const token2Type = await nftContract.methods.tokenType(order.tokenId2).call();
-                        const token2Level = await nftContract.methods.tokenLevel(order.tokenId2).call();
-                        const token1Type = await nftContract.methods.tokenType(order.tokenId1).call();
-                        const token1Level = await nftContract.methods.tokenLevel(order.tokenId1).call();
-                        myMarketOrders.push({
-                            id: orderId,
-                            role: 'participant',
-                            tokenId1: order.tokenId1.toString(),
-                            tokenId2: order.tokenId2.toString(),
-                            token1Type: token1Type.toString(),
-                            token1Level: token1Level.toString(),
-                            token1Image: getNFTImage(token1Type),
-                            token1Name: getNFTName(token1Type),
-                            token2Type: token2Type.toString(),
-                            token2Level: token2Level.toString(),
-                            token2Image: getNFTImage(token2Type),
-                            token2Name: getNFTName(token2Type),
-                            startTime: order.startTime.toString(),
-                            completed: order.completed
-                        });
+                    } else if (order.owner2 !== '0x0000000000000000000000000000000000000000' && !order.completed) {
+                        const isMyOrder = order.owner1.toLowerCase() === account.toLowerCase() || order.owner2.toLowerCase() === account.toLowerCase();
+                        if (isMyOrder) {
+                            const token2Type = await nftContract.methods.tokenType(order.tokenId2).call();
+                            const token2Level = await nftContract.methods.tokenLevel(order.tokenId2).call();
+                            const token1Type = await nftContract.methods.tokenType(order.tokenId1).call();
+                            const token1Level = await nftContract.methods.tokenLevel(order.tokenId1).call();
+                            
+                            const pairOrder = {
+                                id: orderId,
+                                role: order.owner1.toLowerCase() === account.toLowerCase() ? 'owner' : 'participant',
+                                tokenId1: order.tokenId1.toString(),
+                                tokenId2: order.tokenId2.toString(),
+                                token1Type: token1Type.toString(),
+                                token1Level: token1Level.toString(),
+                                token1Image: getNFTImage(token1Type),
+                                token1Name: getNFTName(token1Type),
+                                token2Type: token2Type.toString(),
+                                token2Level: token2Level.toString(),
+                                token2Image: getNFTImage(token2Type),
+                                token2Name: getNFTName(token2Type),
+                                startTime: order.startTime.toString(),
+                                completed: order.completed,
+                                owner1Claimed: order.owner1Claimed,
+                                owner2Claimed: order.owner2Claimed
+                            };
+                            
+                            activePairOrders.push(pairOrder);
+                            
+                            if (order.owner1.toLowerCase() === account.toLowerCase()) {
+                                // 我的上架订单被加入了
+                                myMarketOrders.push({
+                                    id: orderId,
+                                    tokenId1: order.tokenId1.toString(),
+                                    token1Type: token1Type.toString(),
+                                    token1Level: token1Level.toString(),
+                                    token1Image: getNFTImage(token1Type),
+                                    token1Name: getNFTName(token1Type),
+                                    startTime: order.startTime.toString(),
+                                    completed: order.completed,
+                                    hasPartner: true
+                                });
+                            } else {
+                                // 我是加入者
+                                myMarketOrders.push(pairOrder);
+                            }
+                        }
                     }
                 }
 
                 renderMyMarketOrders();
+                renderPairBreedingStatus();
             } catch (error) {
                 console.error('加载我的市场订单失败:', error);
                 ZODIAC_UI.showToast('加载我的订单失败: ' + error.message, 'error');
@@ -925,30 +961,129 @@
 
             let html = '';
             myMarketOrders.forEach(order => {
-                if (order.role === 'participant') {
-                    const endTime = parseInt(order.startTime) + 24 * 60 * 60;
-                    const now = Math.floor(Date.now() / 1000);
-                    const canComplete = now >= endTime;
-
+                if (order.role === 'participant' || order.hasPartner) {
+                    // 配对订单在上方显示，不在这里重复显示
+                } else {
+                    // 显示等待加入的订单
                     html += `
                         <div class="market-card">
-                            <div class="flex items-center justify-between mb-3">
-                                <div class="flex items-center gap-2">
-                                    <img src="${order.token1Image}" class="w-12 h-12 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
-                                    <span class="text-pink-500">💕</span>
-                                    <img src="${order.token2Image}" class="w-12 h-12 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                            <div class="flex items-center gap-4 mb-3">
+                                <img src="${order.token1Image}" class="w-16 h-16 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                                <div class="flex-1">
+                                    <p class="text-gray-800 font-medium">${order.token1Name}</p>
+                                    <p class="text-gray-500 text-sm">${getStars(order.token1Level)}</p>
+                                    <p class="text-gray-400 text-xs">ID: ${order.tokenId1}</p>
                                 </div>
-                                <span class="text-yellow-600 text-sm">等待完成</span>
+                                <span class="text-pink-500 text-sm">我的订单</span>
                             </div>
-                            <button class="btn-primary w-full py-2 rounded-lg text-sm ${canComplete ? '' : 'opacity-50 cursor-not-allowed'}" 
-                                    onclick="${canComplete ? `completeMarketBreeding('${order.id}')` : ''}" ${!canComplete ? 'disabled' : ''}>
-                                ${canComplete ? '完成孕育' : '等待中...'}
+                            <button class="btn-secondary w-full py-2 rounded-lg text-sm" onclick="cancelMyListing('${order.id}')">
+                                取消上架
                             </button>
                         </div>
                     `;
                 }
             });
             container.innerHTML = html;
+        }
+
+        function renderPairBreedingStatus() {
+            const container = document.getElementById('pairBreedingList');
+            const statusSection = document.getElementById('pairBreedingStatus');
+            
+            if (activePairOrders.length === 0) {
+                statusSection.classList.add('hidden');
+                return;
+            }
+
+            statusSection.classList.remove('hidden');
+            let html = '';
+            
+            activePairOrders.forEach((order, index) => {
+                html += `
+                    <div class="mb-6 pb-4 border-b border-gray-200 last:border-b-0 last:pb-0 last:mb-0">
+                        <div class="flex items-center justify-center gap-8 mb-4">
+                            <div class="text-center">
+                                <img src="${order.token1Image}" class="w-20 h-20 object-contain mx-auto mb-2">
+                                <p class="text-gray-800">${order.token1Name}</p>
+                                <p class="text-gray-500 text-sm">${getStars(order.token1Level)}</p>
+                                ${order.role === 'owner' ? '<span class="text-pink-500 text-xs">我的NFT</span>' : ''}
+                            </div>
+                            <div class="text-4xl text-pink-500">💕</div>
+                            <div class="text-center">
+                                <img src="${order.token2Image}" class="w-20 h-20 object-contain mx-auto mb-2">
+                                <p class="text-gray-800">${order.token2Name}</p>
+                                <p class="text-gray-500 text-sm">${getStars(order.token2Level)}</p>
+                                ${order.role === 'participant' ? '<span class="text-pink-500 text-xs">我的NFT</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="text-center mb-4">
+                            <div id="pairCountdown-${index}" class="countdown">24:00:00</div>
+                            <p class="text-gray-500 mt-2">剩余时间</p>
+                        </div>
+                        <div id="pairCompleteBtn-${index}"></div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+            
+            // 启动倒计时更新
+            setInterval(() => updatePairCountdowns(), 1000);
+            updatePairCountdowns();
+        }
+
+        function updatePairCountdowns() {
+            const DURATION = 24 * 60 * 60;
+            
+            activePairOrders.forEach((order, index) => {
+                const countdownEl = document.getElementById(`pairCountdown-${index}`);
+                const btnEl = document.getElementById(`pairCompleteBtn-${index}`);
+                
+                if (!countdownEl || !btnEl) return;
+                
+                const startTime = parseInt(order.startTime);
+                const endTime = startTime + DURATION;
+                const now = Math.floor(Date.now() / 1000);
+                const remaining = endTime - now;
+                
+                let canComplete = remaining <= 0;
+                let alreadyClaimed = (order.role === 'owner' && order.owner1Claimed) || 
+                                     (order.role === 'participant' && order.owner2Claimed);
+                
+                if (remaining <= 0) {
+                    countdownEl.textContent = '00:00:00';
+                    
+                    if (alreadyClaimed) {
+                        btnEl.innerHTML = `
+                            <div class="text-center">
+                                <p class="text-green-600 mb-2">✓ 已完成</p>
+                            </div>
+                        `;
+                    } else {
+                        btnEl.innerHTML = `
+                            <div class="flex justify-center">
+                                <button class="btn-primary text-white px-8 py-3 rounded-lg font-bold" onclick="completeMarketBreeding('${order.id}')">
+                                    完成孕育
+                                </button>
+                            </div>
+                        `;
+                    }
+                } else {
+                    const hours = Math.floor(remaining / 3600);
+                    const minutes = Math.floor((remaining % 3600) / 60);
+                    const seconds = remaining % 60;
+                    countdownEl.textContent = 
+                        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    
+                    btnEl.innerHTML = `
+                        <div class="text-center">
+                            <button class="btn-primary text-white px-8 py-3 rounded-lg font-bold opacity-50 cursor-not-allowed" disabled>
+                                等待中 (${hours}h${minutes}m)
+                            </button>
+                        </div>
+                    `;
+                }
+            });
         }
 
         function openJoinModal(orderId) {
@@ -1087,10 +1222,6 @@
         }
 
         async function completeMarketBreeding(orderId) {
-            const btn = event.target;
-            btn.disabled = true;
-            btn.textContent = '处理中...';
-
             try {
                 const account = getAccount();
                 const gas = await ZODIAC_UI.estimateGas(breedingContract, 'completeMarketBreeding', [orderId], account);
@@ -1100,15 +1231,13 @@
                     gas: gas
                 });
                 
-                ZODIAC_UI.showToast('恭喜！双方都完成了孕育！', 'success');
+                ZODIAC_UI.showToast('恭喜！孕育完成！已获得新NFT！', 'success');
                 await loadNFTs();
                 await loadMarketOrders();
                 await loadMyMarketOrders();
             } catch (error) {
                 console.error('完成市场孕育失败:', error);
                 ZODIAC_UI.showToast('交易失败: ' + (error.message || '未知错误'), 'error');
-                btn.disabled = false;
-                btn.textContent = '完成孕育';
             }
         }
 

@@ -605,6 +605,11 @@ contract RewardManager is
         return updateCard(user, t, cnt);
     }
 
+    function cardCount(address user, NFTDataTypes.ZodiacType zodiacType) external view returns (uint256) {
+        if (nftDataContract == address(0)) return 0;
+        return INFTDataInterface(nftDataContract).getUserTokenCount(user, zodiacType);
+    }
+
     /**
      * @dev 添加持有�?
      * @param user 用户地址
@@ -663,29 +668,10 @@ contract RewardManager is
         baseReward = totalDiv / totalW;
         carryOver = totalDiv % totalW;
         
-        // 修复精度累积问题：使用累积计数器避免长期累积导致精度丢失
-        uint256 accCount = precisionAccumulationCount[user];
-        if (accCount == 0) {
-            accCount = 1;
-        }
-        
-        // 将历史累积的precisionAcc转换为额外奖励
-        uint256 historicalAccumulated = precisionAcc[user] * accCount;
-        uint256 additionalFromHistory = 0;
-        if (historicalAccumulated >= totalW) {
-            additionalFromHistory = historicalAccumulated / totalW;
-        }
-        
-        // 加上本次的carryOver
-        uint256 accumulated = carryOver + (historicalAccumulated % totalW);
-        uint256 additionalReward = additionalFromHistory;
-        
-        if (accumulated >= totalW) {
-            additionalReward += accumulated / totalW;
-            carryOver = accumulated % totalW;
-        } else {
-            carryOver = accumulated;
-        }
+        // 简化的精度累积算法
+        uint256 accumulated = precisionAcc[user] + carryOver;
+        uint256 additionalReward = accumulated / totalW;
+        carryOver = accumulated % totalW;
         
         require(baseReward <= dividendPool, "RewardManager: Base reward exceeds dividend pool");
         require(additionalReward <= dividendPool - baseReward, "RewardManager: Additional reward exceeds remaining pool");
@@ -695,9 +681,8 @@ contract RewardManager is
         require(baseReward > 0, "RewardManager: No reward amount to claim");
         require(baseReward <= dividendPool, "RewardManager: Total reward exceeds dividend pool");
 
-        // 重置精度累积：只保留本次剩余的carryOver，计数器归1
+        // 更新精度累积
         precisionAcc[user] = carryOver;
-        precisionAccumulationCount[user] = 1;
         
         unchecked {
             dividendPool -= baseReward;

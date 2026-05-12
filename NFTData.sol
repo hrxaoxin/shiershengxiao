@@ -48,6 +48,10 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
     function setNFTInfo(uint256 tokenId, NFTDataTypes.NFTInfo memory info) external onlyAuthorized {
         _nftInfos[tokenId] = info;
     }
+    
+    function clearNFTInfo(uint256 tokenId) external onlyAuthorized {
+        delete _nftInfos[tokenId];
+    }
 
     function setTokenType(uint256 tokenId, NFTDataTypes.ZodiacType type_) external override onlyAuthorized {
         tokenType[tokenId] = type_;
@@ -78,8 +82,8 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
                 break;
             }
         }
-        delete tokenType[tokenId];
         delete userTokenExists[user][tokenId];
+        delete _nftInfos[tokenId];
         if (userTokenCount[user][type_] > 0) userTokenCount[user][type_]--;
     }
 
@@ -90,16 +94,11 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
     /** @dev 统一的权重更新函数（由NFTMint、NFTUpdate等调用） */
     function updateUserWeight(address user, uint8 level, bool add) external override onlyAuthorized {
         uint256 currentWeight = userWeightCache[user];
-        uint256 newWeight = _calcWeight(currentWeight, level, add);
-        userWeightCache[user] = newWeight;
-    }
-
-    /** @dev 计算权重（内部函数） */
-    function _calcWeight(uint256 currentWeight, uint8 level, bool add) internal pure returns (uint256) {
+        uint256 weightDelta = level + 3;
         if (add) {
-            return currentWeight + (level * level);
+            userWeightCache[user] = currentWeight + weightDelta;
         } else {
-            return currentWeight - (level * level);
+            userWeightCache[user] = currentWeight >= weightDelta ? currentWeight - weightDelta : 0;
         }
     }
 
@@ -164,16 +163,30 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
         ));
     }
 
-    function hasEligibility(address user) external view returns (bool) {
+    function hasEligibility(address user) external view override returns (bool) {
         return _userTokens[user].length > 0;
     }
 
-    function getUserTokenTypes(address user) external view returns (NFTDataTypes.ZodiacType[] memory) {
+    function getUserTokenTypes(address user) external view override returns (NFTDataTypes.ZodiacType[] memory) {
         uint256[] memory tokens = _userTokens[user];
         NFTDataTypes.ZodiacType[] memory types = new NFTDataTypes.ZodiacType[](tokens.length);
         for (uint i = 0; i < tokens.length; i++) {
             types[i] = tokenType[tokens[i]];
         }
         return types;
+    }
+
+    function getUserTokenTypesByPage(address user, uint256 offset, uint256 limit) external view returns (NFTDataTypes.ZodiacType[] memory, uint256) {
+        uint256[] memory tokens = _userTokens[user];
+        uint256 total = tokens.length;
+        if (offset >= total) {
+            return (new NFTDataTypes.ZodiacType[](0), 0);
+        }
+        uint256 size = offset + limit > total ? total - offset : limit;
+        NFTDataTypes.ZodiacType[] memory types = new NFTDataTypes.ZodiacType[](size);
+        for (uint i = 0; i < size; i++) {
+            types[i] = tokenType[tokens[offset + i]];
+        }
+        return (types, total);
     }
 }

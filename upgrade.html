@@ -584,10 +584,10 @@
                     return;
                 }
 
-                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.nftMint).call();
+                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.nftUpdate).call();
                 if (parseInt(allowance) < web3.utils.toWei(requiredTokens.toString(), 'ether')) {
-                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [window.contractAddresses.nftMint, web3.utils.toWei(requiredTokens.toString(), 'ether')], account);
-                    await tokenContract.methods.approve(window.contractAddresses.nftMint, web3.utils.toWei(requiredTokens.toString(), 'ether')).send({ 
+                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [window.contractAddresses.nftUpdate, web3.utils.toWei(requiredTokens.toString(), 'ether')], account);
+                    await tokenContract.methods.approve(window.contractAddresses.nftUpdate, web3.utils.toWei(requiredTokens.toString(), 'ether')).send({ 
                         from: account,
                         gas: approveGas
                     });
@@ -650,11 +650,11 @@
                     return;
                 }
 
-                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.nftMint).call();
+                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.nftUpdate).call();
                 if (parseInt(allowance) < requiredTokens) {
                     btn.textContent = '授权中...';
-                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [window.contractAddresses.nftMint, requiredTokens], account);
-                    await tokenContract.methods.approve(window.contractAddresses.nftMint, requiredTokens).send({ 
+                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [window.contractAddresses.nftUpdate, requiredTokens], account);
+                    await tokenContract.methods.approve(window.contractAddresses.nftUpdate, requiredTokens).send({ 
                         from: account,
                         gas: approveGas
                     });

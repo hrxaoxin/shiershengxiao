@@ -57,7 +57,6 @@ interface INFTMint {
     function setAddresses(address tb, address rm) external;
     function setMetadataContract(address a) external;
     function setTokenContract(address a) external;
-    function setPriceOracle(address a) external;
     function setBreedingContract(address a) external;
     function calcUserWeight(address user) external view returns (uint256);
 }
@@ -79,6 +78,8 @@ interface IRewardManager {
 
 interface INFTDataInterface {
     function getNFTInfo(uint256 tokenId) external view returns (NFTDataTypes.NFTInfo memory);
+    function setNFTInfo(uint256 tokenId, NFTDataTypes.NFTInfo memory info) external;
+    function clearNFTInfo(uint256 tokenId) external;
     function getElementName(NFTDataTypes.ElementType element) external view returns (string memory);
     function getZodiacName(NFTDataTypes.BaseZodiac zodiac) external view returns (string memory);
     function getGenderName(NFTDataTypes.GenderType gender) external view returns (string memory);
@@ -120,6 +121,15 @@ interface INFTTrading {
 
 interface IBreeding {
     function setNFTContract(address nftContract) external;
+    function startSelfBreeding(uint256 tokenId1, uint256 tokenId2) external;
+    function listForBreeding(uint256 tokenId) external;
+    function joinBreeding(uint256 orderId, uint256 tokenId) external;
+    function completeSelfBreeding(uint256 orderId) external;
+    function completeMarketBreeding(uint256 orderId) external;
+    function cancelBreedingListing(uint256 orderId) external;
+    function getMarketBreedingOrders() external view returns (uint256[] memory);
+    function getUserBreedingOrders(address user) external view returns (uint256[] memory);
+    function breedingOrders(uint256 orderId) external view returns (address, address, uint256, uint256, uint256, bool, bool);
 }
 
 interface IStaking {

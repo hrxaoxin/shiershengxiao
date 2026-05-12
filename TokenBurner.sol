@@ -63,7 +63,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /**
-     * @dev 销毁代币用于铸造（仅限授权的NFT合约调用）
+     * @dev 销毁代币用于铸造（仅限授权的NFT合约或管理员调用）
      * @param user 用户地址
      * @param isRare 是否稀有铸造
      * @return bool 是否成功
@@ -71,7 +71,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     function burnAndMint(address user, bool isRare) external returns (bool) {
         require(tokenContract != address(0), "TokenBurner: tokenContract not set");
         require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
-        require(msg.sender == authorizedNFTContract, "TokenBurner: Unauthorized caller");
+        require(msg.sender == authorizedNFTContract || msg.sender == authorizer, "TokenBurner: Unauthorized caller");
         require(user != address(0), "TokenBurner: Zero user address");
         
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
@@ -136,5 +136,45 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      */
     function setAuthorizer(address _authorizer) external onlyOwner {
         authorizer = _authorizer;
+    }
+
+    /**
+     * @dev 销毁代币用于普通铸造（仅限授权的NFT合约或管理员调用）
+     * @return bool 是否成功
+     */
+    function burnTokenForMint() external returns (bool) {
+        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
+        require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
+        require(msg.sender == authorizedNFTContract || msg.sender == authorizer, "TokenBurner: Unauthorized caller");
+        
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        require(token.balanceOf(msg.sender) >= normalMintCost, "TokenBurner: Insufficient balance");
+        require(token.allowance(msg.sender, address(this)) >= normalMintCost, "TokenBurner: Insufficient allowance");
+        
+        bool success = token.transferFrom(msg.sender, BLACK_HOLE, normalMintCost);
+        require(success, "TokenBurner: Token transfer failed");
+        
+        emit TokenBurned(msg.sender, normalMintCost, block.timestamp);
+        return true;
+    }
+
+    /**
+     * @dev 销毁代币用于稀有铸造（仅限授权的NFT合约或管理员调用）
+     * @return bool 是否成功
+     */
+    function burnTokenForRareMint() external returns (bool) {
+        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
+        require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
+        require(msg.sender == authorizedNFTContract || msg.sender == authorizer, "TokenBurner: Unauthorized caller");
+        
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        require(token.balanceOf(msg.sender) >= rareMintCost, "TokenBurner: Insufficient balance");
+        require(token.allowance(msg.sender, address(this)) >= rareMintCost, "TokenBurner: Insufficient allowance");
+        
+        bool success = token.transferFrom(msg.sender, BLACK_HOLE, rareMintCost);
+        require(success, "TokenBurner: Token transfer failed");
+        
+        emit TokenBurned(msg.sender, rareMintCost, block.timestamp);
+        return true;
     }
 }

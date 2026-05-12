@@ -1,82 +1,68 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/**
- * @title Breeding
- * @dev NFT繁殖合约，允许用户将两个等级6的NFT进行繁殖生成新NFT
- * 繁殖需要消耗代币，生成的NFT类型基于父母类型计算
- * 基于OpenZeppelin UUPS可升级合约实现
- */
 import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/IERC721Upgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 
-/**
- * @title Breeding
- * @dev NFT繁殖合约
- */
 contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    
-    /** @dev 最小繁殖等级：必须达到5级才能繁殖 */
     uint8 public constant MIN_BREEDING_LEVEL = 5;
-    /** @dev 黑洞地址，用于销毁NFT - 使用标准的0x000000000000000000000000000000000000dEaD */
-    address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
+    uint256 public constant SOLO_BREED_DURATION = 12 hours;
+    uint256 public constant PAIR_BREED_DURATION = 24 hours;
 
-    /** @dev NFT合约地址 */
     address public nftContract;
-    /** @dev 授权合约地址 */
     address public authorizer;
 
-    /** @dev 繁殖事件 */
-    event NFTBred(address indexed user, uint256 indexed tokenId1, uint256 indexed tokenId2, uint256 newTokenId, NFTDataTypes.ZodiacType newType, uint256 timestamp);
-    /** @dev 繁殖失败事件 */
-    event BreedFailed(address indexed user, uint256 indexed tokenId1, uint256 indexed tokenId2, string reason, uint256 timestamp);
-
-    /** @dev 存储间隙，用于合约升级兼容性 */
-    uint256[50] private __gap;
-
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
+    struct BreedingOrder {
+        address owner1;
+        address owner2;
+        uint256 tokenId1;
+        uint256 tokenId2;
+        uint256 startTime;
+        bool completed;
+        bool cancelled;
+        NFTDataTypes.ZodiacType resultType1;
+        NFTDataTypes.ZodiacType resultType2;
+        bool owner1Claimed;
+        bool owner2Claimed;
     }
 
-    /**
-     * @dev 初始化合约
-     * @param _nftContract NFT合约地址
-     * @param _authorizer 授权合约地址
-     */
+    mapping(uint256 => BreedingOrder) public breedingOrders;
+    mapping(uint256 => uint256) public tokenToOrderId;
+    mapping(address => uint256[]) public userBreedingOrders;
+    uint256 public nextOrderId;
+
+    event SelfBreedingStarted(uint256 indexed orderId, address indexed owner, uint256 tokenId1, uint256 tokenId2, uint256 startTime);
+    event BreedingListed(uint256 indexed orderId, address indexed owner, uint256 tokenId);
+    event BreedingJoined(uint256 indexed orderId, address indexed joiner, uint256 tokenId);
+    event BreedingCompleted(uint256 indexed orderId, NFTDataTypes.ZodiacType resultType1, NFTDataTypes.ZodiacType resultType2);
+    event BreedingClaimed(uint256 indexed orderId, address indexed owner, uint256 newTokenId);
+    event BreedingCancelled(uint256 indexed orderId, address indexed owner);
+
+    uint256[50] private __gap;
+
+    constructor() { _disableInitializers(); }
+
     function initialize(address _nftContract, address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-
         nftContract = _nftContract;
         authorizer = _authorizer;
+        nextOrderId = 1;
     }
 
-    /**
-     * @dev 升级授权函数
-     */
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    /**
-     * @dev 繁殖NFT
-     * 用户需要拥有两个等级为5的NFT才能进行繁殖
-     * @param tokenId1 第一个NFT ID
-     * @param tokenId2 第二个NFT ID
-     * @return uint256 新生成的NFT ID
-     */
-    function breed(uint256 tokenId1, uint256 tokenId2) external nonReentrant whenNotPaused returns (uint256) {
+    function startSelfBreeding(uint256 tokenId1, uint256 tokenId2) external nonReentrant whenNotPaused {
         require(tokenId1 != tokenId2, "Breeding: Cannot breed the same NFT");
-
-        INFTMint nft = INFTMint(nftContract);
         
+        INFTMint nft = INFTMint(nftContract);
         require(nft.ownerOf(tokenId1) == msg.sender, "Breeding: Not owner of first NFT");
         require(nft.ownerOf(tokenId2) == msg.sender, "Breeding: Not owner of second NFT");
 
@@ -85,95 +71,268 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         require(level1 == MIN_BREEDING_LEVEL, "Breeding: First NFT level too low");
         require(level2 == MIN_BREEDING_LEVEL, "Breeding: Second NFT level too low");
 
-        require(nft.isApprovedForAll(msg.sender, address(this)) || 
-                nft.getApproved(tokenId1) == address(this) && 
-                nft.getApproved(tokenId2) == address(this), "Breeding: Contract not approved");
+        require(tokenToOrderId[tokenId1] == 0, "Breeding: Token1 already in breeding");
+        require(tokenToOrderId[tokenId2] == 0, "Breeding: Token2 already in breeding");
 
         NFTDataTypes.ZodiacType type1 = nft.tokenType(tokenId1);
         NFTDataTypes.ZodiacType type2 = nft.tokenType(tokenId2);
+        
+        NFTDataTypes.BaseZodiac zodiac1 = NFTDataTypes.getBaseZodiac(type1);
+        NFTDataTypes.BaseZodiac zodiac2 = NFTDataTypes.getBaseZodiac(type2);
+        require(zodiac1 == zodiac2, "Breeding: Parents must have same zodiac");
 
-        NFTDataTypes.ZodiacType newType = _calculateNewType(type1, type2);
+        require(nft.isApprovedForAll(msg.sender, address(this)) || 
+                (nft.getApproved(tokenId1) == address(this) && nft.getApproved(tokenId2) == address(this)), 
+                "Breeding: Contract not approved");
 
-        uint256 newTokenId = nft.mintBreedResult(msg.sender, newType);
+        nft.safeTransferFrom(msg.sender, address(this), tokenId1);
+        nft.safeTransferFrom(msg.sender, address(this), tokenId2);
 
-        // 保留父母NFT，不再销毁
-        emit NFTBred(msg.sender, tokenId1, tokenId2, newTokenId, newType, block.timestamp);
-        return newTokenId;
+        uint256 orderId = nextOrderId++;
+        breedingOrders[orderId] = BreedingOrder({
+            owner1: msg.sender,
+            owner2: msg.sender,
+            tokenId1: tokenId1,
+            tokenId2: tokenId2,
+            startTime: block.timestamp,
+            completed: false,
+            cancelled: false,
+            resultType1: NFTDataTypes.ZodiacType(0),
+            resultType2: NFTDataTypes.ZodiacType(0),
+            owner1Claimed: false,
+            owner2Claimed: false
+        });
+
+        tokenToOrderId[tokenId1] = orderId;
+        tokenToOrderId[tokenId2] = orderId;
+        userBreedingOrders[msg.sender].push(orderId);
+
+        emit SelfBreedingStarted(orderId, msg.sender, tokenId1, tokenId2, block.timestamp);
     }
 
-    /**
-     * @dev 安全随机数生成器
-     * 使用多种链上数据源增加随机性
-     */
+    function listForBreeding(uint256 tokenId) external nonReentrant whenNotPaused {
+        INFTMint nft = INFTMint(nftContract);
+        require(nft.ownerOf(tokenId) == msg.sender, "Breeding: Not owner of NFT");
+        
+        uint8 level = nft.tokenLevel(tokenId);
+        require(level == MIN_BREEDING_LEVEL, "Breeding: NFT level too low");
+        require(tokenToOrderId[tokenId] == 0, "Breeding: Token already in breeding");
+
+        require(nft.isApprovedForAll(msg.sender, address(this)) || nft.getApproved(tokenId) == address(this), 
+                "Breeding: Contract not approved");
+
+        nft.safeTransferFrom(msg.sender, address(this), tokenId);
+
+        uint256 orderId = nextOrderId++;
+        breedingOrders[orderId] = BreedingOrder({
+            owner1: msg.sender,
+            owner2: address(0),
+            tokenId1: tokenId,
+            tokenId2: 0,
+            startTime: block.timestamp,
+            completed: false,
+            cancelled: false,
+            resultType1: NFTDataTypes.ZodiacType(0),
+            resultType2: NFTDataTypes.ZodiacType(0),
+            owner1Claimed: false,
+            owner2Claimed: false
+        });
+
+        tokenToOrderId[tokenId] = orderId;
+        userBreedingOrders[msg.sender].push(orderId);
+
+        emit BreedingListed(orderId, msg.sender, tokenId);
+    }
+
+    function joinBreeding(uint256 orderId, uint256 tokenId) external nonReentrant whenNotPaused {
+        BreedingOrder storage order = breedingOrders[orderId];
+        require(order.owner1 != address(0), "Breeding: Order not found");
+        require(order.owner2 == address(0), "Breeding: Order already has two participants");
+        require(order.completed == false, "Breeding: Order already completed");
+        require(order.cancelled == false, "Breeding: Order cancelled");
+        require(order.owner1 != msg.sender, "Breeding: Cannot join your own order");
+
+        INFTMint nft = INFTMint(nftContract);
+        require(nft.ownerOf(tokenId) == msg.sender, "Breeding: Not owner of NFT");
+        
+        uint8 level = nft.tokenLevel(tokenId);
+        require(level == MIN_BREEDING_LEVEL, "Breeding: NFT level too low");
+        require(tokenToOrderId[tokenId] == 0, "Breeding: Token already in breeding");
+
+        NFTDataTypes.ZodiacType type1 = nft.tokenType(order.tokenId1);
+        NFTDataTypes.ZodiacType type2 = nft.tokenType(tokenId);
+        
+        NFTDataTypes.BaseZodiac zodiac1 = NFTDataTypes.getBaseZodiac(type1);
+        NFTDataTypes.BaseZodiac zodiac2 = NFTDataTypes.getBaseZodiac(type2);
+        require(zodiac1 == zodiac2, "Breeding: Must have same zodiac");
+
+        require(nft.isApprovedForAll(msg.sender, address(this)) || nft.getApproved(tokenId) == address(this), 
+                "Breeding: Contract not approved");
+
+        nft.safeTransferFrom(msg.sender, address(this), tokenId);
+
+        order.owner2 = msg.sender;
+        order.tokenId2 = tokenId;
+        order.startTime = block.timestamp;
+
+        tokenToOrderId[tokenId] = orderId;
+        userBreedingOrders[msg.sender].push(orderId);
+
+        emit BreedingJoined(orderId, msg.sender, tokenId);
+    }
+
+    function completeSelfBreeding(uint256 orderId) external nonReentrant whenNotPaused {
+        BreedingOrder storage order = breedingOrders[orderId];
+        require(order.owner1 == msg.sender, "Breeding: Not the owner");
+        require(order.completed == false, "Breeding: Already completed");
+        require(order.cancelled == false, "Breeding: Order cancelled");
+        require(order.owner1 == order.owner2, "Breeding: Not a self breeding");
+
+        uint256 endTime = order.startTime + SOLO_BREED_DURATION;
+        require(block.timestamp >= endTime, "Breeding: Breeding not ready");
+
+        INFTMint nft = INFTMint(nftContract);
+        
+        NFTDataTypes.ZodiacType type1 = nft.tokenType(order.tokenId1);
+        NFTDataTypes.ZodiacType type2 = nft.tokenType(order.tokenId2);
+        
+        NFTDataTypes.ZodiacType resultType = _calculateNewType(type1, type2);
+
+        nft.safeTransferFrom(address(this), msg.sender, order.tokenId1);
+        nft.safeTransferFrom(address(this), msg.sender, order.tokenId2);
+        
+        tokenToOrderId[order.tokenId1] = 0;
+        tokenToOrderId[order.tokenId2] = 0;
+
+        uint256 newTokenId = nft.mintBreedResult(msg.sender, resultType);
+
+        order.completed = true;
+        order.resultType1 = resultType;
+        order.owner1Claimed = true;
+
+        emit BreedingCompleted(orderId, resultType, NFTDataTypes.ZodiacType(0));
+        emit BreedingClaimed(orderId, msg.sender, newTokenId);
+    }
+
+    function completeMarketBreeding(uint256 orderId) external nonReentrant whenNotPaused {
+        BreedingOrder storage order = breedingOrders[orderId];
+        require(order.completed == false, "Breeding: Already completed");
+        require(order.cancelled == false, "Breeding: Order cancelled");
+        require(order.owner2 != address(0), "Breeding: Waiting for second participant");
+        require(msg.sender == order.owner1 || msg.sender == order.owner2, "Breeding: Not a participant");
+
+        uint256 endTime = order.startTime + PAIR_BREED_DURATION;
+        require(block.timestamp >= endTime, "Breeding: Breeding not ready");
+
+        INFTMint nft = INFTMint(nftContract);
+        
+        if (order.resultType1 == NFTDataTypes.ZodiacType(0)) {
+            NFTDataTypes.ZodiacType type1 = nft.tokenType(order.tokenId1);
+            NFTDataTypes.ZodiacType type2 = nft.tokenType(order.tokenId2);
+            
+            order.resultType1 = _calculateNewType(type1, type2);
+            order.resultType2 = _calculateNewType(type2, type1);
+            order.completed = true;
+            
+            emit BreedingCompleted(orderId, order.resultType1, order.resultType2);
+        }
+
+        if (msg.sender == order.owner1 && !order.owner1Claimed) {
+            nft.safeTransferFrom(address(this), msg.sender, order.tokenId1);
+            tokenToOrderId[order.tokenId1] = 0;
+            
+            uint256 newTokenId = nft.mintBreedResult(msg.sender, order.resultType1);
+            order.owner1Claimed = true;
+            
+            emit BreedingClaimed(orderId, msg.sender, newTokenId);
+        } else if (msg.sender == order.owner2 && !order.owner2Claimed) {
+            nft.safeTransferFrom(address(this), msg.sender, order.tokenId2);
+            tokenToOrderId[order.tokenId2] = 0;
+            
+            uint256 newTokenId = nft.mintBreedResult(msg.sender, order.resultType2);
+            order.owner2Claimed = true;
+            
+            emit BreedingClaimed(orderId, msg.sender, newTokenId);
+        }
+    }
+
+    function cancelBreedingListing(uint256 orderId) external nonReentrant whenNotPaused {
+        BreedingOrder storage order = breedingOrders[orderId];
+        require(order.owner1 == msg.sender, "Breeding: Not the owner");
+        require(order.owner2 == address(0), "Breeding: Cannot cancel after joined");
+        require(order.completed == false, "Breeding: Already completed");
+        require(order.cancelled == false, "Breeding: Already cancelled");
+
+        INFTMint nft = INFTMint(nftContract);
+        nft.safeTransferFrom(address(this), msg.sender, order.tokenId1);
+        tokenToOrderId[order.tokenId1] = 0;
+
+        order.cancelled = true;
+
+        emit BreedingCancelled(orderId, msg.sender);
+    }
+
+    function getMarketBreedingOrders() external view returns (uint256[] memory) {
+        uint256 count = 0;
+        for (uint256 i = 1; i < nextOrderId; i++) {
+            BreedingOrder storage order = breedingOrders[i];
+            if (order.owner1 != address(0) && order.owner2 == address(0) && !order.completed && !order.cancelled) {
+                count++;
+            }
+        }
+
+        uint256[] memory result = new uint256[](count);
+        uint256 index = 0;
+        for (uint256 i = 1; i < nextOrderId; i++) {
+            BreedingOrder storage order = breedingOrders[i];
+            if (order.owner1 != address(0) && order.owner2 == address(0) && !order.completed && !order.cancelled) {
+                result[index++] = i;
+            }
+        }
+
+        return result;
+    }
+
+    function getUserBreedingOrders(address user) external view returns (uint256[] memory) {
+        return userBreedingOrders[user];
+    }
+
+    function _calculateNewType(NFTDataTypes.ZodiacType type1, NFTDataTypes.ZodiacType type2) internal view returns (NFTDataTypes.ZodiacType) {
+        NFTDataTypes.ElementType element1 = NFTDataTypes.getElement(type1);
+        NFTDataTypes.ElementType element2 = NFTDataTypes.getElement(type2);
+        NFTDataTypes.BaseZodiac zodiac = NFTDataTypes.getBaseZodiac(type1);
+
+        uint256 rand = _random(uint256(type1) + uint256(type2));
+        
+        NFTDataTypes.ElementType newElement = (rand % 2) == 0 ? element1 : element2;
+        NFTDataTypes.GenderType newGender = (rand % 2) == 0 ? NFTDataTypes.GenderType.FEMALE : NFTDataTypes.GenderType.MALE;
+
+        return NFTDataTypes.createZodiacType(newElement, zodiac, newGender);
+    }
+
     function _random(uint256 seed) internal view returns (uint256) {
         return uint256(keccak256(
             abi.encodePacked(
                 blockhash(block.number > 1 ? block.number - 1 : block.number),
                 seed,
-                msg.sender,
                 block.timestamp,
                 gasleft(),
-                block.prevrandao,
-                address(this).balance,
-                block.difficulty,
-                block.coinbase
+                block.prevrandao
             )
         ));
     }
 
-    /**
-     * @dev 计算繁殖产生的新NFT类型
-     * 基于父母的属性和生肖计算
-     * @param type1 父NFT类型
-     * @param type2 母NFT类型
-     * @return NFTDataTypes.ZodiacType 新NFT类型
-     */
-    function _calculateNewType(NFTDataTypes.ZodiacType type1, NFTDataTypes.ZodiacType type2) internal view returns (NFTDataTypes.ZodiacType) {
-        NFTDataTypes.ElementType element1 = NFTDataTypes.getElement(type1);
-        NFTDataTypes.ElementType element2 = NFTDataTypes.getElement(type2);
-        NFTDataTypes.BaseZodiac zodiac1 = NFTDataTypes.getBaseZodiac(type1);
-        NFTDataTypes.BaseZodiac zodiac2 = NFTDataTypes.getBaseZodiac(type2);
-
-        uint256 rand1 = _random(uint256(type1));
-        uint256 rand2 = _random(uint256(type2));
-        
-        NFTDataTypes.ElementType newElement = (rand1 % 2) == 0 ? element1 : element2;
-        NFTDataTypes.BaseZodiac newZodiac = (rand2 % 2) == 0 ? zodiac1 : zodiac2;
-        NFTDataTypes.GenderType newGender = (rand1 % 2) == 0 ? NFTDataTypes.GenderType.FEMALE : NFTDataTypes.GenderType.MALE;
-
-        return NFTDataTypes.createZodiacType(newElement, newZodiac, newGender);
-    }
-
-    /**
-     * @dev 设置NFT合约地址
-     * @param _nftContract NFT合约地址
-     */
     function setNFTContract(address _nftContract) external {
         require(msg.sender == owner() || msg.sender == authorizer, "Breeding: Unauthorized");
         require(_nftContract != address(0), "Breeding: Zero address");
         nftContract = _nftContract;
     }
 
-    /**
-     * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
-     */
     function setAuthorizer(address _authorizer) external onlyOwner {
         require(_authorizer != address(0), "Breeding: Zero address");
         authorizer = _authorizer;
     }
 
-    /**
-     * @dev 暂停合约
-     */
-    function pause() external onlyOwner {
-        _pause();
-    }
-
-    /**
-     * @dev 恢复合约
-     */
-    function unpause() external onlyOwner {
-        _unpause();
-    }
+    function pause() external onlyOwner { _pause(); }
+    function unpause() external onlyOwner { _unpause(); }
 }

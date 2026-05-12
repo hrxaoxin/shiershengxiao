@@ -108,7 +108,9 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         address nftMint,
         address breeding,
         address staking,
-        address tokenContract
+        address tokenContract,
+        address nftUpdate,
+        address pancakeSwapPair
     ) external onlyOwner {
         require(tokenBurner != address(0), "TokenBurner address cannot be zero");
         require(rewardManager != address(0), "RewardManager address cannot be zero");
@@ -140,6 +142,16 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         if (staking != address(0)) {
             IStaking(staking).setNFTContract(nftMint);
             IStaking(staking).setTokenContract(tokenContract);
+        }
+
+        if (nftUpdate != address(0)) {
+            INFTMint(nftMint).setNFTUpdateContract(nftUpdate);
+            INFTUpdate(nftUpdate).setNFTContract(nftMint);
+            INFTUpdate(nftUpdate).setMetadataContract(nftData);
+            INFTUpdate(nftUpdate).setTokenContract(tokenContract);
+            if (pancakeSwapPair != address(0)) {
+                INFTUpdate(nftUpdate).setPancakeSwapPair(pancakeSwapPair);
+            }
         }
     }
 }
