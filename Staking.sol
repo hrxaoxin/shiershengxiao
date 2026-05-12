@@ -362,35 +362,34 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
         multipleThreshold = _threshold;
     }
 
+    /**
+     * @dev 获取当前释放比例（外部接口）
+     * @return 当前释放比例
+     */
     function getCurrentReleaseRatio() external view returns (uint256) {
-        uint256 availableReward = _getAvailableDailyRewardInternal();
-        if (availableReward == 0) {
+        return _calculateCurrentReleaseRatio();
+    }
+
+    /**
+     * @dev 内部函数：计算当前释放比例（包含弹性调控）
+     * @return 当前释放比例
+     */
+    function _calculateCurrentReleaseRatio() internal view returns (uint256) {
+        if (dailyDeposited <= dailyReleaseRatio * multipleThreshold) {
             return dailyReleaseRatio;
         }
         
-        if (dailyDeposited <= availableReward * multipleThreshold) {
+        // 使用 safeMath 避免溢出
+        uint256 baseThreshold = dailyReleaseRatio * multipleThreshold;
+        if (dailyDeposited <= baseThreshold) {
             return dailyReleaseRatio;
         }
         
-        uint256 excessMultiple = (dailyDeposited / availableReward) - multipleThreshold;
+        uint256 excess = dailyDeposited - baseThreshold;
+        uint256 excessMultiple = excess / dailyReleaseRatio;
         uint256 additionalRatio = excessMultiple > MAX_ELASTIC_INCREMENT ? MAX_ELASTIC_INCREMENT : excessMultiple;
         
         return dailyReleaseRatio + additionalRatio;
-    }
-
-    function _getAvailableDailyRewardInternal() internal view returns (uint256) {
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        uint256 contractBalance = token.balanceOf(address(this));
-        
-        uint256 dynamicReward = (contractBalance * dailyReleaseRatio) / RELEASE_RATIO_DENOMINATOR;
-        
-        if (dynamicReward < MIN_DAILY_REWARD) {
-            return MIN_DAILY_REWARD;
-        } else if (dynamicReward > MAX_DAILY_REWARD) {
-            return MAX_DAILY_REWARD;
-        }
-        
-        return dynamicReward;
     }
 
     /**
@@ -419,17 +418,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
     }
 
     /**
-     * @dev 领取奖励时不重置奖励累积（用户要求累积到领取才清空）
-     * @param amount 领取的奖励数量（仅用于验证，不再限制每日额度）
-     */
-    function _updateDailyRewardDistributed(uint256 amount) internal {
-        // 移除每日限制逻辑，奖励累积不受天数限制
-        // 只要用户不领取，奖励会一直累积
-        lastRewardUpdate = block.timestamp;
-        // 不再检查MAX_DAILY_REWARD限制，改为自由累积
-    }
-
-    /**
      * @dev 计算当日可用奖励总量
      * 根据合约剩余代币总量的一定比例计算
      * 支持根据当日转入量弹性调控释放比例
@@ -439,14 +427,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         uint256 contractBalance = token.balanceOf(address(this));
         
-        uint256 currentRatio = dailyReleaseRatio;
-        
-        uint256 availableReward = (contractBalance * dailyReleaseRatio) / RELEASE_RATIO_DENOMINATOR;
-        if (availableReward > 0 && dailyDeposited > availableReward * multipleThreshold) {
-            uint256 excessMultiple = (dailyDeposited / availableReward) - multipleThreshold;
-            uint256 additionalRatio = excessMultiple > MAX_ELASTIC_INCREMENT ? MAX_ELASTIC_INCREMENT : excessMultiple;
-            currentRatio += additionalRatio;
-        }
+        // 复用弹性调控逻辑计算当前释放比例
+        uint256 currentRatio = _calculateCurrentReleaseRatio();
         
         return (contractBalance * currentRatio) / RELEASE_RATIO_DENOMINATOR;
     }

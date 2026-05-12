@@ -277,6 +277,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
 
     /**
      * @dev 更新奖励管理器中的用户卡牌计数（内部函数）
+     * 使用原子性操作解决时序问题
      * @param u 用户地址
      * @param t NFT类型
      * @param add 是否增加计数（true增加，false减少）
@@ -284,18 +285,20 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     function _updateReward(address u, NFTDataTypes.ZodiacType t, bool add) internal {
         if (rewardManager == address(0)) return;
         IRewardManager rm = IRewardManager(rewardManager);
-        uint cnt = rm.cardCount(u, t);
-        uint n = add ? cnt+1 : (cnt>0 ? cnt-1 : 0);
-        try rm.updateCardExternal(u, t, n) returns (bool success) {
-            if (!success) {
-                emit RewardUpdateFailed(u, t, n, add);
-            }
-        } catch {
-            emit RewardUpdateFailed(u, t, n, add);
+        
+        bool success;
+        if (add) {
+            (success) = rm.addCardCount(u, t);
+        } else {
+            (success) = rm.subCardCount(u, t);
+        }
+        
+        if (!success) {
+            emit RewardUpdateFailed(u, t, add);
         }
     }
     
-    event RewardUpdateFailed(address indexed user, NFTDataTypes.ZodiacType indexed zodiacType, uint256 count, bool add);
+    event RewardUpdateFailed(address indexed user, NFTDataTypes.ZodiacType indexed zodiacType, bool add);
 
     
 
@@ -386,13 +389,13 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     /**
      * @dev 计算用户权重（用于分红计算）
      * 权重 = 每个NFT的等级+ 3 的总和（1级权重为4，每级+1，最高5级权重为8）
-     * 使用缓存机制减少Gas消耗
+     * 直接从 NFTData 获取精确权重值
      * @param user 用户地址
      * @return uint256 用户权重
      */
     function calcUserWeight(address user) external view returns (uint256) {
         INFTDataInterface m = INFTDataInterface(metadataContract);
-        return m.userWeightCache(user);
+        return m.calcUserWeight(user);
     }
 
     /**

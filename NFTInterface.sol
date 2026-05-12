@@ -71,6 +71,10 @@ interface IRewardManager {
     function claimDividend() external;
     function cardCount(address user, NFTDataTypes.ZodiacType zodiacType) external view returns (uint256);
     function updateCardExternal(address user, NFTDataTypes.ZodiacType zodiacType, uint256 count) external returns (bool);
+    /** @dev 原子性增加卡牌计数（解决时序问题） */
+    function addCardCount(address user, NFTDataTypes.ZodiacType zodiacType) external returns (bool);
+    /** @dev 原子性减少卡牌计数（解决时序问题） */
+    function subCardCount(address user, NFTDataTypes.ZodiacType zodiacType) external returns (bool);
     function setAuthorizedNFTContract(address nft, bool ok) external;
     function setNFTContract(address _newNFTContract) external;
     function setNFTDataContract(address _nftDataContract) external;
@@ -105,6 +109,8 @@ interface INFTDataInterface {
     function updateUserWeightCache(address user, uint256 weight) external;
     /** @dev 统一的权重更新函数（计算并更新用户权重） */
     function updateUserWeight(address user, uint8 level, bool add) external;
+    /** @dev 直接计算用户权重（遍历所有NFT） */
+    function calcUserWeight(address user) external view returns (uint256);
     function getUserTokenCount(address user, NFTDataTypes.ZodiacType type_) external view returns (uint256);
     function getUserTotalTokenCount(address user) external view returns (uint256);
 

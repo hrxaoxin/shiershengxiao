@@ -240,6 +240,7 @@ contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reentr
         require(price > 0, "E20: Price oracle returned zero");
         
         if (lastPrice > 0) {
+            // 检查价格缓存是否过期
             require(block.timestamp <= lastPriceUpdateTime + priceExpirySeconds, "E30: Price expired");
             
             uint256 deviation;
@@ -248,12 +249,18 @@ contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reentr
             } else {
                 deviation = ((lastPrice - price) * 10000) / lastPrice;
             }
+            // 如果价格偏差过大，不更新缓存
             require(deviation <= priceDeviationThreshold, "E23: Price deviation too high");
+            
+            lastPrice = price;
+            lastPriceUpdateTime = block.timestamp;
+            emit PriceUpdated(price, block.timestamp);
+        } else {
+            // 首次使用，直接设置缓存（无需检查过期）
+            lastPrice = price;
+            lastPriceUpdateTime = block.timestamp;
+            emit PriceUpdated(price, block.timestamp);
         }
-        
-        lastPrice = price;
-        lastPriceUpdateTime = block.timestamp;
-        emit PriceUpdated(price, block.timestamp);
         
         uint256 cost = (usdValue * 1e18) / price;
         require(cost > 0, "E21: Invalid cost");

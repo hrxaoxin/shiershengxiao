@@ -462,15 +462,15 @@ contract RewardManager is
     /**
      * @dev 计算用户权重（非所有者）
      * 合约所有者的权重单独存储在ownerWeight中，初始值为1000
-     * 普通用户的权重通过NFT合约的calcUserWeight函数计算
+     * 普通用户的权重直接从 NFTData 合约计算，确保数据一致性
      * @param user 用户地址
      * @return 用户权重（所有者返回0，因为所有者权重单独处理）
      */
     function _calcUserWeight(address user) internal view returns (uint256) {
         if (user == owner()) return 0;
-        if (nftContract == address(0)) return 0;
+        if (nftDataContract == address(0)) return 0;
         
-        return INFTMintWeight(nftContract).calcUserWeight(user);
+        return INFTDataInterface(nftDataContract).calcUserWeight(user);
     }
 
     /**
@@ -478,9 +478,9 @@ contract RewardManager is
      * @param user 用户地址
      */
     function refreshUserWeightCache(address user) external onlyOp {
-        if (user == owner() || nftContract == address(0)) return;
+        if (user == owner() || nftDataContract == address(0)) return;
         
-        uint256 weight = INFTMintWeight(nftContract).calcUserWeight(user);
+        uint256 weight = INFTDataInterface(nftDataContract).calcUserWeight(user);
         cachedUserWeight[user] = weight;
         cachedWeightTimestamp[user] = block.timestamp;
     }
@@ -490,14 +490,14 @@ contract RewardManager is
      * @param users 用户地址列表
      */
     function batchRefreshUserWeightCache(address[] calldata users) external onlyOp {
-        if (nftContract == address(0)) return;
+        if (nftDataContract == address(0)) return;
         
-        INFTMintWeight nft = INFTMintWeight(nftContract);
+        INFTDataInterface nftData = INFTDataInterface(nftDataContract);
         for (uint256 i = 0; i < users.length; i++) {
             address user = users[i];
             if (user == owner()) continue;
             
-            uint256 weight = nft.calcUserWeight(user);
+            uint256 weight = nftData.calcUserWeight(user);
             cachedUserWeight[user] = weight;
             cachedWeightTimestamp[user] = block.timestamp;
         }
@@ -644,7 +644,38 @@ contract RewardManager is
     }
 
     /**
-     * @dev 添加持有�?
+     * @dev 原子性增加用户卡牌计数（解决时序问题）
+     * 直接从NFTData获取最新计数，然后+1
+     * @param user 用户地址
+     * @param zodiacType 生肖类型
+     * @return 是否成功
+     */
+    function addCardCount(address user, NFTDataTypes.ZodiacType zodiacType) external onlyOp whenNotPaused returns (bool) {
+        if (nftDataContract == address(0)) return false;
+        uint256 currentCount = INFTDataInterface(nftDataContract).getUserTokenCount(user, zodiacType);
+        _updateUserWeight(user);
+        emit CardUpdated(user, zodiacType, currentCount + 1, block.timestamp);
+        return true;
+    }
+
+    /**
+     * @dev 原子性减少用户卡牌计数（解决时序问题）
+     * 直接从NFTData获取最新计数，然后-1（最小为0）
+     * @param user 用户地址
+     * @param zodiacType 生肖类型
+     * @return 是否成功
+     */
+    function subCardCount(address user, NFTDataTypes.ZodiacType zodiacType) external onlyOp whenNotPaused returns (bool) {
+        if (nftDataContract == address(0)) return false;
+        uint256 currentCount = INFTDataInterface(nftDataContract).getUserTokenCount(user, zodiacType);
+        uint256 newCount = currentCount > 0 ? currentCount - 1 : 0;
+        _updateUserWeight(user);
+        emit CardUpdated(user, zodiacType, newCount, block.timestamp);
+        return true;
+    }
+
+    /**
+     * @dev 添加持有者
      * @param user 用户地址
      * @return 是否成功
      */
@@ -716,6 +747,15 @@ contract RewardManager is
 
         // 更新精度累积
         precisionAcc[user] = carryOver;
+        precisionAccumulationCount[user] += 1;
+        
+        // 当累积次数达到阈值时，保留 10% 的精度值后重置
+        // 这样可以减少分红损失，同时防止精度累积值过大
+        if (precisionAccumulationCount[user] >= 1000) {
+            // 保留 10% 的精度值，减少分红损失
+            precisionAcc[user] = carryOver / 10;
+            precisionAccumulationCount[user] = 0;
+        }
         
         unchecked {
             dividendPool -= baseReward;
@@ -813,7 +853,7 @@ contract RewardManager is
         require(stakingContract != address(0), "RM: staking contract not set");
         require(swapRouter != address(0), "RM: swap router not set");
         
-        _autoSwapAndStake();
+        _tryAutoSwapAndStake();
     }
 
     /**

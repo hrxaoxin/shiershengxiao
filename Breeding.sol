@@ -13,6 +13,8 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
     uint8 public constant MIN_BREEDING_LEVEL = 5;
     uint256 public constant SOLO_BREED_DURATION = 12 hours;
     uint256 public constant PAIR_BREED_DURATION = 24 hours;
+    /** @dev 最大繁殖时间上限，防止时间绕过攻击 */
+    uint256 public constant MAX_BREED_DURATION = 7 days;
 
     address public nftContract;
     address public authorizer;
@@ -189,7 +191,9 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         require(order.owner1 == order.owner2, "Breeding: Not a self breeding");
 
         uint256 endTime = order.startTime + SOLO_BREED_DURATION;
+        uint256 maxEndTime = order.startTime + MAX_BREED_DURATION;
         require(block.timestamp >= endTime, "Breeding: Breeding not ready");
+        require(block.timestamp <= maxEndTime, "Breeding: Breeding window expired");
 
         INFTMint nft = INFTMint(nftContract);
         
@@ -222,10 +226,13 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         require(msg.sender == order.owner1 || msg.sender == order.owner2, "Breeding: Not a participant");
 
         uint256 endTime = order.startTime + PAIR_BREED_DURATION;
+        uint256 maxEndTime = order.startTime + MAX_BREED_DURATION;
         require(block.timestamp >= endTime, "Breeding: Breeding not ready");
+        require(block.timestamp <= maxEndTime, "Breeding: Breeding window expired");
 
         INFTMint nft = INFTMint(nftContract);
         
+        // 首次调用时计算繁殖结果并标记完成
         if (order.resultType1 == NFTDataTypes.ZodiacType(0)) {
             NFTDataTypes.ZodiacType type1 = nft.tokenType(order.tokenId1);
             NFTDataTypes.ZodiacType type2 = nft.tokenType(order.tokenId2);
@@ -237,12 +244,15 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
             emit BreedingCompleted(orderId, order.resultType1, order.resultType2);
         }
 
+        bool claimed = false;
+        
         if (msg.sender == order.owner1 && !order.owner1Claimed) {
             nft.safeTransferFrom(address(this), msg.sender, order.tokenId1);
             tokenToOrderId[order.tokenId1] = 0;
             
             uint256 newTokenId = nft.mintBreedResult(msg.sender, order.resultType1);
             order.owner1Claimed = true;
+            claimed = true;
             
             emit BreedingClaimed(orderId, msg.sender, newTokenId);
         } else if (msg.sender == order.owner2 && !order.owner2Claimed) {
@@ -251,8 +261,59 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
             
             uint256 newTokenId = nft.mintBreedResult(msg.sender, order.resultType2);
             order.owner2Claimed = true;
+            claimed = true;
             
             emit BreedingClaimed(orderId, msg.sender, newTokenId);
+        }
+        
+        // 当双方都领取完成后，清理订单数据
+        if (claimed && order.owner1Claimed && order.owner2Claimed) {
+            _cleanupBreedingOrder(orderId);
+        }
+    }
+    
+    /**
+     * @dev 清理繁殖订单数据
+     * @param orderId 订单ID
+     */
+    function _cleanupBreedingOrder(uint256 orderId) internal {
+        BreedingOrder storage order = breedingOrders[orderId];
+        
+        // 清理 tokenToOrderId（如果还有残留）
+        if (order.tokenId1 != 0 && tokenToOrderId[order.tokenId1] == orderId) {
+            tokenToOrderId[order.tokenId1] = 0;
+        }
+        if (order.tokenId2 != 0 && tokenToOrderId[order.tokenId2] == orderId) {
+            tokenToOrderId[order.tokenId2] = 0;
+        }
+        
+        // 清理用户订单列表引用
+        _removeFromUserBreedingOrders(order.owner1, orderId);
+        if (order.owner2 != address(0) && order.owner2 != order.owner1) {
+            _removeFromUserBreedingOrders(order.owner2, orderId);
+        }
+        
+        // 重置订单数据
+        delete breedingOrders[orderId];
+    }
+    
+    /**
+     * @dev 从用户订单列表中移除指定订单
+     * @param user 用户地址
+     * @param orderId 订单ID
+     */
+    function _removeFromUserBreedingOrders(address user, uint256 orderId) internal {
+        if (user == address(0)) return;
+        uint256[] storage orders = userBreedingOrders[user];
+        uint256 length = orders.length;
+        for (uint256 i = 0; i < length; i++) {
+            if (orders[i] == orderId) {
+                if (length > 1) {
+                    orders[i] = orders[length - 1];
+                }
+                orders.pop();
+                break;
+            }
         }
     }
 

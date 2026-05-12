@@ -67,6 +67,8 @@ contract NFTTrading is
     event FeeCollected(address indexed to, uint256 amountBNB, uint256 amountWEI, uint256 timestamp, uint256 blockNumber);
     event ContractUpdated(address indexed oldAddress, address indexed newAddress, string contractType, uint256 timestamp, uint256 blockNumber);
     event NFTReturned(uint256 indexed tokenId, address indexed seller, uint256 timestamp, uint256 blockNumber);
+    /** @dev NFT 转账失败事件（用于追踪失败的交易） */
+    event NFTTransferFailed(uint256 indexed tokenId, address indexed buyer, address indexed originalSeller, uint256 priceWEI, uint256 timestamp, uint256 blockNumber);
     event EmergencyWithdrawBNB(address indexed owner, address indexed to, uint256 amountBNB, uint256 amountWEI, uint256 timestamp, uint256 blockNumber);
     event EmergencyWithdrawNFT(address indexed owner, address indexed to, uint256 indexed tokenId, uint256 timestamp, uint256 blockNumber);
     event ListingPriceUpdated(uint256 indexed tokenId, address indexed seller, uint256 newPriceBNB, uint256 newPriceWEI, uint256 timestamp, uint256 blockNumber);
@@ -323,23 +325,73 @@ contract NFTTrading is
         totalSales++;
         totalFeesCollected += feeWEI;
 
-        // ========== 3. Interactions：与外部合约交互 ==========
-        if (sellerAmountWEI > 0) {
-            _safeTransferBNB(seller, sellerAmountWEI);
+        // ========== 3. Interactions：与外部合约交互（原子性处理） ==========
+        // 先尝试 NFT 转账，如果失败则回滚所有 BNB 转账
+        bool nftTransferSuccess = false;
+        
+        // 尝试 NFT 转账（最关键的操作）
+        try nft.safeTransferFrom(address(this), msg.sender, tokenId) {
+            nftTransferSuccess = true;
+        } catch {
+            // NFT 转账失败，回滚操作
+            // 恢复 listing 状态
+            listings[tokenId] = NFTListing({
+                seller: seller,
+                price: priceWEI,
+                listedAt: block.timestamp - 1,
+                isActive: true
+            });
+            _addListingToUserTokens(seller, tokenId);
+            _addToActiveListings(tokenId);
+            totalSales--;
+            totalFeesCollected -= feeWEI;
+            
+            // 退还买家全款
+            (bool refundSuccess, ) = msg.sender.call{value: msg.value}("");
+            require(refundSuccess, "NFTTrading: refund to buyer failed");
+            
+            emit NFTTransferFailed(tokenId, msg.sender, seller, priceWEI, block.timestamp, block.number);
+            return;
         }
-        if (feeWEI > 0) {
-            _safeTransferBNB(royaltyWallet, feeWEI);
+        
+        // NFT 转账成功后，处理 BNB 转账
+        if (nftTransferSuccess) {
+            if (sellerAmountWEI > 0) {
+                _safeTransferBNB(seller, sellerAmountWEI);
+            }
+            if (feeWEI > 0) {
+                _safeTransferBNB(royaltyWallet, feeWEI);
+            }
+            if (msg.value > priceWEI) {
+                uint256 overpaidWEI = msg.value - priceWEI;
+                totalOverpaid += overpaidWEI;
+                emit OverpaidReceived(msg.sender, overpaidWEI, block.timestamp, block.number);
+            }
         }
-        if (msg.value > priceWEI) {
-            uint256 overpaidWEI = msg.value - priceWEI;
-            totalOverpaid += overpaidWEI;
-            emit OverpaidReceived(msg.sender, overpaidWEI, block.timestamp, block.number);
-        }
-
-        nft.safeTransferFrom(address(this), msg.sender, tokenId);
 
         emit NFTSold(tokenId, seller, msg.sender, priceBNB, priceWEI, feeBNB, feeWEI, block.timestamp, block.number);
         emit FeeCollected(royaltyWallet, feeBNB, feeWEI, block.timestamp, block.number);
+    }
+    
+    /**
+     * @dev 将 listing 添加回用户上架列表
+     * @param user 用户地址
+     * @param tokenId token ID
+     */
+    function _addListingToUserTokens(address user, uint256 tokenId) internal {
+        uint256[] storage userTokens = userListedTokens[user];
+        tokenToListingIndex[tokenId] = userTokens.length;
+        userTokens.push(tokenId);
+    }
+    
+    /**
+     * @dev 将 token 添加回活跃上架列表
+     * @param tokenId token ID
+     */
+    function _addToActiveListings(uint256 tokenId) internal {
+        tokenToActiveIndex[tokenId] = activeListingIds.length;
+        activeListingIds.push(tokenId);
+        activeListings++;
     }
 
     // ========== 修复：移除onlyOwner修饰符，允许合约内部调用，并大幅提高Gas上限 ==========

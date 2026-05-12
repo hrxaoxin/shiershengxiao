@@ -139,42 +139,20 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     }
 
     /**
-     * @dev 销毁代币用于普通铸造（仅限授权的NFT合约或管理员调用）
+     * @dev 销毁代币用于普通铸造（已废弃，请使用 burnAndMint）
      * @return bool 是否成功
+     * @deprecated 使用 burnAndMint(user, false) 替代
      */
     function burnTokenForMint() external returns (bool) {
-        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
-        require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
-        require(msg.sender == authorizedNFTContract || msg.sender == authorizer, "TokenBurner: Unauthorized caller");
-        
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        require(token.balanceOf(msg.sender) >= normalMintCost, "TokenBurner: Insufficient balance");
-        require(token.allowance(msg.sender, address(this)) >= normalMintCost, "TokenBurner: Insufficient allowance");
-        
-        bool success = token.transferFrom(msg.sender, BLACK_HOLE, normalMintCost);
-        require(success, "TokenBurner: Token transfer failed");
-        
-        emit TokenBurned(msg.sender, normalMintCost, block.timestamp);
-        return true;
+        return burnAndMint(msg.sender, false);
     }
 
     /**
-     * @dev 销毁代币用于稀有铸造（仅限授权的NFT合约或管理员调用）
+     * @dev 销毁代币用于稀有铸造（已废弃，请使用 burnAndMint）
      * @return bool 是否成功
+     * @deprecated 使用 burnAndMint(user, true) 替代
      */
     function burnTokenForRareMint() external returns (bool) {
-        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
-        require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
-        require(msg.sender == authorizedNFTContract || msg.sender == authorizer, "TokenBurner: Unauthorized caller");
-        
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        require(token.balanceOf(msg.sender) >= rareMintCost, "TokenBurner: Insufficient balance");
-        require(token.allowance(msg.sender, address(this)) >= rareMintCost, "TokenBurner: Insufficient allowance");
-        
-        bool success = token.transferFrom(msg.sender, BLACK_HOLE, rareMintCost);
-        require(success, "TokenBurner: Token transfer failed");
-        
-        emit TokenBurned(msg.sender, rareMintCost, block.timestamp);
-        return true;
+        return burnAndMint(msg.sender, true);
     }
 }

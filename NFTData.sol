@@ -102,6 +102,23 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
         }
     }
 
+    /**
+     * @dev 直接计算用户权重（遍历所有NFT）
+     * 权重 = 每个NFT的等级 + 3 的总和
+     * 用于精确计算用户权重，解决缓存不一致问题
+     * @param user 用户地址
+     * @return 用户权重
+     */
+    function calcUserWeight(address user) external view override returns (uint256) {
+        uint256[] memory tokens = _userTokens[user];
+        uint256 totalWeight = 0;
+        for (uint256 i = 0; i < tokens.length; i++) {
+            uint8 level = tokenLevel[tokens[i]];
+            totalWeight += uint256(level) + 3;
+        }
+        return totalWeight;
+    }
+
     function getUserTokenCount(address user, NFTDataTypes.ZodiacType type_) external view override returns (uint256) {
         return userTokenCount[user][type_];
     }
