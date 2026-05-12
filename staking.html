@@ -552,6 +552,12 @@
         async function stakeNFTs() {
             if (selectedNFTs.length === 0) return;
 
+            const stakingAddress = window.contractAddresses.staking;
+            if (!stakingAddress || stakingAddress === '0x0000000000000000000000000000000000000000') {
+                ZODIAC_UI.showToast('质押合约地址未配置，请联系管理员部署合约', 'error');
+                return;
+            }
+
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认质押',
                 `将质押 ${selectedNFTs.length} 个NFT进行挖矿。`
@@ -565,8 +571,8 @@
 
             try {
                 for (const tokenId of selectedNFTs) {
-                    const gas = await ZODIAC_UI.estimateGas(nftContract, 'approve', [window.contractAddresses.staking, tokenId], account);
-                    await nftContract.methods.approve(window.contractAddresses.staking, tokenId).send({
+                    const gas = await ZODIAC_UI.estimateGas(nftContract, 'approve', [stakingAddress, tokenId], account);
+                    await nftContract.methods.approve(stakingAddress, tokenId).send({
                         from: account,
                         gas: gas
                     });

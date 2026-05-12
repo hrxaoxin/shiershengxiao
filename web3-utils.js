@@ -96,6 +96,7 @@ window.ZODIAC_WEB3 = (function() {
             rewardManager: window.rewardManagerABI,
             tokenBurner: window.tokenBurnerABI,
             nftMint: window.nftMintABI,
+            nftUpdate: window.nftUpdateABI,
             nftTrading: window.NFTTradingABI,
             breeding: window.breedingABI,
             staking: window.stakingABI
@@ -106,6 +107,7 @@ window.ZODIAC_WEB3 = (function() {
             rewardManager: window.rewardManagerAddress,
             tokenBurner: window.tokenBurnerAddress,
             nftMint: window.nftMintAddress,
+            nftUpdate: window.nftUpdateAddress,
             nftTrading: window.NFTTradingAddress,
             breeding: window.breedingAddress,
             staking: window.stakingAddress

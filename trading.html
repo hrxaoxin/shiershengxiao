@@ -603,15 +603,15 @@
                         for (let tokenId = startId; tokenId <= endId; tokenId++) {
                             promises.push((async (id) => {
                                 try {
-                                    const result = await nftTradingContract.methods.getListing(id).call();
-                                    if (result[0] && result[0].isActive) {
+                                    const [seller, price, active] = await nftTradingContract.methods.getListing(id).call();
+                                    if (active) {
                                         const type = await nftMintContract.methods.tokenType(id).call();
                                         const level = await nftMintContract.methods.tokenLevel(id).call();
                                         return {
                                             tokenId: id,
-                                            price: web3.utils.fromWei(result[0].price, 'ether'),
-                                            priceWei: result[0].price,
-                                            seller: result[0].seller,
+                                            price: web3.utils.fromWei(price, 'ether'),
+                                            priceWei: price,
+                                            seller: seller,
                                             type: type,
                                             level: parseInt(level)
                                         };
@@ -797,8 +797,8 @@
                     return false;
                 }
                 
-                const listing = await nftTradingContract.methods.getListing(tokenId).call();
-                if (listing[0].isActive) {
+                const [seller, price, active] = await nftTradingContract.methods.getListing(tokenId).call();
+                if (active) {
                     ZODIAC_UI.showToast('此NFT已上架', 'warning');
                     return false;
                 }
@@ -906,13 +906,13 @@
                 const listedTokenIds = await nftTradingContract.methods.getSellerListings(account).call();
                 
                 for (const tokenId of listedTokenIds) {
-                    const result = await nftTradingContract.methods.getListing(tokenId).call();
-                    if (result[0] && result[0].isActive) {
+                    const [seller, price, active] = await nftTradingContract.methods.getListing(tokenId).call();
+                    if (active) {
                         const type = await nftMintContract.methods.tokenType(tokenId).call();
                         const level = await nftMintContract.methods.tokenLevel(tokenId).call();
                         listings.push({
                             tokenId: parseInt(tokenId),
-                            price: web3.utils.fromWei(result[0].price, 'ether'),
+                            price: web3.utils.fromWei(price, 'ether'),
                             type: type,
                             level: parseInt(level)
                         });
@@ -1005,13 +1005,15 @@
 
                         const listingPromises = tokenIds.map(async (tokenId, idx) => {
                             try {
-                                const listing = await nftTradingContract.methods.getListing(tokenId).call();
-                                const isListed = listing[0] && listing[0].isActive;
-                                if (!isListed) {
+                                const [seller, price, active] = await nftTradingContract.methods.getListing(tokenId).call();
+                                if (!active) {
+                                    // 获取 NFT 类型和等级
+                                    const nftType = await nftMintContract.methods.tokenType(tokenId).call();
+                                    const nftLevel = await nftMintContract.methods.tokenLevel(tokenId).call();
                                     return {
                                         tokenId: parseInt(tokenId),
-                                        type: parseInt(tokenIds[idx]),
-                                        level: parseInt(tokenIds[idx])
+                                        type: parseInt(nftType),
+                                        level: parseInt(nftLevel)
                                     };
                                 }
                             } catch (e) {}

@@ -575,6 +575,14 @@
             btn.textContent = '升级中...';
 
             try {
+                const nftUpdateAddress = window.contractAddresses.nftUpdate;
+                if (!nftUpdateAddress || nftUpdateAddress === '0x0000000000000000000000000000000000000000') {
+                    ZODIAC_UI.showToast('升阶合约地址未配置，请联系管理员部署合约', 'error');
+                    btn.disabled = false;
+                    btn.textContent = '使用代币升阶';
+                    return;
+                }
+
                 const balance = await tokenContract.methods.balanceOf(account).call();
                 
                 if (parseInt(balance) < web3.utils.toWei(requiredTokens.toString(), 'ether')) {
@@ -584,10 +592,10 @@
                     return;
                 }
 
-                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.nftUpdate).call();
+                const allowance = await tokenContract.methods.allowance(account, nftUpdateAddress).call();
                 if (parseInt(allowance) < web3.utils.toWei(requiredTokens.toString(), 'ether')) {
-                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [window.contractAddresses.nftUpdate, web3.utils.toWei(requiredTokens.toString(), 'ether')], account);
-                    await tokenContract.methods.approve(window.contractAddresses.nftUpdate, web3.utils.toWei(requiredTokens.toString(), 'ether')).send({ 
+                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [nftUpdateAddress, web3.utils.toWei(requiredTokens.toString(), 'ether')], account);
+                    await tokenContract.methods.approve(nftUpdateAddress, web3.utils.toWei(requiredTokens.toString(), 'ether')).send({ 
                         from: account,
                         gas: approveGas
                     });
@@ -619,6 +627,14 @@
             btn.textContent = '查询价格中...';
 
             try {
+                const nftUpdateAddress = window.contractAddresses.nftUpdate;
+                if (!nftUpdateAddress || nftUpdateAddress === '0x0000000000000000000000000000000000000000') {
+                    ZODIAC_UI.showToast('升阶合约地址未配置，请联系管理员部署合约', 'error');
+                    btn.disabled = false;
+                    btn.textContent = '使用USDT价值代币升阶';
+                    return;
+                }
+
                 const requiredUSD = getUSDValue(selectedNft.level);
                 const tokenPrice = await getTokenPriceFromPancakeSwap();
                 
@@ -650,11 +666,11 @@
                     return;
                 }
 
-                const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.nftUpdate).call();
+                const allowance = await tokenContract.methods.allowance(account, nftUpdateAddress).call();
                 if (parseInt(allowance) < requiredTokens) {
                     btn.textContent = '授权中...';
-                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [window.contractAddresses.nftUpdate, requiredTokens], account);
-                    await tokenContract.methods.approve(window.contractAddresses.nftUpdate, requiredTokens).send({ 
+                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [nftUpdateAddress, requiredTokens], account);
+                    await tokenContract.methods.approve(nftUpdateAddress, requiredTokens).send({ 
                         from: account,
                         gas: approveGas
                     });
