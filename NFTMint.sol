@@ -47,9 +47,6 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     address public tokenContract;
     /** @dev 繁殖合约地址 */
     address public breedingContract;
-    /** @dev NFTUpdate合约地址 */
-    address public nftUpdateContract;
-
     /** @dev 授权铸造者映射 */
     mapping(address => bool) public authorizedMinter;
 
@@ -355,26 +352,7 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      */
     function setBreedingContract(address a) external onlyOwner { breedingContract = a; }
 
-    /**
-     * @dev 设置NFTUpdate合约地址
-     * @param a NFTUpdate合约地址
-     */
-    function setNFTUpdateContract(address a) external onlyOwner { nftUpdateContract = a; }
-
-    function upgradeWithNFT(uint256 tokenId) external returns (uint8) {
-        require(nftUpdateContract != address(0), "E31: NFTUpdate contract not set");
-        return INFTUpdate(nftUpdateContract).upgradeWithNFT(tokenId);
-    }
-
-    function upgradeWithToken(uint256 tokenId) external returns (uint8) {
-        require(nftUpdateContract != address(0), "E31: NFTUpdate contract not set");
-        return INFTUpdate(nftUpdateContract).upgradeWithToken(tokenId);
-    }
-
-    function upgradeWithUSDValue(uint256 tokenId) external returns (uint8) {
-        require(nftUpdateContract != address(0), "E31: NFTUpdate contract not set");
-        return INFTUpdate(nftUpdateContract).upgradeWithUSDValue(tokenId);
-    }
+    
 
     /**
      * @dev 获取用户拥有的指定类型NFT数量

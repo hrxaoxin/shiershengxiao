@@ -95,10 +95,22 @@ window.ZODIAC_UTILS = (function() {
     }
 
     function getUpgradeCost(level) {
+        const tokenCosts = {
+            1: 10000,
+            2: 40000,
+            3: 120000,
+            4: 480000
+        };
+        const usdtValues = {
+            1: 1,
+            2: 4,
+            3: 12,
+            4: 48
+        };
         return {
             nftCount: level,
-            tokens: level * 10000 * Math.pow(3, level - 1),
-            usdtValue: Math.pow(4, level - 1)
+            tokens: tokenCosts[level] || 0,
+            usdtValue: usdtValues[level] || 0
         };
     }
 

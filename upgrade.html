@@ -357,6 +357,7 @@
         let account;
         let nftContract;
         let tokenContract;
+        let nftUpdateContract;
         let selectedNft = null;
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -419,9 +420,10 @@
             }
         }
 
-        function initContracts() {
-            nftContract = window.ZODIAC_WEB3.getContract('nftMint');
-            tokenContract = window.ZODIAC_WEB3.getContract('tokenContract');
+        async function initContracts() {
+            nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
+            tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
+            nftUpdateContract = await window.ZODIAC_WEB3.getContract('nftUpdate');
         }
 
         async function loadUserNFTs() {
@@ -540,8 +542,16 @@
             btn.textContent = '升级中...';
 
             try {
-                const gas = await ZODIAC_UI.estimateGas(nftContract, 'upgradeWithNFT', [selectedNft.id], account);
-                const result = await nftContract.methods.upgradeWithNFT(selectedNft.id).send({ 
+                const nftUpdateAddress = window.contractAddresses.nftUpdate;
+                if (!nftUpdateAddress || nftUpdateAddress === '0x0000000000000000000000000000000000000000') {
+                    ZODIAC_UI.showToast('升阶合约地址未配置，请联系管理员部署合约', 'error');
+                    btn.disabled = false;
+                    btn.textContent = '使用NFT升阶';
+                    return;
+                }
+
+                const gas = await ZODIAC_UI.estimateGas(nftUpdateContract, 'upgradeWithNFT', [selectedNft.id], account);
+                const result = await nftUpdateContract.methods.upgradeWithNFT(selectedNft.id).send({ 
                     from: account,
                     gas: gas
                 });
@@ -601,8 +611,8 @@
                     });
                 }
 
-                const gas = await ZODIAC_UI.estimateGas(nftContract, 'upgradeWithToken', [selectedNft.id], account);
-                const result = await nftContract.methods.upgradeWithToken(selectedNft.id).send({ 
+                const gas = await ZODIAC_UI.estimateGas(nftUpdateContract, 'upgradeWithToken', [selectedNft.id], account);
+                const result = await nftUpdateContract.methods.upgradeWithToken(selectedNft.id).send({ 
                     from: account,
                     gas: gas
                 });
@@ -677,8 +687,8 @@
                 }
 
                 btn.textContent = '升级中...';
-                const gas = await ZODIAC_UI.estimateGas(nftContract, 'upgradeWithUSDValue', [selectedNft.id], account);
-                const result = await nftContract.methods.upgradeWithUSDValue(selectedNft.id).send({ 
+                const gas = await ZODIAC_UI.estimateGas(nftUpdateContract, 'upgradeWithUSDValue', [selectedNft.id], account);
+                const result = await nftUpdateContract.methods.upgradeWithUSDValue(selectedNft.id).send({ 
                     from: account,
                     gas: gas
                 });

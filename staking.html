@@ -507,31 +507,20 @@
         async function loadEstimatedReward() {
             try {
                 const balance = await tokenContract.methods.balanceOf(window.contractAddresses.staking).call();
+                const totalStakedNFTs = await stakingContract.methods.totalStakedNFTs().call();
+                const currentReleaseRatio = await stakingContract.methods.getCurrentReleaseRatio().call();
                 
-                let dailyReward = balance / 100;
-                const maxDailyReward = web3.utils.toWei('14400', 'ether');
-                if (dailyReward > maxDailyReward) {
-                    dailyReward = maxDailyReward;
-                }
+                const RELEASE_RATIO_DENOMINATOR = 10000;
                 
-                const userStakeCount = await stakingContract.methods.getUserStakeCount(account).call();
+                const dailyReward = (parseInt(balance) * parseInt(currentReleaseRatio)) / RELEASE_RATIO_DENOMINATOR;
                 
                 let estimatedReward = 0;
-                if (parseInt(userStakeCount) > 0) {
-                    const totalMinuteReward = dailyReward / 1440;
-                    estimatedReward = totalMinuteReward / Math.max(parseInt(userStakeCount), 1);
-                    
-                    const minReward = web3.utils.toWei('1', 'ether');
-                    const maxReward = web3.utils.toWei('10', 'ether');
-                    if (estimatedReward < minReward) {
-                        estimatedReward = minReward;
-                    } else if (estimatedReward > maxReward) {
-                        estimatedReward = maxReward;
-                    }
+                if (parseInt(totalStakedNFTs) > 0 && dailyReward > 0) {
+                    estimatedReward = dailyReward / (1440 * parseInt(totalStakedNFTs));
                 }
                 
-                const estimatedRewardFormatted = web3.utils.fromWei(estimatedReward, 'ether');
-                document.getElementById('estimatedReward').textContent = estimatedRewardFormatted.substring(0, 6);
+                const estimatedRewardFormatted = web3.utils.fromWei(estimatedReward.toString(), 'ether');
+                document.getElementById('estimatedReward').textContent = estimatedRewardFormatted.substring(0, 10);
             } catch (error) {
                 console.error('计算预计奖励失败:', error);
             }
