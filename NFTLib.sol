@@ -90,7 +90,12 @@ library NFTLib {
     }
 
     function calculateWeightDelta(uint8 level) internal pure returns (uint256) {
-        return level + 3;
+        if (level == 1) return 1;
+        if (level == 2) return 2;
+        if (level == 3) return 4;
+        if (level == 4) return 12;
+        if (level == 5) return 48;
+        return 0;
     }
 
     function updateUserWeightValue(uint256 currentWeight, uint8 level, bool add) internal pure returns (uint256) {

@@ -119,7 +119,8 @@ window.ZODIAC_UTILS = (function() {
     }
 
     function getWeight(level) {
-        return Math.min(4 + (level - 1), 8);
+        const weights = { 1: 1, 2: 2, 3: 4, 4: 12, 5: 48 };
+        return weights[level] || 0;
     }
 
     function formatAddress(address) {

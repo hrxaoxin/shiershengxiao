@@ -40,6 +40,8 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         uint256 defenderDamage;
         string attackerSkill;
         string defenderSkill;
+        bool attackerDodged;
+        bool defenderDodged;
     }
     
     struct NFTStatus {
@@ -51,13 +53,16 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         uint256 zodiac;
         bool isFrontRow;
         bool isAlive;
+        uint256 speed;
     }
     
     mapping(uint256 => Skill) public zodiacSkills;
+    mapping(uint256 => uint256) public zodiacSpeed;
     mapping(uint256 => BattleResult) public battleHistory;
     
     uint256 public nextBattleId;
     uint256 public baseHealth;
+    uint256 public dodgeBaseChance = 1500;
     
     event BattleCompleted(
         address indexed attacker,
@@ -66,7 +71,7 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         uint256 attackerWinCount,
         uint256 defenderWinCount
     );
-    
+
     event RoundCompleted(
         uint256 indexed battleId,
         uint256 attackerTokenId,
@@ -80,9 +85,10 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         __ReentrancyGuard_init();
         nftContract = INFTMint(_nftContract);
         nextBattleId = 1;
-        baseHealth = 1000;
+        baseHealth = 400;
         
         _initZodiacSkills();
+        _initZodiacSpeed();
     }
     
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -93,6 +99,11 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     
     function setBaseHealth(uint256 _baseHealth) external onlyOwner {
         baseHealth = _baseHealth;
+    }
+    
+    function setDodgeBaseChance(uint256 _chance) external onlyOwner {
+        require(_chance <= 10000, "Dodge chance too high");
+        dodgeBaseChance = _chance;
     }
     
     function _initZodiacSkills() internal {
@@ -110,6 +121,26 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         zodiacSkills[11] = Skill("猪之福气", SkillType.Heal, 120, 6);
     }
     
+    function _initZodiacSpeed() internal {
+        zodiacSpeed[0] = 95;  // 鼠 - 非常敏捷
+        zodiacSpeed[1] = 40;  // 牛 - 稳重
+        zodiacSpeed[2] = 70;  // 虎 - 勇猛
+        zodiacSpeed[3] = 90; // 兔 - 灵活
+        zodiacSpeed[4] = 80; // 龙 - 威严
+        zodiacSpeed[5] = 85; // 蛇 - 迅猛
+        zodiacSpeed[6] = 100;// 马 - 奔腾
+        zodiacSpeed[7] = 35; // 羊 - 温和
+        zodiacSpeed[8] = 110;// 猴 - 极其灵活
+        zodiacSpeed[9] = 55; // 鸡 - 警觉
+        zodiacSpeed[10] = 60;// 狗 - 忠诚
+        zodiacSpeed[11] = 30;// 猪 - 迟缓
+    }
+    
+    function setZodiacSpeed(uint256 zodiacIndex, uint256 speed) external onlyOwner {
+        require(zodiacIndex < 12, "Invalid zodiac");
+        zodiacSpeed[zodiacIndex] = speed;
+    }
+    
     function getElementFromTokenType(uint256 tokenType) public pure returns (Element) {
         uint256 attrIndex = tokenType / 24;
         if (attrIndex == 0) return Element.Water;
@@ -121,6 +152,10 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     
     function getZodiacIndex(uint256 tokenType) public pure returns (uint256) {
         return (tokenType % 24) / 2;
+    }
+    
+    function getSpeed(uint256 zodiacIndex) public view returns (uint256) {
+        return zodiacSpeed[zodiacIndex];
     }
     
     function calculateDamage(uint256 baseDamage, Element attackerElement, Element defenderElement) 
@@ -161,7 +196,17 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     }
     
     function calculateHealth(uint256 level) public view returns (uint256) {
-        return baseHealth + (level - 1) * 200;
+        return baseHealth + (level - 1) * 100;
+    }
+    
+    function calculateDodgeChance(uint256 attackerSpeed, uint256 defenderSpeed) public view returns (bool) {
+        if (defenderSpeed >= attackerSpeed) {
+            return false;
+        }
+        uint256 speedDiff = defenderSpeed * 10000 / attackerSpeed;
+        uint256 dodgeChance = ((10000 - speedDiff) * dodgeBaseChance) / 10000;
+        uint256 randomVal = uint256(keccak256(abi.encodePacked(block.timestamp, block.number, msg.sender))) % 10000;
+        return randomVal < dodgeChance;
     }
     
     function battle(uint256[] calldata attackerTokens, uint256[] calldata defenderTokens) 
@@ -177,6 +222,8 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
             (uint256 attackerType, uint8 attackerLevel) = _getTokenInfo(attackerTokens[i]);
             (uint256 defenderType, uint8 defenderLevel) = _getTokenInfo(defenderTokens[i]);
+            uint256 attackerZodiac = getZodiacIndex(attackerType);
+            uint256 defenderZodiac = getZodiacIndex(defenderType);
             
             attackerTeam[i] = NFTStatus({
                 currentHealth: calculateHealth(attackerLevel),
@@ -184,9 +231,10 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
                 level: attackerLevel,
                 tokenId: attackerTokens[i],
                 element: getElementFromTokenType(attackerType),
-                zodiac: getZodiacIndex(attackerType),
+                zodiac: attackerZodiac,
                 isFrontRow: i < FRONT_ROW_SIZE,
-                isAlive: true
+                isAlive: true,
+                speed: zodiacSpeed[attackerZodiac]
             });
             
             defenderTeam[i] = NFTStatus({
@@ -195,9 +243,10 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
                 level: defenderLevel,
                 tokenId: defenderTokens[i],
                 element: getElementFromTokenType(defenderType),
-                zodiac: getZodiacIndex(defenderType),
+                zodiac: defenderZodiac,
                 isFrontRow: i < FRONT_ROW_SIZE,
-                isAlive: true
+                isAlive: true,
+                speed: zodiacSpeed[defenderZodiac]
             });
         }
         
@@ -205,14 +254,22 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         uint256 defenderWins = 0;
         BattleRoundResult[] memory roundResults = new BattleRoundResult[](TEAM_SIZE);
         
+        bool[] memory attackerParticipated = new bool[](TEAM_SIZE);
+        bool[] memory defenderParticipated = new bool[](TEAM_SIZE);
+        
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
             if (!attackerTeam[i].isAlive) continue;
             
             uint256 targetIndex = _findTarget(defenderTeam, attackerTeam[i].isFrontRow);
             if (targetIndex == type(uint256).max) continue;
             
-            (bool attackerWon, uint256 atkDmg, uint256 defDmg, string memory atkSkill, string memory defSkill) = 
-                _singleBattle(attackerTeam[i], defenderTeam[targetIndex]);
+            defenderParticipated[targetIndex] = true;
+            attackerParticipated[i] = true;
+            
+            bool attackerFirst = attackerTeam[i].speed >= defenderTeam[targetIndex].speed;
+            
+            (bool attackerWon, uint256 atkDmg, uint256 defDmg, string memory atkSkill, string memory defSkill, bool atkDodged, bool defDodged) = 
+                _singleBattle(attackerTeam[i], defenderTeam[targetIndex], attackerFirst);
             
             roundResults[i] = BattleRoundResult({
                 attackerTokenId: attackerTeam[i].tokenId,
@@ -221,7 +278,9 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
                 attackerDamage: atkDmg,
                 defenderDamage: defDmg,
                 attackerSkill: atkSkill,
-                defenderSkill: defSkill
+                defenderSkill: defSkill,
+                attackerDodged: atkDodged,
+                defenderDodged: defDodged
             });
             
             if (attackerWon) {
@@ -266,14 +325,17 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         return type(uint256).max;
     }
     
-    function _singleBattle(NFTStatus memory attacker, NFTStatus memory defender) 
-        internal view returns (bool, uint256, uint256, string memory, string memory) {
+    function _singleBattle(NFTStatus memory attacker, NFTStatus memory defender, bool attackerFirst) 
+        internal view returns (bool, uint256, uint256, string memory, string memory, bool, bool) {
+        
+        bool attackerDodged = false;
+        bool defenderDodged = false;
         
         Skill storage attackerSkill = zodiacSkills[attacker.zodiac];
         Skill storage defenderSkill = zodiacSkills[defender.zodiac];
         
-        uint256 attackerBaseDamage = attacker.level * 100;
-        uint256 defenderBaseDamage = defender.level * 100;
+        uint256 attackerBaseDamage = attacker.level * 60;
+        uint256 defenderBaseDamage = defender.level * 60;
         
         uint256 attackerTotalDamage = calculateDamage(attackerBaseDamage, attacker.element, defender.element);
         uint256 defenderTotalDamage = calculateDamage(defenderBaseDamage, defender.element, attacker.element);
@@ -281,35 +343,83 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         string memory attackerSkillName = attackerSkill.name;
         string memory defenderSkillName = defenderSkill.name;
         
-        if (attackerSkill.skillType == SkillType.Attack) {
-            attackerTotalDamage = (attackerTotalDamage * attackerSkill.value) / 100;
-        } else if (attackerSkill.skillType == SkillType.Defense) {
-            defenderTotalDamage = (defenderTotalDamage * (100 - attackerSkill.value)) / 100;
-        } else if (attackerSkill.skillType == SkillType.Heal) {
-            uint256 healAmount = attackerSkill.value;
-            attacker.currentHealth = attacker.currentHealth + healAmount > attacker.maxHealth 
-                ? attacker.maxHealth 
-                : attacker.currentHealth + healAmount;
-        }
-        
-        if (attackerTotalDamage >= defender.currentHealth) {
-            return (true, attackerTotalDamage, defenderTotalDamage, attackerSkillName, "");
-        }
-        
-        if (defenderSkill.skillType == SkillType.Attack) {
-            defenderTotalDamage = (defenderTotalDamage * defenderSkill.value) / 100;
-        } else if (defenderSkill.skillType == SkillType.Defense) {
-            attackerTotalDamage = (attackerTotalDamage * (100 - defenderSkill.value)) / 100;
-        } else if (defenderSkill.skillType == SkillType.Heal) {
-            uint256 healAmount = defenderSkill.value;
-            defender.currentHealth = defender.currentHealth + healAmount > defender.maxHealth 
-                ? defender.maxHealth 
-                : defender.currentHealth + healAmount;
+        if (attackerFirst) {
+            if (calculateDodgeChance(attacker.speed, defender.speed)) {
+                defenderDodged = true;
+                attackerTotalDamage = 0;
+            }
+            
+            if (!defenderDodged && attackerSkill.skillType == SkillType.Attack) {
+                attackerTotalDamage = (attackerTotalDamage * attackerSkill.value) / 100;
+            } else if (!defenderDodged && attackerSkill.skillType == SkillType.Defense) {
+                defenderTotalDamage = (defenderTotalDamage * (100 - attackerSkill.value)) / 100;
+            } else if (!defenderDodged && attackerSkill.skillType == SkillType.Heal) {
+                uint256 healAmount = attackerSkill.value;
+                attacker.currentHealth = attacker.currentHealth + healAmount > attacker.maxHealth 
+                    ? attacker.maxHealth 
+                    : attacker.currentHealth + healAmount;
+            }
+            
+            if (attackerTotalDamage >= defender.currentHealth) {
+                return (true, attackerTotalDamage, 0, attackerSkillName, "", defenderDodged, false);
+            }
+            
+            if (calculateDodgeChance(defender.speed, attacker.speed)) {
+                attackerDodged = true;
+                defenderTotalDamage = 0;
+            }
+            
+            if (!attackerDodged && defenderSkill.skillType == SkillType.Attack) {
+                defenderTotalDamage = (defenderTotalDamage * defenderSkill.value) / 100;
+            } else if (!attackerDodged && defenderSkill.skillType == SkillType.Defense) {
+                attackerTotalDamage = (attackerTotalDamage * (100 - defenderSkill.value)) / 100;
+            } else if (!attackerDodged && defenderSkill.skillType == SkillType.Heal) {
+                uint256 healAmount = defenderSkill.value;
+                defender.currentHealth = defender.currentHealth + healAmount > defender.maxHealth 
+                    ? defender.maxHealth 
+                    : defender.currentHealth + healAmount;
+            }
+        } else {
+            if (calculateDodgeChance(defender.speed, attacker.speed)) {
+                attackerDodged = true;
+                defenderTotalDamage = 0;
+            }
+            
+            if (!attackerDodged && defenderSkill.skillType == SkillType.Attack) {
+                defenderTotalDamage = (defenderTotalDamage * defenderSkill.value) / 100;
+            } else if (!attackerDodged && defenderSkill.skillType == SkillType.Defense) {
+                attackerTotalDamage = (attackerTotalDamage * (100 - defenderSkill.value)) / 100;
+            } else if (!attackerDodged && defenderSkill.skillType == SkillType.Heal) {
+                uint256 healAmount = defenderSkill.value;
+                defender.currentHealth = defender.currentHealth + healAmount > defender.maxHealth 
+                    ? defender.maxHealth 
+                    : defender.currentHealth + healAmount;
+            }
+            
+            if (defenderTotalDamage >= attacker.currentHealth) {
+                return (false, 0, defenderTotalDamage, "", defenderSkillName, false, attackerDodged);
+            }
+            
+            if (calculateDodgeChance(attacker.speed, defender.speed)) {
+                defenderDodged = true;
+                attackerTotalDamage = 0;
+            }
+            
+            if (!defenderDodged && attackerSkill.skillType == SkillType.Attack) {
+                attackerTotalDamage = (attackerTotalDamage * attackerSkill.value) / 100;
+            } else if (!defenderDodged && attackerSkill.skillType == SkillType.Defense) {
+                defenderTotalDamage = (defenderTotalDamage * (100 - attackerSkill.value)) / 100;
+            } else if (!defenderDodged && attackerSkill.skillType == SkillType.Heal) {
+                uint256 healAmount = attackerSkill.value;
+                attacker.currentHealth = attacker.currentHealth + healAmount > attacker.maxHealth 
+                    ? attacker.maxHealth 
+                    : attacker.currentHealth + healAmount;
+            }
         }
         
         bool attackerWon = attackerTotalDamage >= defender.currentHealth && defenderTotalDamage < attacker.currentHealth;
         
-        return (attackerWon, attackerTotalDamage, defenderTotalDamage, attackerSkillName, attackerWon ? "" : defenderSkillName);
+        return (attackerWon, attackerTotalDamage, defenderTotalDamage, attackerSkillName, attackerWon ? "" : defenderSkillName, attackerDodged, defenderDodged);
     }
     
     function _getTokenInfo(uint256 tokenId) internal view returns (uint256, uint8) {
@@ -331,6 +441,8 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
             (uint256 attackerType, uint8 attackerLevel) = _getTokenInfo(attackerTokens[i]);
             (uint256 defenderType, uint8 defenderLevel) = _getTokenInfo(defenderTokens[i]);
+            uint256 attackerZodiac = getZodiacIndex(attackerType);
+            uint256 defenderZodiac = getZodiacIndex(defenderType);
             
             attackerTeam[i] = NFTStatus({
                 currentHealth: calculateHealth(attackerLevel),
@@ -338,9 +450,10 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
                 level: attackerLevel,
                 tokenId: attackerTokens[i],
                 element: getElementFromTokenType(attackerType),
-                zodiac: getZodiacIndex(attackerType),
+                zodiac: attackerZodiac,
                 isFrontRow: i < FRONT_ROW_SIZE,
-                isAlive: true
+                isAlive: true,
+                speed: zodiacSpeed[attackerZodiac]
             });
             
             defenderTeam[i] = NFTStatus({
@@ -349,9 +462,10 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
                 level: defenderLevel,
                 tokenId: defenderTokens[i],
                 element: getElementFromTokenType(defenderType),
-                zodiac: getZodiacIndex(defenderType),
+                zodiac: defenderZodiac,
                 isFrontRow: i < FRONT_ROW_SIZE,
-                isAlive: true
+                isAlive: true,
+                speed: zodiacSpeed[defenderZodiac]
             });
         }
         
@@ -364,7 +478,8 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
             uint256 targetIndex = _findTarget(defenderTeam, attackerTeam[i].isFrontRow);
             if (targetIndex == type(uint256).max) continue;
             
-            (bool attackerWon, , , , ) = _singleBattle(attackerTeam[i], defenderTeam[targetIndex]);
+            bool attackerFirst = attackerTeam[i].speed >= defenderTeam[targetIndex].speed;
+            (bool attackerWon, , , , , , ) = _singleBattle(attackerTeam[i], defenderTeam[targetIndex], attackerFirst);
             
             if (attackerWon) {
                 attackerWins++;
@@ -380,5 +495,13 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     
     function getBattleResult(uint256 battleId) public view returns (BattleResult memory) {
         return battleHistory[battleId];
+    }
+    
+    function getZodiacSpeedTable() external view returns (uint256[12] memory) {
+        uint256[12] memory speeds;
+        for (uint256 i = 0; i < 12; i++) {
+            speeds[i] = zodiacSpeed[i];
+        }
+        return speeds;
     }
 }

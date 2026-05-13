@@ -97,10 +97,19 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
         userWeightCache[user] = weight;
     }
 
+    function _getLevelWeight(uint8 level) internal pure returns (uint256) {
+        if (level == 1) return 1;
+        if (level == 2) return 2;
+        if (level == 3) return 4;
+        if (level == 4) return 12;
+        if (level == 5) return 48;
+        return 0;
+    }
+
     /** @dev 统一的权重更新函数（由NFTMint、NFTUpdate等调用） */
     function updateUserWeight(address user, uint8 level, bool add) external override onlyAuthorized {
         uint256 currentWeight = userWeightCache[user];
-        uint256 weightDelta = level + 3;
+        uint256 weightDelta = _getLevelWeight(level);
         if (add) {
             userWeightCache[user] = currentWeight + weightDelta;
         } else {
@@ -110,7 +119,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
 
     /**
      * @dev 直接计算用户权重（遍历所有NFT）
-     * 权重 = 每个NFT的等级 + 3 的总和
+     * 权重规则：1阶=1, 2阶=2, 3阶=4, 4阶=12, 5阶=48
      * 用于精确计算用户权重，解决缓存不一致问题
      * @param user 用户地址
      * @return 用户权重
@@ -120,7 +129,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
         uint256 totalWeight = 0;
         for (uint256 i = 0; i < tokens.length; i++) {
             uint8 level = tokenLevel[tokens[i]];
-            totalWeight += uint256(level) + 3;
+            totalWeight += _getLevelWeight(level);
         }
         return totalWeight;
     }
