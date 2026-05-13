@@ -45,7 +45,9 @@ window.contractAddresses = {
     nftUpdate: '0x0000000000000000000000000000000000000000', // NFTUpdate合约地址（需部署后填写）
     nftTrading: '0x97fFAb23e26b45F8bab80E4A64Ac51369f4Ff5E4', // NFTTrading代理合约地址
     breeding: '0x0000000000000000000000000000000000000000', // Breeding合约地址（需部署后填写）
-    staking: '0x0000000000000000000000000000000000000000' // Staking合约地址（需部署后填写）
+    staking: '0x0000000000000000000000000000000000000000', // Staking合约地址（需部署后填写）
+    battle: '0x0000000000000000000000000000000000000000', // Battle合约地址（需部署后填写）
+    arena: '0x0000000000000000000000000000000000000000' // ArenaRanking合约地址（需部署后填写）
 };
 
 // 单独地址变量
@@ -2121,4 +2123,47 @@ window.stakingABI = [
 		"stateMutability": "view",
 		"type": "function"
 	}
+];
+
+// Battle合约ABI
+window.battleABI = [
+	{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
+	{"inputs":[{"internalType":"address","name":"_nftContract","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"baseDamage","type":"uint256"},{"internalType":"enum Battle.Element","name":"attackerElement","type":"uint8"},{"internalType":"enum Battle.Element","name":"defenderElement","type":"uint8"}],"name":"calculateDamage","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"pure","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tokenType","type":"uint256"}],"name":"getElementFromTokenType","outputs":[{"internalType":"enum Battle.Element","name":"","type":"uint8"}],"stateMutability":"pure","type":"function"},
+	{"inputs":[],"name":"nftContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"attackerTokenId","type":"uint256"},{"internalType":"address","name":"defender","type":"address"},{"internalType":"uint256","name":"defenderTokenId","type":"uint256"}],"name":"battle","outputs":[{"internalType":"bool","name":"","type":"bool"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"attackerTokenId","type":"uint256"},{"internalType":"uint256","name":"defenderTokenId","type":"uint256"}],"name":"simulateBattle","outputs":[{"internalType":"bool","name":"","type":"bool"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"_nftContract","type":"address"}],"name":"setNFTContract","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"newImplementation","type":"address"}],"name":"upgradeTo","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"newImplementation","type":"address"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"upgradeToAndCall","outputs":[],"stateMutability":"payable","type":"function"}
+];
+
+// ArenaRanking合约ABI
+window.arenaABI = [
+	{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},
+	{"inputs":[{"internalType":"address","name":"_battleContract","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"currentSeason","outputs":[{"internalType":"uint256","name":"seasonNumber","type":"uint256"},{"internalType":"uint256","name":"startTime","type":"uint256"},{"internalType":"uint256","name":"endTime","type":"uint256"},{"internalType":"bool","name":"isActive","type":"bool"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"rank","type":"uint256"}],"name":"calculateRewardForRank","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"seasonNumber","type":"uint256"}],"name":"calculateSeasonRewards","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"defender","type":"address"},{"internalType":"uint256","name":"attackerTokenId","type":"uint256"},{"internalType":"uint256","name":"defenderTokenId","type":"uint256"}],"name":"challenge","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"seasonNumber","type":"uint256"}],"name":"claimReward","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"seasonNumber","type":"uint256"}],"name":"getPendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"getPendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"getPlayerRank","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"limit","type":"uint256"}],"name":"getTopPlayers","outputs":[{"internalType":"address[]","name":"","type":"address[]"}],"stateMutability":"view","type":"function"},
+	{"inputs":[],"name":"battleContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"players","outputs":[{"internalType":"uint256","name":"points","type":"uint256"},{"internalType":"uint256","name":"wins","type":"uint256"},{"internalType":"uint256","name":"losses","type":"uint256"},{"internalType":"uint256","name":"lastBattleTime","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"seasonNumber","type":"uint256"}],"name":"seasons","outputs":[{"internalType":"uint256","name":"seasonNumber","type":"uint256"},{"internalType":"uint256","name":"startTime","type":"uint256"},{"internalType":"uint256","name":"endTime","type":"uint256"},{"internalType":"bool","name":"isActive","type":"bool"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"seasonNumber","type":"uint256"}],"name":"startNewSeason","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"_battleContract","type":"address"}],"name":"setBattleContract","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256[10]","name":"rewards","type":"uint256[10]"}],"name":"setTop10Rewards","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"tier","type":"uint256"},{"internalType":"uint256","name":"reward","type":"uint256"}],"name":"setTieredRewards","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"totalPlayers","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"withdrawBNB","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"newImplementation","type":"address"}],"name":"upgradeTo","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"address","name":"newImplementation","type":"address"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"upgradeToAndCall","outputs":[],"stateMutability":"payable","type":"function"},
+	{"inputs":[],"stateMutability":"payable","type":"receive"}
 ];

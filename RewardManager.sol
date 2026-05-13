@@ -56,20 +56,37 @@ contract RewardManager is
     address public royaltyWallet;
     /** @dev 版税比例（默认500 = 5%） */
     uint256 public royaltyFee = 500;
-    /** @dev 用户分红比例（7500 = 75%）*/
-    uint256 public constant USER_SHARE = 7500;
-    /** @dev 所有者分红比例（2500 = 25%）*/
-    uint256 public constant OWNER_SHARE = 2500;
+    /** @dev 用户分红比例（4500 = 45%）*/
+    uint256 public constant DIVIDEND_RATIO = 4500;
+    /** @dev 合约所有者比例（500 = 5%）*/
+    uint256 public constant OWNER_RATIO = 500;
+    /** @dev NFT质押矿池比例（2500 = 25%）*/
+    uint256 public constant NFT_STAKING_RATIO = 2500;
+    /** @dev 竞技场奖励矿池比例（1500 = 15%）*/
+    uint256 public constant ARENA_RATIO = 1500;
+    /** @dev 代币质押矿池比例（1000 = 10%）*/
+    uint256 public constant TOKEN_STAKING_RATIO = 1000;
+    
     /** @dev 所有者资金池 */
     uint256 public ownerPool;
+    /** @dev NFT质押矿池 */
+    uint256 public nftStakingPool;
+    /** @dev 竞技场奖励矿池 */
+    uint256 public arenaPool;
+    /** @dev 代币质押矿池 */
+    uint256 public tokenStakingPool;
     /** @dev 分红池最大容量（1000 ETH/BNB）*/
     uint256 public constant MAX_DIVIDEND_POOL = 1000 ether;
     /** @dev 自动兑换阈值（达到此金额自动兑换）*/
     uint256 public autoSwapThreshold = 0.01 ether;
     /** @dev 代币合约地址 */
     address public rewardToken;
-    /** @dev 质押合约地址 */
+    /** @dev NFT质押合约地址 */
     address public stakingContract;
+    /** @dev 代币质押合约地址 */
+    address public tokenStakingContract;
+    /** @dev 竞技场合约地址 */
+    address public arenaContract;
     /** @dev SwapRouter 地址（PancakeSwap V2 Router）*/
     address public swapRouter = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
     /** @dev PancakeFactory 地址（用于检测交易池）*/
@@ -266,6 +283,8 @@ contract RewardManager is
         address _authorizer,
         address _rewardToken,
         address _stakingContract,
+        address _tokenStakingContract,
+        address _arenaContract,
         address _swapRouter
     ) external initializer nonZeroAddress(initialOwner) nonZeroAddress(_operator) nonZeroAddress(_nftContract) {
         __UUPSUpgradeable_init();
@@ -280,6 +299,8 @@ contract RewardManager is
         authorizer = _authorizer;
         rewardToken = _rewardToken;
         stakingContract = _stakingContract;
+        tokenStakingContract = _tokenStakingContract;
+        arenaContract = _arenaContract;
         swapRouter = _swapRouter;
         ownerWeight = minOwnerWeight;
         totalWeight = ownerWeight;
@@ -423,6 +444,14 @@ contract RewardManager is
 
     function setStakingContract(address _stakingContract) external onlyOwner nonZeroAddress(_stakingContract) {
         stakingContract = _stakingContract;
+    }
+
+    function setTokenStakingContract(address _tokenStakingContract) external onlyOwner nonZeroAddress(_tokenStakingContract) {
+        tokenStakingContract = _tokenStakingContract;
+    }
+
+    function setArenaContract(address _arenaContract) external onlyOwner nonZeroAddress(_arenaContract) {
+        arenaContract = _arenaContract;
     }
 
     function setSwapRouter(address _swapRouter) external onlyOwner nonZeroAddress(_swapRouter) {
@@ -787,23 +816,33 @@ contract RewardManager is
     receive() external payable {
         require(msg.value > 0, "RewardManager: Cannot deposit zero value");
         
-        uint256 userDividend = (msg.value * USER_SHARE) / 10000;
-        uint256 ownerDividend = (msg.value * OWNER_SHARE) / 10000;
+        uint256 dividendAmount = (msg.value * DIVIDEND_RATIO) / 10000;
+        uint256 ownerAmount = (msg.value * OWNER_RATIO) / 10000;
+        uint256 nftStakingAmount = (msg.value * NFT_STAKING_RATIO) / 10000;
+        uint256 arenaAmount = (msg.value * ARENA_RATIO) / 10000;
+        uint256 tokenStakingAmount = (msg.value * TOKEN_STAKING_RATIO) / 10000;
         
-        require(dividendPool + userDividend <= MAX_DIVIDEND_POOL, 
+        require(dividendPool + dividendAmount <= MAX_DIVIDEND_POOL, 
             "RewardManager: Dividend pool would exceed maximum capacity");
-        require(ownerPool + ownerDividend <= MAX_DIVIDEND_POOL, 
+        require(ownerPool + ownerAmount <= MAX_DIVIDEND_POOL, 
             "RewardManager: Owner pool would exceed maximum capacity");
+        require(nftStakingPool + nftStakingAmount <= MAX_DIVIDEND_POOL, 
+            "RewardManager: NFT staking pool would exceed maximum capacity");
+        require(arenaPool + arenaAmount <= MAX_DIVIDEND_POOL, 
+            "RewardManager: Arena pool would exceed maximum capacity");
+        require(tokenStakingPool + tokenStakingAmount <= MAX_DIVIDEND_POOL, 
+            "RewardManager: Token staking pool would exceed maximum capacity");
         
         unchecked { 
-            dividendPool += userDividend;
-            ownerPool += ownerDividend;
+            dividendPool += dividendAmount;
+            ownerPool += ownerAmount;
+            nftStakingPool += nftStakingAmount;
+            arenaPool += arenaAmount;
+            tokenStakingPool += tokenStakingAmount;
         }
         emit DividendDeposited(msg.value, msg.sender, block.timestamp);
         
-        if (ownerPool >= autoSwapThreshold && rewardToken != address(0) && stakingContract != address(0) && swapRouter != address(0)) {
-            _tryAutoSwapAndStake();
-        }
+        _processPools();
     }
 
     function _hasLiquidityPool() internal view returns (bool) {
@@ -815,13 +854,10 @@ contract RewardManager is
         return pair != address(0);
     }
 
-    function _tryAutoSwapAndStake() internal {
+    function _tryAutoSwapAndStake(uint256 amount, address targetContract) internal {
         if (!_hasLiquidityPool()) {
             return;
         }
-        
-        uint256 amount = ownerPool;
-        ownerPool = 0;
         
         address[] memory path = new address[](2);
         path[0] = address(0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c);
@@ -837,23 +873,42 @@ contract RewardManager is
         ) returns (uint256[] memory amounts) {
             uint256 tokenAmount = amounts[1];
             if (tokenAmount > 0) {
-                IERC20(rewardToken).approve(stakingContract, tokenAmount);
-                IStakingContract(stakingContract).depositToken(tokenAmount);
-            } else {
-                ownerPool += amount;
+                IERC20(rewardToken).approve(targetContract, tokenAmount);
+                IStakingContract(targetContract).depositToken(tokenAmount);
             }
         } catch {
-            ownerPool += amount;
         }
     }
 
-    function manualSwapAndStake() external onlyOwner nonReentrant whenNotPaused {
-        require(ownerPool > 0, "RM: no owner pool balance");
-        require(rewardToken != address(0), "RM: reward token not set");
-        require(stakingContract != address(0), "RM: staking contract not set");
-        require(swapRouter != address(0), "RM: swap router not set");
+    function _processPools() internal {
+        if (nftStakingPool >= autoSwapThreshold && rewardToken != address(0) && 
+            stakingContract != address(0) && swapRouter != address(0)) {
+            uint256 amount = nftStakingPool;
+            nftStakingPool = 0;
+            _tryAutoSwapAndStake(amount, stakingContract);
+        }
         
-        _tryAutoSwapAndStake();
+        if (arenaPool >= autoSwapThreshold && arenaContract != address(0)) {
+            uint256 amount = arenaPool;
+            arenaPool = 0;
+            (bool success, ) = payable(arenaContract).call{value: amount}("");
+            if (!success) {
+                arenaPool += amount;
+            }
+        }
+        
+        if (tokenStakingPool >= autoSwapThreshold && tokenStakingContract != address(0)) {
+            uint256 amount = tokenStakingPool;
+            tokenStakingPool = 0;
+            (bool success, ) = payable(tokenStakingContract).call{value: amount}("");
+            if (!success) {
+                tokenStakingPool += amount;
+            }
+        }
+    }
+
+    function manualProcessPools() external onlyOwner nonReentrant whenNotPaused {
+        _processPools();
     }
 
     /**
@@ -861,9 +916,10 @@ contract RewardManager is
      */
     function withdrawExtraFunds() external onlyOwner nonReentrant whenNotPaused {
         uint256 contractBalance = address(this).balance;
-        uint256 extraFunds = contractBalance - dividendPool - ownerPool;
+        uint256 totalPools = dividendPool + ownerPool + nftStakingPool + arenaPool + tokenStakingPool;
+        uint256 extraFunds = contractBalance - totalPools;
         require(extraFunds > 0, "RM: no extra funds to withdraw");
-        require(contractBalance >= dividendPool + ownerPool, "RM: insufficient balance for dividend and owner pool");
+        require(contractBalance >= totalPools, "RM: insufficient balance for pools");
 
         emit ExtraFundsWithdrawn(owner(), extraFunds, block.timestamp);
         (bool success, ) = payable(owner()).call{value: extraFunds}("");

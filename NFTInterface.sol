@@ -183,3 +183,18 @@ interface IERC20 {
     function approve(address spender, uint256 amount) external returns (bool);
     function balanceOf(address account) external view returns (uint256);
 }
+
+interface ITokenStaking {
+    function stakeTokens(uint256 amount) external;
+    function unstakeTokens(uint256 amount) external;
+    function claimRewards() external;
+    function withdrawBNB(uint256 amount) external;
+    function getContractBNBBalance() external view returns (uint256);
+    function getContractTokenBalance() external view returns (uint256);
+    function getUserStake(address user) external view returns (NFTDataTypes.NFTInfo memory);
+    function getTotalStaked() external view returns (uint256);
+}
+
+interface IArenaRanking {
+    function isNFTInArena(uint256 tokenId) external view returns (bool);
+}

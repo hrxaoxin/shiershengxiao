@@ -48,6 +48,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
     address public tokenContract;
     /** @dev 授权合约地址 */
     address public authorizer;
+    /** @dev 竞技场排名合约地址 */
+    address public arenaRankingContract;
 
     /** @dev 当前质押的NFT总数量 */
     uint256 public totalStakedNFTs;
@@ -148,6 +150,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
 
         uint8 level = INFTMint(nftContract).tokenLevel(tokenId);
         require(level >= MIN_STAKING_LEVEL, "NFT level too low");
+
+        if (arenaRankingContract != address(0)) {
+            require(!IArenaRanking(arenaRankingContract).isNFTInArena(tokenId), 
+                    "Staking: NFT is in arena team");
+        }
 
         userStakes[msg.sender].push(StakeInfo({
             tokenId: tokenId,
@@ -350,6 +357,10 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
      */
     function setAuthorizer(address _authorizer) external onlyOwner {
         authorizer = _authorizer;
+    }
+
+    function setArenaRankingContract(address _arenaRankingContract) external onlyOwner {
+        arenaRankingContract = _arenaRankingContract;
     }
 
     function setDailyReleaseRatio(uint256 _ratio) external onlyOwner {

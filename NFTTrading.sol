@@ -42,6 +42,7 @@ contract NFTTrading is
 
     // ========== 关键修复1：添加缺失的_authorizer状态变量 ==========
     address private _authorizer; // 授权合约地址
+    address private _royaltyWallet; // 手续费接收钱包地址
 
     // 核心状态变量
     address private _nftContract;          // NFT合约地址（封装）
@@ -91,7 +92,8 @@ contract NFTTrading is
         address nftContract, 
         address rewardManager, 
         address authorizer,
-        uint256 maxListingPriceBNB
+        uint256 maxListingPriceBNB,
+        address royaltyWallet
     ) external initializer {
         // UUPSUpgradeable应优先初始化，确保代理上下文正确
         __UUPSUpgradeable_init();
@@ -111,6 +113,7 @@ contract NFTTrading is
         _maxListingPriceBNB = maxListingPriceBNB;
         _maxListingPrice = _bnbToWei(maxListingPriceBNB);
         _authorizer = authorizer;
+        _royaltyWallet = royaltyWallet;
     }
 
     // UUPS升级授权（增强校验+添加view修饰符消除警告）
@@ -311,8 +314,7 @@ contract NFTTrading is
         
         uint256 feeBNB = _weiToBnbWithDecimals(feeWEI);
 
-        IRewardManager rm = IRewardManager(_rewardManager);
-        address royaltyWallet = rm.royaltyWallet();
+        address royaltyWallet = _royaltyWallet;
         if (royaltyWallet == address(0)) {
             royaltyWallet = owner();
         }
@@ -492,6 +494,23 @@ contract NFTTrading is
         _authorizer = authorizer;
         // ========== 关键修复4：添加事件发射 ==========
         emit AuthorizerUpdated(oldAuthorizer, authorizer, block.timestamp, block.number);
+    }
+
+    /**
+     * @dev 管理员功能：设置手续费接收钱包地址
+     * @param wallet 手续费接收钱包地址
+     */
+    function setRoyaltyWallet(address wallet) external onlyOwner {
+        require(wallet != address(0), "NFTTrading: invalid royalty wallet");
+        _royaltyWallet = wallet;
+    }
+
+    /**
+     * @dev 获取手续费接收钱包地址
+     * @return 手续费接收钱包地址
+     */
+    function getRoyaltyWallet() external view returns (address) {
+        return _royaltyWallet;
     }
 
     // 修复：添加可配置最大上架价格
