@@ -1200,22 +1200,25 @@
             }
         }
 
+        const IPFS_BASE_1 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/';
+        const IPFS_BASE_2 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/';
+        
         const mockOpponents = [
             { address: '0x1234...5678', team: [
-                { name: '火龙', level: 5, element: 'Fire', zodiacIndex: 4, emoji: '🐉', skill: ZODIAC_SKILLS[4] },
-                { name: '风虎', level: 4, element: 'Wind', zodiacIndex: 2, emoji: '🐅', skill: ZODIAC_SKILLS[2] },
-                { name: '水兔', level: 5, element: 'Water', zodiacIndex: 3, emoji: '🐇', skill: ZODIAC_SKILLS[3] },
-                { name: '光鸡', level: 4, element: 'Light', zodiacIndex: 9, emoji: '🐓', skill: ZODIAC_SKILLS[9] },
-                { name: '暗狗', level: 3, element: 'Dark', zodiacIndex: 10, emoji: '🐕', skill: ZODIAC_SKILLS[10] },
-                { name: '火蛇', level: 3, element: 'Fire', zodiacIndex: 5, emoji: '🐍', skill: ZODIAC_SKILLS[5] }
+                { name: '火龙', level: 5, element: 'Fire', zodiacIndex: 4, emoji: '🐉', skill: ZODIAC_SKILLS[4], imagePath: `${IPFS_BASE_1}huolong_1.png` },
+                { name: '风虎', level: 4, element: 'Wind', zodiacIndex: 2, emoji: '🐅', skill: ZODIAC_SKILLS[2], imagePath: `${IPFS_BASE_1}fenghu_1.png` },
+                { name: '水兔', level: 5, element: 'Water', zodiacIndex: 3, emoji: '🐇', skill: ZODIAC_SKILLS[3], imagePath: `${IPFS_BASE_1}shuitu_1.png` },
+                { name: '光鸡', level: 4, element: 'Light', zodiacIndex: 9, emoji: '🐓', skill: ZODIAC_SKILLS[9], imagePath: `${IPFS_BASE_2}guangji_1.png` },
+                { name: '暗狗', level: 3, element: 'Dark', zodiacIndex: 10, emoji: '🐕', skill: ZODIAC_SKILLS[10], imagePath: `${IPFS_BASE_2}angou_1.png` },
+                { name: '火蛇', level: 3, element: 'Fire', zodiacIndex: 5, emoji: '🐍', skill: ZODIAC_SKILLS[5], imagePath: `${IPFS_BASE_1}huoshe_1.png` }
             ]},
             { address: '0x2345...6789', team: [
-                { name: '风马', level: 4, element: 'Wind', zodiacIndex: 6, emoji: '🐎', skill: ZODIAC_SKILLS[6] },
-                { name: '水牛', level: 5, element: 'Water', zodiacIndex: 1, emoji: '🐂', skill: ZODIAC_SKILLS[1] },
-                { name: '光猪', level: 4, element: 'Light', zodiacIndex: 11, emoji: '🐷', skill: ZODIAC_SKILLS[11] },
-                { name: '暗鼠', level: 3, element: 'Dark', zodiacIndex: 0, emoji: '🐀', skill: ZODIAC_SKILLS[0] },
-                { name: '火龙', level: 3, element: 'Fire', zodiacIndex: 4, emoji: '🐉', skill: ZODIAC_SKILLS[4] },
-                { name: '风虎', level: 2, element: 'Wind', zodiacIndex: 2, emoji: '🐅', skill: ZODIAC_SKILLS[2] }
+                { name: '风马', level: 4, element: 'Wind', zodiacIndex: 6, emoji: '🐎', skill: ZODIAC_SKILLS[6], imagePath: `${IPFS_BASE_1}fengma_1.png` },
+                { name: '水牛', level: 5, element: 'Water', zodiacIndex: 1, emoji: '🐂', skill: ZODIAC_SKILLS[1], imagePath: `${IPFS_BASE_1}shuiniu_1.png` },
+                { name: '光猪', level: 4, element: 'Light', zodiacIndex: 11, emoji: '🐷', skill: ZODIAC_SKILLS[11], imagePath: `${IPFS_BASE_2}guangzhu_1.png` },
+                { name: '暗鼠', level: 3, element: 'Dark', zodiacIndex: 0, emoji: '🐀', skill: ZODIAC_SKILLS[0], imagePath: `${IPFS_BASE_2}anshu_1.png` },
+                { name: '火龙', level: 3, element: 'Fire', zodiacIndex: 4, emoji: '🐉', skill: ZODIAC_SKILLS[4], imagePath: `${IPFS_BASE_1}huolong_1.png` },
+                { name: '风虎', level: 2, element: 'Wind', zodiacIndex: 2, emoji: '🐅', skill: ZODIAC_SKILLS[2], imagePath: `${IPFS_BASE_1}fenghu_1.png` }
             ]}
         ];
 
@@ -1232,7 +1235,7 @@
                     <div class="grid grid-cols-3 gap-2">
                         ${opponent.team.slice(0, 3).map((nft, i) => `
                             <div class="text-center p-2 bg-green-500/20 rounded-lg">
-                                <div class="text-2xl mb-1">${nft.emoji}</div>
+                                <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-white text-xs">${nft.name}</div>
                                 <div class="text-gray-400 text-xs">Lv.${nft.level}</div>
                             </div>
@@ -1241,7 +1244,7 @@
                     <div class="grid grid-cols-3 gap-2">
                         ${opponent.team.slice(3, 6).map((nft, i) => `
                             <div class="text-center p-2 bg-purple-500/20 rounded-lg">
-                                <div class="text-2xl mb-1">${nft.emoji}</div>
+                                <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-white text-xs">${nft.name}</div>
                                 <div class="text-gray-400 text-xs">Lv.${nft.level}</div>
                             </div>
@@ -1278,7 +1281,7 @@
                 const slot = document.getElementById(`attacker${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
                 if (slot && nft) {
                     slot.innerHTML = `
-                        <div class="text-3xl mb-1">${ZODIAC_EMOJIS[nft.zodiacIndex]}</div>
+                        <img src="${nft.imagePath}" alt="${nft.name}" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                         <div class="text-xs text-gray-300">${nft.name}</div>
                         <div class="text-xs text-gray-500">Lv.${nft.level}</div>
                     `;
@@ -1289,7 +1292,7 @@
                 const slot = document.getElementById(`defender${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
                 if (slot && nft) {
                     slot.innerHTML = `
-                        <div class="text-3xl mb-1">${nft.emoji}</div>
+                        <img src="${nft.imagePath}" alt="${nft.name}" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                         <div class="text-xs text-gray-300">${nft.name}</div>
                         <div class="text-xs text-gray-500">Lv.${nft.level}</div>
                     `;
