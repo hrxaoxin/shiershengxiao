@@ -33,7 +33,8 @@ contract RewardManager is
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
-    IERC2981
+    IERC2981,
+    IRewardManager
 {
     /** @dev 合约版本号 */
     uint256 public constant VERSION = 2;

@@ -185,70 +185,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @dev Breeding合约扩展接口（用于批量设置合约关联）
-     */
-    interface IBreedingExt {
-        function setNFTContract(address nftContract) external;
-        function setArenaRankingContract(address arenaRankingContract) external;
-        function setAuthorizer(address authorizer) external;
-    }
-
-    /**
-     * @dev Staking合约扩展接口（用于批量设置合约关联）
-     */
-    interface IStakingExt {
-        function setNFTContract(address nftContract) external;
-        function setTokenContract(address tokenContract) external;
-        function setAuthorizer(address authorizer) external;
-        function setArenaRankingContract(address arenaRankingContract) external;
-    }
-
-    /**
-     * @dev TokenStaking合约扩展接口（用于批量设置合约关联）
-     */
-    interface ITokenStakingExt {
-        function setTokenContract(address tokenContract) external;
-    }
-
-    /**
-     * @dev RewardManager合约扩展接口（用于批量设置合约关联）
-     */
-    interface IRewardManagerExt {
-        function setAuthorizedNFTContract(address nft, bool ok) external;
-        function setNFTContract(address _newNFTContract) external;
-        function setNFTDataContract(address _nftDataContract) external;
-        function setStakingContract(address _stakingContract) external;
-        function setTokenStakingContract(address _tokenStakingContract) external;
-        function setArenaContract(address _arenaContract) external;
-        function setAuthorizer(address _authorizer) external;
-    }
-
-    /**
-     * @dev NFTUpdate合约扩展接口（用于批量设置合约关联）
-     */
-    interface INFTUpdateExt {
-        function setNFTContract(address a) external;
-        function setMetadataContract(address a) external;
-        function setTokenContract(address a) external;
-        function setPancakeSwapPair(address pair) external;
-        function setAuthorizer(address a) external;
-    }
-
-    /**
-     * @dev Battle合约扩展接口（用于批量设置合约关联）
-     */
-    interface IBattleExt {
-        function setNFTContract(address _nftContract) external;
-    }
-
-    /**
-     * @dev ArenaRanking合约扩展接口（用于批量设置合约关联）
-     */
-    interface IArenaRankingExt {
-        function setBattleContract(address _battleContract) external;
-    }
-
-    /**
      * @dev 一键设置所有合约关联
      * 批量配置系统中所有合约的相互关联关系，简化部署流程
      * 
@@ -324,49 +260,49 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
         // 配置Breeding（可选）
         if (breeding != address(0)) {
-            IBreedingExt(breeding).setNFTContract(nftMint);
+            IBreeding(breeding).setNFTContract(nftMint);
             INFTMint(nftMint).setBreedingContract(breeding);
-            IBreedingExt(breeding).setAuthorizer(address(this));
+            IBreeding(breeding).setAuthorizer(address(this));
             if (arenaRanking != address(0)) {
-                IBreedingExt(breeding).setArenaRankingContract(arenaRanking);
+                IBreeding(breeding).setArenaRankingContract(arenaRanking);
             }
         }
 
         // 配置Staking（可选）
         if (staking != address(0)) {
-            IStakingExt(staking).setNFTContract(nftMint);
-            IStakingExt(staking).setTokenContract(tokenContract);
-            IStakingExt(staking).setAuthorizer(address(this));
+            IStaking(staking).setNFTContract(nftMint);
+            IStaking(staking).setTokenContract(tokenContract);
+            IStaking(staking).setAuthorizer(address(this));
             if (arenaRanking != address(0)) {
-                IStakingExt(staking).setArenaRankingContract(arenaRanking);
+                IStaking(staking).setArenaRankingContract(arenaRanking);
             }
         }
 
         // 配置NFTUpdate（可选）
         if (nftUpdate != address(0)) {
             INFTMint(nftMint).setNFTUpdateContract(nftUpdate);
-            INFTUpdateExt(nftUpdate).setNFTContract(nftMint);
-            INFTUpdateExt(nftUpdate).setMetadataContract(nftData);
-            INFTUpdateExt(nftUpdate).setTokenContract(tokenContract);
-            INFTUpdateExt(nftUpdate).setAuthorizer(address(this));
+            INFTUpdate(nftUpdate).setNFTContract(nftMint);
+            INFTUpdate(nftUpdate).setMetadataContract(nftData);
+            INFTUpdate(nftUpdate).setTokenContract(tokenContract);
+            INFTUpdate(nftUpdate).setAuthorizer(address(this));
             if (pancakeSwapPair != address(0)) {
-                INFTUpdateExt(nftUpdate).setPancakeSwapPair(pancakeSwapPair);
+                INFTUpdate(nftUpdate).setPancakeSwapPair(pancakeSwapPair);
             }
         }
 
         // 配置TokenStaking（可选）
         if (tokenStaking != address(0)) {
-            ITokenStakingExt(tokenStaking).setTokenContract(tokenContract);
+            ITokenStaking(tokenStaking).setTokenContract(tokenContract);
         }
 
         // 配置Battle（可选）
         if (battle != address(0)) {
-            IBattleExt(battle).setNFTContract(nftMint);
+            IBattle(battle).setNFTContract(nftMint);
         }
 
         // 配置ArenaRanking（可选）
         if (arenaRanking != address(0) && battle != address(0)) {
-            IArenaRankingExt(arenaRanking).setBattleContract(battle);
+            IArenaRanking(arenaRanking).setBattleContract(battle);
         }
     }
 }

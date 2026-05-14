@@ -12,7 +12,7 @@ import "./Battle.sol";
  * 管理赛季系统、玩家排名、挑战机制和奖励分发
  * 基于OpenZeppelin UUPS可升级合约实现
  */
-contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, IArenaRanking {
     /** @dev 战斗合约地址 */
     Battle public battleContract;
     /** @dev 授权合约地址 */

@@ -9,6 +9,7 @@ pragma solidity ^0.8.20;
  */
 import "./NFTData.sol";
 import "./NFTLib.sol";
+import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/ERC721Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/utils/ERC721HolderUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
@@ -19,87 +20,10 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/utils/Counters.sol";
 
 /**
- * @dev ITokenBurner接口：代币销毁合约接口
- */
-interface ITokenBurner {
-    /**
-     * @dev 销毁普通铸造费用的代币
-     * @return bool 是否成功
-     */
-    function burnTokenForMint() external returns (bool);
-    /**
-     * @dev 销毁稀有铸造费用的代币
-     * @return bool 是否成功
-     */
-    function burnTokenForRareMint() external returns (bool);
-    /**
-     * @dev 销毁代币并铸造
-     * @param user 用户地址
-     * @param isRare 是否稀有铸造
-     * @return bool 是否成功
-     */
-    function burnAndMint(address user, bool isRare) external returns (bool);
-    /**
-     * @dev 获取普通铸造费用
-     * @return uint256 费用
-     */
-    function normalMintCost() external view returns (uint256);
-    /**
-     * @dev 获取稀有铸造费用
-     * @return uint256 费用
-     */
-    function rareMintCost() external view returns (uint256);
-}
-
-/**
- * @dev IToken接口：ERC20代币接口
- */
-interface IToken {
-    /**
-     * @dev 转账
-     * @param from 转出地址
-     * @param to 转入地址
-     * @param amount 数量
-     * @return bool 是否成功
-     */
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    /**
-     * @dev 获取余额
-     * @param account 账户地址
-     * @return uint256 余额
-     */
-    function balanceOf(address account) external view returns (uint256);
-}
-
-/**
- * @dev IPriceOracle接口：价格预言机接口（保留兼容）
- */
-interface IPriceOracle {
-    function getTokenPriceInUSD() external view returns (uint256);
-    function getPriceTimestamp() external view returns (uint256);
-}
-
-/**
- * @dev IPancakeSwapPair接口：PancakeSwap流动性池接口
- */
-interface IPancakeSwapPair {
-    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-    function token0() external view returns (address);
-    function token1() external view returns (address);
-}
-
-/**
- * @dev IBEP20接口：BEP20代币接口
- */
-interface IBEP20 {
-    function decimals() external view returns (uint8);
-}
-
-/**
  * @title NFTMint
  * @dev 十二生肖NFT合约
  */
-contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, ERC721HolderUpgradeable {
+contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, ERC721HolderUpgradeable, INFTMint {
     using Counters for Counters.Counter;
     using NFTLib for uint256;
     using NFTLib for address;

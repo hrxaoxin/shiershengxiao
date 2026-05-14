@@ -12,7 +12,7 @@ import "./NFTInterface.sol";
  * @notice 战斗合约 - 实现6v6 NFT团队对战系统
  * @dev 支持五行相克、技能系统、闪避机制，包含120种独特技能（5属性×12生肖×2性别）
  */
-contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, IBattle {
     INFTMint public nftContract;
     address public authorizer;
     

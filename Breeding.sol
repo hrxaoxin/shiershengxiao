@@ -19,7 +19,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * - 繁殖时间：自繁殖12小时，市场繁殖24小时（可配置）
  * - 繁殖结果：产生一个新的NFT，属性继承自父母之一
  */
-contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable, IBreeding {
     /** @dev 最小繁殖等级（必须是5级NFT才能繁殖） */
     uint8 public constant MIN_BREEDING_LEVEL = 5;
     /** @dev 自繁殖时长（默认12小时）*/

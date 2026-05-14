@@ -302,19 +302,6 @@ interface INFTMint {
 }
 
 /**
- * @title INFTMintWeight
- * @dev NFT权重计算接口
- */
-interface INFTMintWeight {
-    /**
-     * @dev 获取用户权重缓存
-     * @param user 用户地址
-     * @return uint256 用户权重缓存值
-     */
-    function calcUserWeight(address user) external view returns (uint256);
-}
-
-/**
  * @title IRewardManager
  * @dev 奖励管理合约接口
  */
@@ -390,6 +377,30 @@ interface IRewardManager {
      * @param _nftDataContract NFT数据合约地址
      */
     function setNFTDataContract(address _nftDataContract) external;
+    
+    /**
+     * @dev 设置NFT质押合约地址
+     * @param _stakingContract 质押合约地址
+     */
+    function setStakingContract(address _stakingContract) external;
+    
+    /**
+     * @dev 设置代币质押合约地址
+     * @param _tokenStakingContract 代币质押合约地址
+     */
+    function setTokenStakingContract(address _tokenStakingContract) external;
+    
+    /**
+     * @dev 设置竞技场排名合约地址
+     * @param _arenaContract 竞技场合约地址
+     */
+    function setArenaContract(address _arenaContract) external;
+    
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 授权合约地址
+     */
+    function setAuthorizer(address _authorizer) external;
 }
 
 /**
@@ -713,6 +724,24 @@ interface IBreeding {
      * @return bool cancelled
      */
     function breedingOrders(uint256 orderId) external view returns (address, address, uint256, uint256, uint256, bool, bool);
+    
+    /**
+     * @dev 设置NFT合约地址
+     * @param nftContract NFT合约地址
+     */
+    function setNFTContract(address nftContract) external;
+    
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 授权合约地址
+     */
+    function setAuthorizer(address _authorizer) external;
+    
+    /**
+     * @dev 设置竞技场排名合约地址
+     * @param _arenaRankingContract 竞技场排名合约地址
+     */
+    function setArenaRankingContract(address _arenaRankingContract) external;
 }
 
 /**
@@ -731,6 +760,36 @@ interface IStaking {
      * @param tokenContract 代币合约地址
      */
     function setTokenContract(address tokenContract) external;
+    
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 授权合约地址
+     */
+    function setAuthorizer(address _authorizer) external;
+    
+    /**
+     * @dev 设置竞技场排名合约地址
+     * @param _arenaRankingContract 竞技场排名合约地址
+     */
+    function setArenaRankingContract(address _arenaRankingContract) external;
+}
+
+/**
+ * @title ITokenStaking
+ * @dev 代币质押合约接口
+ */
+interface ITokenStaking {
+    /**
+     * @dev 设置代币合约地址
+     * @param tokenContract 代币合约地址
+     */
+    function setTokenContract(address tokenContract) external;
+    
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external;
 }
 
 /**
@@ -788,6 +847,12 @@ interface INFTUpdate {
      * @param pair 流动性池地址
      */
     function setPancakeSwapPair(address pair) external;
+    
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external;
     
     /**
      * @dev 设置价格过期时间
@@ -965,6 +1030,24 @@ interface ITokenStaking {
  * @title IArenaRanking
  * @dev 竞技场排名合约接口
  */
+/**
+ * @title IBattle
+ * @dev 战斗合约接口
+ */
+interface IBattle {
+    /**
+     * @dev 设置NFT合约地址
+     * @param _nftContract NFT合约地址
+     */
+    function setNFTContract(address _nftContract) external;
+    
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external;
+}
+
 interface IArenaRanking {
     /**
      * @dev 检查NFT是否在竞技场中
@@ -972,4 +1055,16 @@ interface IArenaRanking {
      * @return bool 是否在竞技场中
      */
     function isNFTInArena(uint256 tokenId) external view returns (bool);
+    
+    /**
+     * @dev 设置战斗合约地址
+     * @param _battleContract 战斗合约地址
+     */
+    function setBattleContract(address _battleContract) external;
+    
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external;
 }

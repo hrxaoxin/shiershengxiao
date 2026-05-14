@@ -15,7 +15,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * 支持使用NFT、代币或USD价值升级NFT等级
  * 基于OpenZeppelin UUPS可升级合约实现
  */
-contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, INFTUpdate {
     using NFTLib for uint256;
     using NFTLib for address;
 
