@@ -99,7 +99,8 @@ window.ZODIAC_WEB3 = (function() {
             nftUpdate: window.nftUpdateABI,
             nftTrading: window.NFTTradingABI,
             breeding: window.breedingABI,
-            staking: window.stakingABI
+            staking: window.stakingABI,
+            tokenStaking: window.tokenStakingABI
         };
 
         const addresses = {
@@ -110,7 +111,8 @@ window.ZODIAC_WEB3 = (function() {
             nftUpdate: window.nftUpdateAddress,
             nftTrading: window.NFTTradingAddress,
             breeding: window.breedingAddress,
-            staking: window.stakingAddress
+            staking: window.stakingAddress,
+            tokenStaking: window.contractAddresses.tokenStaking
         };
 
         if (!abis[contractName]) {
