@@ -478,7 +478,18 @@
                 <div class="space-y-6">
                     <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
                         <h3 class="text-white font-semibold mb-4 flex items-center">
-                            <span class="mr-2">🏅</span> 排行榜
+                            <span class="mr-2">�</span> 赛季奖励池
+                        </h3>
+                        <div id="rewardPoolDisplay" class="text-center mb-4 p-4 bg-yellow-500/10 rounded-lg">
+                            <div class="text-yellow-400 text-2xl font-bold" id="rewardPoolAmount">--</div>
+                            <div class="text-gray-400 text-sm mt-1">ETH 总奖励</div>
+                            <div class="text-gray-500 text-xs mt-2" id="rewardRateInfo">奖励比例: --</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
+                        <h3 class="text-white font-semibold mb-4 flex items-center">
+                            <span class="mr-2">�</span> 排行榜
                         </h3>
                         <div id="leaderboard" class="space-y-3">
                             <div class="text-center text-gray-400 py-4">加载中...</div>
@@ -794,6 +805,7 @@
                     await loadRewards();
                     await loadMyTeam();
                     await loadRemainingAttempts();
+                    await loadRewardPool();
                 } catch (error) {
                     console.error('连接钱包失败:', error);
                     alert('连接钱包失败: ' + error.message);
@@ -1140,25 +1152,82 @@
             }
         }
 
+        async function loadRewardPool() {
+            try {
+                // 获取当前奖励池
+                let rewardPoolWei = '0';
+                try {
+                    rewardPoolWei = await arenaContract.methods.getCurrentRewardPool().call();
+                } catch (e) {
+                    // 如果没有这个方法，使用合约余额计算
+                    const balance = await web3.eth.getBalance(window.contractAddresses.arena);
+                    const rewardRate = await arenaContract.methods.seasonRewardRate().call();
+                    rewardPoolWei = (balance * rewardRate) / 10000;
+                }
+                
+                const rewardPoolEth = web3.utils.fromWei(rewardPoolWei, 'ether');
+                document.getElementById('rewardPoolAmount').textContent = parseFloat(rewardPoolEth) > 0 ? rewardPoolEth : '--';
+                
+                // 获取奖励比例
+                try {
+                    const rate = await arenaContract.methods.seasonRewardRate().call();
+                    const ratePercent = (rate / 100) + '%';
+                    document.getElementById('rewardRateInfo').textContent = `奖励比例: ${ratePercent} (赛季结束发放)`;
+                } catch (e) {
+                    document.getElementById('rewardRateInfo').textContent = '奖励比例: 0.2% (赛季结束发放)';
+                }
+            } catch (error) {
+                console.error('加载奖励池失败:', error);
+            }
+        }
+
         async function loadLeaderboard() {
             try {
+                // 获取排行榜数据
+                let leaderboardData = [];
+                try {
+                    leaderboardData = await arenaContract.methods.getLeaderboard(20).call();
+                } catch (e) {
+                    // 如果获取失败，使用模拟数据
+                    console.log('使用模拟数据');
+                }
+
                 const topPlayers = [];
-                for (let i = 0; i < 10; i++) {
-                    topPlayers.push({
-                        address: `0x${(1234 + i).toString(16).padStart(8, '0')}...${(5678 + i).toString(16).padStart(4, '0')}`,
-                        points: 15000 - i * 1500,
-                        wins: 45 - i * 3,
-                        losses: 12 + i * 2,
-                        rank: i + 1,
-                        team: [
-                            { name: ['火龙', '风虎', '水兔', '光鸡', '暗狗', '火蛇'][i % 6], level: Math.max(1, 5 - Math.floor(i / 2)), emoji: ZODIAC_EMOJIS[[4, 2, 3, 9, 10, 5][i % 6]] },
-                            { name: ['风马', '水牛', '光猪', '暗鼠', '火龙', '风虎'][i % 6], level: Math.max(1, 4 - Math.floor(i / 2)), emoji: ZODIAC_EMOJIS[[6, 1, 11, 0, 4, 2][i % 6]] },
-                            { name: ['水兔', '光鸡', '暗狗', '火蛇', '风马', '水牛'][i % 6], level: Math.max(1, 3 - Math.floor(i / 3)), emoji: ZODIAC_EMOJIS[[3, 9, 10, 5, 6, 1][i % 6]] },
-                            { name: ['光猪', '暗鼠', '火龙', '风虎', '水兔', '光鸡'][i % 6], level: Math.max(1, 3 - Math.floor(i / 3)), emoji: ZODIAC_EMOJIS[[11, 0, 4, 2, 3, 9][i % 6]] },
-                            { name: ['暗狗', '火蛇', '风马', '水牛', '光猪', '暗鼠'][i % 6], level: Math.max(1, 2 - Math.floor(i / 4)), emoji: ZODIAC_EMOJIS[[10, 5, 6, 1, 11, 0][i % 6]] },
-                            { name: ['火蛇', '风马', '水牛', '光猪', '暗鼠', '火龙'][i % 6], level: Math.max(1, 2 - Math.floor(i / 4)), emoji: ZODIAC_EMOJIS[[5, 6, 1, 11, 0, 4][i % 6]] }
-                        ]
-                    });
+                if (leaderboardData.length > 0) {
+                    for (let i = 0; i < leaderboardData.length; i++) {
+                        const player = leaderboardData[i];
+                        topPlayers.push({
+                            address: player.playerAddress,
+                            points: player.points,
+                            wins: player.wins,
+                            losses: player.losses,
+                            rank: i + 1,
+                            isMock: player.isMock
+                        });
+                    }
+                } else {
+                    // 使用模拟数据
+                    for (let i = 0; i < 10; i++) {
+                        topPlayers.push({
+                            address: `0x${(1234 + i).toString(16).padStart(8, '0')}...${(5678 + i).toString(16).padStart(4, '0')}`,
+                            points: 15000 - i * 1500,
+                            wins: 45 - i * 3,
+                            losses: 12 + i * 2,
+                            rank: i + 1,
+                            isMock: true
+                        });
+                    }
+                }
+                
+                // 获取每个排名的奖励
+                const rewards = [];
+                for (let i = 0; i < topPlayers.length; i++) {
+                    try {
+                        const rewardWei = await arenaContract.methods.getRewardForRank(topPlayers[i].rank).call();
+                        rewards.push(web3.utils.fromWei(rewardWei, 'ether'));
+                    } catch (e) {
+                        rewards.push('0');
+                    }
                 }
                 
                 const leaderboard = document.getElementById('leaderboard');
@@ -1166,13 +1235,17 @@
                     <div class="flex items-center p-3 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors" 
                          onclick="selectOpponent(${index})">
                         <div class="rank-badge w-8 h-8 rounded-full flex items-center justify-center text-white font-bold mr-3">
-                            ${index + 1}
+                            ${player.rank}
                         </div>
                         <div class="flex-1">
-                            <div class="text-white text-sm font-medium">${shortenAddress(player.address)}</div>
+                            <div class="text-white text-sm font-medium">${player.isMock ? '模拟玩家' + player.rank : shortenAddress(player.address)}</div>
                             <div class="text-gray-400 text-xs flex items-center">
-                                ${player.team.slice(0, 3).map(t => t.emoji).join('')}... · ${player.wins}/${player.losses}
+                                ${player.wins}/${player.losses} 胜/负
                             </div>
+                        </div>
+                        <div class="text-right mr-4">
+                            <div class="text-yellow-400 font-bold text-sm">${parseFloat(rewards[index]) > 0 ? rewards[index] : '--'} ETH</div>
+                            <div class="text-gray-400 text-xs">预计奖励</div>
                         </div>
                         <div class="text-right">
                             <div class="text-white font-bold text-sm">${player.points}</div>
@@ -1189,17 +1262,417 @@
         const IPFS_BASE_2 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/';
         
         const mockOpponents = [
-            { address: '0x1234...5678', rank: 1, team: [
-                { name: '火龙', level: 5, element: 'Fire', zodiacIndex: 4, emoji: '🐉', imagePath: `${IPFS_BASE_1}huolong_1.png` },
-                { name: '风虎', level: 4, element: 'Wind', zodiacIndex: 2, emoji: '🐅', imagePath: `${IPFS_BASE_1}fenghu_1.png` },
-                { name: '水兔', level: 5, element: 'Water', zodiacIndex: 3, emoji: '🐇', imagePath: `${IPFS_BASE_1}shuitu_1.png` },
-                { name: '光鸡', level: 4, element: 'Light', zodiacIndex: 9, emoji: '🐓', imagePath: `${IPFS_BASE_2}guangji_1.png` },
-                { name: '暗狗', level: 3, element: 'Dark', zodiacIndex: 10, emoji: '🐕', imagePath: `${IPFS_BASE_2}angou_1.png` },
-                { name: '火蛇', level: 3, element: 'Fire', zodiacIndex: 5, emoji: '🐍', imagePath: `${IPFS_BASE_1}huoshe_1.png` }
-            ]},
-            { address: '0x2345...6789', rank: 2, team: [
-                { name: '风马', level: 4, element: 'Wind', zodiacIndex: 6, emoji: '🐎', imagePath: `${IPFS_BASE_1}fengma_1.png` },
-                { name: '水牛', level: 5, element: 'Water', zodiacIndex: 1, emoji: '🐂', imagePath: `${IPFS_BASE_1}shuiniu_1.png` },
-                { name: '光猪', level: 4, element: 'Light', zodiacIndex: 11, emoji: '🐷', imagePath: `${IPFS_BASE_2}guangzhu_1.png` },
-                { name: '暗鼠', level: 3, element: 'Dark', zodiacIndex: 0, emoji: '🐀', imagePath: `${IPFS_BASE_2}anshu_1.png` },
-                { name: '火龙', level: 3, element: 'Fire', zodiacIndex: 4, emoji: '🐉', imagePath: `${IPFS_BASE_1}huolong_1.png`
+            { 
+                name: '竞技场霸主',
+                address: '0x1234...5678', 
+                rank: 1, 
+                team: [
+                    { name: '火龙·霸', level: 5, element: 'Fire', zodiacIndex: 4, emoji: '🐉', imagePath: `${IPFS_BASE_1}huolong_1.png` },
+                    { name: '风虎·猛', level: 4, element: 'Wind', zodiacIndex: 2, emoji: '🐅', imagePath: `${IPFS_BASE_1}fenghu_1.png` },
+                    { name: '水兔·敏', level: 5, element: 'Water', zodiacIndex: 3, emoji: '🐇', imagePath: `${IPFS_BASE_1}shuitu_1.png` },
+                    { name: '光鸡·圣', level: 4, element: 'Light', zodiacIndex: 9, emoji: '🐓', imagePath: `${IPFS_BASE_2}guangji_1.png` },
+                    { name: '暗狗·凶', level: 3, element: 'Dark', zodiacIndex: 10, emoji: '🐕', imagePath: `${IPFS_BASE_2}angou_1.png` },
+                    { name: '火蛇·毒', level: 3, element: 'Fire', zodiacIndex: 5, emoji: '🐍', imagePath: `${IPFS_BASE_1}huoshe_1.png` }
+                ]
+            },
+            { 
+                name: '五行大师',
+                address: '0x2345...6789', 
+                rank: 2, 
+                team: [
+                    { name: '风马·疾', level: 4, element: 'Wind', zodiacIndex: 6, emoji: '🐎', imagePath: `${IPFS_BASE_1}fengma_1.png` },
+                    { name: '水牛·厚', level: 5, element: 'Water', zodiacIndex: 1, emoji: '🐂', imagePath: `${IPFS_BASE_1}shuiniu_1.png` },
+                    { name: '光猪·福', level: 4, element: 'Light', zodiacIndex: 11, emoji: '🐷', imagePath: `${IPFS_BASE_2}guangzhu_1.png` },
+                    { name: '暗鼠·诡', level: 3, element: 'Dark', zodiacIndex: 0, emoji: '🐀', imagePath: `${IPFS_BASE_2}anshu_1.png` },
+                    { name: '火龙·焰', level: 3, element: 'Fire', zodiacIndex: 4, emoji: '🐉', imagePath: `${IPFS_BASE_1}huolong_1.png` },
+                    { name: '风虎·啸', level: 3, element: 'Wind', zodiacIndex: 2, emoji: '🐅', imagePath: `${IPFS_BASE_1}fenghu_1.png` }
+                ]
+            },
+            { 
+                name: '暗影刺客',
+                address: '0x3456...7890', 
+                rank: 3, 
+                team: [
+                    { name: '暗龙·影', level: 5, element: 'Dark', zodiacIndex: 4, emoji: '🐉', imagePath: `${IPFS_BASE_2}anlong_1.png` },
+                    { name: '暗蛇·噬', level: 5, element: 'Dark', zodiacIndex: 5, emoji: '🐍', imagePath: `${IPFS_BASE_2}anshe_1.png` },
+                    { name: '暗鼠·偷', level: 4, element: 'Dark', zodiacIndex: 0, emoji: '🐀', imagePath: `${IPFS_BASE_2}anshu_1.png` },
+                    { name: '暗虎·猛', level: 4, element: 'Dark', zodiacIndex: 2, emoji: '🐅', imagePath: `${IPFS_BASE_2}anhu_1.png` },
+                    { name: '暗兔·捷', level: 3, element: 'Dark', zodiacIndex: 3, emoji: '🐇', imagePath: `${IPFS_BASE_2}antu_1.png` },
+                    { name: '暗狗·猎', level: 3, element: 'Dark', zodiacIndex: 10, emoji: '🐕', imagePath: `${IPFS_BASE_2}angou_1.png` }
+                ]
+            },
+            { 
+                name: '圣光守护',
+                address: '0x4567...8901', 
+                rank: 4, 
+                team: [
+                    { name: '光龙·耀', level: 5, element: 'Light', zodiacIndex: 4, emoji: '🐉', imagePath: `${IPFS_BASE_2}guanglong_1.png` },
+                    { name: '光羊·慈', level: 5, element: 'Light', zodiacIndex: 7, emoji: '🐑', imagePath: `${IPFS_BASE_2}guangyang_1.png` },
+                    { name: '光猪·福', level: 5, element: 'Light', zodiacIndex: 11, emoji: '🐷', imagePath: `${IPFS_BASE_2}guangzhu_1.png` },
+                    { name: '光猴·灵', level: 4, element: 'Light', zodiacIndex: 8, emoji: '🐒', imagePath: `${IPFS_BASE_2}guanghou_1.png` },
+                    { name: '光鸡·鸣', level: 4, element: 'Light', zodiacIndex: 9, emoji: '🐓', imagePath: `${IPFS_BASE_2}guangji_1.png` },
+                    { name: '光兔·洁', level: 3, element: 'Light', zodiacIndex: 3, emoji: '🐇', imagePath: `${IPFS_BASE_2}guangtu_1.png` }
+                ]
+            },
+            { 
+                name: '均衡大师',
+                address: '0x5678...9012', 
+                rank: 5, 
+                team: [
+                    { name: '火牛·勇', level: 4, element: 'Fire', zodiacIndex: 1, emoji: '🐂', imagePath: `${IPFS_BASE_1}huoniu_1.png` },
+                    { name: '风龙·速', level: 4, element: 'Wind', zodiacIndex: 4, emoji: '🐉', imagePath: `${IPFS_BASE_1}fenglong_1.png` },
+                    { name: '水蛇·柔', level: 4, element: 'Water', zodiacIndex: 5, emoji: '🐍', imagePath: `${IPFS_BASE_1}shuishe_1.png` },
+                    { name: '光马·圣', level: 3, element: 'Light', zodiacIndex: 6, emoji: '🐎', imagePath: `${IPFS_BASE_2}guangma_1.png` },
+                    { name: '暗虎·威', level: 3, element: 'Dark', zodiacIndex: 2, emoji: '🐅', imagePath: `${IPFS_BASE_2}anhu_1.png` },
+                    { name: '水羊·善', level: 3, element: 'Water', zodiacIndex: 7, emoji: '🐑', imagePath: `${IPFS_BASE_1}shuiyang_1.png` }
+                ]
+            }
+        ];
+
+        function selectOpponent(index) {
+            selectedOpponent = mockOpponents[index % mockOpponents.length];
+            updateChallengeBtn();
+            showOpponentTeam(selectedOpponent);
+        }
+
+        function showOpponentTeam(opponent) {
+            const opponentDiv = document.getElementById('opponentDefenseTeam');
+            opponentDiv.innerHTML = `
+                <div class="space-y-2">
+                    <div class="grid grid-cols-3 gap-2">
+                        ${opponent.team.slice(0, 3).map(nft => `
+                            <div class="text-center p-2 bg-green-500/20 rounded-lg">
+                                <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
+                                <div class="text-white text-xs">${nft.name}</div>
+                                <div class="text-gray-400 text-xs">Lv.${nft.level}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <div class="grid grid-cols-3 gap-2">
+                        ${opponent.team.slice(3, 6).map(nft => `
+                            <div class="text-center p-2 bg-purple-500/20 rounded-lg">
+                                <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
+                                <div class="text-white text-xs">${nft.name}</div>
+                                <div class="text-gray-400 text-xs">Lv.${nft.level}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function openBattleModal() {
+            if (!selectedOpponent) return;
+            
+            const modal = document.getElementById('battleModal');
+            modal.classList.remove('hidden');
+            
+            updateBattleDisplay();
+            document.getElementById('battleResult').textContent = 'VS';
+            document.getElementById('battleMessage').textContent = '战斗即将开始...';
+            document.getElementById('currentRound').textContent = '第 1 回合';
+            document.getElementById('attackerWinCount').textContent = '0';
+            document.getElementById('defenderWinCount').textContent = '0';
+            document.getElementById('battleProcessLog').innerHTML = '';
+            
+            setTimeout(() => startBattle(), 1500);
+        }
+
+        function updateBattleDisplay() {
+            const attackerTeam = battleTeam.filter(n => n);
+            const defenderTeam = selectedOpponent.team;
+            
+            attackerTeam.forEach((nft, index) => {
+                const slot = document.getElementById(`attacker${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
+                if (slot && nft) {
+                    slot.innerHTML = `
+                        <img src="${nft.imagePath}" alt="${nft.name}" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
+                        <div class="text-xs text-gray-300">${nft.name}</div>
+                        <div class="text-xs text-gray-500">Lv.${nft.level}</div>
+                    `;
+                }
+            });
+            
+            defenderTeam.forEach((nft, index) => {
+                const slot = document.getElementById(`defender${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
+                if (slot && nft) {
+                    slot.innerHTML = `
+                        <img src="${nft.imagePath}" alt="${nft.name}" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
+                        <div class="text-xs text-gray-300">${nft.name}</div>
+                        <div class="text-xs text-gray-500">Lv.${nft.level}</div>
+                    `;
+                }
+            });
+            
+            initHpBars();
+        }
+
+        function initHpBars() {
+            for (let i = 1; i <= 6; i++) {
+                const attackerHp = document.getElementById(`attackerHp${i}`);
+                const attackerHpText = document.getElementById(`attackerHpText${i}`);
+                const defenderHp = document.getElementById(`defenderHp${i}`);
+                const defenderHpText = document.getElementById(`defenderHpText${i}`);
+                
+                if (attackerHp) {
+                    attackerHp.style.width = '100%';
+                    attackerHp.style.backgroundColor = '#22c55e';
+                }
+                if (attackerHpText) attackerHpText.textContent = '100%';
+                if (defenderHp) {
+                    defenderHp.style.width = '100%';
+                    defenderHp.style.backgroundColor = '#22c55e';
+                }
+                if (defenderHpText) defenderHpText.textContent = '100%';
+            }
+        }
+
+        function updateHpBar(isAttacker, index, newHpPercent) {
+            const prefix = isAttacker ? 'attacker' : 'defender';
+            const hpBar = document.getElementById(`${prefix}Hp${index + 1}`);
+            const hpText = document.getElementById(`${prefix}HpText${index + 1}`);
+            const slot = document.getElementById(`${prefix}${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
+            
+            if (hpBar) {
+                hpBar.style.width = `${newHpPercent}%`;
+                if (newHpPercent > 60) {
+                    hpBar.style.backgroundColor = '#22c55e';
+                } else if (newHpPercent > 30) {
+                    hpBar.style.backgroundColor = '#eab308';
+                } else {
+                    hpBar.style.backgroundColor = '#ef4444';
+                }
+            }
+            if (hpText) hpText.textContent = `${Math.round(newHpPercent)}%`;
+            
+            if (newHpPercent <= 0 && slot) {
+                slot.style.opacity = '0.3';
+                const emoji = slot.querySelector('.battle-emoji');
+                if (emoji) emoji.textContent = '💀';
+            }
+        }
+
+        function addAttackEffect(isAttacker, index) {
+            const prefix = isAttacker ? 'attacker' : 'defender';
+            const slot = document.getElementById(`${prefix}${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
+            
+            if (slot) {
+                slot.style.transform = 'scale(1.1)';
+                slot.style.boxShadow = '0 0 20px rgba(59, 130, 246, 0.5)';
+                
+                setTimeout(() => {
+                    slot.style.transform = 'scale(1)';
+                    slot.style.boxShadow = 'none';
+                }, 300);
+            }
+        }
+
+        function addDamageEffect(isAttacker, index) {
+            const prefix = isAttacker ? 'attacker' : 'defender';
+            const slot = document.getElementById(`${prefix}${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
+            
+            if (slot) {
+                slot.style.filter = 'brightness(0.5) sepia(1) hue-rotate(-50deg)';
+                
+                setTimeout(() => {
+                    slot.style.filter = 'none';
+                }, 300);
+            }
+        }
+
+        async function startBattle() {
+            document.getElementById('fightBtn').style.display = 'none';
+            document.getElementById('surrenderBtn').style.display = 'block';
+            
+            document.getElementById('surrenderBtn').onclick = () => {
+                document.getElementById('battleResult').textContent = '🏳️';
+                document.getElementById('battleMessage').textContent = '你选择了认输！';
+                document.getElementById('surrenderBtn').style.display = 'none';
+            };
+
+            const attackerTeam = battleTeam.filter(n => n);
+            const defenderTeam = selectedOpponent.team;
+            
+            const MAX_HP = 1000;
+            const attackerHp = attackerTeam.map(() => MAX_HP);
+            const defenderHp = defenderTeam.map(() => MAX_HP);
+            const attackerAlive = attackerTeam.map(() => true);
+            const defenderAlive = defenderTeam.map(() => true);
+            
+            addBattleLog(`⚔️ 6v6战斗开始！`);
+            await delay(800);
+            
+            let battleRound = 0;
+            while (attackerAlive.some(a => a) && defenderAlive.some(d => d)) {
+                battleRound++;
+                document.getElementById('currentRound').textContent = `第 ${battleRound} 回合`;
+                
+                for (let i = 0; i < attackerTeam.length; i++) {
+                    if (!attackerAlive[i]) continue;
+                    
+                    const attackerIndex = i;
+                    const defenderIndex = findAliveIndex(defenderAlive, attackerIndex < FRONT_ROW_SIZE);
+                    
+                    if (defenderIndex === -1) {
+                        addBattleLog('⚠️ 防守方已无可用单位！');
+                        break;
+                    }
+                    
+                    const attacker = attackerTeam[attackerIndex];
+                    const defender = defenderTeam[defenderIndex];
+                    
+                    addBattleLog(`\n🎯 ${attacker.name} → ${defender.name}`);
+                    await delay(300);
+                    
+                    const attackerAdvantage = checkAdvantage(attacker.attr, defender.element);
+                    if (attackerAdvantage) {
+                        addBattleLog(`🔥 属性克制！`);
+                    }
+                    
+                    await delay(200);
+                    
+                    let attackerDamage = attacker.level * 50;
+                    
+                    if (attackerAdvantage) attackerDamage = Math.floor(attackerDamage * 1.5);
+                    
+                    addBattleLog(`✨ ${attacker.name} 发起攻击！`);
+                    addAttackEffect(true, attackerIndex);
+                    await delay(300);
+                    
+                    addBattleLog(`💥 造成 ${attackerDamage} 点伤害！`);
+                    addDamageEffect(false, defenderIndex);
+                    defenderHp[defenderIndex] -= attackerDamage;
+                    const defenderHpPercent = Math.max(0, (defenderHp[defenderIndex] / MAX_HP) * 100);
+                    updateHpBar(false, defenderIndex, defenderHpPercent);
+                    await delay(400);
+                    
+                    if (defenderHp[defenderIndex] <= 0) {
+                        defenderAlive[defenderIndex] = false;
+                        addBattleLog(`💀 ${defender.name} 被击败！`);
+                    }
+                    
+                    if (!defenderAlive.some(d => d)) break;
+                }
+                
+                if (!defenderAlive.some(d => d)) break;
+                
+                for (let i = 0; i < defenderTeam.length; i++) {
+                    if (!defenderAlive[i]) continue;
+                    
+                    const defenderIndex = i;
+                    const attackerIndex = findAliveIndex(attackerAlive, defenderIndex < FRONT_ROW_SIZE);
+                    
+                    if (attackerIndex === -1) {
+                        addBattleLog('⚠️ 进攻方已无可用单位！');
+                        break;
+                    }
+                    
+                    const defender = defenderTeam[defenderIndex];
+                    const attacker = attackerTeam[attackerIndex];
+                    
+                    addBattleLog(`\n🛡️ ${defender.name} → ${attacker.name}`);
+                    await delay(300);
+                    
+                    const defenderAdvantage = checkAdvantage(defender.element, attacker.attr);
+                    if (defenderAdvantage) {
+                        addBattleLog(`🔥 属性克制！`);
+                    }
+                    
+                    await delay(200);
+                    
+                    let defenderDamage = defender.level * 50;
+                    
+                    if (defenderAdvantage) defenderDamage = Math.floor(defenderDamage * 1.5);
+                    
+                    addBattleLog(`✨ ${defender.name} 发起攻击！`);
+                    addAttackEffect(false, defenderIndex);
+                    await delay(300);
+                    
+                    addBattleLog(`💥 造成 ${defenderDamage} 点伤害！`);
+                    addDamageEffect(true, attackerIndex);
+                    attackerHp[attackerIndex] -= defenderDamage;
+                    const attackerHpPercent = Math.max(0, (attackerHp[attackerIndex] / MAX_HP) * 100);
+                    updateHpBar(true, attackerIndex, attackerHpPercent);
+                    await delay(400);
+                    
+                    if (attackerHp[attackerIndex] <= 0) {
+                        attackerAlive[attackerIndex] = false;
+                        addBattleLog(`💀 ${attacker.name} 被击败！`);
+                    }
+                    
+                    if (!attackerAlive.some(a => a)) break;
+                }
+                
+                await delay(500);
+                
+                const attackerWins = attackerAlive.filter(a => a).length;
+                const defenderWins = defenderAlive.filter(d => d).length;
+                
+                document.getElementById('attackerWinCount').textContent = attackerWins.toString();
+                document.getElementById('defenderWinCount').textContent = defenderWins.toString();
+            }
+            
+            const attackerSurvivors = attackerAlive.filter(a => a).length;
+            const defenderSurvivors = defenderAlive.filter(d => d).length;
+            
+            await delay(500);
+            
+            if (attackerSurvivors > defenderSurvivors) {
+                document.getElementById('battleResult').textContent = '🎉';
+                document.getElementById('battleMessage').textContent = `胜利！存活 ${attackerSurvivors}:${defenderSurvivors}`;
+                addBattleLog(`\n🏆 进攻方获胜！存活 ${attackerSurvivors} 人`);
+            } else if (defenderSurvivors > attackerSurvivors) {
+                document.getElementById('battleResult').textContent = '💀';
+                document.getElementById('battleMessage').textContent = `失败！存活 ${attackerSurvivors}:${defenderSurvivors}`;
+                addBattleLog(`\n💔 防守方获胜！存活 ${defenderSurvivors} 人`);
+            } else {
+                document.getElementById('battleResult').textContent = '🤝';
+                document.getElementById('battleMessage').textContent = '平局！';
+                addBattleLog(`\n🤝 平局！双方同归于尽`);
+            }
+            
+            document.getElementById('surrenderBtn').style.display = 'none';
+        }
+
+        function findAliveIndex(aliveArray, preferFrontRow) {
+            if (preferFrontRow) {
+                for (let i = 0; i < FRONT_ROW_SIZE; i++) {
+                    if (aliveArray[i]) return i;
+                }
+            }
+            for (let i = FRONT_ROW_SIZE; i < TEAM_SIZE; i++) {
+                if (aliveArray[i]) return i;
+            }
+            if (!preferFrontRow) {
+                for (let i = 0; i < FRONT_ROW_SIZE; i++) {
+                    if (aliveArray[i]) return i;
+                }
+            }
+            return -1;
+        }
+
+        function addBattleLog(message) {
+            const log = document.getElementById('battleProcessLog');
+            const logEntry = document.createElement('div');
+            logEntry.textContent = message;
+            log.appendChild(logEntry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function checkAdvantage(attacker, defender) {
+            const advantages = { Fire: 'Wind', Wind: 'Water', Water: 'Fire', Light: 'Dark', Dark: 'Light' };
+            return advantages[attacker] === defender;
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function shortenAddress(address) {
+            return address.slice(0, 6) + '...' + address.slice(-4);
+        }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>

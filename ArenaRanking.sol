@@ -29,8 +29,11 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     uint256 public constant RECHARGE_AMOUNT = 5;
     uint256 public constant DEFAULT_RECHARGE_COST = 888000000000000000000;
     uint256 public constant TIER1_NFT_COUNT = 120;
+    uint256 public constant DEFAULT_SEASON_REWARD_RATE = 2; // 0.2% (2 basis points)
+    uint256 public constant BPS = 10000; // Basis points denominator
 
     uint256 public rechargeCost = DEFAULT_RECHARGE_COST;
+    uint256 public seasonRewardRate = DEFAULT_SEASON_REWARD_RATE; // Reward rate in basis points
 
     enum ChallengeMode {
         Points,
@@ -54,6 +57,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         uint256 endTime;
         bool isActive;
         uint256 totalReward;
+        uint256 totalRewardPool; // Total BNB pool for the season
     }
 
     struct SeasonReward {
@@ -81,11 +85,15 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         bool isMock;
     }
 
+    struct RewardTier {
+        uint256 startRank;
+        uint256 endRank;
+        uint256 percentage; // in basis points
+    }
+
     mapping(address => Player) public players;
     mapping(uint256 => Season) public seasons;
     mapping(address => mapping(uint256 => SeasonReward)) public playerRewards;
-    mapping(uint256 => uint256) public top10Rewards;
-    mapping(uint256 => uint256) public tieredRewards;
 
     mapping(uint256 => address) public nftToPlayer;
     mapping(uint256 => bool) public isInBattleTeam;
@@ -102,6 +110,8 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     uint256 public mockPlayerCount;
     mapping(uint256 => bool) public isMockPlayerActive;
 
+    RewardTier[] public rewardTiers;
+
     event ChallengeCompleted(
         address indexed attacker,
         address indexed defender,
@@ -112,7 +122,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         uint256 defenderRank
     );
 
-    event SeasonStarted(uint256 seasonNumber, uint256 startTime, uint256 endTime);
+    event SeasonStarted(uint256 seasonNumber, uint256 startTime, uint256 endTime, uint256 totalRewardPool);
     event SeasonEnded(uint256 seasonNumber, uint256 totalReward);
     event RewardClaimed(address indexed player, uint256 seasonNumber, uint256 reward);
     event BattleTeamSet(address indexed player, uint256[] tokens);
@@ -122,6 +132,8 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     event RankSwapped(address indexed winner, address indexed loser, uint256 oldWinnerRank, uint256 oldLoserRank);
     event RechargeCostUpdated(uint256 oldCost, uint256 newCost);
     event MockPlayerBattleTeamReplaced(uint256 mockRank);
+    event SeasonRewardRateUpdated(uint256 oldRate, uint256 newRate);
+    event RewardTiersUpdated();
 
     function initialize(address _battleContract, address _nftContract, address _tokenContract) external initializer {
         __Ownable2Step_init();
@@ -133,15 +145,30 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         currentSeason = 1;
         seasonDuration = 7 days;
 
+        _initializeDefaultRewardTiers();
+
         seasons[currentSeason] = Season({
             seasonNumber: currentSeason,
             startTime: block.timestamp,
             endTime: block.timestamp + seasonDuration,
             isActive: true,
-            totalReward: 0
+            totalReward: 0,
+            totalRewardPool: 0
         });
 
         _initializeMockPlayers();
+    }
+
+    function _initializeDefaultRewardTiers() internal {
+        delete rewardTiers;
+        rewardTiers.push(RewardTier({startRank: 1, endRank: 1, percentage: 1500})); // 15%
+        rewardTiers.push(RewardTier({startRank: 2, endRank: 2, percentage: 1000})); // 10%
+        rewardTiers.push(RewardTier({startRank: 3, endRank: 3, percentage: 800}));  // 8%
+        rewardTiers.push(RewardTier({startRank: 4, endRank: 5, percentage: 600}));  // 6% each
+        rewardTiers.push(RewardTier({startRank: 6, endRank: 10, percentage: 400})); // 4% each
+        rewardTiers.push(RewardTier({startRank: 11, endRank: 20, percentage: 250})); // 2.5% each
+        rewardTiers.push(RewardTier({startRank: 21, endRank: 50, percentage: 150})); // 1.5% each
+        rewardTiers.push(RewardTier({startRank: 51, endRank: 100, percentage: 80})); // 0.8% each
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -176,14 +203,30 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         emit RechargeCostUpdated(oldCost, _cost);
     }
 
-    function setTop10Rewards(uint256[10] calldata rewards) external onlyOwner {
-        for (uint256 i = 0; i < 10; i++) {
-            top10Rewards[i + 1] = rewards[i];
-        }
+    function setSeasonRewardRate(uint256 _rate) external onlyOwner {
+        require(_rate > 0 && _rate <= BPS, "Rate must be between 1 and 10000 basis points");
+        uint256 oldRate = seasonRewardRate;
+        seasonRewardRate = _rate;
+        emit SeasonRewardRateUpdated(oldRate, _rate);
     }
 
-    function setTieredReward(uint256 tier, uint256 reward) external onlyOwner {
-        tieredRewards[tier] = reward;
+    function setRewardTiers(RewardTier[] calldata _rewardTiers) external onlyOwner {
+        delete rewardTiers;
+        uint256 totalPercentage = 0;
+        uint256 lastRank = 0;
+
+        for (uint256 i = 0; i < _rewardTiers.length; i++) {
+            require(_rewardTiers[i].startRank > lastRank, "Tiers must be sequential");
+            require(_rewardTiers[i].endRank >= _rewardTiers[i].startRank, "Invalid tier range");
+            require(_rewardTiers[i].percentage > 0, "Percentage must be positive");
+
+            rewardTiers.push(_rewardTiers[i]);
+            totalPercentage += _rewardTiers[i].percentage * (_rewardTiers[i].endRank - _rewardTiers[i].startRank + 1);
+            lastRank = _rewardTiers[i].endRank;
+        }
+
+        require(totalPercentage <= BPS, "Total percentage cannot exceed 100%");
+        emit RewardTiersUpdated();
     }
 
     function _initializeMockPlayers() internal {
@@ -195,7 +238,6 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     function _generateMockTeam(uint256 seed) internal pure returns (uint256[6] memory) {
         uint256[6] memory team;
-        uint256[6] memory usedIndices;
 
         for (uint256 i = 0; i < 6; i++) {
             uint256 randomIndex;
@@ -228,55 +270,48 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     function startNewSeason() external onlyOwner {
         require(seasons[currentSeason].isActive, "E01: No active season");
 
-        seasons[currentSeason].isActive = false;
-        seasons[currentSeason].totalReward = address(this).balance;
-
-        emit SeasonEnded(currentSeason, seasons[currentSeason].totalReward);
-
-        _resetSeasonPoints();
+        _finalizeCurrentSeason();
 
         currentSeason++;
-        seasons[currentSeason] = Season({
-            seasonNumber: currentSeason,
-            startTime: block.timestamp,
-            endTime: block.timestamp + seasonDuration,
-            isActive: true,
-            totalReward: 0
-        });
-
-        _initializeMockPlayers();
-
-        emit SeasonStarted(currentSeason, block.timestamp, block.timestamp + seasonDuration);
+        _startNewSeason();
     }
 
     function checkSeasonEnd() external {
         Season storage current = seasons[currentSeason];
         if (current.isActive && block.timestamp >= current.endTime) {
-            _endSeasonAndCalculateRewards();
+            _finalizeCurrentSeason();
+            currentSeason++;
+            _startNewSeason();
         }
     }
 
-    function _endSeasonAndCalculateRewards() internal {
+    function _finalizeCurrentSeason() internal {
         Season storage current = seasons[currentSeason];
         current.isActive = false;
-        current.totalReward = address(this).balance;
 
-        emit SeasonEnded(currentSeason, current.totalReward);
+        uint256 contractBalance = address(this).balance;
+        uint256 seasonRewardPool = (contractBalance * seasonRewardRate) / BPS;
+        current.totalRewardPool = seasonRewardPool;
 
+        emit SeasonEnded(currentSeason, seasonRewardPool);
         _resetSeasonPoints();
+    }
 
-        currentSeason++;
+    function _startNewSeason() internal {
+        uint256 contractBalance = address(this).balance;
+        uint256 seasonRewardPool = (contractBalance * seasonRewardRate) / BPS;
+
         seasons[currentSeason] = Season({
             seasonNumber: currentSeason,
             startTime: block.timestamp,
             endTime: block.timestamp + seasonDuration,
             isActive: true,
-            totalReward: 0
+            totalReward: 0,
+            totalRewardPool: seasonRewardPool
         });
 
         _initializeMockPlayers();
-
-        emit SeasonStarted(currentSeason, block.timestamp, block.timestamp + seasonDuration);
+        emit SeasonStarted(currentSeason, block.timestamp, block.timestamp + seasonDuration, seasonRewardPool);
     }
 
     function _resetSeasonPoints() internal {
@@ -633,121 +668,6 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         return (attackerWon, attackerWins, defenderWins);
     }
 
-    function _challengePoints(address attacker, address defender, uint256 attackerRank, uint256 defenderRank) internal returns (bool, uint256, uint256) {
-        Player storage attackerPlayer = players[attacker];
-        Player storage defenderPlayer = players[defender];
-
-        (bool attackerWon, uint256 attackerWinCount, uint256 defenderWinCount) =
-            battleContract.battle(attackerPlayer.battleTeam, defenderPlayer.battleTeam);
-
-        int256 attackerPointsChange;
-        int256 defenderPointsChange;
-
-        if (attackerWon) {
-            attackerPointsChange = _calculateWinPoints(attackerRank, defenderRank, attackerWinCount);
-            attackerPlayer.points += uint256(attackerPointsChange);
-            attackerPlayer.wins++;
-
-            defenderPointsChange = -attackerPointsChange / 2;
-            if (defenderPlayer.points > uint256(-defenderPointsChange)) {
-                defenderPlayer.points -= uint256(-defenderPointsChange);
-            } else {
-                defenderPlayer.points = 0;
-            }
-            defenderPlayer.losses++;
-        } else {
-            defenderPointsChange = _calculateWinPoints(defenderRank, attackerRank, defenderWinCount);
-            defenderPlayer.points += uint256(defenderPointsChange);
-            defenderPlayer.wins++;
-
-            attackerPointsChange = -_calculateLossPoints(attackerRank, defenderRank);
-            if (attackerPlayer.points > uint256(-attackerPointsChange)) {
-                attackerPlayer.points -= uint256(-attackerPointsChange);
-            } else {
-                attackerPlayer.points = 0;
-            }
-            attackerPlayer.losses++;
-        }
-
-        attackerPlayer.lastBattleTime = block.timestamp;
-
-        battleHistory[nextBattleId] = BattleRecord({
-            attacker: attacker,
-            defender: defender,
-            attackerWon: attackerWon,
-            attackerWinCount: attackerWinCount,
-            defenderWinCount: defenderWinCount,
-            timestamp: block.timestamp,
-            mode: ChallengeMode.Points
-        });
-        nextBattleId++;
-
-        emit ChallengeCompleted(attacker, defender, attackerWon, attackerPointsChange, defenderPointsChange, attackerRank, defenderRank);
-
-        return (attackerWon, attackerWinCount, defenderWinCount);
-    }
-
-    function _challengeRankSwap(address attacker, address defender, uint256 attackerRank, uint256 defenderRank) internal returns (bool, uint256, uint256) {
-        Player storage attackerPlayer = players[attacker];
-        Player storage defenderPlayer = players[defender];
-
-        require(attackerRank > defenderRank, "E24: Can only challenge higher ranked players");
-
-        uint256 attackerWins = 0;
-        uint256 defenderWins = 0;
-
-        for (uint256 i = 0; i < 3; i++) {
-            (bool roundWon, uint256 atkCount, uint256 defCount) =
-                battleContract.battle(attackerPlayer.battleTeam, defenderPlayer.battleTeam);
-
-            if (roundWon) {
-                attackerWins++;
-            } else {
-                defenderWins++;
-            }
-
-            if (attackerWins >= 2 || defenderWins >= 2) {
-                break;
-            }
-        }
-
-        bool attackerWon = attackerWins >= 2;
-
-        if (attackerWon) {
-            uint256 tempPoints = attackerPlayer.points;
-            attackerPlayer.points = defenderPlayer.points;
-            defenderPlayer.points = tempPoints;
-
-            attackerPlayer.wins++;
-            defenderPlayer.losses++;
-
-            emit RankSwapped(attacker, defender, attackerRank, defenderRank);
-        } else {
-            attackerPlayer.losses++;
-            defenderPlayer.wins++;
-        }
-
-        attackerPlayer.lastBattleTime = block.timestamp;
-
-        battleHistory[nextBattleId] = BattleRecord({
-            attacker: attacker,
-            defender: defender,
-            attackerWon: attackerWon,
-            attackerWinCount: attackerWins,
-            defenderWinCount: defenderWins,
-            timestamp: block.timestamp,
-            mode: ChallengeMode.RankSwap
-        });
-        nextBattleId++;
-
-        int256 attackerPointsChange = attackerWon ? int256(defenderPlayer.points) - int256(tempPoints) : 0;
-        int256 defenderPointsChange = attackerWon ? -attackerPointsChange : 0;
-
-        emit ChallengeCompleted(attacker, defender, attackerWon, attackerPointsChange, defenderPointsChange, attackerRank, defenderRank);
-
-        return (attackerWon, attackerWins, defenderWins);
-    }
-
     function _calculateWinPoints(uint256 attackerRank, uint256 defenderRank, uint256 winCount) internal pure returns (int256) {
         uint256 rankDiff;
         if (attackerRank > defenderRank) {
@@ -881,18 +801,35 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         return _getMockPlayerRank(player);
     }
 
+    function getCurrentRewardPool() public view returns (uint256) {
+        return seasons[currentSeason].totalRewardPool;
+    }
+
+    function getRewardForRank(uint256 rank) public view returns (uint256) {
+        uint256 rewardPool = seasons[currentSeason].totalRewardPool;
+        if (rewardPool == 0) {
+            rewardPool = (address(this).balance * seasonRewardRate) / BPS;
+        }
+
+        for (uint256 i = 0; i < rewardTiers.length; i++) {
+            if (rank >= rewardTiers[i].startRank && rank <= rewardTiers[i].endRank) {
+                return (rewardPool * rewardTiers[i].percentage) / BPS;
+            }
+        }
+
+        return 0;
+    }
+
+    function getRewardTiersCount() public view returns (uint256) {
+        return rewardTiers.length;
+    }
+
     function calculateSeasonReward(address player, uint256 seasonNumber) public view returns (uint256) {
         SeasonReward storage reward = playerRewards[player][seasonNumber];
         if (reward.claimed) return 0;
 
         uint256 rank = getPlayerRank(player);
-
-        if (rank <= 10) {
-            return top10Rewards[rank];
-        } else {
-            uint256 tier = (rank - 11) / 100 + 1;
-            return tieredRewards[tier];
-        }
+        return getRewardForRank(rank);
     }
 
     function claimReward(uint256 seasonNumber) external nonReentrant {
@@ -904,9 +841,11 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
         uint256 rewardAmount = calculateSeasonReward(msg.sender, seasonNumber);
         require(rewardAmount > 0, "E10: No reward available");
+        require(rewardAmount <= season.totalRewardPool, "Reward exceeds pool");
 
         reward.claimed = true;
         reward.reward = rewardAmount;
+        reward.rank = getPlayerRank(msg.sender);
 
         (bool success, ) = msg.sender.call{value: rewardAmount}("");
         require(success, "E11: Transfer failed");
