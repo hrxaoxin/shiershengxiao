@@ -236,62 +236,168 @@
             <h1 class="text-2xl font-bold text-gray-800">质押挖矿</h1>
         </div>
 
-        <p class="text-lg text-gray-600 mb-8">质押5阶及以上的NFT来挖矿，每分钟获得代币奖励</p>
-
-        <div class="info-box mb-8">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">🌟 挖矿规则</h3>
-            <ul class="text-gray-600 space-y-2">
-                <li>• 质押5阶及以上的NFT来挖矿</li>
-                <li>• 每分钟自动挖矿，奖励根据合约余额和质押数量动态调整</li>
-                <li>• 随时可以领取已挖矿的代币</li>
-                <li>• 随时可以赎回质押的NFT</li>
-                <li>• 挖矿奖励来自合约地址中的代币</li>
-            </ul>
-        </div>
-
-        <div class="mb-8">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">我的可质押NFT（5阶及以上）</h3>
-            <div id="eligibleNFTs" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                <div class="col-span-full text-center text-gray-500 py-8">加载中...</div>
-            </div>
-            <button id="stakeBtn" class="btn-primary w-full mt-4" disabled>
-                质押选中的NFT
+        <div class="flex space-x-4 mb-8">
+            <button id="nftStakeTab" class="tab-btn active px-6 py-3 bg-blue-500 text-white rounded-lg font-medium transition-colors">
+                🎴 NFT质押
+            </button>
+            <button id="tokenStakeTab" class="tab-btn px-6 py-3 bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors hover:bg-gray-300">
+                💰 代币质押
             </button>
         </div>
 
-        <div class="mb-8">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">我的质押</h3>
-            <div id="myStakes" class="space-y-4">
-                <div class="text-center text-gray-500 py-8">暂无质押</div>
+        <div id="nftStakePanel">
+            <p class="text-lg text-gray-600 mb-8">质押5阶及以上的NFT来挖矿，每分钟获得代币奖励</p>
+
+            <div class="info-box mb-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">🌟 挖矿规则</h3>
+                <ul class="text-gray-600 space-y-2">
+                    <li>• 质押5阶及以上的NFT来挖矿</li>
+                    <li>• 每分钟自动挖矿，奖励根据合约余额和质押数量动态调整</li>
+                    <li>• 随时可以领取已挖矿的代币</li>
+                    <li>• 随时可以赎回质押的NFT</li>
+                    <li>• 挖矿奖励来自合约地址中的代币</li>
+                </ul>
+            </div>
+
+            <div class="mb-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">我的可质押NFT（5阶及以上）</h3>
+                <div id="eligibleNFTs" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    <div class="col-span-full text-center text-gray-500 py-8">加载中...</div>
+                </div>
+                <button id="stakeBtn" class="btn-primary w-full mt-4" disabled>
+                    质押选中的NFT
+                </button>
+            </div>
+
+            <div class="mb-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">我的质押</h3>
+                <div id="myStakes" class="space-y-4">
+                    <div class="text-center text-gray-500 py-8">暂无质押</div>
+                </div>
+            </div>
+
+            <div class="info-box mb-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">🎁 奖励信息</h3>
+                <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg mb-4">
+                    <span class="text-lg font-medium text-gray-800">可领取代币</span>
+                    <span class="text-lg font-bold text-gray-800" id="rewardsAmount">0.00</span>
+                </div>
+                <button id="claimBtn" class="btn-primary w-full" disabled>
+                    领取奖励
+                </button>
+            </div>
+
+            <div class="info-box">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">📊 合约信息</h3>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <span class="text-sm text-gray-600">合约代币余额</span>
+                        <p class="text-lg font-bold text-gray-800" id="contractBalance">0.00</p>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg">
+                        <span class="text-sm text-gray-600">我的质押NFT数量</span>
+                        <p class="text-lg font-bold text-gray-800" id="myStakedCount">0</p>
+                    </div>
+                    <div class="p-4 bg-gray-50 rounded-lg col-span-2">
+                        <span class="text-sm text-gray-600">每分钟预计奖励</span>
+                        <p class="text-lg font-bold text-gray-800" id="estimatedReward">0.00</p>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="info-box mb-8">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">🎁 奖励信息</h3>
-            <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg mb-4">
-                <span class="text-lg font-medium text-gray-800">可领取代币</span>
-                <span class="text-lg font-bold text-gray-800" id="rewardsAmount">0.00</span>
-            </div>
-            <button id="claimBtn" class="btn-primary w-full" disabled>
-                领取奖励
-            </button>
-        </div>
+        <div id="tokenStakePanel" class="hidden">
+            <p class="text-lg text-gray-600 mb-8">质押代币获得BNB奖励，支持弹性释放机制</p>
 
-        <div class="info-box">
-            <h3 class="text-xl font-bold text-gray-800 mb-4">📊 合约信息</h3>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="p-4 bg-gray-50 rounded-lg">
-                    <span class="text-sm text-gray-600">合约代币余额</span>
-                    <p class="text-lg font-bold text-gray-800" id="contractBalance">0.00</p>
+            <div class="info-box mb-8">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">🌟 代币质押规则</h3>
+                <ul class="text-gray-600 space-y-2">
+                    <li>• 质押代币获得BNB奖励</li>
+                    <li>• 最低质押时长30分钟</li>
+                    <li>• 每日释放比例15%，支持弹性增量机制</li>
+                    <li>• 赎回时自动领取累积奖励</li>
+                    <li>• 奖励以BNB形式发放</li>
+                </ul>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="info-box">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">💰 质押代币</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">质押数量</label>
+                            <input type="number" id="tokenStakeAmount" placeholder="输入代币数量" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <div class="text-sm text-gray-500">
+                            当前余额: <span id="tokenBalance" class="font-bold text-gray-800">0.00</span>
+                        </div>
+                        <button id="tokenStakeBtn" class="btn-primary w-full" disabled>
+                            质押代币
+                        </button>
+                    </div>
                 </div>
-                <div class="p-4 bg-gray-50 rounded-lg">
-                    <span class="text-sm text-gray-600">我的质押NFT数量</span>
-                    <p class="text-lg font-bold text-gray-800" id="myStakedCount">0</p>
+
+                <div class="info-box">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">🎁 我的质押</h3>
+                    <div class="space-y-4">
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <span class="text-sm text-gray-600">质押数量</span>
+                            <p class="text-xl font-bold text-gray-800" id="myTokenStakeAmount">0.00</p>
+                        </div>
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <span class="text-sm text-gray-600">可领取奖励 (BNB)</span>
+                            <p class="text-xl font-bold text-blue-600" id="tokenRewardsAmount">0.00</p>
+                        </div>
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <span class="text-sm text-gray-600">质押时间</span>
+                            <p class="text-sm text-gray-800" id="tokenStakedAt">-</p>
+                        </div>
+                    </div>
                 </div>
-                <div class="p-4 bg-gray-50 rounded-lg col-span-2">
-                    <span class="text-sm text-gray-600">每分钟预计奖励</span>
-                    <p class="text-lg font-bold text-gray-800" id="estimatedReward">0.00</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div class="info-box">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">📤 赎回代币</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">赎回数量</label>
+                            <input type="number" id="tokenUnstakeAmount" placeholder="输入赎回数量" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                        </div>
+                        <button id="tokenUnstakeBtn" class="btn-secondary w-full" disabled>
+                            赎回代币
+                        </button>
+                    </div>
                 </div>
+
+                <div class="info-box">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">📊 代币质押合约信息</h3>
+                    <div class="space-y-4">
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <span class="text-sm text-gray-600">合约BNB余额</span>
+                            <p class="text-lg font-bold text-gray-800" id="tokenStakingBNBBalance">0.00</p>
+                        </div>
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <span class="text-sm text-gray-600">总质押代币</span>
+                            <p class="text-lg font-bold text-gray-800" id="totalStakedTokens">0.00</p>
+                        </div>
+                        <div class="p-4 bg-gray-50 rounded-lg">
+                            <span class="text-sm text-gray-600">今日释放比例</span>
+                            <p class="text-lg font-bold text-gray-800" id="currentReleaseRatio">0.00%</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">🎯 领取奖励</h3>
+                <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg mb-4">
+                    <span class="text-lg font-medium text-gray-800">可领取BNB奖励</span>
+                    <span class="text-lg font-bold text-blue-600" id="claimableBNB">0.00</span>
+                </div>
+                <button id="claimTokenRewardsBtn" class="btn-primary w-full" disabled>
+                    领取BNB奖励
+                </button>
             </div>
         </div>
     </main>
@@ -307,6 +413,7 @@
         let nftContract;
         let tokenContract;
         let stakingContract;
+        let tokenStakingContract;
         let selectedNFTs = [];
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -326,7 +433,48 @@
 
             initWeb3();
             initWalletUI();
+            initTabSwitch();
         });
+
+        function initTabSwitch() {
+            document.getElementById('nftStakeTab').addEventListener('click', () => switchTab('nft'));
+            document.getElementById('tokenStakeTab').addEventListener('click', () => switchTab('token'));
+        }
+
+        function switchTab(tab) {
+            const nftTab = document.getElementById('nftStakeTab');
+            const tokenTab = document.getElementById('tokenStakeTab');
+            const nftPanel = document.getElementById('nftStakePanel');
+            const tokenPanel = document.getElementById('tokenStakePanel');
+
+            if (tab === 'nft') {
+                nftTab.classList.add('active');
+                nftTab.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                nftTab.classList.add('bg-blue-500', 'text-white');
+                
+                tokenTab.classList.remove('active');
+                tokenTab.classList.remove('bg-blue-500', 'text-white');
+                tokenTab.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                
+                nftPanel.classList.remove('hidden');
+                tokenPanel.classList.add('hidden');
+            } else {
+                tokenTab.classList.add('active');
+                tokenTab.classList.remove('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                tokenTab.classList.add('bg-blue-500', 'text-white');
+                
+                nftTab.classList.remove('active');
+                nftTab.classList.remove('bg-blue-500', 'text-white');
+                nftTab.classList.add('bg-gray-200', 'text-gray-700', 'hover:bg-gray-300');
+                
+                tokenPanel.classList.remove('hidden');
+                nftPanel.classList.add('hidden');
+                
+                if (account) {
+                    loadTokenStakingInfo();
+                }
+            }
+        }
 
         function initWalletUI() {
             ZODIAC_UI.initWalletButton('connectWalletBtn', 'walletAddress', 'connectionStatus');
@@ -337,6 +485,7 @@
                 await loadMyStakes();
                 await loadRewards();
                 await loadContractInfo();
+                await loadTokenStakingInfo();
             });
         }
 
@@ -355,6 +504,7 @@
                 await loadMyStakes();
                 await loadRewards();
                 await loadContractInfo();
+                await loadTokenStakingInfo();
             }
         }
 
@@ -379,6 +529,7 @@
                 nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
                 tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
                 stakingContract = await window.ZODIAC_WEB3.getContract('staking');
+                tokenStakingContract = await window.ZODIAC_WEB3.getContract('tokenStaking');
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
                 ZODIAC_UI.showToast('合约初始化失败: ' + error.message, 'warning');
@@ -665,8 +816,185 @@
         document.getElementById('refreshWallet').addEventListener('click', initWeb3);
         document.getElementById('stakeBtn').addEventListener('click', stakeNFTs);
         document.getElementById('claimBtn').addEventListener('click', claimRewards);
+        
+        document.getElementById('tokenStakeBtn').addEventListener('click', handleTokenStake);
+        document.getElementById('tokenUnstakeBtn').addEventListener('click', handleTokenUnstake);
+        document.getElementById('claimTokenRewardsBtn').addEventListener('click', claimTokenRewards);
+        
+        document.getElementById('tokenStakeAmount').addEventListener('input', updateTokenStakeButton);
+        document.getElementById('tokenUnstakeAmount').addEventListener('input', updateTokenUnstakeButton);
 
         setInterval(loadRewards, 60000);
+    </script>
+
+    <script>
+        async function loadTokenStakingInfo() {
+            if (!tokenStakingContract) {
+                ZODIAC_UI.showToast('代币质押合约未配置', 'warning');
+                return;
+            }
+
+            try {
+                const balance = await tokenContract.methods.balanceOf(account).call();
+                document.getElementById('tokenBalance').textContent = web3.utils.fromWei(balance, 'ether').substring(0, 10);
+
+                const stakeInfo = await tokenStakingContract.methods.getUserStake(account).call();
+                document.getElementById('myTokenStakeAmount').textContent = web3.utils.fromWei(stakeInfo.amount, 'ether').substring(0, 10);
+                document.getElementById('tokenRewardsAmount').textContent = web3.utils.fromWei(stakeInfo.accumulatedRewards, 'ether').substring(0, 10);
+                document.getElementById('claimableBNB').textContent = web3.utils.fromWei(stakeInfo.accumulatedRewards, 'ether').substring(0, 10);
+
+                if (stakeInfo.stakedAt > 0) {
+                    const date = new Date(stakeInfo.stakedAt * 1000);
+                    document.getElementById('tokenStakedAt').textContent = date.toLocaleString('zh-CN');
+                } else {
+                    document.getElementById('tokenStakedAt').textContent = '-';
+                }
+
+                const bnbBalance = await tokenStakingContract.methods.getContractBNBBalance().call();
+                document.getElementById('tokenStakingBNBBalance').textContent = web3.utils.fromWei(bnbBalance, 'ether').substring(0, 10);
+
+                const totalStaked = await tokenStakingContract.methods.totalStakedTokens().call();
+                document.getElementById('totalStakedTokens').textContent = web3.utils.fromWei(totalStaked, 'ether').substring(0, 10);
+
+                const releaseRatio = await tokenStakingContract.methods.getCurrentReleaseRatio().call();
+                document.getElementById('currentReleaseRatio').textContent = (releaseRatio / 100).toFixed(2) + '%';
+
+                document.getElementById('tokenStakeBtn').disabled = false;
+                document.getElementById('tokenUnstakeBtn').disabled = stakeInfo.amount == 0;
+                document.getElementById('claimTokenRewardsBtn').disabled = stakeInfo.accumulatedRewards == 0;
+            } catch (error) {
+                console.error('加载代币质押信息失败:', error);
+                ZODIAC_UI.showToast('加载代币质押信息失败: ' + error.message, 'error');
+            }
+        }
+
+        function updateTokenStakeButton() {
+            const amount = document.getElementById('tokenStakeAmount').value;
+            const btn = document.getElementById('tokenStakeBtn');
+            btn.disabled = !amount || parseFloat(amount) <= 0;
+        }
+
+        function updateTokenUnstakeButton() {
+            const amount = document.getElementById('tokenUnstakeAmount').value;
+            const btn = document.getElementById('tokenUnstakeBtn');
+            btn.disabled = !amount || parseFloat(amount) <= 0;
+        }
+
+        async function handleTokenStake() {
+            const amount = document.getElementById('tokenStakeAmount').value;
+            if (!amount || parseFloat(amount) <= 0) {
+                ZODIAC_UI.showToast('请输入有效的质押数量', 'warning');
+                return;
+            }
+
+            const tokenStakingAddress = window.contractAddresses.tokenStaking;
+            if (!tokenStakingAddress || tokenStakingAddress === '0x0000000000000000000000000000000000000000') {
+                ZODIAC_UI.showToast('代币质押合约地址未配置', 'error');
+                return;
+            }
+
+            const confirm = await ZODIAC_UI.showConfirmModal(
+                '确认质押',
+                `将质押 ${amount} 代币`
+            );
+
+            if (!confirm) return;
+
+            const btn = document.getElementById('tokenStakeBtn');
+            btn.disabled = true;
+            btn.textContent = '质押中...';
+
+            try {
+                const amountWei = web3.utils.toWei(amount, 'ether');
+                
+                const allowance = await tokenContract.methods.allowance(account, tokenStakingAddress).call();
+                if (parseInt(allowance) < parseInt(amountWei)) {
+                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [tokenStakingAddress, amountWei], account);
+                    await tokenContract.methods.approve(tokenStakingAddress, amountWei).send({
+                        from: account,
+                        gas: approveGas
+                    });
+                }
+
+                const stakeGas = await ZODIAC_UI.estimateGas(tokenStakingContract, 'stakeTokens', [amountWei], account);
+                await tokenStakingContract.methods.stakeTokens(amountWei).send({
+                    from: account,
+                    gas: stakeGas
+                });
+
+                ZODIAC_UI.showToast('代币质押成功！', 'success');
+                document.getElementById('tokenStakeAmount').value = '';
+                await loadTokenStakingInfo();
+            } catch (error) {
+                console.error('代币质押失败:', error);
+                ZODIAC_UI.showToast('代币质押失败: ' + (error.message || '未知错误'), 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '质押代币';
+            }
+        }
+
+        async function handleTokenUnstake() {
+            const amount = document.getElementById('tokenUnstakeAmount').value;
+            if (!amount || parseFloat(amount) <= 0) {
+                ZODIAC_UI.showToast('请输入有效的赎回数量', 'warning');
+                return;
+            }
+
+            const confirm = await ZODIAC_UI.showConfirmModal(
+                '确认赎回',
+                `将赎回 ${amount} 代币，同时领取累积奖励`
+            );
+
+            if (!confirm) return;
+
+            const btn = document.getElementById('tokenUnstakeBtn');
+            btn.disabled = true;
+            btn.textContent = '赎回中...';
+
+            try {
+                const amountWei = web3.utils.toWei(amount, 'ether');
+                
+                const gas = await ZODIAC_UI.estimateGas(tokenStakingContract, 'unstakeTokens', [amountWei], account);
+                await tokenStakingContract.methods.unstakeTokens(amountWei).send({
+                    from: account,
+                    gas: gas
+                });
+
+                ZODIAC_UI.showToast('代币赎回成功！', 'success');
+                document.getElementById('tokenUnstakeAmount').value = '';
+                await loadTokenStakingInfo();
+            } catch (error) {
+                console.error('代币赎回失败:', error);
+                ZODIAC_UI.showToast('代币赎回失败: ' + (error.message || '未知错误'), 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '赎回代币';
+            }
+        }
+
+        async function claimTokenRewards() {
+            const btn = document.getElementById('claimTokenRewardsBtn');
+            btn.disabled = true;
+            btn.textContent = '领取中...';
+
+            try {
+                const gas = await ZODIAC_UI.estimateGas(tokenStakingContract, 'claimRewards', [], account);
+                await tokenStakingContract.methods.claimRewards().send({
+                    from: account,
+                    gas: gas
+                });
+
+                ZODIAC_UI.showToast('BNB奖励领取成功！', 'success');
+                await loadTokenStakingInfo();
+            } catch (error) {
+                console.error('领取代币奖励失败:', error);
+                ZODIAC_UI.showToast('领取代币奖励失败: ' + (error.message || '未知错误'), 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '领取BNB奖励';
+            }
+        }
     </script>
 </body>
 </html>
