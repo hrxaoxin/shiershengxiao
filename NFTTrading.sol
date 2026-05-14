@@ -10,7 +10,13 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/utils/Counters.sol";
 
-// NFT上架结构体
+/**
+ * @dev NFT上架结构体
+ * @param seller 卖家地址
+ * @param price 价格（单位：BNB wei，1 BNB = 10^18 wei）
+ * @param listedAt 上架时间戳
+ * @param isActive 是否活跃
+ */
 struct NFTListing {
     address seller;
     uint256 price; // 价格（单位：BNB wei，1 BNB = 10^18 wei）
@@ -18,7 +24,11 @@ struct NFTListing {
     bool isActive; // 是否活跃
 }
 
-// 核心NFT交易合约
+/**
+ * @title NFTTrading
+ * @dev 核心NFT交易合约，支持NFT上架、购买、下架等功能
+ * 基于OpenZeppelin UUPS可升级合约实现
+ */
 contract NFTTrading is 
     Initializable, 
     OwnableUpgradeable, 
@@ -28,58 +38,208 @@ contract NFTTrading is
     ERC721HolderUpgradeable
 {
     // 核心常量
+    /** @dev 合约版本号 */
     uint256 public constant VERSION = 1;
-    uint256 public constant FEE_DENOMINATOR = 10000; // 手续费分母（10000 = 100%）
-    uint256 public constant FEE_PERCENTAGE = 500;    // 5%手续费（500/10000）
-    uint256 public constant BNB_TO_WEI = 1e18;        // BNB转wei的系数（1 BNB = 10^18 wei）
-    uint256 public constant MIN_LISTING_PRICE_WEI = 1e15; // 最小上架价格（0.001 BNB）
-    uint256 public constant MAX_OVERPAY_RATIO = 200;  // 最大超额支付比例（200%）
-    uint256 public constant OVERPAY_DENOMINATOR = 100; // 超额支付分母
+    /** @dev 手续费分母（10000 = 100%）*/
+    uint256 public constant FEE_DENOMINATOR = 10000;
+    /** @dev 5%手续费（500/10000）*/
+    uint256 public constant FEE_PERCENTAGE = 500;
+    /** @dev BNB转wei的系数（1 BNB = 10^18 wei）*/
+    uint256 public constant BNB_TO_WEI = 1e18;
+    /** @dev 最小上架价格（0.001 BNB）*/
+    uint256 public constant MIN_LISTING_PRICE_WEI = 1e15;
+    /** @dev 最大超额支付比例（200%）*/
+    uint256 public constant MAX_OVERPAY_RATIO = 200;
+    /** @dev 超额支付分母 */
+    uint256 public constant OVERPAY_DENOMINATOR = 100;
 
     // 可配置参数（替代硬编码）
-    uint256 private _maxListingPriceBNB; // 最大上架价格（BNB）
-    uint256 private _maxListingPrice;    // 最大价格（wei）
+    /** @dev 最大上架价格（BNB）*/
+    uint256 private _maxListingPriceBNB;
+    /** @dev 最大价格（wei）*/
+    uint256 private _maxListingPrice;
 
-    // ========== 关键修复1：添加缺失的_authorizer状态变量 ==========
-    address private _authorizer; // 授权合约地址
-    address private _royaltyWallet; // 手续费接收钱包地址
+    // 关键状态变量
+    /** @dev 授权合约地址 */
+    address private _authorizer;
+    /** @dev 手续费接收钱包地址 */
+    address private _royaltyWallet;
 
     // 核心状态变量
-    address private _nftContract;          // NFT合约地址（封装）
-    address private _rewardManager;        // 奖励管理器地址（封装）
-    uint256 public activeListings;       // 当前活跃上架数
-    uint256 public totalListedCount;     // 累计上架总数
-    uint256 public totalSales;           // 累计成交数
-    uint256 public totalFeesCollected;   // 累计手续费（单位：BNB wei）
+    /** @dev NFT合约地址（封装）*/
+    address private _nftContract;
+    /** @dev 奖励管理器地址（封装）*/
+    address private _rewardManager;
+    /** @dev 当前活跃上架数 */
+    uint256 public activeListings;
+    /** @dev 累计上架总数 */
+    uint256 public totalListedCount;
+    /** @dev 累计成交数 */
+    uint256 public totalSales;
+    /** @dev 累计手续费（单位：BNB wei）*/
+    uint256 public totalFeesCollected;
 
     // 核心映射
-    mapping(uint256 => NFTListing) public listings;          // tokenId => 上架信息
-    mapping(address => uint256[]) public userListedTokens;   // 用户 => 上架的token列表
-    mapping(uint256 => uint256) public tokenToListingIndex;  // tokenId => 在用户列表中的索引
-    uint256[] public activeListingIds;                       // 活跃上架列表（优化查询效率）
-    mapping(uint256 => uint256) public tokenToActiveIndex;   // tokenId => 在活跃列表中的索引
-    uint256[] public allListingIds;                         // 所有上架记录（包括已下架）
-    uint256 public totalOverpaid;                            // 累计超额支付金额（作为合约运营费用）
+    /** @dev tokenId => 上架信息 */
+    mapping(uint256 => NFTListing) public listings;
+    /** @dev 用户 => 上架的token列表 */
+    mapping(address => uint256[]) public userListedTokens;
+    /** @dev tokenId => 在用户列表中的索引 */
+    mapping(uint256 => uint256) public tokenToListingIndex;
+    /** @dev 活跃上架列表（优化查询效率）*/
+    uint256[] public activeListingIds;
+    /** @dev tokenId => 在活跃列表中的索引 */
+    mapping(uint256 => uint256) public tokenToActiveIndex;
+    /** @dev 所有上架记录（包括已下架）*/
+    uint256[] public allListingIds;
+    /** @dev 累计超额支付金额（作为合约运营费用）*/
+    uint256 public totalOverpaid;
 
-    // 事件定义（新增block.number索引）
+    // 事件定义
+    /**
+     * @dev NFT上架事件
+     * @param tokenId NFT ID
+     * @param seller 卖家地址
+     * @param priceBNB 价格（BNB）
+     * @param priceWEI 价格（wei）
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event NFTListed(uint256 indexed tokenId, address indexed seller, uint256 priceBNB, uint256 priceWEI, uint256 timestamp, uint256 blockNumber);
+    
+    /**
+     * @dev NFT下架事件
+     * @param tokenId NFT ID
+     * @param seller 卖家地址
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event NFTUnlisted(uint256 indexed tokenId, address indexed seller, uint256 timestamp, uint256 blockNumber);
+    
+    /**
+     * @dev NFT成交事件
+     * @param tokenId NFT ID
+     * @param seller 卖家地址
+     * @param buyer 买家地址
+     * @param priceBNB 价格（BNB）
+     * @param priceWEI 价格（wei）
+     * @param feeBNB 手续费（BNB）
+     * @param feeWEI 手续费（wei）
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event NFTSold(uint256 indexed tokenId, address indexed seller, address indexed buyer, uint256 priceBNB, uint256 priceWEI, uint256 feeBNB, uint256 feeWEI, uint256 timestamp, uint256 blockNumber);
+    
+    /**
+     * @dev 手续费收取事件
+     * @param to 接收地址
+     * @param amountBNB 金额（BNB）
+     * @param amountWEI 金额（wei）
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event FeeCollected(address indexed to, uint256 amountBNB, uint256 amountWEI, uint256 timestamp, uint256 blockNumber);
+    
+    /**
+     * @dev 合约地址更新事件
+     * @param oldAddress 旧地址
+     * @param newAddress 新地址
+     * @param contractType 合约类型
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event ContractUpdated(address indexed oldAddress, address indexed newAddress, string contractType, uint256 timestamp, uint256 blockNumber);
+    
+    /**
+     * @dev NFT退回事件
+     * @param tokenId NFT ID
+     * @param seller 卖家地址
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event NFTReturned(uint256 indexed tokenId, address indexed seller, uint256 timestamp, uint256 blockNumber);
-    /** @dev NFT 转账失败事件（用于追踪失败的交易） */
+    
+    /**
+     * @dev NFT转账失败事件（用于追踪失败的交易）
+     * @param tokenId NFT ID
+     * @param buyer 买家地址
+     * @param originalSeller 原始卖家地址
+     * @param priceWEI 价格（wei）
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event NFTTransferFailed(uint256 indexed tokenId, address indexed buyer, address indexed originalSeller, uint256 priceWEI, uint256 timestamp, uint256 blockNumber);
+    
+    /**
+     * @dev 紧急提取BNB事件
+     * @param owner 所有者地址
+     * @param to 接收地址
+     * @param amountBNB 金额（BNB）
+     * @param amountWEI 金额（wei）
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event EmergencyWithdrawBNB(address indexed owner, address indexed to, uint256 amountBNB, uint256 amountWEI, uint256 timestamp, uint256 blockNumber);
+    
+    /**
+     * @dev 紧急提取NFT事件
+     * @param owner 所有者地址
+     * @param to 接收地址
+     * @param tokenId NFT ID
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event EmergencyWithdrawNFT(address indexed owner, address indexed to, uint256 indexed tokenId, uint256 timestamp, uint256 blockNumber);
+    
+    /**
+     * @dev 上架价格更新事件
+     * @param tokenId NFT ID
+     * @param seller 卖家地址
+     * @param newPriceBNB 新价格（BNB）
+     * @param newPriceWEI 新价格（wei）
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event ListingPriceUpdated(uint256 indexed tokenId, address indexed seller, uint256 newPriceBNB, uint256 newPriceWEI, uint256 timestamp, uint256 blockNumber);
+    
+    /**
+     * @dev 最大上架价格更新事件
+     * @param oldPriceBNB 旧价格（BNB）
+     * @param newPriceBNB 新价格（BNB）
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event MaxListingPriceUpdated(uint256 oldPriceBNB, uint256 newPriceBNB, uint256 timestamp, uint256 blockNumber);
-    // ========== 关键修复2：添加Authorizer更新事件 ==========
+    
+    /**
+     * @dev 授权合约更新事件
+     * @param oldAuthorizer 旧授权合约地址
+     * @param newAuthorizer 新授权合约地址
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event AuthorizerUpdated(address indexed oldAuthorizer, address indexed newAuthorizer, uint256 timestamp, uint256 blockNumber);
+    
+    /**
+     * @dev 超额支付接收事件
+     * @param user 用户地址
+     * @param amountWEI 金额（wei）
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event OverpaidReceived(address indexed user, uint256 amountWEI, uint256 timestamp, uint256 blockNumber);
+    
+    /**
+     * @dev 超额支付提取事件
+     * @param owner 所有者地址
+     * @param to 接收地址
+     * @param amountWEI 金额（wei）
+     * @param timestamp 时间戳
+     * @param blockNumber 区块号
+     */
     event OverpaidWithdrawn(address indexed owner, address indexed to, uint256 amountWEI, uint256 timestamp, uint256 blockNumber);
 
-    // 存储间隙（重新分配，避免和父合约冲突）
+    /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[40] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -87,7 +247,14 @@ contract NFTTrading is
         _disableInitializers();
     }
 
-    // 初始化函数（替代构造函数）
+    /**
+     * @dev 初始化函数（替代构造函数）
+     * @param nftContract NFT合约地址
+     * @param rewardManager 奖励管理器地址
+     * @param authorizer 授权合约地址
+     * @param maxListingPriceBNB 最大上架价格（BNB）
+     * @param royaltyWallet 手续费接收钱包地址
+     */
     function initialize(
         address nftContract, 
         address rewardManager, 
@@ -95,19 +262,16 @@ contract NFTTrading is
         uint256 maxListingPriceBNB,
         address royaltyWallet
     ) external initializer {
-        // UUPSUpgradeable应优先初始化，确保代理上下文正确
         __UUPSUpgradeable_init();
         __ERC721Holder_init();
         __Ownable2Step_init();
         __ReentrancyGuard_init();
         __Pausable_init();
 
-        // 基础校验
         require(nftContract != address(0), "NFTTrading: invalid NFT contract");
         require(rewardManager != address(0), "NFTTrading: invalid RewardManager");
         require(maxListingPriceBNB > 0, "NFTTrading: max price must be > 0");
 
-        // 初始化状态变量
         _nftContract = nftContract;
         _rewardManager = rewardManager;
         _maxListingPriceBNB = maxListingPriceBNB;
@@ -116,33 +280,56 @@ contract NFTTrading is
         _royaltyWallet = royaltyWallet;
     }
 
-    // UUPS升级授权（增强校验+添加view修饰符消除警告）
+    /**
+     * @dev UUPS升级授权
+     * @param newImplementation 新实现合约地址
+     */
     function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
         require(newImplementation != address(0), "NFTTrading: invalid new implementation");
     }
 
-    // 检查合约是否运行在UUPS代理上下文
+    /**
+     * @dev 检查合约是否运行在UUPS代理上下文
+     * @return bool 是否在代理上下文
+     */
     function isProxy() public view returns (bool) {
         return address(this).code.length == 0;
     }
 
-    // ========== 内部辅助函数：BNB单位转换（修复精度问题） ==========
+    /**
+     * @dev BNB转wei（内部辅助函数）
+     * @param amountBNB BNB数量
+     * @return uint256 wei数量
+     */
     function _bnbToWei(uint256 amountBNB) internal pure returns (uint256) {
         require(amountBNB <= type(uint256).max / BNB_TO_WEI, "NFTTrading: BNB amount overflow");
         return amountBNB * BNB_TO_WEI;
     }
 
-    // 修复：返回带18位小数的BNB值（如1.5e18 wei返回1500000000000000000）
+    /**
+     * @dev wei转BNB（带小数精度）
+     * @param amountWEI wei数量
+     * @return uint256 BNB数量（18位小数）
+     */
     function _weiToBnbWithDecimals(uint256 amountWEI) internal pure returns (uint256) {
-        return amountWEI; // 直接返回wei值，前端可除以1e18解析为带小数的BNB
+        return amountWEI;
     }
 
-    // 兼容旧逻辑：返回整数BNB（仅用于事件/展示，核心计算仍用wei）
+    /**
+     * @dev wei转BNB（整数）
+     * @param amountWEI wei数量
+     * @return uint256 BNB数量（整数）
+     */
     function _weiToBnb(uint256 amountWEI) internal pure returns (uint256) {
         return amountWEI / BNB_TO_WEI;
     }
 
-    // 处理带小数的BNB（比如0.001 BNB = 1e15 wei）
+    /**
+     * @dev 带小数的BNB转wei
+     * @param amount 数量
+     * @param decimals 小数位数
+     * @return uint256 wei数量
+     */
     function _bnbWithDecimalsToWei(uint256 amount, uint256 decimals) internal pure returns (uint256) {
         require(decimals <= 18, "NFTTrading: decimals exceed 18");
         uint256 multiplier = 10 ** decimals;
@@ -150,24 +337,22 @@ contract NFTTrading is
         return amount * (BNB_TO_WEI / multiplier);
     }
 
-    // ========== 接口兼容性检查（修复调用风险） ==========
+    /**
+     * @dev 接口兼容性检查
+     * @return bool 是否兼容
+     * @return string 错误信息（如果不兼容）
+     */
     function checkInterfaceCompatibility() external view returns (bool, string memory) {
-        bytes4 ERC721_INTERFACE_ID = 0x80ac58cd; // 标准ERC721接口ID
+        bytes4 ERC721_INTERFACE_ID = 0x80ac58cd;
 
-        // 检查ERC721核心接口
         (bool supportsERC721, bytes memory data) = _nftContract.staticcall(
-            abi.encodeWithSelector(
-                bytes4(keccak256("supportsInterface(bytes4)")),
-                ERC721_INTERFACE_ID
-            )
+            abi.encodeWithSelector(bytes4(keccak256("supportsInterface(bytes4)")), ERC721_INTERFACE_ID)
         );
         if (!supportsERC721 || data.length == 0 || !abi.decode(data, (bool))) {
             return (false, "NFT contract does not support ERC721");
         }
 
-        // 检查自定义NFT接口（使用try/catch处理Revert）
         try INFTMint(_nftContract).tokenType(1) returns (NFTDataTypes.ZodiacType) {
-            // 接口存在
         } catch {
             return (false, "NFT contract does not support tokenType");
         }
@@ -175,13 +360,20 @@ contract NFTTrading is
         return (true, "All interfaces are compatible");
     }
 
-    // ========== 自定义修饰器 ==========
+    /**
+     * @dev 有效Token校验修饰器
+     * @param tokenId NFT ID
+     */
     modifier onlyValidToken(uint256 tokenId) {
         INFTMint nft = INFTMint(_nftContract);
         require(nft.ownerOf(tokenId) != address(0), "NFTTrading: token does not exist");
         _;
     }
 
+    /**
+     * @dev 卖家校验修饰器
+     * @param tokenId NFT ID
+     */
     modifier onlySeller(uint256 tokenId) {
         NFTListing storage listing = listings[tokenId];
         require(listing.isActive, "NFTTrading: NFT not listed");
@@ -189,24 +381,24 @@ contract NFTTrading is
         _;
     }
 
-    // ========== 核心功能：上架NFT ==========
+    /**
+     * @dev 上架NFT
+     * @param tokenId NFT ID
+     * @param priceWEI 价格（wei）
+     */
     function listNFT(uint256 tokenId, uint256 priceWEI) external nonReentrant whenNotPaused onlyValidToken(tokenId) {
         INFTMint nft = INFTMint(_nftContract);
 
-        // 基础校验：直接校验wei单位价格
         require(nft.ownerOf(tokenId) == msg.sender, "NFTTrading: not the owner");
         require(nft.isApprovedForAll(msg.sender, address(this)) || nft.getApproved(tokenId) == address(this), "NFTTrading: contract not approved");
         require(!listings[tokenId].isActive, "NFTTrading: NFT already listed");
         require(priceWEI >= MIN_LISTING_PRICE_WEI && priceWEI <= _maxListingPrice, "NFTTrading: invalid WEI price");
 
-        // 校验NFT类型合法性
         NFTDataTypes.ZodiacType zodiacType = nft.tokenType(tokenId);
         require(uint256(zodiacType) < 120, "NFTTrading: invalid ZodiacType");
 
-        // 转移NFT到合约托管
         nft.safeTransferFrom(msg.sender, address(this), tokenId);
 
-        // 创建上架记录（存储wei单位）
         listings[tokenId] = NFTListing({
             seller: msg.sender,
             price: priceWEI,
@@ -214,28 +406,27 @@ contract NFTTrading is
             isActive: true
         });
 
-        // 更新用户上架列表
         uint256[] storage userTokens = userListedTokens[msg.sender];
         tokenToListingIndex[tokenId] = userTokens.length;
         userTokens.push(tokenId);
 
-        // 添加到活跃上架列表
         tokenToActiveIndex[tokenId] = activeListingIds.length;
         activeListingIds.push(tokenId);
         
-        // 添加到所有上架记录列表
         allListingIds.push(tokenId);
 
-        // 更新统计数据
         activeListings++;
         totalListedCount++;
 
-        // 计算BNB单位用于事件输出（修复精度）
         uint256 priceBNB = _weiToBnbWithDecimals(priceWEI);
         emit NFTListed(tokenId, msg.sender, priceBNB, priceWEI, block.timestamp, block.number);
     }
 
-    // ========== 核心功能：修改上架价格 ==========
+    /**
+     * @dev 修改上架价格
+     * @param tokenId NFT ID
+     * @param newPriceWEI 新价格（wei）
+     */
     function updateListingPrice(uint256 tokenId, uint256 newPriceWEI) external nonReentrant whenNotPaused onlySeller(tokenId) {
         require(newPriceWEI >= MIN_LISTING_PRICE_WEI && newPriceWEI <= _maxListingPrice, "NFTTrading: invalid new WEI price");
 
@@ -244,24 +435,27 @@ contract NFTTrading is
         emit ListingPriceUpdated(tokenId, msg.sender, newPriceBNB, newPriceWEI, block.timestamp, block.number);
     }
 
-    // ========== 核心功能：下架NFT ==========
+    /**
+     * @dev 下架NFT
+     * @param tokenId NFT ID
+     */
     function unlistNFT(uint256 tokenId) external nonReentrant whenNotPaused onlySeller(tokenId) {
         NFTListing storage listing = listings[tokenId];
         address seller = listing.seller;
 
-        // 移除上架记录
         _removeListing(tokenId, seller);
 
-        // 安全退回NFT
         INFTMint(_nftContract).safeTransferFrom(address(this), seller, tokenId);
 
         emit NFTUnlisted(tokenId, seller, block.timestamp, block.number);
         emit NFTReturned(tokenId, seller, block.timestamp, block.number);
     }
 
-    // ========== 核心功能：购买NFT（按照Checks-Effects-Interactions模式） ==========
+    /**
+     * @dev 购买NFT（按照Checks-Effects-Interactions模式）
+     * @param tokenId NFT ID
+     */
     function buyNFT(uint256 tokenId) external payable nonReentrant whenNotPaused {
-        // ========== 1. Checks：所有校验放在最前面 ==========
         require(tokenId > 0, "NFTTrading: invalid token ID (must be > 0)");
         require(msg.value > 0, "NFTTrading: payment must be greater than 0");
         require(msg.value <= _maxListingPrice, "NFTTrading: payment exceeds maximum allowed price");
@@ -306,24 +500,17 @@ contract NFTTrading is
             royaltyWallet = owner();
         }
 
-        // 校验合约余额足够支付给卖家
         require(address(this).balance >= sellerAmountWEI, "NFTTrading: insufficient contract balance for seller payment");
 
-        // ========== 2. Effects：修改内部状态 ==========
         _removeListing(tokenId, seller);
         totalSales++;
         totalFeesCollected += feeWEI;
 
-        // ========== 3. Interactions：与外部合约交互（原子性处理） ==========
-        // 先尝试 NFT 转账，如果失败则回滚所有 BNB 转账
         bool nftTransferSuccess = false;
         
-        // 尝试 NFT 转账（最关键的操作）
         try nft.safeTransferFrom(address(this), msg.sender, tokenId) {
             nftTransferSuccess = true;
         } catch {
-            // NFT 转账失败，回滚操作
-            // 恢复 listing 状态
             listings[tokenId] = NFTListing({
                 seller: seller,
                 price: priceWEI,
@@ -335,7 +522,6 @@ contract NFTTrading is
             totalSales--;
             totalFeesCollected -= feeWEI;
             
-            // 退还买家全款
             (bool refundSuccess, ) = msg.sender.call{value: msg.value}("");
             require(refundSuccess, "NFTTrading: refund to buyer failed");
             
@@ -343,7 +529,6 @@ contract NFTTrading is
             return;
         }
         
-        // NFT 转账成功后，处理 BNB 转账
         if (nftTransferSuccess) {
             if (sellerAmountWEI > 0) {
                 _safeTransferBNB(seller, sellerAmountWEI);
@@ -363,7 +548,7 @@ contract NFTTrading is
     }
     
     /**
-     * @dev 将 listing 添加回用户上架列表
+     * @dev 将listing添加回用户上架列表
      * @param user 用户地址
      * @param tokenId token ID
      */
@@ -374,7 +559,7 @@ contract NFTTrading is
     }
     
     /**
-     * @dev 将 token 添加回活跃上架列表
+     * @dev 将token添加回活跃上架列表
      * @param tokenId token ID
      */
     function _addToActiveListings(uint256 tokenId) internal {
@@ -383,21 +568,27 @@ contract NFTTrading is
         activeListings++;
     }
 
-    // ========== 修复：移除onlyOwner修饰符，允许合约内部调用，并大幅提高Gas上限 ==========
+    /**
+     * @dev 安全转移BNB
+     * @param to 接收地址
+     * @param amountWEI 金额（wei）
+     */
     function _safeTransferBNB(address to, uint256 amountWEI) internal {
         require(to != address(0), "NFTTrading: transfer to zero address");
         require(amountWEI > 0, "NFTTrading: transfer amount must be positive");
         require(address(this).balance >= amountWEI, "NFTTrading: contract BNB balance insufficient");
 
-        // 修复：移除Gas限制，让调用者提供足够的Gas
-        // 对于EOA，2300 gas足够；对于合约，我们不限制，让合约自己处理。
         (bool success, ) = to.call{value: amountWEI}("");
         require(success, string(abi.encodePacked(
             "NFTTrading: BNB transfer failed to ", to, " (amount: ", amountWEI, " wei)"
         )));
     }
 
-    // ========== 合约拥有者专属：提取指定金额BNB ==========
+    /**
+     * @dev 合约拥有者提取指定金额BNB
+     * @param to 接收地址
+     * @param amountBNB BNB数量
+     */
     function ownerWithdrawBNB(address payable to, uint256 amountBNB) external onlyOwner nonReentrant {
         require(to != address(0), "NFTTrading: invalid recipient");
         require(amountBNB > 0, "NFTTrading: invalid BNB amount");
@@ -405,13 +596,16 @@ contract NFTTrading is
         uint256 amountWEI = _bnbToWei(amountBNB);
         require(amountWEI <= address(this).balance, "NFTTrading: insufficient BNB balance");
 
-        // 安全转账
         _safeTransferBNB(to, amountWEI);
 
         emit EmergencyWithdrawBNB(msg.sender, to, amountBNB, amountWEI, block.timestamp, block.number);
     }
 
-    // ========== 合约拥有者提取超额支付金额（作为运营费用） ==========
+    /**
+     * @dev 合约拥有者提取超额支付金额
+     * @param to 接收地址
+     * @param amountWEI 金额（wei）
+     */
     function withdrawOverpaid(address payable to, uint256 amountWEI) external onlyOwner nonReentrant {
         require(to != address(0), "NFTTrading: invalid recipient");
         require(amountWEI > 0, "NFTTrading: invalid amount");
@@ -424,7 +618,10 @@ contract NFTTrading is
         emit OverpaidWithdrawn(msg.sender, to, amountWEI, block.timestamp, block.number);
     }
 
-    // ========== 合约拥有者专属：提取所有BNB ==========
+    /**
+     * @dev 合约拥有者提取所有BNB
+     * @param to 接收地址
+     */
     function ownerWithdrawAllBNB(address payable to) external onlyOwner nonReentrant {
         require(to != address(0), "NFTTrading: invalid recipient");
         uint256 balanceWEI = address(this).balance;
@@ -439,23 +636,27 @@ contract NFTTrading is
         emit EmergencyWithdrawBNB(msg.sender, to, balanceBNB, balanceWEI, block.timestamp, block.number);
     }
 
-    // ========== 合约拥有者专属：提取NFT ==========
+    /**
+     * @dev 合约拥有者提取NFT
+     * @param to 接收地址
+     * @param tokenId NFT ID
+     */
     function ownerWithdrawNFT(address to, uint256 tokenId) external onlyOwner nonReentrant {
         require(to != address(0), "NFTTrading: invalid recipient");
         INFTMint nft = INFTMint(_nftContract);
 
-        // 校验合约持有NFT
         require(nft.ownerOf(tokenId) == address(this), "NFTTrading: contract does not own NFT");
-        // 禁止提取正在上架的NFT
         require(!listings[tokenId].isActive, "NFTTrading: cannot withdraw listed NFT");
 
-        // 安全转移NFT
         nft.safeTransferFrom(address(this), to, tokenId);
 
         emit EmergencyWithdrawNFT(msg.sender, to, tokenId, block.timestamp, block.number);
     }
 
-    // ========== 管理员功能 ==========
+    /**
+     * @dev 设置NFT合约地址
+     * @param newNFTContract NFT合约地址
+     */
     function setNFTContract(address newNFTContract) external {
         require(msg.sender == owner() || msg.sender == _authorizer, "NFTTrading: Unauthorized");
         require(newNFTContract != address(0), "NFTTrading: invalid NFT contract");
@@ -464,6 +665,10 @@ contract NFTTrading is
         emit ContractUpdated(oldAddress, newNFTContract, "NFTContract", block.timestamp, block.number);
     }
 
+    /**
+     * @dev 设置奖励管理器地址
+     * @param newRewardManager 奖励管理器地址
+     */
     function setRewardManager(address newRewardManager) external {
         require(msg.sender == owner() || msg.sender == _authorizer, "NFTTrading: Unauthorized");
         require(newRewardManager != address(0), "NFTTrading: invalid RewardManager");
@@ -473,18 +678,17 @@ contract NFTTrading is
     }
 
     /**
-     * @dev 管理员功能：设置授权合约地址
+     * @dev 设置授权合约地址
      * @param authorizer 授权合约地址
      */
     function setAuthorizer(address authorizer) external onlyOwner {
         address oldAuthorizer = _authorizer;
         _authorizer = authorizer;
-        // ========== 关键修复4：添加事件发射 ==========
         emit AuthorizerUpdated(oldAuthorizer, authorizer, block.timestamp, block.number);
     }
 
     /**
-     * @dev 管理员功能：设置手续费接收钱包地址
+     * @dev 设置手续费接收钱包地址
      * @param wallet 手续费接收钱包地址
      */
     function setRoyaltyWallet(address wallet) external onlyOwner {
@@ -500,7 +704,10 @@ contract NFTTrading is
         return _royaltyWallet;
     }
 
-    // 修复：添加可配置最大上架价格
+    /**
+     * @dev 设置最大上架价格
+     * @param newMaxListingPriceBNB 最大上架价格（BNB）
+     */
     function setMaxListingPriceBNB(uint256 newMaxListingPriceBNB) external onlyOwner {
         require(newMaxListingPriceBNB > 0, "NFTTrading: max price must be > 0");
         uint256 oldPrice = _maxListingPriceBNB;
@@ -509,27 +716,34 @@ contract NFTTrading is
         emit MaxListingPriceUpdated(oldPrice, newMaxListingPriceBNB, block.timestamp, block.number);
     }
 
+    /**
+     * @dev 暂停合约
+     */
     function pause() external onlyOwner {
         _pause();
     }
 
+    /**
+     * @dev 恢复合约
+     */
     function unpause() external onlyOwner {
         _unpause();
     }
 
+    /**
+     * @dev 紧急下架NFT（合约拥有者）
+     * @param tokenId NFT ID
+     */
     function emergencyUnlistNFT(uint256 tokenId) external onlyOwner {
         NFTListing storage listing = listings[tokenId];
         if (listing.isActive) {
             address seller = listing.seller;
             INFTMint nft = INFTMint(_nftContract);
 
-            // 增加NFT持有校验
             require(nft.ownerOf(tokenId) == address(this), "NFTTrading: contract does not hold NFT");
 
-            // 移除上架记录
             _removeListing(tokenId, seller);
 
-            // 退回NFT
             nft.safeTransferFrom(address(this), seller, tokenId);
 
             emit NFTUnlisted(tokenId, seller, block.timestamp, block.number);
@@ -537,14 +751,17 @@ contract NFTTrading is
         }
     }
 
-    // ========== 辅助函数（修复activeListings下溢+彻底清理数据） ==========
+    /**
+     * @dev 移除上架记录（内部函数）
+     * @param tokenId NFT ID
+     * @param seller 卖家地址
+     */
     function _removeListing(uint256 tokenId, address seller) internal {
         NFTListing storage listing = listings[tokenId];
         if (!listing.isActive) return;
 
         listing.isActive = false;
 
-        // 从用户列表中移除token
         uint256[] storage userTokens = userListedTokens[seller];
         uint256 index = tokenToListingIndex[tokenId];
 
@@ -555,16 +772,18 @@ contract NFTTrading is
                 tokenToListingIndex[userTokens[lastIndex]] = index;
             }
             userTokens.pop();
-            delete tokenToListingIndex[tokenId]; // 彻底清理索引
+            delete tokenToListingIndex[tokenId];
         }
 
-        // 从活跃上架列表中移除token
         _removeFromActiveListings(tokenId);
 
-        // 确保activeListings不会下溢
         activeListings = activeListings > 0 ? activeListings - 1 : 0;
     }
 
+    /**
+     * @dev 从活跃上架列表中移除token
+     * @param tokenId NFT ID
+     */
     function _removeFromActiveListings(uint256 tokenId) internal {
         uint256 index = tokenToActiveIndex[tokenId];
         uint256 lastIndex = activeListingIds.length - 1;
@@ -580,28 +799,56 @@ contract NFTTrading is
         }
     }
 
-    // ========== 合约状态查询（封装+增强） ==========
+    /**
+     * @dev 获取NFT合约地址
+     * @return NFT合约地址
+     */
     function getNFTContract() external view returns (address) {
         return _nftContract;
     }
 
+    /**
+     * @dev 获取奖励管理器地址
+     * @return 奖励管理器地址
+     */
     function getRewardManager() external view returns (address) {
         return _rewardManager;
     }
 
-    // ========== 关键修复5：添加_authorizer的访问器函数 ==========
+    /**
+     * @dev 获取授权合约地址
+     * @return 授权合约地址
+     */
     function getAuthorizer() external view returns (address) {
         return _authorizer;
     }
 
+    /**
+     * @dev 获取最大上架价格（BNB）
+     * @return 最大上架价格（BNB）
+     */
     function getMaxListingPriceBNB() external view returns (uint256) {
         return _maxListingPriceBNB;
     }
 
+    /**
+     * @dev 获取最大上架价格（wei）
+     * @return 最大上架价格（wei）
+     */
     function getMaxListingPrice() external view returns (uint256) {
         return _maxListingPrice;
     }
 
+    /**
+     * @dev 获取合约统计数据
+     * @return _activeListings 活跃上架数
+     * @return _totalListedCount 累计上架数
+     * @return _totalSales 累计成交数
+     * @return _totalFeesCollectedBNB 累计手续费（BNB）
+     * @return _totalFeesCollectedWEI 累计手续费（wei）
+     * @return _contractBalanceBNB 合约余额（BNB）
+     * @return _contractBalanceWEI 合约余额（wei）
+     */
     function getContractStats() external view returns (
         uint256 _activeListings,
         uint256 _totalListedCount,
@@ -625,6 +872,13 @@ contract NFTTrading is
         );
     }
 
+    /**
+     * @dev 获取上架信息
+     * @param tokenId NFT ID
+     * @return listing 上架信息
+     * @return priceBNB 价格（BNB）
+     * @return priceWEI 价格（wei）
+     */
     function getListing(uint256 tokenId) external view returns (NFTListing memory listing, uint256 priceBNB, uint256 priceWEI) {
         listing = listings[tokenId];
         priceBNB = _weiToBnbWithDecimals(listing.price);
@@ -632,18 +886,37 @@ contract NFTTrading is
         return (listing, priceBNB, priceWEI);
     }
 
+    /**
+     * @dev 获取用户上架的NFT列表
+     * @param user 用户地址
+     * @return uint256[] NFT ID列表
+     */
     function getUserListedTokens(address user) external view returns (uint256[] memory) {
         return userListedTokens[user];
     }
 
+    /**
+     * @dev 获取卖家上架列表
+     * @param seller 卖家地址
+     * @return uint256[] NFT ID列表
+     */
     function getSellerListings(address seller) external view returns (uint256[] memory) {
         return userListedTokens[seller];
     }
 
+    /**
+     * @dev 取消上架（与unlistNFT同义）
+     * @param tokenId NFT ID
+     */
     function cancelListing(uint256 tokenId) external nonReentrant whenNotPaused {
         unlistNFT(tokenId);
     }
 
+    /**
+     * @dev 获取用户活跃上架数量
+     * @param user 用户地址
+     * @return uint256 活跃上架数量
+     */
     function getUserActiveListingsCount(address user) external view returns (uint256) {
         uint256 count = 0;
         uint256[] storage tokens = userListedTokens[user];
@@ -655,7 +928,12 @@ contract NFTTrading is
         return count;
     }
 
-    // 查询NFT价格（单独接口，便于前端调用）
+    /**
+     * @dev 查询NFT价格
+     * @param tokenId NFT ID
+     * @return priceWEI 价格（wei）
+     * @return priceBNB 价格（BNB）
+     */
     function getNFTPrice(uint256 tokenId) external view returns (uint256 priceWEI, uint256 priceBNB) {
         require(listings[tokenId].isActive, "NFTTrading: NFT not listed");
         priceWEI = listings[tokenId].price;
@@ -663,7 +941,9 @@ contract NFTTrading is
         return (priceWEI, priceBNB);
     }
 
-    // ========== 批量查询接口：获取所有活跃上架（优化前端查询效率） ==========
+    /**
+     * @dev 上架NFT结构体（用于批量查询）
+     */
     struct ListedNFT {
         uint256 tokenId;
         address seller;
@@ -672,6 +952,13 @@ contract NFTTrading is
         uint256 listedAt;
     }
 
+    /**
+     * @dev 获取所有上架记录
+     * @return tokenIds NFT ID列表
+     * @return sellers 卖家列表
+     * @return prices 价格列表
+     * @return actives 活跃状态列表
+     */
     function getAllListings() external view returns (uint256[] memory, address[] memory, uint256[] memory, bool[] memory) {
         uint256 count = allListingIds.length;
         uint256[] memory tokenIds = new uint256[](count);
@@ -691,6 +978,10 @@ contract NFTTrading is
         return (tokenIds, sellers, prices, actives);
     }
 
+    /**
+     * @dev 获取所有活跃上架
+     * @return ListedNFT[] 活跃上架列表
+     */
     function getAllActiveListings() external view returns (ListedNFT[] memory) {
         uint256 count = activeListingIds.length;
         ListedNFT[] memory result = new ListedNFT[](count);
@@ -710,26 +1001,32 @@ contract NFTTrading is
         return result;
     }
 
+    /**
+     * @dev 获取活跃上架数量
+     * @return uint256 活跃上架数量
+     */
     function getActiveListingsCount() external view returns (uint256) {
         return activeListingIds.length;
     }
 
-    // ========== 合约健康检查接口 ==========
+    /**
+     * @dev 获取合约健康状态
+     * @return nftContractAlive NFT合约是否正常
+     * @return availableBNBBalance 可用BNB余额
+     * @return status 合约状态
+     */
     function getContractHealth() external view returns (
         bool nftContractAlive,
         uint256 availableBNBBalance,
         string memory status
     ) {
-        // 检查NFT合约是否可调用
         nftContractAlive = false;
         try INFTMint(_nftContract).supportsInterface(0x80ac58cd) returns (bool) {
             nftContractAlive = true;
         } catch {}
 
-        // 可用BNB余额（扣除已承诺的手续费）
         availableBNBBalance = _weiToBnbWithDecimals(address(this).balance);
 
-        // 整体状态
         if (nftContractAlive && !paused()) {
             status = "HEALTHY";
         } else if (paused()) {
@@ -741,7 +1038,9 @@ contract NFTTrading is
         return (nftContractAlive, availableBNBBalance, status);
     }
 
-    // ========== 禁止直接BNB转账 ==========
+    /**
+     * @dev 禁止直接BNB转账
+     */
     receive() external payable {
         revert("NFTTrading: direct BNB transfers are forbidden - use buyNFT()");
     }

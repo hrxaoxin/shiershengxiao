@@ -20,6 +20,12 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 /**
  * @title RewardManager
  * @dev 奖励管理器合约，负责管理NFT持有者的分红和权重计算
+ * 资金分配比例可配置：
+ * - 用户分红: 45% (dividendRatio = 4500)
+ * - 合约所有者: 5% (ownerRatio = 500)
+ * - NFT质押矿池: 25% (nftStakingRatio = 2500)
+ * - 竞技场奖励: 15% (arenaRatio = 1500)
+ * - 代币质押矿池: 10% (tokenStakingRatio = 1000)
  */
 contract RewardManager is
     Initializable,
@@ -31,16 +37,16 @@ contract RewardManager is
 {
     /** @dev 合约版本号 */
     uint256 public constant VERSION = 2;
-    /** @dev 每张卡牌的权重值 */
+    /** @dev 每张卡牌的权重值（默认8） */
     uint256 public constant WEIGHT_PER_CARD = 8;
-    /** @dev 最低所有者权重（可修改） */
+    /** @dev 最低所有者权重（可修改，默认100） */
     uint256 public minOwnerWeight = 100;
     /** @dev 最大版税比例（5000 = 50%） */
     uint256 public constant MAX_ROYALTY_FEE = 5000;
 
     /** @dev 当前持有者总数 */
     uint256 public holdersCount;
-    /** @dev 分红池余额 */
+    /** @dev 用户分红池余额 */
     uint256 public dividendPool;
     /** @dev 已分发的分红总量 */
     uint256 public totalDistributed;
@@ -56,7 +62,7 @@ contract RewardManager is
     address public royaltyWallet;
     /** @dev 版税比例（默认500 = 5%） */
     uint256 public royaltyFee = 500;
-    /** @dev 比例总和分母 */
+    /** @dev 比例总和分母（10000 = 100%） */
     uint256 public constant RATIO_DENOMINATOR = 10000;
     /** @dev 用户分红比例（4500 = 45%）*/
     uint256 public dividendRatio = 4500;
@@ -102,7 +108,7 @@ contract RewardManager is
     mapping(address => bool) public isHolder;
     /** @dev 用户已领取分红映射 */
     mapping(address => uint256) public claimedDividend;
-    /** @dev 用户精度累积映射 */
+    /** @dev 用户精度累积映射（用于分红精度计算） */
     mapping(address => uint256) public precisionAcc;
     /** @dev 用户精度累积次数（用于解决长期累积导致的精度丢失问题） */
     mapping(address => uint256) public precisionAccumulationCount;
@@ -139,82 +145,92 @@ contract RewardManager is
      * @param user 用户地址
      * @param t 生肖类型
      * @param c 卡牌数量
-     * @param ts 时间�?
+     * @param ts 时间戳
      */
     event CardUpdated(address indexed user, NFTDataTypes.ZodiacType t, uint256 c, uint256 ts);
+    
     /**
      * @dev 分红领取事件
      * @param user 用户地址
      * @param amt 领取金额
-     * @param prec 精度�?
-     * @param ts 时间�?
+     * @param prec 精度值
+     * @param ts 时间戳
      */
     event DividendClaimed(address indexed user, uint256 amt, uint256 prec, uint256 ts);
+    
     /**
      * @dev 分红存入事件
      * @param amt 存入金额
      * @param sender 发送者地址
-     * @param ts 时间�?
+     * @param ts 时间戳
      */
     event DividendDeposited(uint256 amt, address indexed sender, uint256 ts);
+    
     /**
      * @dev 用户权重更新事件
      * @param user 用户地址
-     * @param oldWeight 旧权�?
-     * @param newWeight 新权�?
-     * @param ts 时间�?
+     * @param oldWeight 旧权重
+     * @param newWeight 新权重
+     * @param ts 时间戳
      */
     event UserWeightUpdated(address indexed user, uint256 oldWeight, uint256 newWeight, uint256 ts);
+    
     /**
-     * @dev 总权重更新事�?
-     * @param oldTotal 旧总权�?
-     * @param newTotal 新总权�?
-     * @param ts 时间�?
+     * @dev 总权重更新事件
+     * @param oldTotal 旧总权重
+     * @param newTotal 新总权重
+     * @param ts 时间戳
      */
     event TotalWeightUpdated(uint256 oldTotal, uint256 newTotal, uint256 ts);
+    
     /**
      * @dev NFT合约授权事件
      * @param nftContract NFT合约地址
      * @param authorized 是否授权
-     * @param timestamp 时间�?
+     * @param timestamp 时间戳
      */
     event NFTContractAuthorized(address indexed nftContract, bool authorized, uint256 timestamp);
+    
     /**
-     * @dev 紧急暂停事�?
+     * @dev 紧急暂停事件
      * @param owner 所有者地址
-     * @param timestamp 时间�?
+     * @param timestamp 时间戳
      */
     event EmergencyPause(address indexed owner, uint256 timestamp);
+    
     /**
      * @dev NFT合约更新事件
      * @param oldNFTContract 旧NFT合约地址
      * @param newNFTContract 新NFT合约地址
-     * @param timestamp 时间�?
+     * @param timestamp 时间戳
      */
     event NFTContractUpdated(address indexed oldNFTContract, address indexed newNFTContract, uint256 timestamp);
+    
     /**
      * @dev 版税钱包更新事件
      * @param oldWallet 旧钱包地址
      * @param newWallet 新钱包地址
-     * @param timestamp 时间�?
+     * @param timestamp 时间戳
      */
     event RoyaltyWalletUpdated(address indexed oldWallet, address indexed newWallet, uint256 timestamp);
+    
     /**
      * @dev 额外资金提取事件
      * @param owner 所有者地址
      * @param amount 提取金额
-     * @param timestamp 时间�?
+     * @param timestamp 时间戳
      */
     event ExtraFundsWithdrawn(address indexed owner, uint256 amount, uint256 timestamp);
+    
     /**
      * @dev 全部资金提取事件
      * @param owner 所有者地址
      * @param amount 提取金额
-     * @param timestamp 时间�?
+     * @param timestamp 时间戳
      */
     event FullFundsWithdrawn(address indexed owner, uint256 amount, uint256 timestamp);
 
-    /** @dev 存储间隙，用于合约升级兼容�?*/
+    /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[90] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -224,7 +240,7 @@ contract RewardManager is
 
     /**
      * @dev 授权检查修饰器
-     * 只有owner、operator、nftContract、authorizer或已授权的合约才能调�?
+     * 只有owner、operator、nftContract、authorizer或已授权的合约才能调用
      */
     modifier onlyAuthorized() {
         require(
@@ -257,7 +273,7 @@ contract RewardManager is
 
     /**
      * @dev 速率限制检查修饰器
-     * @param funcSig 函数选择�?
+     * @param funcSig 函数选择器
      */
     modifier rateLimited(bytes4 funcSig) {
         require(
@@ -274,7 +290,13 @@ contract RewardManager is
      * @param _royaltyWallet 版税接收钱包地址
      * @param _operator 运营者地址
      * @param _nftContract NFT合约地址
+     * @param _nftDataContract NFT数据合约地址
      * @param _authorizer 授权合约地址
+     * @param _rewardToken 奖励代币合约地址
+     * @param _stakingContract NFT质押合约地址
+     * @param _tokenStakingContract 代币质押合约地址
+     * @param _arenaContract 竞技场合约地址
+     * @param _swapRouter SwapRouter地址
      */
     function initialize(
         address initialOwner,
@@ -328,6 +350,7 @@ contract RewardManager is
 
     /**
      * @dev 获取NFT版税信息（ERC2981接口实现）
+     * @param tokenId NFT ID（未使用）
      * @param salePrice 销售价格
      * @return receiver 版税接收地址
      * @return royaltyAmount 版税金额
@@ -367,8 +390,8 @@ contract RewardManager is
     }
 
     /**
-     * @dev 设置所有者权�?
-     * @param _w 新权重�?
+     * @dev 设置所有者权重
+     * @param _w 新权重值
      */
     function setOwnerWeight(uint256 _w) external onlyOwner {
         require(_w >= minOwnerWeight, "RewardManager: Owner weight must be >= minimum weight");
@@ -408,7 +431,7 @@ contract RewardManager is
 
     /**
      * @dev 设置版税比例
-     * @param _f 新版税比例
+     * @param _f 新版税比例（千分比）
      */
     function setRoyaltyFee(uint256 _f) external onlyOwner {
         require(_f >= 0 && _f <= MAX_ROYALTY_FEE, "RM: fee invalid");
@@ -496,7 +519,7 @@ contract RewardManager is
 
     /**
      * @dev 设置操作冷却时间
-     * @param _cooldown 新的冷却时间
+     * @param _cooldown 新的冷却时间（秒）
      */
     function setOperationCooldown(uint256 _cooldown) external onlyOwner {
         operationCooldown = _cooldown;
@@ -519,33 +542,57 @@ contract RewardManager is
         nftDataContract = _nftDataContract;
     }
 
+    /**
+     * @dev 设置奖励代币合约地址
+     * @param _rewardToken 代币合约地址
+     */
     function setRewardToken(address _rewardToken) external onlyOwner nonZeroAddress(_rewardToken) {
         rewardToken = _rewardToken;
     }
 
+    /**
+     * @dev 设置NFT质押合约地址
+     * @param _stakingContract 质押合约地址
+     */
     function setStakingContract(address _stakingContract) external onlyOwner nonZeroAddress(_stakingContract) {
         stakingContract = _stakingContract;
     }
 
+    /**
+     * @dev 设置代币质押合约地址
+     * @param _tokenStakingContract 代币质押合约地址
+     */
     function setTokenStakingContract(address _tokenStakingContract) external onlyOwner nonZeroAddress(_tokenStakingContract) {
         tokenStakingContract = _tokenStakingContract;
     }
 
+    /**
+     * @dev 设置竞技场合约地址
+     * @param _arenaContract 竞技场合约地址
+     */
     function setArenaContract(address _arenaContract) external onlyOwner nonZeroAddress(_arenaContract) {
         arenaContract = _arenaContract;
     }
 
+    /**
+     * @dev 设置SwapRouter地址
+     * @param _swapRouter SwapRouter地址
+     */
     function setSwapRouter(address _swapRouter) external onlyOwner nonZeroAddress(_swapRouter) {
         swapRouter = _swapRouter;
     }
 
+    /**
+     * @dev 设置自动兑换阈值
+     * @param _threshold 阈值（ETH/BNB）
+     */
     function setAutoSwapThreshold(uint256 _threshold) external onlyOwner {
         require(_threshold > 0, "RM: threshold must be > 0");
         autoSwapThreshold = _threshold;
     }
 
     /**
-     * @dev 紧急暂停合�?
+     * @dev 紧急暂停合约
      */
     function emergencyPause() external onlyEmergencyOwner {
         _pause();
@@ -553,7 +600,7 @@ contract RewardManager is
     }
 
     /**
-     * @dev 紧急恢复合�?
+     * @dev 紧急恢复合约
      */
     function emergencyUnpause() external onlyEmergencyOwner {
         _unpause();
@@ -571,8 +618,8 @@ contract RewardManager is
 
     /**
      * @dev 计算用户权重（非所有者）
-     * 合约所有者的权重单独存储在ownerWeight中，初始值为1000
-     * 普通用户的权重直接从 NFTData 合约计算，确保数据一致性
+     * 合约所有者的权重单独存储在ownerWeight中
+     * 普通用户的权重直接从NFTData合约计算，确保数据一致性
      * @param user 用户地址
      * @return 用户权重（所有者返回0，因为所有者权重单独处理）
      */
@@ -684,7 +731,7 @@ contract RewardManager is
     /**
      * @dev 检查用户是否有资格分红
      * @param user 用户地址
-     * @return 是否有资�?
+     * @return 是否有资格
      */
     function _hasEligibility(address user) internal view returns (bool) {
         if (user == owner()) return true;
@@ -748,6 +795,12 @@ contract RewardManager is
         return updateCard(user, t, cnt);
     }
 
+    /**
+     * @dev 获取用户持有指定类型卡牌数量
+     * @param user 用户地址
+     * @param zodiacType 生肖类型
+     * @return uint256 卡牌数量
+     */
     function cardCount(address user, NFTDataTypes.ZodiacType zodiacType) external view returns (uint256) {
         if (nftDataContract == address(0)) return 0;
         return INFTDataInterface(nftDataContract).getUserTokenCount(user, zodiacType);
@@ -804,7 +857,7 @@ contract RewardManager is
     }
 
     /**
-     * @dev 移除持有�?
+     * @dev 移除持有者
      * @param user 用户地址
      */
     function removeHolder(address user) external onlyOp whenNotPaused {
@@ -820,6 +873,8 @@ contract RewardManager is
 
     /**
      * @dev 领取分红
+     * 用户根据权重比例从分红池中领取相应的分红
+     * 支持精度累积，避免小数精度损失
      */
     function claimDividend() external nonReentrant whenNotPaused rateLimited(msg.sig) {
         address user = msg.sender;
@@ -859,10 +914,9 @@ contract RewardManager is
         precisionAcc[user] = carryOver;
         precisionAccumulationCount[user] += 1;
         
-        // 当累积次数达到阈值时，保留 10% 的精度值后重置
+        // 当累积次数达到阈值时，保留10%的精度值后重置
         // 这样可以减少分红损失，同时防止精度累积值过大
         if (precisionAccumulationCount[user] >= 1000) {
-            // 保留 10% 的精度值，减少分红损失
             precisionAcc[user] = carryOver / 10;
             precisionAccumulationCount[user] = 0;
         }
@@ -878,11 +932,18 @@ contract RewardManager is
         require(success, "RewardManager: Failed to transfer dividend");
     }
     
+    /**
+     * @dev 清除用户精度累积
+     * @param user 用户地址
+     */
     function clearPrecisionAcc(address user) external onlyOwner {
         precisionAcc[user] = 0;
         precisionAccumulationCount[user] = 1;
     }
     
+    /**
+     * @dev 提取所有精度累积（紧急情况下使用，需要暂停合约）
+     */
     function withdrawAllPrecisionAcc() external onlyOwner nonReentrant whenPaused {
         uint256 contractBalance = address(this).balance;
         require(contractBalance > 0 && paused(), "RM: no balance or not paused");
@@ -893,15 +954,16 @@ contract RewardManager is
 
     /**
      * @dev 接收ETH分红
+     * 自动按配置比例分配到各个资金池
      */
     receive() external payable {
         require(msg.value > 0, "RewardManager: Cannot deposit zero value");
         
-        uint256 dividendAmount = (msg.value * DIVIDEND_RATIO) / 10000;
-        uint256 ownerAmount = (msg.value * OWNER_RATIO) / 10000;
-        uint256 nftStakingAmount = (msg.value * NFT_STAKING_RATIO) / 10000;
-        uint256 arenaAmount = (msg.value * ARENA_RATIO) / 10000;
-        uint256 tokenStakingAmount = (msg.value * TOKEN_STAKING_RATIO) / 10000;
+        uint256 dividendAmount = (msg.value * dividendRatio) / 10000;
+        uint256 ownerAmount = (msg.value * ownerRatio) / 10000;
+        uint256 nftStakingAmount = (msg.value * nftStakingRatio) / 10000;
+        uint256 arenaAmount = (msg.value * arenaRatio) / 10000;
+        uint256 tokenStakingAmount = (msg.value * tokenStakingRatio) / 10000;
         
         require(dividendPool + dividendAmount <= MAX_DIVIDEND_POOL, 
             "RewardManager: Dividend pool would exceed maximum capacity");
@@ -926,6 +988,10 @@ contract RewardManager is
         _processPools();
     }
 
+    /**
+     * @dev 检查是否存在流动性池
+     * @return bool 是否存在
+     */
     function _hasLiquidityPool() internal view returns (bool) {
         if (rewardToken == address(0) || pancakeFactory == address(0)) {
             return false;
@@ -935,6 +1001,11 @@ contract RewardManager is
         return pair != address(0);
     }
 
+    /**
+     * @dev 尝试自动兑换并质押
+     * @param amount 兑换金额
+     * @param targetContract 目标合约地址
+     */
     function _tryAutoSwapAndStake(uint256 amount, address targetContract) internal {
         if (!_hasLiquidityPool()) {
             return;
@@ -961,6 +1032,10 @@ contract RewardManager is
         }
     }
 
+    /**
+     * @dev 处理各个资金池
+     * 当池余额达到阈值时自动处理
+     */
     function _processPools() internal {
         if (nftStakingPool >= autoSwapThreshold && rewardToken != address(0) && 
             stakingContract != address(0) && swapRouter != address(0)) {
@@ -988,6 +1063,9 @@ contract RewardManager is
         }
     }
 
+    /**
+     * @dev 手动处理资金池
+     */
     function manualProcessPools() external onlyOwner nonReentrant whenNotPaused {
         _processPools();
     }
@@ -1041,7 +1119,7 @@ contract RewardManager is
      * @dev 计算用户可领取的分红
      * @param user 用户地址
      * @return base 基本分红金额
-     * @return precRemain 剩余精度�?
+     * @return precRemain 剩余精度值
      */
     function calcUserDividend(address user) external view returns (uint256, uint256) {
         uint256 totalW = totalWeight;
@@ -1076,10 +1154,9 @@ contract RewardManager is
     }
 
     /**
-     * @dev 刷新总权�?
+     * @dev 刷新总权重（触发事件）
      */
     function refreshTotalWeight() external onlyOwner {
         emit TotalWeightUpdated(totalWeight, totalWeight, block.timestamp);
     }
 }
-

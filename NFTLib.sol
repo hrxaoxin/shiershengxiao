@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/**
+ * @title NFTLib
+ * @dev NFT工具库，提供字符串处理、数学运算等辅助函数
+ */
 library NFTLib {
+    /**
+     * @dev 将无符号整数转换为字符串
+     * @param n 要转换的整数
+     * @return string memory 转换后的字符串
+     */
     function uint2str(uint256 n) internal pure returns (string memory) {
         if (n == 0) return "0";
         uint256 temp = n;
@@ -12,6 +21,11 @@ library NFTLib {
         return string(buf);
     }
 
+    /**
+     * @dev 将以太坊地址转换为十六进制字符串
+     * @param _addr 要转换的地址
+     * @return string memory 转换后的十六进制字符串（以0x开头）
+     */
     function addressToString(address _addr) internal pure returns (string memory) {
         bytes32 value = bytes32(uint256(uint160(_addr)));
         bytes memory alphabet = "0123456789abcdef";
@@ -24,6 +38,11 @@ library NFTLib {
         return string(str);
     }
 
+    /**
+     * @dev Base64编码函数
+     * @param data 要编码的原始字节数据
+     * @return string memory Base64编码后的字符串
+     */
     function base64Encode(bytes memory data) internal pure returns (string memory) {
         bytes memory base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         bytes memory result = new bytes((data.length + 2) / 3 * 4);
@@ -43,6 +62,11 @@ library NFTLib {
         return string(result);
     }
 
+    /**
+     * @dev 转义字符串中的特殊字符（双引号和反斜杠）
+     * @param input 输入字符串
+     * @return string memory 转义后的字符串
+     */
     function escapeString(string memory input) internal pure returns (string memory) {
         bytes memory b = bytes(input);
         uint esc;
@@ -57,38 +81,87 @@ library NFTLib {
         return string(o);
     }
 
+    /**
+     * @dev 连接两个字符串
+     * @param a 第一个字符串
+     * @param b 第二个字符串
+     * @return string memory 连接后的字符串
+     */
     function concat(string memory a, string memory b) internal pure returns (string memory) {
         return string(abi.encodePacked(a, b));
     }
 
+    /**
+     * @dev 连接三个字符串
+     * @param a 第一个字符串
+     * @param b 第二个字符串
+     * @param c 第三个字符串
+     * @return string memory 连接后的字符串
+     */
     function concat3(string memory a, string memory b, string memory c) internal pure returns (string memory) {
         return string(abi.encodePacked(a, b, c));
     }
 
+    /**
+     * @dev 安全减法，防止下溢
+     * @param a 被减数
+     * @param b 减数
+     * @return uint256 差
+     */
     function safeSub(uint256 a, uint256 b) internal pure returns (uint256) {
         require(a >= b, "NFTLib: Underflow in subtraction");
         return a - b;
     }
 
+    /**
+     * @dev 安全加法，防止溢出
+     * @param a 被加数
+     * @param b 加数
+     * @return uint256 和
+     */
     function safeAdd(uint256 a, uint256 b) internal pure returns (uint256) {
         require(a <= type(uint256).max - b, "NFTLib: Overflow in addition");
         return a + b;
     }
 
+    /**
+     * @dev 安全乘法，防止溢出
+     * @param a 被乘数
+     * @param b 乘数
+     * @return uint256 积
+     */
     function safeMul(uint256 a, uint256 b) internal pure returns (uint256) {
         if (a == 0 || b == 0) return 0;
         require(a <= type(uint256).max / b, "NFTLib: Overflow in multiplication");
         return a * b;
     }
 
+    /**
+     * @dev 返回两个数中的较小值
+     * @param a 第一个数
+     * @param b 第二个数
+     * @return uint256 较小值
+     */
     function min(uint256 a, uint256 b) internal pure returns (uint256) {
         return a < b ? a : b;
     }
 
+    /**
+     * @dev 返回两个数中的较大值
+     * @param a 第一个数
+     * @param b 第二个数
+     * @return uint256 较大值
+     */
     function max(uint256 a, uint256 b) internal pure returns (uint256) {
         return a > b ? a : b;
     }
 
+    /**
+     * @dev 计算NFT等级对应的权重增量
+     * 权重规则：1阶=1, 2阶=2, 3阶=4, 4阶=12, 5阶=48
+     * @param level NFT等级（1-5）
+     * @return uint256 权重增量
+     */
     function calculateWeightDelta(uint8 level) internal pure returns (uint256) {
         if (level == 1) return 1;
         if (level == 2) return 2;
@@ -98,6 +171,13 @@ library NFTLib {
         return 0;
     }
 
+    /**
+     * @dev 更新用户权重值
+     * @param currentWeight 当前权重
+     * @param level NFT等级
+     * @param add 是否增加权重（true增加，false减少）
+     * @return uint256 更新后的权重
+     */
     function updateUserWeightValue(uint256 currentWeight, uint8 level, bool add) internal pure returns (uint256) {
         uint256 weightDelta = calculateWeightDelta(level);
         if (add) {
