@@ -247,7 +247,12 @@
                     </div>
                     <h1 class="text-2xl font-bold text-gray-800">十二生肖</h1>
                 </div>
-                <button id="walletBtn" class="wallet-button">连接钱包</button>
+                <div class="flex items-center gap-3">
+                    <button id="menuBtn" class="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                        <i class="fas fa-bars text-xl text-gray-700"></i>
+                    </button>
+                    <button id="walletBtn" class="wallet-button">连接钱包</button>
+                </div>
             </div>
         </header>
 
@@ -481,44 +486,78 @@
 
     <nav class="navbar fixed bottom-0 left-0 right-0 z-50 md:hidden">
             <div class="flex justify-around items-center px-2 py-2">
-                <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
                     <div class="text-2xl mb-1">🏠</div>
                     <span class="text-xs font-bold text-gray-700">首页</span>
                 </a>
-                <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
                     <div class="text-2xl mb-1">🃏</div>
                     <span class="text-xs font-bold text-gray-700">铸造</span>
                 </a>
-                <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
                     <div class="text-2xl mb-1">🎁</div>
                     <span class="text-xs font-bold text-gray-700">生肖</span>
                 </a>
-                <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
                     <div class="text-2xl mb-1">🏆</div>
                     <span class="text-xs font-bold text-gray-700">奖励</span>
                 </a>
-                <a href="upgrade.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
-                    <div class="text-2xl mb-1">⭐</div>
-                    <span class="text-xs font-bold text-gray-700">升阶</span>
-                </a>
-                <a href="trading.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
-                    <div class="text-2xl mb-1">💰</div>
-                    <span class="text-xs font-bold text-gray-700">交易</span>
-                </a>
-                <a href="breeding.html" class="flex flex-col items-center justify-center w-full py-2 px-3 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
-                    <div class="text-2xl mb-1">🐾</div>
-                    <span class="text-xs font-bold text-gray-700">孕育</span>
-                </a>
-                <a href="staking.html" class="flex flex-col items-center justify-center w-full py-2 px-2 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
-                    <div class="text-xl mb-1">⚡</div>
-                    <span class="text-xs font-bold text-gray-700">挖矿</span>
-                </a>
-                <a href="arena.html" class="flex flex-col items-center justify-center w-full py-2 px-2 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
-                    <div class="text-xl mb-1">⚔️</div>
-                    <span class="text-xs font-bold text-gray-700">竞技</span>
-                </a>
+                <button id="moreMenuBtn" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
+                    <div class="text-2xl mb-1">☰</div>
+                    <span class="text-xs font-bold text-gray-700">更多</span>
+                </button>
             </div>
         </nav>
+
+        <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 z-40 md:hidden hidden" onclick="closeMobileMenu()"></div>
+        <div id="mobileMenu" class="fixed right-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50 md:hidden transform translate-x-full transition-transform duration-300">
+            <div class="p-4 border-b">
+                <div class="flex justify-between items-center">
+                    <span class="font-bold text-gray-800">导航菜单</span>
+                    <button id="closeMenuBtn" class="p-2 hover:bg-gray-100 rounded-lg" onclick="closeMobileMenu()">
+                        <i class="fas fa-times text-gray-600"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-4 space-y-2">
+                <a href="index.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🏠</span>
+                    <span class="text-gray-700">首页</span>
+                </a>
+                <a href="mint.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🃏</span>
+                    <span class="text-gray-700">铸造</span>
+                </a>
+                <a href="collection.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🎁</span>
+                    <span class="text-gray-700">生肖收藏</span>
+                </a>
+                <a href="rewards.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🏆</span>
+                    <span class="text-gray-700">奖励分红</span>
+                </a>
+                <a href="upgrade.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">⭐</span>
+                    <span class="text-gray-700">升阶升级</span>
+                </a>
+                <a href="trading.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">💰</span>
+                    <span class="text-gray-700">交易市场</span>
+                </a>
+                <a href="breeding.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🐾</span>
+                    <span class="text-gray-700">孕育繁殖</span>
+                </a>
+                <a href="staking.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">⚡</span>
+                    <span class="text-gray-700">质押挖矿</span>
+                </a>
+                <a href="arena.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">⚔️</span>
+                    <span class="text-gray-700">竞技场</span>
+                </a>
+            </div>
+        </div>
 
         <nav class="hidden md:block fixed left-6 top-1/2 -translate-y-1/2 z-50 desktop-nav">
             <div class="p-3 space-y-3">
@@ -743,6 +782,24 @@
                 countdownElement.textContent = `下次分红: ${formattedMinutes}:${formattedSeconds}`;
             }
         }
+
+        function openMobileMenu() {
+            document.getElementById('mobileMenu').classList.remove('translate-x-full');
+            document.getElementById('mobileMenuOverlay').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeMobileMenu() {
+            document.getElementById('mobileMenu').classList.add('translate-x-full');
+            document.getElementById('mobileMenuOverlay').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('menuBtn').addEventListener('click', openMobileMenu);
+            document.getElementById('moreMenuBtn').addEventListener('click', openMobileMenu);
+            document.getElementById('closeMenuBtn').addEventListener('click', closeMobileMenu);
+        });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
 </body>
