@@ -485,6 +485,21 @@
             'Shield': '护盾'
         };
 
+        const ZODIAC_SKILLS = [
+            { name: '烈焰穿梭', type: 'Attack', value: 125 },
+            { name: '水之守护', type: 'Shield', value: 110 },
+            { name: '疾风突击', type: 'Attack', value: 145 },
+            { name: '圣光治愈', type: 'Heal', value: 130 },
+            { name: '龙焰焚天', type: 'Special', value: 220 },
+            { name: '暗影吞噬', type: 'Lifesteal', value: 145 },
+            { name: '追风踏燕', type: 'Attack', value: 150 },
+            { name: '碧水祈福', type: 'Heal', value: 140 },
+            { name: '火舞戏耍', type: 'Attack', value: 115 },
+            { name: '光羽振翅', type: 'Attack', value: 130 },
+            { name: '疾风狂吠', type: 'Attack', value: 125 },
+            { name: '圣猪纳福', type: 'Heal', value: 165 }
+        ];
+
         const FULL_SKILLS = {
             fire: [
                 { name: '烈焰穿梭', type: 'Attack', value: 125 },
@@ -650,16 +665,18 @@
             const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
             
             myNfts = [
-                { tokenId: 1, tokenType: 25, level: 3, attr: 'Wind', zodiacIndex: 4, name: '风龙·雄', imagePath: `${IPFS_BASE_1}fenglong_1.png`, skill: getSkillByTokenType(25), inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 2, tokenType: 49, level: 5, attr: 'Fire', zodiacIndex: 0, name: '火鼠·雄', imagePath: `${IPFS_BASE_1}huoshu_1.png`, skill: getSkillByTokenType(49), inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 3, tokenType: 2, level: 4, attr: 'Water', zodiacIndex: 1, name: '水牛·雌', imagePath: `${IPFS_BASE_1}shuiniu_1.png`, skill: getSkillByTokenType(2), inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 4, tokenType: 73, level: 2, attr: 'Dark', zodiacIndex: 3, name: '暗兔·雄', imagePath: `${IPFS_BASE_2}antu_1.png`, skill: getSkillByTokenType(73), inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 5, tokenType: 97, level: 3, attr: 'Light', zodiacIndex: 8, name: '光猴·雄', imagePath: `${IPFS_BASE_2}guanghou_1.png`, skill: getSkillByTokenType(97), inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 6, tokenType: 53, level: 4, attr: 'Fire', zodiacIndex: 4, name: '火龙·雄', imagePath: `${IPFS_BASE_1}huolong_1.png`, skill: getSkillByTokenType(53), inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 7, tokenType: 77, level: 2, attr: 'Dark', zodiacIndex: 7, name: '暗羊·雌', imagePath: `${IPFS_BASE_2}anyang_0.png`, skill: getSkillByTokenType(77), inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 8, tokenType: 101, level: 5, attr: 'Light', zodiacIndex: 11, name: '光猪·雄', imagePath: `${IPFS_BASE_2}guangzhu_1.png`, skill: getSkillByTokenType(101), inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 9, tokenType: 50, level: 2, attr: 'Fire', zodiacIndex: 0, name: '火鼠·雌', imagePath: `${IPFS_BASE_1}huoshu_0.png`, skill: getSkillByTokenType(50), inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 10, tokenType: 26, level: 4, attr: 'Wind', zodiacIndex: 4, name: '风龙·雌', imagePath: `${IPFS_BASE_1}fenglong_0.png`, skill: getSkillByTokenType(26), inAttackTeam: false, inDefenseTeam: false }
+                { tokenId: 1, tokenType: 25, level: 5, attr: 'Wind', zodiacIndex: 4, name: '风龙·雄', imagePath: `${IPFS_BASE_1}fenglong_1.png`, skill: FULL_SKILLS.wind[4], inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 2, tokenType: 49, level: 5, attr: 'Fire', zodiacIndex: 0, name: '火鼠·雄', imagePath: `${IPFS_BASE_1}huoshu_1.png`, skill: FULL_SKILLS.fire[0], inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 3, tokenType: 2, level: 4, attr: 'Water', zodiacIndex: 1, name: '水牛·雌', imagePath: `${IPFS_BASE_1}shuiniu_1.png`, skill: FULL_SKILLS.water[1], inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 4, tokenType: 73, level: 4, attr: 'Dark', zodiacIndex: 3, name: '暗兔·雄', imagePath: `${IPFS_BASE_2}antu_1.png`, skill: FULL_SKILLS.dark[3], inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 5, tokenType: 97, level: 3, attr: 'Light', zodiacIndex: 8, name: '光猴·雄', imagePath: `${IPFS_BASE_2}guanghou_1.png`, skill: FULL_SKILLS.light[8], inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 6, tokenType: 53, level: 5, attr: 'Fire', zodiacIndex: 4, name: '火龙·雄', imagePath: `${IPFS_BASE_1}huolong_1.png`, skill: FULL_SKILLS.fire[4], inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 7, tokenType: 77, level: 3, attr: 'Dark', zodiacIndex: 7, name: '暗羊·雌', imagePath: `${IPFS_BASE_2}anyang_0.png`, skill: FULL_SKILLS.dark[7], inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 8, tokenType: 101, level: 5, attr: 'Light', zodiacIndex: 11, name: '光猪·雄', imagePath: `${IPFS_BASE_2}guangzhu_1.png`, skill: FULL_SKILLS.light[11], inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 9, tokenType: 50, level: 4, attr: 'Fire', zodiacIndex: 1, name: '火牛·雌', imagePath: `${IPFS_BASE_1}huoniu_0.png`, skill: FULL_SKILLS.fire[1], inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 10, tokenType: 26, level: 4, attr: 'Wind', zodiacIndex: 5, name: '风蛇·雌', imagePath: `${IPFS_BASE_1}fengshe_0.png`, skill: FULL_SKILLS.wind[5], inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 11, tokenType: 7, level: 3, attr: 'Water', zodiacIndex: 6, name: '水马·雄', imagePath: `${IPFS_BASE_1}shuima_1.png`, skill: FULL_SKILLS.water[6], inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 12, tokenType: 104, level: 2, attr: 'Light', zodiacIndex: 3, name: '光兔·雌', imagePath: `${IPFS_BASE_2}guangtu_0.png`, skill: FULL_SKILLS.light[3], inAttackTeam: false, inDefenseTeam: false }
             ];
         }
 
@@ -915,11 +932,11 @@
 
         function loadLeaderboard() {
             const topPlayers = [
-                { address: '0x1234...5678', points: 15000, team: ['🐉', '🐅', '🐇', '🐓', '🐕', '🐍'] },
-                { address: '0x2345...6789', points: 12500, team: ['🐎', '🐂', '🐷', '🐀', '🐉', '🐅'] },
-                { address: '0x3456...7890', points: 10000, team: ['🐇', '🐓', '🐕', '🐍', '🐎', '🐂'] },
-                { address: '0x4567...8901', points: 8500, team: ['🐷', '🐀', '🐉', '🐅', '🐇', '🐓'] },
-                { address: '0x5678...9012', points: 7000, team: ['🐕', '🐍', '🐎', '🐂', '🐷', '🐀'] }
+                { name: '竞技场霸主', address: '0x1234...5678', points: 15000, team: ['🐉', '🐅', '🐇', '🐓', '🐕', '🐍'] },
+                { name: '五行大师', address: '0x2345...6789', points: 12500, team: ['🐎', '🐂', '🐷', '🐀', '🐉', '🐅'] },
+                { name: '暗影刺客', address: '0x3456...7890', points: 10000, team: ['🐉', '🐍', '🐀', '🐅', '🐇', '🐕'] },
+                { name: '圣光守护', address: '0x4567...8901', points: 8500, team: ['🐉', '🐑', '🐷', '🐒', '🐓', '🐇'] },
+                { name: '均衡大师', address: '0x5678...9012', points: 7000, team: ['🐂', '🐉', '🐍', '🐎', '🐅', '🐑'] }
             ];
 
             const leaderboard = document.getElementById('leaderboard');
@@ -927,8 +944,8 @@
                 <div class="flex items-center p-3 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10" onclick="selectOpponent(${index})">
                     <div class="rank-badge w-8 h-8 rounded-full flex items-center justify-center text-white font-bold mr-3">${index + 1}</div>
                     <div class="flex-1">
-                        <div class="text-white text-sm font-medium">${shortenAddress(player.address)}</div>
-                        <div class="text-gray-400 text-xs">${player.team.slice(0, 3).join('')}...</div>
+                        <div class="text-white text-sm font-medium">${player.name}</div>
+                        <div class="text-gray-400 text-xs">${shortenAddress(player.address)} · ${player.team.slice(0, 3).join('')}...</div>
                     </div>
                     <div class="text-right">
                         <div class="text-white font-bold text-sm">${player.points}</div>
@@ -939,22 +956,61 @@
         }
 
         const mockOpponents = [
-            { team: [
-                { name: '火龙', level: 5, element: 'Fire', emoji: '🐉', skill: ZODIAC_SKILLS[4] },
-                { name: '风虎', level: 4, element: 'Wind', emoji: '🐅', skill: ZODIAC_SKILLS[2] },
-                { name: '水兔', level: 5, element: 'Water', emoji: '🐇', skill: ZODIAC_SKILLS[3] },
-                { name: '光鸡', level: 4, element: 'Light', emoji: '🐓', skill: ZODIAC_SKILLS[9] },
-                { name: '暗狗', level: 3, element: 'Dark', emoji: '🐕', skill: ZODIAC_SKILLS[10] },
-                { name: '火蛇', level: 3, element: 'Fire', emoji: '🐍', skill: ZODIAC_SKILLS[5] }
-            ]},
-            { team: [
-                { name: '风马', level: 4, element: 'Wind', emoji: '🐎', skill: ZODIAC_SKILLS[6] },
-                { name: '水牛', level: 5, element: 'Water', emoji: '🐂', skill: ZODIAC_SKILLS[1] },
-                { name: '光猪', level: 4, element: 'Light', emoji: '🐷', skill: ZODIAC_SKILLS[11] },
-                { name: '暗鼠', level: 3, element: 'Dark', emoji: '🐀', skill: ZODIAC_SKILLS[0] },
-                { name: '火龙', level: 3, element: 'Fire', emoji: '🐉', skill: ZODIAC_SKILLS[4] },
-                { name: '风虎', level: 2, element: 'Wind', emoji: '🐅', skill: ZODIAC_SKILLS[2] }
-            ]}
+            { 
+                name: '竞技场霸主',
+                team: [
+                    { name: '火龙·霸', level: 5, element: 'Fire', emoji: '🐉', skill: FULL_SKILLS.fire[4] },
+                    { name: '风虎·猛', level: 5, element: 'Wind', emoji: '🐅', skill: FULL_SKILLS.wind[2] },
+                    { name: '水兔·敏', level: 5, element: 'Water', emoji: '🐇', skill: FULL_SKILLS.water[3] },
+                    { name: '光鸡·圣', level: 4, element: 'Light', emoji: '🐓', skill: FULL_SKILLS.light[9] },
+                    { name: '暗狗·凶', level: 4, element: 'Dark', emoji: '🐕', skill: FULL_SKILLS.dark[10] },
+                    { name: '火蛇·毒', level: 3, element: 'Fire', emoji: '🐍', skill: FULL_SKILLS.fire[5] }
+                ]
+            },
+            { 
+                name: '五行大师',
+                team: [
+                    { name: '风马·疾', level: 5, element: 'Wind', emoji: '🐎', skill: FULL_SKILLS.wind[6] },
+                    { name: '水牛·厚', level: 5, element: 'Water', emoji: '🐂', skill: FULL_SKILLS.water[1] },
+                    { name: '光猪·福', level: 5, element: 'Light', emoji: '🐷', skill: FULL_SKILLS.light[11] },
+                    { name: '暗鼠·诡', level: 4, element: 'Dark', emoji: '🐀', skill: FULL_SKILLS.dark[0] },
+                    { name: '火龙·焰', level: 4, element: 'Fire', emoji: '🐉', skill: FULL_SKILLS.fire[4] },
+                    { name: '风虎·啸', level: 3, element: 'Wind', emoji: '🐅', skill: FULL_SKILLS.wind[2] }
+                ]
+            },
+            { 
+                name: '暗影刺客',
+                team: [
+                    { name: '暗龙·影', level: 5, element: 'Dark', emoji: '🐉', skill: FULL_SKILLS.dark[4] },
+                    { name: '暗蛇·噬', level: 5, element: 'Dark', emoji: '🐍', skill: FULL_SKILLS.dark[5] },
+                    { name: '暗鼠·偷', level: 4, element: 'Dark', emoji: '🐀', skill: FULL_SKILLS.dark[0] },
+                    { name: '暗虎·猛', level: 4, element: 'Dark', emoji: '🐅', skill: FULL_SKILLS.dark[2] },
+                    { name: '暗兔·捷', level: 3, element: 'Dark', emoji: '🐇', skill: FULL_SKILLS.dark[3] },
+                    { name: '暗狗·猎', level: 3, element: 'Dark', emoji: '🐕', skill: FULL_SKILLS.dark[10] }
+                ]
+            },
+            { 
+                name: '圣光守护',
+                team: [
+                    { name: '光龙·耀', level: 5, element: 'Light', emoji: '🐉', skill: FULL_SKILLS.light[4] },
+                    { name: '光羊·慈', level: 5, element: 'Light', emoji: '🐑', skill: FULL_SKILLS.light[7] },
+                    { name: '光猪·福', level: 5, element: 'Light', emoji: '🐷', skill: FULL_SKILLS.light[11] },
+                    { name: '光猴·灵', level: 4, element: 'Light', emoji: '🐒', skill: FULL_SKILLS.light[8] },
+                    { name: '光鸡·鸣', level: 4, element: 'Light', emoji: '🐓', skill: FULL_SKILLS.light[9] },
+                    { name: '光兔·洁', level: 3, element: 'Light', emoji: '🐇', skill: FULL_SKILLS.light[3] }
+                ]
+            },
+            { 
+                name: '均衡大师',
+                team: [
+                    { name: '火牛·勇', level: 4, element: 'Fire', emoji: '🐂', skill: FULL_SKILLS.fire[1] },
+                    { name: '风龙·速', level: 4, element: 'Wind', emoji: '🐉', skill: FULL_SKILLS.wind[4] },
+                    { name: '水蛇·柔', level: 4, element: 'Water', emoji: '🐍', skill: FULL_SKILLS.water[5] },
+                    { name: '光马·圣', level: 3, element: 'Light', emoji: '🐎', skill: FULL_SKILLS.light[6] },
+                    { name: '暗虎·威', level: 3, element: 'Dark', emoji: '🐅', skill: FULL_SKILLS.dark[2] },
+                    { name: '水羊·善', level: 3, element: 'Water', emoji: '🐑', skill: FULL_SKILLS.water[7] }
+                ]
+            }
         ];
 
         function selectOpponent(index) {
