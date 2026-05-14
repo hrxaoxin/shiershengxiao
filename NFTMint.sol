@@ -218,6 +218,8 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     address public stablecoinAddress;
     /** @dev 繁殖合约地址 */
     address public breedingContract;
+    /** @dev NFT升级合约地址 */
+    address public nftUpdateContract;
     /** @dev 价格过期时间（秒）- 默认1小时 */
     uint256 public priceExpirySeconds = 3600;
     /** @dev 价格波动保护阈值（百分比，精度4位）- 默认50% */
@@ -740,6 +742,15 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      * @param a 繁殖合约地址
      */
     function setBreedingContract(address a) external onlyOwner { breedingContract = a; }
+
+    /**
+     * @dev 设置NFT升级合约地址
+     * @param a NFT升级合约地址
+     */
+    function setNFTUpdateContract(address a) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "E10");
+        nftUpdateContract = a;
+    }
 
     /**
      * @dev 设置价格过期时间（秒）

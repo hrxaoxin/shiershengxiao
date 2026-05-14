@@ -10,9 +10,12 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 
 contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    /** @dev 最小繁殖等级 */
     uint8 public constant MIN_BREEDING_LEVEL = 5;
-    uint256 public constant SOLO_BREED_DURATION = 12 hours;
-    uint256 public constant PAIR_BREED_DURATION = 24 hours;
+    /** @dev 自繁殖时长（默认12小时）*/
+    uint256 public soloBreedDuration = 12 hours;
+    /** @dev 市场繁殖时长（默认24小时）*/
+    uint256 public pairBreedDuration = 24 hours;
     /** @dev 最大繁殖时间上限，防止时间绕过攻击 */
     uint256 public constant MAX_BREED_DURATION = 7 days;
 
@@ -208,7 +211,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         require(order.cancelled == false, "Breeding: Order cancelled");
         require(order.owner1 == order.owner2, "Breeding: Not a self breeding");
 
-        uint256 endTime = order.startTime + SOLO_BREED_DURATION;
+        uint256 endTime = order.startTime + soloBreedDuration;
         uint256 maxEndTime = order.startTime + MAX_BREED_DURATION;
         require(block.timestamp >= endTime, "Breeding: Breeding not ready");
         require(block.timestamp <= maxEndTime, "Breeding: Breeding window expired");
@@ -243,7 +246,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         require(order.owner2 != address(0), "Breeding: Waiting for second participant");
         require(msg.sender == order.owner1 || msg.sender == order.owner2, "Breeding: Not a participant");
 
-        uint256 endTime = order.startTime + PAIR_BREED_DURATION;
+        uint256 endTime = order.startTime + pairBreedDuration;
         uint256 maxEndTime = order.startTime + MAX_BREED_DURATION;
         require(block.timestamp >= endTime, "Breeding: Breeding not ready");
         require(block.timestamp <= maxEndTime, "Breeding: Breeding window expired");
@@ -414,6 +417,40 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
     function setAuthorizer(address _authorizer) external onlyOwner {
         require(_authorizer != address(0), "Breeding: Zero address");
         authorizer = _authorizer;
+    }
+
+    /**
+     * @dev 设置自繁殖时长
+     * @param _duration 新时长（秒），默认12小时
+     */
+    function setSoloBreedDuration(uint256 _duration) external onlyOwner {
+        require(_duration > 0, "Breeding: Duration must be greater than 0");
+        require(_duration <= MAX_BREED_DURATION, "Breeding: Duration exceeds maximum");
+        soloBreedDuration = _duration;
+    }
+
+    /**
+     * @dev 设置市场繁殖时长
+     * @param _duration 新时长（秒），默认24小时
+     */
+    function setPairBreedDuration(uint256 _duration) external onlyOwner {
+        require(_duration > 0, "Breeding: Duration must be greater than 0");
+        require(_duration <= MAX_BREED_DURATION, "Breeding: Duration exceeds maximum");
+        pairBreedDuration = _duration;
+    }
+
+    /**
+     * @dev 批量设置繁殖时长
+     * @param _soloDuration 自繁殖时长（秒）
+     * @param _pairDuration 市场繁殖时长（秒）
+     */
+    function setBreedDurations(uint256 _soloDuration, uint256 _pairDuration) external onlyOwner {
+        require(_soloDuration > 0, "Breeding: Solo duration must be greater than 0");
+        require(_pairDuration > 0, "Breeding: Pair duration must be greater than 0");
+        require(_soloDuration <= MAX_BREED_DURATION, "Breeding: Solo duration exceeds maximum");
+        require(_pairDuration <= MAX_BREED_DURATION, "Breeding: Pair duration exceeds maximum");
+        soloBreedDuration = _soloDuration;
+        pairBreedDuration = _pairDuration;
     }
 
     function pause() external onlyOwner { _pause(); }

@@ -56,16 +56,18 @@ contract RewardManager is
     address public royaltyWallet;
     /** @dev 版税比例（默认500 = 5%） */
     uint256 public royaltyFee = 500;
+    /** @dev 比例总和分母 */
+    uint256 public constant RATIO_DENOMINATOR = 10000;
     /** @dev 用户分红比例（4500 = 45%）*/
-    uint256 public constant DIVIDEND_RATIO = 4500;
+    uint256 public dividendRatio = 4500;
     /** @dev 合约所有者比例（500 = 5%）*/
-    uint256 public constant OWNER_RATIO = 500;
+    uint256 public ownerRatio = 500;
     /** @dev NFT质押矿池比例（2500 = 25%）*/
-    uint256 public constant NFT_STAKING_RATIO = 2500;
+    uint256 public nftStakingRatio = 2500;
     /** @dev 竞技场奖励矿池比例（1500 = 15%）*/
-    uint256 public constant ARENA_RATIO = 1500;
+    uint256 public arenaRatio = 1500;
     /** @dev 代币质押矿池比例（1000 = 10%）*/
-    uint256 public constant TOKEN_STAKING_RATIO = 1000;
+    uint256 public tokenStakingRatio = 1000;
     
     /** @dev 所有者资金池 */
     uint256 public ownerPool;
@@ -406,11 +408,90 @@ contract RewardManager is
 
     /**
      * @dev 设置版税比例
-     * @param _f 新版税比�?
+     * @param _f 新版税比例
      */
     function setRoyaltyFee(uint256 _f) external onlyOwner {
         require(_f >= 0 && _f <= MAX_ROYALTY_FEE, "RM: fee invalid");
         royaltyFee = _f;
+    }
+
+    /**
+     * @dev 设置用户分红比例
+     * @param _ratio 新比例（精度4位，如4500表示45%）
+     */
+    function setDividendRatio(uint256 _ratio) external onlyOwner {
+        require(_ratio >= 0 && _ratio <= RATIO_DENOMINATOR, "RM: dividend ratio invalid");
+        require(_ratio + ownerRatio + nftStakingRatio + arenaRatio + tokenStakingRatio <= RATIO_DENOMINATOR, "RM: total ratio exceeds 100%");
+        dividendRatio = _ratio;
+    }
+
+    /**
+     * @dev 设置合约所有者比例
+     * @param _ratio 新比例（精度4位，如500表示5%）
+     */
+    function setOwnerRatio(uint256 _ratio) external onlyOwner {
+        require(_ratio >= 0 && _ratio <= RATIO_DENOMINATOR, "RM: owner ratio invalid");
+        require(dividendRatio + _ratio + nftStakingRatio + arenaRatio + tokenStakingRatio <= RATIO_DENOMINATOR, "RM: total ratio exceeds 100%");
+        ownerRatio = _ratio;
+    }
+
+    /**
+     * @dev 设置NFT质押矿池比例
+     * @param _ratio 新比例（精度4位，如2500表示25%）
+     */
+    function setNftStakingRatio(uint256 _ratio) external onlyOwner {
+        require(_ratio >= 0 && _ratio <= RATIO_DENOMINATOR, "RM: NFT staking ratio invalid");
+        require(dividendRatio + ownerRatio + _ratio + arenaRatio + tokenStakingRatio <= RATIO_DENOMINATOR, "RM: total ratio exceeds 100%");
+        nftStakingRatio = _ratio;
+    }
+
+    /**
+     * @dev 设置竞技场奖励比例
+     * @param _ratio 新比例（精度4位，如1500表示15%）
+     */
+    function setArenaRatio(uint256 _ratio) external onlyOwner {
+        require(_ratio >= 0 && _ratio <= RATIO_DENOMINATOR, "RM: arena ratio invalid");
+        require(dividendRatio + ownerRatio + nftStakingRatio + _ratio + tokenStakingRatio <= RATIO_DENOMINATOR, "RM: total ratio exceeds 100%");
+        arenaRatio = _ratio;
+    }
+
+    /**
+     * @dev 设置代币质押矿池比例
+     * @param _ratio 新比例（精度4位，如1000表示10%）
+     */
+    function setTokenStakingRatio(uint256 _ratio) external onlyOwner {
+        require(_ratio >= 0 && _ratio <= RATIO_DENOMINATOR, "RM: token staking ratio invalid");
+        require(dividendRatio + ownerRatio + nftStakingRatio + arenaRatio + _ratio <= RATIO_DENOMINATOR, "RM: total ratio exceeds 100%");
+        tokenStakingRatio = _ratio;
+    }
+
+    /**
+     * @dev 批量设置所有资金分配比例
+     * @param _dividendRatio 用户分红比例
+     * @param _ownerRatio 合约所有者比例
+     * @param _nftStakingRatio NFT质押矿池比例
+     * @param _arenaRatio 竞技场奖励比例
+     * @param _tokenStakingRatio 代币质押矿池比例
+     */
+    function setAllAllocationRatios(
+        uint256 _dividendRatio,
+        uint256 _ownerRatio,
+        uint256 _nftStakingRatio,
+        uint256 _arenaRatio,
+        uint256 _tokenStakingRatio
+    ) external onlyOwner {
+        require(_dividendRatio >= 0 && _dividendRatio <= RATIO_DENOMINATOR, "RM: dividend ratio invalid");
+        require(_ownerRatio >= 0 && _ownerRatio <= RATIO_DENOMINATOR, "RM: owner ratio invalid");
+        require(_nftStakingRatio >= 0 && _nftStakingRatio <= RATIO_DENOMINATOR, "RM: NFT staking ratio invalid");
+        require(_arenaRatio >= 0 && _arenaRatio <= RATIO_DENOMINATOR, "RM: arena ratio invalid");
+        require(_tokenStakingRatio >= 0 && _tokenStakingRatio <= RATIO_DENOMINATOR, "RM: token staking ratio invalid");
+        require(_dividendRatio + _ownerRatio + _nftStakingRatio + _arenaRatio + _tokenStakingRatio <= RATIO_DENOMINATOR, "RM: total ratio exceeds 100%");
+        
+        dividendRatio = _dividendRatio;
+        ownerRatio = _ownerRatio;
+        nftStakingRatio = _nftStakingRatio;
+        arenaRatio = _arenaRatio;
+        tokenStakingRatio = _tokenStakingRatio;
     }
 
     /**

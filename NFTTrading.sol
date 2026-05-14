@@ -172,19 +172,6 @@ contract NFTTrading is
             return (false, "NFT contract does not support tokenType");
         }
 
-        // 检查RewardManager接口
-        try IRewardManager(_rewardManager).royaltyWallet() returns (address) {
-            // 接口存在
-        } catch {
-            return (false, "RewardManager does not support royaltyWallet");
-        }
-
-        try IRewardManager(_rewardManager).royaltyInfo(1, _bnbToWei(1)) returns (address, uint256) {
-            // 接口存在
-        } catch {
-            return (false, "RewardManager does not support royaltyInfo");
-        }
-
         return (true, "All interfaces are compatible");
     }
 
@@ -730,7 +717,6 @@ contract NFTTrading is
     // ========== 合约健康检查接口 ==========
     function getContractHealth() external view returns (
         bool nftContractAlive,
-        bool rewardManagerAlive,
         uint256 availableBNBBalance,
         string memory status
     ) {
@@ -740,17 +726,11 @@ contract NFTTrading is
             nftContractAlive = true;
         } catch {}
 
-        // 检查RewardManager是否可调用
-        rewardManagerAlive = false;
-        try IRewardManager(_rewardManager).royaltyWallet() returns (address) {
-            rewardManagerAlive = true;
-        } catch {}
-
         // 可用BNB余额（扣除已承诺的手续费）
         availableBNBBalance = _weiToBnbWithDecimals(address(this).balance);
 
         // 整体状态
-        if (nftContractAlive && rewardManagerAlive && !paused()) {
+        if (nftContractAlive && !paused()) {
             status = "HEALTHY";
         } else if (paused()) {
             status = "PAUSED";
@@ -758,7 +738,7 @@ contract NFTTrading is
             status = "UNHEALTHY";
         }
 
-        return (nftContractAlive, rewardManagerAlive, availableBNBBalance, status);
+        return (nftContractAlive, availableBNBBalance, status);
     }
 
     // ========== 禁止直接BNB转账 ==========
