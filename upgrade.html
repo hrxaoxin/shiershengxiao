@@ -423,7 +423,14 @@
 
             initWeb3();
             initWalletUI();
+            initEventListeners();
         });
+
+        function initEventListeners() {
+            document.getElementById('upgradeWithNftBtn').addEventListener('click', handleUpgradeWithNFT);
+            document.getElementById('upgradeWithTokenBtn').addEventListener('click', handleUpgradeWithToken);
+            document.getElementById('upgradeWithUSDValueBtn').addEventListener('click', handleUpgradeWithUSDValue);
+        }
 
         function initWalletUI() {
             ZODIAC_UI.initWalletButton('walletBtn', null, null);
@@ -568,7 +575,7 @@
             upgradeSection.classList.remove('hidden');
         }
 
-        document.getElementById('upgradeWithNftBtn').addEventListener('click', async function() {
+        async function handleUpgradeWithNFT() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
 
@@ -607,9 +614,9 @@
                 btn.disabled = false;
                 btn.textContent = '使用NFT升阶';
             }
-        });
+        }
 
-        document.getElementById('upgradeWithTokenBtn').addEventListener('click', async function() {
+        async function handleUpgradeWithToken() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
 
@@ -668,9 +675,9 @@
                 btn.disabled = false;
                 btn.textContent = '使用代币升阶';
             }
-        });
+        }
 
-        document.getElementById('upgradeWithUSDValueBtn').addEventListener('click', async function() {
+        async function handleUpgradeWithUSDValue() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
 
@@ -744,11 +751,19 @@
                 btn.disabled = false;
                 btn.textContent = '使用USDT价值代币升阶';
             }
-        });
+        }
 
         async function getTokenPriceFromPancakeSwap() {
             try {
-                const pancakeSwapABI = [{"inputs":[{"internalType":"address","name":"token","type":"address"}],"name":"getAmountOut","outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"},{"inputs":[{"internalType":"address[]","name":"path","type":"address[]"}],"name":"getAmountsOut","outputs":[{"internalType":"uint256[]","name":"amounts","type":"uint256[]"}],"stateMutability":"view","type":"function"}];
+                const pancakeSwapABI = [{"inputs":[
+                    {"internalType":"address","name":"token","type":"address"}
+                ],"name":"getAmountOut","outputs":[
+                    {"internalType":"uint256","name":"amountOut","type":"uint256"}
+                ],"stateMutability":"view","type":"function"},
+                {"inputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"address[]","name":"path","type":"address[]"}],
+                "name":"getAmountsOut","outputs":[
+                    {"internalType":"uint256[]","name":"amounts","type":"uint256[]"}
+                ],"stateMutability":"view","type":"function"}];
                 const pancakeSwapRouter = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
                 const wbnbAddress = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
                 
@@ -806,12 +821,6 @@
             document.getElementById('mobileMenuOverlay').classList.add('hidden');
             document.body.style.overflow = '';
         }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('moreMenuBtn').addEventListener('click', openMobileMenu);
-            document.getElementById('closeMenuBtn').addEventListener('click', closeMobileMenu);
-        });
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
 </body>
 </html>
