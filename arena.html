@@ -163,6 +163,11 @@
         .skill-defense { background: #3b82f6; }
         .skill-heal { background: #22c55e; }
         .skill-special { background: #f59e0b; }
+        .skill-counter { background: #8b5cf6; }
+        .skill-lifesteal { background: #ec4899; }
+        .skill-shield { background: #06b6d4; }
+        .skill-buff { background: #10b981; }
+        .skill-debuff { background: #f97316; }
 
         .team-slot {
             min-height: 120px;
@@ -724,20 +729,29 @@
         const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
         const ELEMENT_NAMES = ['Water', 'Wind', 'Fire', 'Dark', 'Light'];
 
-        const ZODIAC_SKILLS = [
-            { name: '鼠之敏捷', type: 'Attack', value: 120 },
-            { name: '牛之坚韧', type: 'Defense', value: 80 },
-            { name: '虎之猛击', type: 'Attack', value: 150 },
-            { name: '兔之闪避', type: 'Defense', value: 100 },
-            { name: '龙之吐息', type: 'Special', value: 200 },
-            { name: '蛇之毒液', type: 'Attack', value: 130 },
-            { name: '马之奔腾', type: 'Attack', value: 140 },
-            { name: '羊之治愈', type: 'Heal', value: 100 },
-            { name: '猴之灵活', type: 'Attack', value: 110 },
-            { name: '鸡之警戒', type: 'Defense', value: 90 },
-            { name: '狗之忠诚', type: 'Defense', value: 95 },
-            { name: '猪之福气', type: 'Heal', value: 120 }
-        ];
+        const SKILL_TYPE_MAP = {
+            '0': 'Attack',
+            '1': 'Defense',
+            '2': 'Heal',
+            '3': 'Special',
+            '4': 'Buff',
+            '5': 'Debuff',
+            '6': 'Counter',
+            '7': 'Lifesteal',
+            '8': 'Shield'
+        };
+
+        const SKILL_TYPE_LABELS = {
+            'Attack': '攻击',
+            'Defense': '防御',
+            'Heal': '治疗',
+            'Special': '特殊',
+            'Buff': '增益',
+            'Debuff': '减益',
+            'Counter': '反击',
+            'Lifesteal': '吸血',
+            'Shield': '护盾'
+        };
 
         async function init() {
             document.getElementById('connectWalletBtn').addEventListener('click', connectWallet);
@@ -795,12 +809,22 @@
                     
                     const attrIndex = Math.floor(tokenType / 24);
                     const zodiacIndex = Math.floor((tokenType % 24) / 2);
+                    const gender = tokenType % 2;
                     const attr = ELEMENT_NAMES[attrIndex];
                     const zodiac = ZODIAC_NAMES[zodiacIndex];
-                    const name = `${attr === 'Water' ? '水' : attr === 'Wind' ? '风' : attr === 'Fire' ? '火' : attr === 'Dark' ? '暗' : '光'}${zodiac}`;
+                    const name = `${attr === 'Water' ? '水' : attr === 'Wind' ? '风' : attr === 'Fire' ? '火' : attr === 'Dark' ? '暗' : '光'}${zodiac}${gender === 0 ? '·雄' : '·雌'}`;
                     
                     const imagePath = getNFTImagePath(tokenType);
-                    const skill = ZODIAC_SKILLS[zodiacIndex];
+                    
+                    const skillData = await battleContract.methods.getSkill(tokenType).call();
+                    const skill = {
+                        name: skillData.name,
+                        type: SKILL_TYPE_MAP[skillData.skillType],
+                        value: skillData.value,
+                        cooldown: skillData.cooldown,
+                        duration: skillData.duration,
+                        isAoe: skillData.isAoe
+                    };
                     
                     myNfts.push({
                         tokenId: tokenId,
@@ -810,6 +834,7 @@
                         attrName: attr === 'Water' ? '水' : attr === 'Wind' ? '风' : attr === 'Fire' ? '火' : attr === 'Dark' ? '暗' : '光',
                         zodiacIndex: zodiacIndex,
                         zodiac: zodiac,
+                        gender: gender,
                         name: name,
                         imagePath: imagePath,
                         skill: skill,

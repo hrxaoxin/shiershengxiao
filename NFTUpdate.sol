@@ -121,14 +121,6 @@ contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reentr
     }
 
     /**
-     * @dev 设置授权合约地址
-     * @param a 授权合约地址
-     */
-    function setAuthorizer(address a) external onlyOwner {
-        authorizer = a;
-    }
-
-    /**
      * @dev 设置价格过期时间
      * @param seconds_ 过期时间（秒）
      */
@@ -288,8 +280,9 @@ contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reentr
         
         uint8 newLv = lv + 1;
         m.setTokenLevel(tokenId, newLv);
-        m.updateUserWeight(msg.sender, lv, false);
-        m.updateUserWeight(msg.sender, newLv, true);
+        NFTDataTypes.ElementType element = t.getElement();
+        m.updateUserWeight(msg.sender, lv, false, element);
+        m.updateUserWeight(msg.sender, newLv, true, element);
         emit CardUpgraded(tokenId, t, lv, newLv, msg.sender, uint64(block.timestamp));
         return newLv;
     }
@@ -391,8 +384,9 @@ contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reentr
         NFTDataTypes.ZodiacType t = m.tokenType(id);
         uint8 newLv = oldLv + 1;
         m.setTokenLevel(id, newLv);
-        m.updateUserWeight(msg.sender, oldLv, false);
-        m.updateUserWeight(msg.sender, newLv, true);
+        NFTDataTypes.ElementType element = t.getElement();
+        m.updateUserWeight(msg.sender, oldLv, false, element);
+        m.updateUserWeight(msg.sender, newLv, true, element);
         emit CardUpgraded(id, t, oldLv, newLv, msg.sender, uint64(block.timestamp));
         return newLv;
     }

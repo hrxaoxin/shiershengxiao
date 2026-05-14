@@ -294,9 +294,9 @@ interface INFTMint {
     function setBreedingContract(address a) external;
     
     /**
-     * @dev 计算用户权重
+     * @dev 获取用户权重缓存
      * @param user 用户地址
-     * @return uint256 用户权重
+     * @return uint256 用户权重缓存值
      */
     function calcUserWeight(address user) external view returns (uint256);
 }
@@ -307,9 +307,9 @@ interface INFTMint {
  */
 interface INFTMintWeight {
     /**
-     * @dev 计算用户权重
+     * @dev 获取用户权重缓存
      * @param user 用户地址
-     * @return uint256 用户权重
+     * @return uint256 用户权重缓存值
      */
     function calcUserWeight(address user) external view returns (uint256);
 }
@@ -568,8 +568,9 @@ interface INFTDataInterface {
      * @param user 用户地址
      * @param level NFT等级
      * @param add 是否增加（true增加，false减少）
+     * @param element 属性类型
      */
-    function updateUserWeight(address user, uint8 level, bool add) external;
+    function updateUserWeight(address user, uint8 level, bool add, NFTDataTypes.ElementType element) external;
     
     /**
      * @dev 直接计算用户权重（遍历所有NFT）

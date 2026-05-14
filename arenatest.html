@@ -473,20 +473,159 @@
         const ZODIAC_EMOJIS = ['🐀', '🐂', '🐅', '🐇', '🐉', '🐍', '🐎', '🐑', '🐒', '🐓', '🐕', '🐷'];
         const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
 
-        const ZODIAC_SKILLS = [
-            { name: '鼠之敏捷', type: 'Attack', value: 120 },
-            { name: '牛之坚韧', type: 'Defense', value: 80 },
-            { name: '虎之猛击', type: 'Attack', value: 150 },
-            { name: '兔之闪避', type: 'Defense', value: 100 },
-            { name: '龙之吐息', type: 'Special', value: 200 },
-            { name: '蛇之毒液', type: 'Attack', value: 130 },
-            { name: '马之奔腾', type: 'Attack', value: 140 },
-            { name: '羊之治愈', type: 'Heal', value: 100 },
-            { name: '猴之灵活', type: 'Attack', value: 110 },
-            { name: '鸡之警戒', type: 'Defense', value: 90 },
-            { name: '狗之忠诚', type: 'Defense', value: 95 },
-            { name: '猪之福气', type: 'Heal', value: 120 }
-        ];
+        const SKILL_TYPE_LABELS = {
+            'Attack': '攻击',
+            'Defense': '防御',
+            'Heal': '治疗',
+            'Special': '特殊',
+            'Buff': '增益',
+            'Debuff': '减益',
+            'Counter': '反击',
+            'Lifesteal': '吸血',
+            'Shield': '护盾'
+        };
+
+        const FULL_SKILLS = {
+            fire: [
+                { name: '烈焰穿梭', type: 'Attack', value: 125 },
+                { name: '炎影反击', type: 'Counter', value: 110 },
+                { name: '焚天巨力', type: 'Attack', value: 145 },
+                { name: '炽焰守护', type: 'Shield', value: 95 },
+                { name: '爆炎猛击', type: 'Attack', value: 165 },
+                { name: '烈焰威慑', type: 'Debuff', value: 85 },
+                { name: '疾风烈焰', type: 'Attack', value: 130 },
+                { name: '火焰跃闪', type: 'Defense', value: 80 },
+                { name: '龙焰焚天', type: 'Special', value: 220 },
+                { name: '炎龙守护', type: 'Shield', value: 120 },
+                { name: '火毒噬咬', type: 'Lifesteal', value: 115 },
+                { name: '烈焰反击', type: 'Counter', value: 125 },
+                { name: '燎原奔踏', type: 'Attack', value: 140 },
+                { name: '火云疾驰', type: 'Buff', value: 85 },
+                { name: '圣火治愈', type: 'Heal', value: 110 },
+                { name: '烈焰祈福', type: 'Heal', value: 130 },
+                { name: '火舞戏耍', type: 'Attack', value: 115 },
+                { name: '赤炎变幻', type: 'Defense', value: 90 },
+                { name: '火羽锐击', type: 'Attack', value: 105 },
+                { name: '烈焰警戒', type: 'Buff', value: 75 },
+                { name: '火獒追击', type: 'Attack', value: 120 },
+                { name: '炎犬反击', type: 'Counter', value: 115 },
+                { name: '火猪纳福', type: 'Heal', value: 140 },
+                { name: '烈焰厚积', type: 'Defense', value: 100 }
+            ],
+            wind: [
+                { name: '疾风穿梭', type: 'Attack', value: 135 },
+                { name: '风影反击', type: 'Counter', value: 115 },
+                { name: '旋风巨力', type: 'Attack', value: 130 },
+                { name: '风之壁垒', type: 'Shield', value: 105 },
+                { name: '暴风猛击', type: 'Attack', value: 155 },
+                { name: '风啸威慑', type: 'Debuff', value: 90 },
+                { name: '风跃突袭', type: 'Attack', value: 140 },
+                { name: '疾风闪避', type: 'Defense', value: 100 },
+                { name: '风暴龙吟', type: 'Special', value: 210 },
+                { name: '风龙护盾', type: 'Shield', value: 115 },
+                { name: '风刃穿刺', type: 'Attack', value: 125 },
+                { name: '旋风反击', type: 'Counter', value: 120 },
+                { name: '追风踏燕', type: 'Attack', value: 150 },
+                { name: '风驰电掣', type: 'Buff', value: 90 },
+                { name: '清风治愈', type: 'Heal', value: 105 },
+                { name: '风之祈福', type: 'Heal', value: 120 },
+                { name: '风猴戏耍', type: 'Attack', value: 120 },
+                { name: '疾风变幻', type: 'Defense', value: 95 },
+                { name: '风羽振翅', type: 'Attack', value: 110 },
+                { name: '风之警戒', type: 'Buff', value: 80 },
+                { name: '风犬追击', type: 'Attack', value: 125 },
+                { name: '疾风反击', type: 'Counter', value: 110 },
+                { name: '风猪纳福', type: 'Heal', value: 130 },
+                { name: '风之厚积', type: 'Defense', value: 95 }
+            ],
+            water: [
+                { name: '潮涌穿梭', type: 'Attack', value: 120 },
+                { name: '水影反击', type: 'Counter', value: 105 },
+                { name: '巨浪冲击', type: 'Attack', value: 140 },
+                { name: '水之磐石', type: 'Shield', value: 110 },
+                { name: '海啸猛击', type: 'Attack', value: 160 },
+                { name: '寒水威慑', type: 'Debuff', value: 85 },
+                { name: '水跃突袭', type: 'Attack', value: 135 },
+                { name: '碧水闪避', type: 'Defense', value: 95 },
+                { name: '海啸龙吟', type: 'Special', value: 200 },
+                { name: '水龙护盾', type: 'Shield', value: 110 },
+                { name: '毒水噬咬', type: 'Lifesteal', value: 120 },
+                { name: '寒水反击', type: 'Counter', value: 115 },
+                { name: '踏浪奔腾', type: 'Attack', value: 145 },
+                { name: '水之疾驰', type: 'Buff', value: 85 },
+                { name: '净水治愈', type: 'Heal', value: 115 },
+                { name: '水之祈福', type: 'Heal', value: 135 },
+                { name: '水猴戏耍', type: 'Attack', value: 115 },
+                { name: '碧水变幻', type: 'Defense', value: 90 },
+                { name: '水羽振翅', type: 'Attack', value: 105 },
+                { name: '水之警戒', type: 'Buff', value: 75 },
+                { name: '水犬追击', type: 'Attack', value: 115 },
+                { name: '碧水反击', type: 'Counter', value: 100 },
+                { name: '水猪纳福', type: 'Heal', value: 145 },
+                { name: '水之厚积', type: 'Defense', value: 105 }
+            ],
+            light: [
+                { name: '圣光穿梭', type: 'Attack', value: 130 },
+                { name: '光影反击', type: 'Counter', value: 120 },
+                { name: '光耀巨力', type: 'Attack', value: 135 },
+                { name: '光之壁垒', type: 'Shield', value: 100 },
+                { name: '圣光猛击', type: 'Attack', value: 150 },
+                { name: '光明威慑', type: 'Debuff', value: 80 },
+                { name: '光跃突袭', type: 'Attack', value: 130 },
+                { name: '圣光闪避', type: 'Defense', value: 95 },
+                { name: '圣光龙吟', type: 'Special', value: 220 },
+                { name: '光龙护盾', type: 'Shield', value: 125 },
+                { name: '光刃穿刺', type: 'Attack', value: 120 },
+                { name: '圣光反击', type: 'Counter', value: 125 },
+                { name: '踏光而行', type: 'Attack', value: 145 },
+                { name: '光明疾驰', type: 'Buff', value: 90 },
+                { name: '圣光治愈', type: 'Heal', value: 125 },
+                { name: '光之祈福', type: 'Heal', value: 145 },
+                { name: '灵猴戏耍', type: 'Attack', value: 125 },
+                { name: '圣光变幻', type: 'Defense', value: 100 },
+                { name: '光羽振翅', type: 'Attack', value: 115 },
+                { name: '光之警戒', type: 'Buff', value: 85 },
+                { name: '圣犬追击', type: 'Attack', value: 130 },
+                { name: '圣光反击', type: 'Counter', value: 115 },
+                { name: '圣猪纳福', type: 'Heal', value: 150 },
+                { name: '光之厚积', type: 'Defense', value: 100 }
+            ],
+            dark: [
+                { name: '暗影穿梭', type: 'Attack', value: 135 },
+                { name: '幽冥反击', type: 'Counter', value: 125 },
+                { name: '暗影重击', type: 'Attack', value: 140 },
+                { name: '冥之壁垒', type: 'Shield', value: 95 },
+                { name: '暗影猛击', type: 'Attack', value: 155 },
+                { name: '幽冥威慑', type: 'Debuff', value: 90 },
+                { name: '暗跃突袭', type: 'Attack', value: 140 },
+                { name: '暗影闪避', type: 'Defense', value: 100 },
+                { name: '暗影龙吟', type: 'Special', value: 230 },
+                { name: '暗龙护盾', type: 'Shield', value: 115 },
+                { name: '暗影吞噬', type: 'Lifesteal', value: 130 },
+                { name: '幽冥反击', type: 'Counter', value: 130 },
+                { name: '踏冥奔腾', type: 'Attack', value: 150 },
+                { name: '暗影疾驰', type: 'Buff', value: 95 },
+                { name: '暗影治愈', type: 'Heal', value: 110 },
+                { name: '冥之祈福', type: 'Heal', value: 125 },
+                { name: '冥猴戏耍', type: 'Attack', value: 120 },
+                { name: '暗影变幻', type: 'Defense', value: 95 },
+                { name: '暗羽振翅', type: 'Attack', value: 110 },
+                { name: '冥之警戒', type: 'Buff', value: 85 },
+                { name: '冥犬追击', type: 'Attack', value: 135 },
+                { name: '暗影反击', type: 'Counter', value: 120 },
+                { name: '冥猪纳福', type: 'Heal', value: 135 },
+                { name: '冥之厚积', type: 'Defense', value: 95 }
+            ]
+        };
+
+        function getSkillByTokenType(tokenType) {
+            const elementIndex = Math.floor(tokenType / 24);
+            const indexInElement = tokenType % 24;
+            
+            const elements = ['water', 'wind', 'fire', 'dark', 'light'];
+            const element = elements[elementIndex];
+            return FULL_SKILLS[element][indexInElement];
+        }
 
         function init() {
             loadMockNfts();
@@ -507,16 +646,20 @@
         function loadMockNfts() {
             const IPFS_BASE_1 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/';
             const IPFS_BASE_2 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/';
+            const ELEMENT_NAMES = ['Water', 'Wind', 'Fire', 'Dark', 'Light'];
+            const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
             
             myNfts = [
-                { tokenId: 1, tokenType: 25, level: 3, attr: 'Wind', zodiacIndex: 4, name: '风龙', imagePath: `${IPFS_BASE_1}fenglong_1.png`, skill: ZODIAC_SKILLS[4], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 2, tokenType: 49, level: 5, attr: 'Fire', zodiacIndex: 0, name: '火鼠', imagePath: `${IPFS_BASE_1}huoshu_1.png`, skill: ZODIAC_SKILLS[0], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 3, tokenType: 2, level: 4, attr: 'Water', zodiacIndex: 1, name: '水牛', imagePath: `${IPFS_BASE_1}shuiniu_1.png`, skill: ZODIAC_SKILLS[1], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 4, tokenType: 73, level: 2, attr: 'Dark', zodiacIndex: 3, name: '暗兔', imagePath: `${IPFS_BASE_2}antu_1.png`, skill: ZODIAC_SKILLS[3], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 5, tokenType: 97, level: 3, attr: 'Light', zodiacIndex: 8, name: '光猴', imagePath: `${IPFS_BASE_2}guanghou_1.png`, skill: ZODIAC_SKILLS[8], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 6, tokenType: 53, level: 4, attr: 'Fire', zodiacIndex: 4, name: '火龙', imagePath: `${IPFS_BASE_1}huolong_1.png`, skill: ZODIAC_SKILLS[4], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 7, tokenType: 77, level: 2, attr: 'Dark', zodiacIndex: 7, name: '暗羊', imagePath: `${IPFS_BASE_2}anyang_0.png`, skill: ZODIAC_SKILLS[7], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 8, tokenType: 101, level: 5, attr: 'Light', zodiacIndex: 11, name: '光猪', imagePath: `${IPFS_BASE_2}guangzhu_1.png`, skill: ZODIAC_SKILLS[11], inAttackTeam: false, inDefenseTeam: false }
+                { tokenId: 1, tokenType: 25, level: 3, attr: 'Wind', zodiacIndex: 4, name: '风龙·雄', imagePath: `${IPFS_BASE_1}fenglong_1.png`, skill: getSkillByTokenType(25), inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 2, tokenType: 49, level: 5, attr: 'Fire', zodiacIndex: 0, name: '火鼠·雄', imagePath: `${IPFS_BASE_1}huoshu_1.png`, skill: getSkillByTokenType(49), inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 3, tokenType: 2, level: 4, attr: 'Water', zodiacIndex: 1, name: '水牛·雌', imagePath: `${IPFS_BASE_1}shuiniu_1.png`, skill: getSkillByTokenType(2), inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 4, tokenType: 73, level: 2, attr: 'Dark', zodiacIndex: 3, name: '暗兔·雄', imagePath: `${IPFS_BASE_2}antu_1.png`, skill: getSkillByTokenType(73), inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 5, tokenType: 97, level: 3, attr: 'Light', zodiacIndex: 8, name: '光猴·雄', imagePath: `${IPFS_BASE_2}guanghou_1.png`, skill: getSkillByTokenType(97), inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 6, tokenType: 53, level: 4, attr: 'Fire', zodiacIndex: 4, name: '火龙·雄', imagePath: `${IPFS_BASE_1}huolong_1.png`, skill: getSkillByTokenType(53), inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 7, tokenType: 77, level: 2, attr: 'Dark', zodiacIndex: 7, name: '暗羊·雌', imagePath: `${IPFS_BASE_2}anyang_0.png`, skill: getSkillByTokenType(77), inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 8, tokenType: 101, level: 5, attr: 'Light', zodiacIndex: 11, name: '光猪·雄', imagePath: `${IPFS_BASE_2}guangzhu_1.png`, skill: getSkillByTokenType(101), inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 9, tokenType: 50, level: 2, attr: 'Fire', zodiacIndex: 0, name: '火鼠·雌', imagePath: `${IPFS_BASE_1}huoshu_0.png`, skill: getSkillByTokenType(50), inAttackTeam: false, inDefenseTeam: false },
+                { tokenId: 10, tokenType: 26, level: 4, attr: 'Wind', zodiacIndex: 4, name: '风龙·雌', imagePath: `${IPFS_BASE_1}fenglong_0.png`, skill: getSkillByTokenType(26), inAttackTeam: false, inDefenseTeam: false }
             ];
         }
 

@@ -48,8 +48,18 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
     address public authorizedNFTContract;
     /** @dev 授权NFT合约设置事件 */
     event AuthorizedNFTContractSet(address indexed nftContract, uint256 timestamp);
+    /** @dev 授权合约地址 */
+    address public authorizer;
+    
+    /** @dev 普通属性（风、水、火）各等级权重：1阶=1, 2阶=2, 3阶=6, 4阶=18, 5阶=66 */
+    uint256[6] public commonWeights;
+    /** @dev 稀有属性（光、暗）各等级权重：1阶=10, 2阶=12, 3阶=16, 4阶=28, 5阶=76 */
+    uint256[6] public rareWeights;
+    /** @dev 权重规则更新事件 */
+    event WeightRulesUpdated(uint256[6] commonWeights, uint256[6] rareWeights, uint256 timestamp);
+    
     /** @dev 存储间隙，用于合约升级兼容性 */
-    uint256[50] private __gap;
+    uint256[48] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
@@ -62,7 +72,27 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         transferOwnership(initialOwner);
+        
+        // 设置默认权重规则
+        // 普通属性（风、水、火）: 1阶=1, 2阶=2, 3阶=6, 4阶=18, 5阶=66
+        commonWeights[0] = 0;  // 索引0未使用
+        commonWeights[1] = 1;
+        commonWeights[2] = 2;
+        commonWeights[3] = 6;
+        commonWeights[4] = 18;
+        commonWeights[5] = 66;
+        
+        // 稀有属性（光、暗）: 1阶=10, 2阶=12, 3阶=16, 4阶=28, 5阶=76
+        // 光暗为稀有属性，铸造消耗更高，权重适当提升
+        rareWeights[0] = 0;     // 索引0未使用
+        rareWeights[1] = 10;
+        rareWeights[2] = 12;
+        rareWeights[3] = 16;
+        rareWeights[4] = 28;
+        rareWeights[5] = 76;
     }
+
+    
 
     /**
      * @dev 升级授权函数
@@ -171,18 +201,25 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
     }
 
     /**
-     * @dev 根据等级获取权重值（内部函数）
-     * 权重规则：1阶=1, 2阶=2, 3阶=4, 4阶=12, 5阶=48
+     * @dev 根据等级和属性类型获取权重值（内部函数）
+     * 普通属性（风、水、火）权重规则：1阶=1, 2阶=2, 3阶=4, 4阶=12, 5阶=48
+     * 稀有属性（光、暗）权重规则：1阶=10, 2阶=20, 3阶=40, 4阶=120, 5阶=480
      * @param level NFT等级
+     * @param isRare 是否稀有属性
      * @return uint256 权重值
      */
-    function _getLevelWeight(uint8 level) internal pure returns (uint256) {
-        if (level == 1) return 1;
-        if (level == 2) return 2;
-        if (level == 3) return 4;
-        if (level == 4) return 12;
-        if (level == 5) return 48;
-        return 0;
+    function _getLevelWeight(uint8 level, bool isRare) internal view returns (uint256) {
+        if (level < 1 || level > 5) return 0;
+        return isRare ? rareWeights[level] : commonWeights[level];
+    }
+
+    /**
+     * @dev 检查属性是否为稀有属性（光、暗）
+     * @param element 属性类型
+     * @return bool 是否为稀有属性
+     */
+    function _isRareElement(NFTDataTypes.ElementType element) internal pure returns (bool) {
+        return element == NFTDataTypes.ElementType.DARK || element == NFTDataTypes.ElementType.LIGHT;
     }
 
     /**
@@ -190,10 +227,11 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
      * @param user 用户地址
      * @param level NFT等级
      * @param add 是否增加（true增加，false减少）
+     * @param element 属性类型
      */
-    function updateUserWeight(address user, uint8 level, bool add) external override onlyAuthorized {
+    function updateUserWeight(address user, uint8 level, bool add, NFTDataTypes.ElementType element) external override onlyAuthorized {
         uint256 currentWeight = userWeightCache[user];
-        uint256 weightDelta = _getLevelWeight(level);
+        uint256 weightDelta = _getLevelWeight(level, _isRareElement(element));
         if (add) {
             userWeightCache[user] = currentWeight + weightDelta;
         } else {
@@ -203,7 +241,6 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
 
     /**
      * @dev 直接计算用户权重（遍历所有NFT）
-     * 权重规则：1阶=1, 2阶=2, 3阶=4, 4阶=12, 5阶=48
      * 用于精确计算用户权重，解决缓存不一致问题
      * @param user 用户地址
      * @return uint256 用户权重
@@ -212,10 +249,41 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
         uint256[] memory tokens = _userTokens[user];
         uint256 totalWeight = 0;
         for (uint256 i = 0; i < tokens.length; i++) {
-            uint8 level = tokenLevel[tokens[i]];
-            totalWeight += _getLevelWeight(level);
+            uint256 tokenId = tokens[i];
+            uint8 level = tokenLevel[tokenId];
+            NFTDataTypes.ZodiacType t = tokenType[tokenId];
+            bool isRare = _isRareElement(t.getElement());
+            totalWeight += _getLevelWeight(level, isRare);
         }
         return totalWeight;
+    }
+
+    /**
+     * @dev 设置权重规则（仅合约所有者可调用）
+     * @param _commonWeights 普通属性各等级权重（索引0未使用，1-5对应等级1-5）
+     * @param _rareWeights 稀有属性各等级权重（索引0未使用，1-5对应等级1-5）
+     */
+    function setWeightRules(uint256[6] calldata _commonWeights, uint256[6] calldata _rareWeights) external onlyOwner {
+        require(_commonWeights[1] > 0, "NFTData: Common weight level 1 must be > 0");
+        require(_rareWeights[1] > 0, "NFTData: Rare weight level 1 must be > 0");
+        
+        for (uint i = 1; i <= 5; i++) {
+            require(_commonWeights[i] >= _commonWeights[i-1], "NFTData: Common weights must be non-decreasing");
+            require(_rareWeights[i] >= _rareWeights[i-1], "NFTData: Rare weights must be non-decreasing");
+        }
+        
+        commonWeights = _commonWeights;
+        rareWeights = _rareWeights;
+        
+        emit WeightRulesUpdated(_commonWeights, _rareWeights, block.timestamp);
+    }
+
+    /**
+     * @dev 获取权重规则信息
+     * @return (uint256[6], uint256[6]) 普通属性权重数组和稀有属性权重数组
+     */
+    function getWeightRules() external view returns (uint256[6] memory, uint256[6] memory) {
+        return (commonWeights, rareWeights);
     }
 
     /**
@@ -270,6 +338,10 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
         require(nftContract != address(0), "Zero address");
         authorizedNFTContract = nftContract;
         emit AuthorizedNFTContractSet(nftContract, block.timestamp);
+    }
+
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
     }
 
     /**

@@ -34,6 +34,8 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     /** @dev 代币合约地址 */
     address public tokenContract;
+    /** @dev 授权合约地址 */
+    address public authorizer;
 
     /** @dev 总质押代币数量 */
     uint256 public totalStakedTokens;
@@ -302,6 +304,10 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function setMultipleThreshold(uint256 _threshold) external onlyOwner {
         require(_threshold >= 1, "TokenStaking: Multiple threshold must be >= 1");
         multipleThreshold = _threshold;
+    }
+
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
     }
 
     /**

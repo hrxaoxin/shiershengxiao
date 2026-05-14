@@ -15,6 +15,8 @@ import "./Battle.sol";
 contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     /** @dev 战斗合约地址 */
     Battle public battleContract;
+    /** @dev 授权合约地址 */
+    address public authorizer;
 
     /** @dev 团队大小：每队6个NFT */
     uint256 public constant TEAM_SIZE = 6;
@@ -31,7 +33,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
      * @param wins 胜利次数
      * @param losses 失败次数
      * @param lastBattleTime 上次战斗时间
-     * @param attackTeam 进攻队伍NFT列表
+     * @param offenseTeam 进攻队伍NFT列表
      * @param defenseTeam 防御队伍NFT列表
      */
     struct Player {
@@ -39,7 +41,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         uint256 wins;
         uint256 losses;
         uint256 lastBattleTime;
-        uint256[] attackTeam;
+        uint256[] offenseTeam;
         uint256[] defenseTeam;
     }
 
@@ -87,7 +89,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     /** @dev NFT所属玩家映射（tokenId => 玩家地址） */
     mapping(uint256 => address) public nftToPlayer;
     /** @dev NFT是否在进攻队伍映射 */
-    mapping(uint256 => bool) public isInAttackTeam;
+    mapping(uint256 => bool) public isInOffenseTeam;
     /** @dev NFT是否在防御队伍映射 */
     mapping(uint256 => bool) public isInDefenseTeam;
 
@@ -207,6 +209,10 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         battleContract = Battle(_battleContract);
     }
 
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
     /**
      * @dev 设置赛季持续时间
      * @param _duration 持续时间（秒）
@@ -304,7 +310,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         _clearAttackTeam(msg.sender);
 
         Player storage player = players[msg.sender];
-        player.attackTeam = tokenIds;
+        player.offenseTeam = tokenIds;
 
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
             require(!isInDefenseTeam[tokenIds[i]], "E14: NFT already in defense team");
@@ -378,14 +384,14 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
      */
     function _clearAttackTeam(address player) internal {
         Player storage p = players[player];
-        for (uint256 i = 0; i < p.attackTeam.length; i++) {
-            uint256 tokenId = p.attackTeam[i];
+        for (uint256 i = 0; i < p.offenseTeam.length; i++) {
+            uint256 tokenId = p.offenseTeam[i];
             if (isInAttackTeam[tokenId] && !isInDefenseTeam[tokenId]) {
                 delete nftToPlayer[tokenId];
             }
             isInAttackTeam[tokenId] = false;
         }
-        delete p.attackTeam;
+        delete p.offenseTeam;
     }
 
     /**
@@ -417,7 +423,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         Player storage attacker = players[msg.sender];
         Player storage defenderPlayer = players[defender];
 
-        require(attacker.attackTeam.length == TEAM_SIZE, "E05: Attacker must set attack team");
+        require(attacker.offenseTeam.length == TEAM_SIZE, "E05: Attacker must set attack team");
         require(defenderPlayer.defenseTeam.length == TEAM_SIZE, "E06: Defender must set defense team");
         require(msg.sender != defender, "E16: Cannot challenge yourself");
 
@@ -432,7 +438,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         uint256 defenderRank = getPlayerRank(defender);
 
         (bool attackerWon, uint256 attackerWinCount, uint256 defenderWinCount) =
-            battleContract.battle(attacker.attackTeam, defenderPlayer.defenseTeam);
+            battleContract.battle(attacker.offenseTeam, defenderPlayer.defenseTeam);
 
         int256 attackerPointsChange;
         int256 defenderPointsChange;
@@ -704,7 +710,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
      * @return uint256[] NFT ID数组
      */
     function getPlayerAttackTeam(address player) external view returns (uint256[] memory) {
-        return players[player].attackTeam;
+        return players[player].offenseTeam;
     }
 
     /**
