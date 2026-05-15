@@ -370,8 +370,19 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div class="bg-white/5 rounded-xl p-4 border border-white/10">
                                 <h3 class="text-white font-semibold mb-4">我的战队</h3>
-                                <div id="myBattleTeamDisplay" class="text-center text-gray-400 py-4">
-                                    请先设置战队
+                                <div id="myBattleTeamDisplay" class="space-y-2">
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">前1</div>
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">前2</div>
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">前3</div>
+                                    </div>
+                                    <div class="text-center text-gray-500 text-xs mb-1">前排</div>
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">后1</div>
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">后2</div>
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">后3</div>
+                                    </div>
+                                    <div class="text-center text-gray-500 text-xs">后排</div>
                                 </div>
                             </div>
 
@@ -392,8 +403,19 @@
 
                             <div class="bg-white/5 rounded-xl p-4 border border-white/10">
                                 <h3 class="text-white font-semibold mb-4">对手战队</h3>
-                                <div id="opponentBattleTeam" class="text-center text-gray-400 py-4">
-                                    选择对手后显示
+                                <div id="opponentBattleTeam" class="space-y-2">
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">前1</div>
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">前2</div>
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">前3</div>
+                                    </div>
+                                    <div class="text-center text-gray-500 text-xs mb-1">前排</div>
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">后1</div>
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">后2</div>
+                                        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">后3</div>
+                                    </div>
+                                    <div class="text-center text-gray-500 text-xs">后排</div>
                                 </div>
                             </div>
                         </div>
@@ -541,157 +563,88 @@
     </main>
 
     <div id="battleModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-50 hidden">
-        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 max-w-7xl w-full mx-4 border border-white/10 max-h-[90vh] overflow-hidden flex flex-col">
-            <div class="text-center mb-4 flex-shrink-0">
-                <h2 class="text-2xl font-bold text-white mb-1">⚔️ 6v6 战斗开始！</h2>
-                <div class="text-gray-400" id="battleModeText">积分模式</div>
+        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-4 max-w-6xl w-full mx-4 border border-white/10 max-h-[90vh] overflow-hidden flex flex-col">
+            <div class="text-center mb-3 flex-shrink-0">
+                <h2 class="text-xl font-bold text-white mb-1">⚔️ 6v6 战斗开始！</h2>
+                <div class="text-gray-400 text-sm" id="battleModeText">积分模式</div>
             </div>
 
-            <div class="flex-1 flex gap-4 overflow-hidden">
+            <div class="flex-1 flex gap-3 overflow-hidden">
                 <div class="flex-1 flex flex-col">
-                    <div class="flex items-center justify-center py-2 flex-shrink-0">
-                        <div class="text-center">
-                            <div class="text-3xl mb-2" id="battleResult">VS</div>
-                            <div class="text-gray-400 text-sm" id="battleMessage">战斗即将开始...</div>
-                            <div class="text-sm text-gray-500" id="currentRound">第 1 回合</div>
+                    <h3 class="text-red-400 font-semibold text-center mb-2">防守方</h3>
+                    <div class="flex-1 flex flex-col justify-around">
+                        <div class="space-y-1">
+                            <div class="text-center text-gray-500 text-xs mb-1">前排</div>
+                            <div class="flex justify-center gap-2">
+                                <div class="text-center p-1.5 bg-red-500/20 rounded-lg border border-red-500/30 w-20" id="defenderFront1">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp1"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="defenderImg1"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="defenderName1">前排1</div>
+                                    <div class="text-xs text-green-400" id="defenderHpText1">100%</div>
+                                </div>
+                                <div class="text-center p-1.5 bg-red-500/20 rounded-lg border border-red-500/30 w-20" id="defenderFront2">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp2"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="defenderImg2"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="defenderName2">前排2</div>
+                                    <div class="text-xs text-green-400" id="defenderHpText2">100%</div>
+                                </div>
+                                <div class="text-center p-1.5 bg-red-500/20 rounded-lg border border-red-500/30 w-20" id="defenderFront3">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp3"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="defenderImg3"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="defenderName3">前排3</div>
+                                    <div class="text-xs text-green-400" id="defenderHpText3">100%</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="text-center text-gray-500 text-xs mb-1">后排</div>
+                            <div class="flex justify-center gap-2">
+                                <div class="text-center p-1.5 bg-purple-500/20 rounded-lg border border-purple-500/30 w-20" id="defenderBack1">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp4"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="defenderImg4"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="defenderName4">后排1</div>
+                                    <div class="text-xs text-green-400" id="defenderHpText4">100%</div>
+                                </div>
+                                <div class="text-center p-1.5 bg-purple-500/20 rounded-lg border border-purple-500/30 w-20" id="defenderBack2">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp5"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="defenderImg5"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="defenderName5">后排2</div>
+                                    <div class="text-xs text-green-400" id="defenderHpText5">100%</div>
+                                </div>
+                                <div class="text-center p-1.5 bg-purple-500/20 rounded-lg border border-purple-500/30 w-20" id="defenderBack3">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp6"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="defenderImg6"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="defenderName6">后排3</div>
+                                    <div class="text-xs text-green-400" id="defenderHpText6">100%</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    <div class="flex-1 flex flex-col justify-end overflow-hidden">
-                        <div class="flex-shrink-0 mb-4">
-                            <h3 class="text-red-400 font-semibold text-center mb-3">防守方</h3>
-                            <div id="battleDefenderTeam" class="space-y-2">
-                                <div class="grid grid-cols-3 gap-2">
-                                    <div class="text-center p-2 bg-green-500/20 rounded-lg" id="defenderFront1">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp1"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="defenderImg1"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="defenderName1">前排1</div>
-                                        <div class="text-xs text-green-400" id="defenderHpText1">100%</div>
-                                    </div>
-                                    <div class="text-center p-2 bg-green-500/20 rounded-lg" id="defenderFront2">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp2"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="defenderImg2"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="defenderName2">前排2</div>
-                                        <div class="text-xs text-green-400" id="defenderHpText2">100%</div>
-                                    </div>
-                                    <div class="text-center p-2 bg-green-500/20 rounded-lg" id="defenderFront3">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp3"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="defenderImg3"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="defenderName3">前排3</div>
-                                        <div class="text-xs text-green-400" id="defenderHpText3">100%</div>
-                                    </div>
-                                </div>
-                                <div class="grid grid-cols-3 gap-2">
-                                    <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="defenderBack1">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp4"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="defenderImg4"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="defenderName4">后排1</div>
-                                        <div class="text-xs text-green-400" id="defenderHpText4">100%</div>
-                                    </div>
-                                    <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="defenderBack2">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp5"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="defenderImg5"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="defenderName5">后排2</div>
-                                        <div class="text-xs text-green-400" id="defenderHpText5">100%</div>
-                                    </div>
-                                    <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="defenderBack3">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp6"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="defenderImg6"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="defenderName6">后排3</div>
-                                        <div class="text-xs text-green-400" id="defenderHpText6">100%</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mt-2 text-center">
-                                <div class="text-white font-bold" id="defenderWinCount">0</div>
-                                <div class="text-gray-400 text-xs">获胜数</div>
-                            </div>
-                        </div>
-
-                        <div class="flex-shrink-0">
-                            <h3 class="text-blue-400 font-semibold text-center mb-3">进攻方</h3>
-                            <div id="battleAttackerTeam" class="space-y-2">
-                                <div class="grid grid-cols-3 gap-2">
-                                    <div class="text-center p-2 bg-blue-500/20 rounded-lg" id="attackerFront1">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp1"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="attackerImg1"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="attackerName1">前排1</div>
-                                        <div class="text-xs text-green-400" id="attackerHpText1">100%</div>
-                                    </div>
-                                    <div class="text-center p-2 bg-blue-500/20 rounded-lg" id="attackerFront2">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp2"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="attackerImg2"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="attackerName2">前排2</div>
-                                        <div class="text-xs text-green-400" id="attackerHpText2">100%</div>
-                                    </div>
-                                    <div class="text-center p-2 bg-blue-500/20 rounded-lg" id="attackerFront3">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp3"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="attackerImg3"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="attackerName3">前排3</div>
-                                        <div class="text-xs text-green-400" id="attackerHpText3">100%</div>
-                                    </div>
-                                </div>
-                                <div class="grid grid-cols-3 gap-2">
-                                    <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="attackerBack1">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp4"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="attackerImg4"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="attackerName4">后排1</div>
-                                        <div class="text-xs text-green-400" id="attackerHpText4">100%</div>
-                                    </div>
-                                    <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="attackerBack2">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp5"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="attackerImg5"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="attackerName5">后排2</div>
-                                        <div class="text-xs text-green-400" id="attackerHpText5">100%</div>
-                                    </div>
-                                    <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="attackerBack3">
-                                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp6"></div>
-                                        </div>
-                                        <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center" id="attackerImg6"><img src="https://via.placeholder.com/48" class="w-full h-full rounded-lg object-cover" /></div>
-                                        <div class="text-xs text-gray-300" id="attackerName6">后排3</div>
-                                        <div class="text-xs text-green-400" id="attackerHpText6">100%</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mt-2 text-center">
-                                <div class="text-white font-bold" id="attackerWinCount">0</div>
-                                <div class="text-gray-400 text-xs">获胜数</div>
-                            </div>
-                        </div>
+                    <div class="mt-2 text-center">
+                        <div class="text-white font-bold text-sm" id="defenderWinCount">0</div>
+                        <div class="text-gray-400 text-xs">获胜数</div>
                     </div>
                 </div>
 
-                <div class="w-72 flex-shrink-0 flex flex-col">
-                    <div class="flex-1 bg-gray-800/50 rounded-xl p-4 overflow-hidden flex flex-col">
-                        <h3 class="text-white font-semibold mb-3 flex-shrink-0">战斗过程</h3>
-                        <div id="battleProcess" class="flex-1 overflow-y-auto text-sm space-y-1 pr-2">
-                            <div class="text-gray-500">等待战斗开始...</div>
-                        </div>
+                <div class="w-32 flex-shrink-0 flex flex-col items-center justify-center gap-3">
+                    <div class="text-center">
+                        <div class="text-4xl mb-2" id="battleResult">VS</div>
+                        <div class="text-gray-400 text-sm" id="battleMessage">战斗即将开始...</div>
+                        <div class="text-gray-500 text-xs" id="currentRound">第 1 回合</div>
                     </div>
-                    <div class="mt-4 flex flex-col gap-2">
+                    <div class="flex flex-col gap-2 w-full">
                         <button id="fightBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
                             开始战斗
                         </button>
@@ -699,6 +652,81 @@
                             关闭
                         </button>
                     </div>
+                </div>
+
+                <div class="flex-1 flex flex-col">
+                    <h3 class="text-blue-400 font-semibold text-center mb-2">进攻方</h3>
+                    <div class="flex-1 flex flex-col justify-around">
+                        <div class="space-y-1">
+                            <div class="text-center text-gray-500 text-xs mb-1">前排</div>
+                            <div class="flex justify-center gap-2">
+                                <div class="text-center p-1.5 bg-blue-500/20 rounded-lg border border-blue-500/30 w-20" id="attackerFront1">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp1"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="attackerImg1"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="attackerName1">前排1</div>
+                                    <div class="text-xs text-green-400" id="attackerHpText1">100%</div>
+                                </div>
+                                <div class="text-center p-1.5 bg-blue-500/20 rounded-lg border border-blue-500/30 w-20" id="attackerFront2">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp2"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="attackerImg2"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="attackerName2">前排2</div>
+                                    <div class="text-xs text-green-400" id="attackerHpText2">100%</div>
+                                </div>
+                                <div class="text-center p-1.5 bg-blue-500/20 rounded-lg border border-blue-500/30 w-20" id="attackerFront3">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp3"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="attackerImg3"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="attackerName3">前排3</div>
+                                    <div class="text-xs text-green-400" id="attackerHpText3">100%</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="text-center text-gray-500 text-xs mb-1">后排</div>
+                            <div class="flex justify-center gap-2">
+                                <div class="text-center p-1.5 bg-purple-500/20 rounded-lg border border-purple-500/30 w-20" id="attackerBack1">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp4"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="attackerImg4"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="attackerName4">后排1</div>
+                                    <div class="text-xs text-green-400" id="attackerHpText4">100%</div>
+                                </div>
+                                <div class="text-center p-1.5 bg-purple-500/20 rounded-lg border border-purple-500/30 w-20" id="attackerBack2">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp5"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="attackerImg5"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="attackerName5">后排2</div>
+                                    <div class="text-xs text-green-400" id="attackerHpText5">100%</div>
+                                </div>
+                                <div class="text-center p-1.5 bg-purple-500/20 rounded-lg border border-purple-500/30 w-20" id="attackerBack3">
+                                    <div class="hp-bar-container h-1 bg-gray-700 rounded-full mb-0.5 overflow-hidden">
+                                        <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp6"></div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-md bg-gray-700 mx-auto mb-0.5 flex items-center justify-center" id="attackerImg6"><img src="https://via.placeholder.com/40" class="w-full h-full rounded-md object-cover" /></div>
+                                    <div class="text-xs text-gray-300 truncate" id="attackerName6">后排3</div>
+                                    <div class="text-xs text-green-400" id="attackerHpText6">100%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-center">
+                        <div class="text-white font-bold text-sm" id="attackerWinCount">0</div>
+                        <div class="text-gray-400 text-xs">获胜数</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-3 bg-gray-800/50 rounded-lg p-3 max-h-32 overflow-y-auto">
+                <h3 class="text-white font-semibold mb-2 text-sm">战斗过程</h3>
+                <div id="battleProcess" class="text-sm space-y-1">
+                    <div class="text-gray-500">等待战斗开始...</div>
                 </div>
             </div>
         </div>
@@ -876,6 +904,8 @@
         function generateMockNfts() {
             var nfts = [];
             var elements = ['Fire', 'Wind', 'Water', 'Light', 'Dark'];
+            var elementPinyinMap = { Fire: 'huo', Wind: 'feng', Water: 'shui', Light: 'guang', Dark: 'an' };
+            var zodiacPinyinMap = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
             
             for (var elementIdx = 0; elementIdx < elements.length; elementIdx++) {
                 for (var zodiacIdx = 0; zodiacIdx < 12; zodiacIdx++) {
@@ -890,7 +920,9 @@
                         
                         var imageUrl = '';
                         var basePath = elementIdx < 3 ? IPFS_BASE_1 : IPFS_BASE_2;
-                        var elementPath = element.toLowerCase() + ZODIAC_NAMES[zodiacIdx] + '_' + gender + '.png';
+                        var elementPinyin = elementPinyinMap[element];
+                        var zodiacPinyin = zodiacPinyinMap[zodiacIdx];
+                        var elementPath = elementPinyin + zodiacPinyin + '_' + gender + '.png';
                         imageUrl = basePath + elementPath;
                         
                         nfts.push({
@@ -1015,15 +1047,19 @@
             var filledSlots = battleTeam.filter(function(n) { return n; }).length;
             
             if (filledSlots === 0) {
-                display.innerHTML = '<div class="text-gray-400 py-4">请先设置战队</div>';
+                display.innerHTML = '<div class="space-y-2"><div class="grid grid-cols-3 gap-2"><div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">前1</div><div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">前2</div><div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">前3</div></div><div class="text-center text-gray-500 text-xs mb-1">前排</div><div class="grid grid-cols-3 gap-2"><div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">后1</div><div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">后2</div><div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">后3</div></div><div class="text-center text-gray-500 text-xs">后排</div></div>';
             } else {
-                display.innerHTML = '<div class="text-white font-semibold mb-2">已配置 ' + filledSlots + '/' + TEAM_SIZE + '</div><div class="flex flex-wrap gap-1">' + battleTeam.filter(function(n) { return n; }).map(function(nft) { return '<div class="w-8 h-8 rounded bg-gray-700 overflow-hidden"><img src="' + nft.imageUrl + '" alt="' + nft.name + '" class="w-full h-full object-cover" onerror="this.src=\'https://via.placeholder.com/32\'"></div>'; }).join('') + Array(TEAM_SIZE - filledSlots).fill('<div class="w-8 h-8 rounded bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">?</div>').join('') + '</div>';
+                var frontRow = battleTeam.slice(0, 3);
+                var backRow = battleTeam.slice(3, 6);
+                display.innerHTML = '<div class="text-white font-semibold mb-2">已配置 ' + filledSlots + '/' + TEAM_SIZE + '</div><div class="space-y-2"><div class="grid grid-cols-3 gap-2">' + frontRow.map(function(nft) { return nft ? '<div class="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden"><img src="' + nft.imageUrl + '" alt="' + nft.name + '" class="w-full h-full object-cover" onerror="this.src=\'https://via.placeholder.com/40\'"></div>' : '<div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">?</div>'; }).join('') + '</div><div class="text-center text-gray-500 text-xs mb-1">前排</div><div class="grid grid-cols-3 gap-2">' + backRow.map(function(nft) { return nft ? '<div class="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden"><img src="' + nft.imageUrl + '" alt="' + nft.name + '" class="w-full h-full object-cover" onerror="this.src=\'https://via.placeholder.com/40\'"></div>' : '<div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-gray-500 text-xs">?</div>'; }).join('') + '</div><div class="text-center text-gray-500 text-xs">后排</div></div>';
             }
         }
 
         function selectOpponent(opponent) {
             selectedOpponent = opponent;
-            document.getElementById('opponentBattleTeam').innerHTML = '<div class="text-white font-semibold mb-2">' + opponent.name + '</div><div class="flex flex-wrap gap-1">' + opponent.team.map(function(nft) { return '<div class="w-8 h-8 rounded bg-gray-700 overflow-hidden"><img src="' + nft.imageUrl + '" alt="' + nft.name + '" class="w-full h-full object-cover" onerror="this.src=\'https://via.placeholder.com/32\'"></div>'; }).join('') + '</div>';
+            var frontRow = opponent.team.slice(0, 3);
+            var backRow = opponent.team.slice(3, 6);
+            document.getElementById('opponentBattleTeam').innerHTML = '<div class="text-white font-semibold mb-2">' + opponent.name + '</div><div class="space-y-2"><div class="grid grid-cols-3 gap-2">' + frontRow.map(function(nft) { return '<div class="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden"><img src="' + nft.imageUrl + '" alt="' + nft.name + '" class="w-full h-full object-cover" onerror="this.src=\'https://via.placeholder.com/40\'"></div>'; }).join('') + '</div><div class="text-center text-gray-500 text-xs mb-1">前排</div><div class="grid grid-cols-3 gap-2">' + backRow.map(function(nft) { return '<div class="w-10 h-10 rounded-lg bg-gray-700 overflow-hidden"><img src="' + nft.imageUrl + '" alt="' + nft.name + '" class="w-full h-full object-cover" onerror="this.src=\'https://via.placeholder.com/40\'"></div>'; }).join('') + '</div><div class="text-center text-gray-500 text-xs">后排</div></div>';
             updateChallengeButton();
         }
 
@@ -1069,14 +1105,22 @@
 
             for (var i = 0; i < TEAM_SIZE; i++) {
                 if (attackerTeam[i]) {
-                    document.getElementById('attackerImg' + (i + 1)).innerHTML = '<img src="' + attackerTeam[i].imageUrl + '" class="w-full h-full rounded-lg object-cover" onerror="this.src=\'https://via.placeholder.com/48\'">';
+                    var attackerImg = attackerTeam[i].imageUrl;
+                    if (!attackerImg || attackerImg.indexOf('http') !== 0) {
+                        attackerImg = 'https://via.placeholder.com/40';
+                    }
+                    document.getElementById('attackerImg' + (i + 1)).innerHTML = '<img src="' + attackerImg + '" class="w-full h-full rounded-md object-cover" onerror="this.src=\'https://via.placeholder.com/40\'">';
                     document.getElementById('attackerName' + (i + 1)).textContent = attackerTeam[i].name;
                     document.getElementById('attackerHp' + (i + 1)).style.width = '100%';
                     document.getElementById('attackerHpText' + (i + 1)).textContent = '100%';
                 }
                 
                 if (defenderTeam[i]) {
-                    document.getElementById('defenderImg' + (i + 1)).innerHTML = '<img src="' + defenderTeam[i].imageUrl + '" class="w-full h-full rounded-lg object-cover" onerror="this.src=\'https://via.placeholder.com/48\'">';
+                    var defenderImg = defenderTeam[i].imageUrl;
+                    if (!defenderImg || defenderImg.indexOf('http') !== 0) {
+                        defenderImg = 'https://via.placeholder.com/40';
+                    }
+                    document.getElementById('defenderImg' + (i + 1)).innerHTML = '<img src="' + defenderImg + '" class="w-full h-full rounded-md object-cover" onerror="this.src=\'https://via.placeholder.com/40\'">';
                     document.getElementById('defenderName' + (i + 1)).textContent = defenderTeam[i].name;
                     document.getElementById('defenderHp' + (i + 1)).style.width = '100%';
                     document.getElementById('defenderHpText' + (i + 1)).textContent = '100%';
