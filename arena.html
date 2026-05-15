@@ -574,8 +574,8 @@
         </div>
     </main>
 
-    <div id="battleModal" class="fixed inset-0 bg-black/80 z-50 hidden overflow-y-auto">
-        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-2 md:p-4 max-w-6xl w-full mx-1 md:mx-4 my-2 md:my-4 border border-white/10 flex flex-col min-h-fit md:min-h-0">
+    <div id="battleModal" class="fixed inset-0 bg-black/80 z-50 hidden overflow-y-auto flex justify-center">
+        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-2 md:p-4 max-w-6xl w-full mx-1 md:mx-auto my-2 md:my-4 border border-white/10 flex flex-col min-h-fit md:min-h-0 md:max-h-[90vh]">
             <div class="text-center mb-1 md:mb-3 flex-shrink-0">
                 <h2 class="text-base md:text-xl font-bold text-white mb-0.5">⚔️ 6v6 战斗开始！</h2>
                 <div class="text-gray-400 text-[10px] md:text-sm" id="battleModeText">积分模式</div>
@@ -882,6 +882,17 @@
             });
             document.getElementById('fightBtn').addEventListener('click', startBattle);
             document.getElementById('mobileFightBtn')?.addEventListener('click', startBattle);
+            document.getElementById('closeBattleBtn').addEventListener('click', function() {
+                calculateBattleResult();
+                document.getElementById('battleModal').classList.add('hidden');
+                matchRound = 1;
+                attackerMatchWins = 0;
+                defenderMatchWins = 0;
+                selectedOpponent = null;
+                document.getElementById('opponentBattleTeam').innerHTML = '<div class="text-gray-500 text-center py-8">请选择对手</div>';
+                document.getElementById('challengeBtn').disabled = true;
+                loadLeaderboard();
+            });
             document.getElementById('clearBattleTeamBtn').addEventListener('click', clearBattleTeam);
             document.getElementById('saveBattleTeamBtn').addEventListener('click', saveBattleTeam);
             document.getElementById('rechargeBtn').addEventListener('click', rechargeAttempts);
@@ -1478,13 +1489,23 @@
             const modal = document.getElementById('battleModal');
             modal.classList.remove('hidden');
             
+            // 重新初始化战斗界面
+            matchRound = 1;
+            attackerMatchWins = 0;
+            defenderMatchWins = 0;
+            isBattleSkipped = false;
+            
             updateBattleDisplay();
             document.getElementById('battleResult').textContent = 'VS';
             document.getElementById('battleMessage').textContent = '战斗即将开始...';
             document.getElementById('currentRound').textContent = '第 1 回合';
             document.getElementById('attackerWinCount').textContent = '0';
             document.getElementById('defenderWinCount').textContent = '0';
-            document.getElementById('battleProcessLog').innerHTML = '';
+            document.getElementById('battleProcess').innerHTML = '<div class="text-gray-500">等待战斗开始...</div>';
+            
+            // 显示开始战斗按钮，隐藏跳过按钮
+            document.getElementById('fightBtn').style.display = 'block';
+            document.getElementById('skipBtn').style.display = 'none';
             
             setTimeout(() => startBattle(), 1500);
         }
@@ -1918,14 +1939,17 @@
                     document.getElementById('battleResult').textContent = '🎉';
                     document.getElementById('battleMessage').textContent = `系列赛胜利！${attackerWins}:${defenderWins}`;
                     addBattleLog(`\n🏆🏆🏆 系列赛胜利！进攻方以 ${attackerWins}:${defenderWins} 赢得比赛！`);
+                    setTimeout(() => alert('🎉 战斗胜利！'), 100);
                 } else if (defenderWins > attackerWins) {
                     document.getElementById('battleResult').textContent = '💀';
                     document.getElementById('battleMessage').textContent = `系列赛失败！${attackerWins}:${defenderWins}`;
                     addBattleLog(`\n💀💀💀 系列赛失败！防守方以 ${defenderWins}:${attackerWins} 赢得比赛！`);
+                    setTimeout(() => alert('💀 战斗失败！'), 100);
                 } else {
                     document.getElementById('battleResult').textContent = '🤝';
                     document.getElementById('battleMessage').textContent = `系列赛平局！${attackerWins}:${defenderWins}`;
                     addBattleLog(`\n🤝🤝🤝 系列赛平局！双方战成 ${attackerWins}:${defenderWins}！`);
+                    setTimeout(() => alert('🤝 战斗平局！'), 100);
                 }
             } else {
                 const attackerSurvivors = Math.max(1, Math.floor(attackerPower / (defenderPower / 6)));
@@ -1935,14 +1959,17 @@
                     document.getElementById('battleResult').textContent = '🎉';
                     document.getElementById('battleMessage').textContent = `胜利！存活 ${attackerSurvivors}:${defenderSurvivors}`;
                     addBattleLog(`\n🏆 进攻方获胜！存活 ${attackerSurvivors} 人`);
+                    setTimeout(() => alert('🎉 战斗胜利！'), 100);
                 } else if (defenderSurvivors > attackerSurvivors) {
                     document.getElementById('battleResult').textContent = '💀';
                     document.getElementById('battleMessage').textContent = `失败！存活 ${attackerSurvivors}:${defenderSurvivors}`;
                     addBattleLog(`\n💀 防守方获胜！存活 ${defenderSurvivors} 人`);
+                    setTimeout(() => alert('💀 战斗失败！'), 100);
                 } else {
                     document.getElementById('battleResult').textContent = '🤝';
                     document.getElementById('battleMessage').textContent = '平局！';
                     addBattleLog('\n🤝 平局！双方同归于尽');
+                    setTimeout(() => alert('🤝 战斗平局！'), 100);
                 }
             }
         }

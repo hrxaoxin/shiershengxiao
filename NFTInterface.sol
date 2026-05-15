@@ -166,6 +166,13 @@ interface INFTMint {
     function tokenLevel(uint256 tokenId) external view returns (uint8);
     
     /**
+     * @dev 获取NFT成长值
+     * @param tokenId NFT ID
+     * @return uint256 成长值(10-100)
+     */
+    function tokenGrowthValue(uint256 tokenId) external view returns (uint256);
+    
+    /**
      * @dev 普通铸造
      * @param to 接收地址
      * @return uint256 新NFT ID
@@ -516,6 +523,13 @@ interface INFTDataInterface {
     function tokenLevel(uint256 tokenId) external view returns (uint8);
     
     /**
+     * @dev 获取NFT成长值
+     * @param tokenId NFT ID
+     * @return uint256 成长值(10-100)
+     */
+    function tokenGrowthValue(uint256 tokenId) external view returns (uint256);
+    
+    /**
      * @dev 获取用户持有的指定类型NFT列表
      * @param user 用户地址
      * @param type_ 生肖类型
@@ -550,6 +564,13 @@ interface INFTDataInterface {
      * @param level 等级
      */
     function setTokenLevel(uint256 tokenId, uint8 level) external;
+    
+    /**
+     * @dev 设置NFT成长值
+     * @param tokenId NFT ID
+     * @param growth 成长值（10-100）
+     */
+    function setTokenGrowthValue(uint256 tokenId, uint256 growth) external;
     
     /**
      * @dev 添加用户NFT

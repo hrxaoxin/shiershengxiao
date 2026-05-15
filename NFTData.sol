@@ -35,6 +35,8 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
     mapping(uint256 => NFTDataTypes.ZodiacType) public override tokenType;
     /** @dev NFT等级映射：tokenId -> level(1-5) */
     mapping(uint256 => uint8) public override tokenLevel;
+    /** @dev NFT成长值映射：tokenId -> growthValue(10-100)，影响战斗属性 */
+    mapping(uint256 => uint256) public tokenGrowthValue;
     /** @dev 用户持有的NFT列表：user -> tokenId数组 */
     mapping(address => uint256[]) public _userTokens;
     /** @dev 用户NFT存在性检查：user -> tokenId -> bool */
@@ -151,6 +153,16 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, INF
      */
     function setTokenLevel(uint256 tokenId, uint8 level) external override onlyAuthorized {
         tokenLevel[tokenId] = level;
+    }
+
+    /**
+     * @dev 设置NFT成长值
+     * @param tokenId NFT ID
+     * @param growth 成长值（10-100）
+     */
+    function setTokenGrowthValue(uint256 tokenId, uint256 growth) external override onlyAuthorized {
+        require(growth >= 10 && growth <= 100, "NFTData: Growth value must be 10-100");
+        tokenGrowthValue[tokenId] = growth;
     }
 
     /**
