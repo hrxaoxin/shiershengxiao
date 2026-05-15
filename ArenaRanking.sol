@@ -106,6 +106,9 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     ChallengeMode public currentMode;
 
+    address[] public sortedPlayerAddresses;
+    mapping(address => uint256) public playerSortedIndex;
+
     event ChallengeCompleted(
         address indexed attacker,
         address indexed defender,
@@ -322,7 +325,9 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
             players[player].points = 0;
             players[player].wins = 0;
             players[player].losses = 0;
+            delete playerSortedIndex[player];
         }
+        delete sortedPlayerAddresses;
     }
 
     function setBattleTeam(uint256[] calldata tokenIds) external nonReentrant {
@@ -385,6 +390,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     function _registerPlayer(address player) internal {
         isPlayerRegistered[player] = true;
         playerAddresses.push(player);
+        _insertIntoSortedArray(player);
     }
 
     function _clearBattleTeam(address playerAddr) internal {
@@ -562,6 +568,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
                     defenderPlayer.points = 0;
                 }
                 defenderPlayer.losses++;
+                _updatePlayerPosition(defender);
             }
         } else {
             attackerPointsChange = -_calculateLossPoints(attackerRank, defenderRank);
@@ -577,9 +584,11 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
                 defenderPointsChange = _calculateWinPoints(defenderRank, attackerRank, defenderWinCount);
                 defenderPlayer.points += uint256(defenderPointsChange);
                 defenderPlayer.wins++;
+                _updatePlayerPosition(defender);
             }
         }
 
+        _updatePlayerPosition(attacker);
         attackerPlayer.lastBattleTime = block.timestamp;
 
         battleHistory[nextBattleId] = BattleRecord({
@@ -639,12 +648,15 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
                 attackerPlayer.points = defenderPlayer.points;
                 defenderPlayer.points = tempPoints;
                 defenderPlayer.losses++;
+                _updatePlayerPosition(defender);
             }
             attackerPlayer.wins++;
+            _updatePlayerPosition(attacker);
 
             emit RankSwapped(attacker, defender, attackerRank, defenderRank);
         } else {
             attackerPlayer.losses++;
+            _updatePlayerPosition(attacker);
             if (!isMockDefender) {
                 Player storage defenderPlayer = players[defender];
                 defenderPlayer.wins++;
@@ -720,17 +732,87 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         }
     }
 
-    function getPlayerRank(address player) public view returns (uint256) {
+    function _insertIntoSortedArray(address player) internal {
         uint256 playerPoints = players[player].points;
-        uint256 rank = 1;
+        uint256 left = 0;
+        uint256 right = sortedPlayerAddresses.length;
 
-        for (uint256 i = 0; i < playerAddresses.length; i++) {
-            if (playerAddresses[i] != player && players[playerAddresses[i]].points > playerPoints) {
-                rank++;
+        while (left < right) {
+            uint256 mid = (left + right) / 2;
+            if (players[sortedPlayerAddresses[mid]].points > playerPoints) {
+                left = mid + 1;
+            } else {
+                right = mid;
             }
         }
 
-        return rank;
+        playerSortedIndex[player] = left;
+        
+        if (left == sortedPlayerAddresses.length) {
+            sortedPlayerAddresses.push(player);
+        } else {
+            sortedPlayerAddresses.push();
+            for (uint256 i = sortedPlayerAddresses.length - 1; i > left; i--) {
+                sortedPlayerAddresses[i] = sortedPlayerAddresses[i - 1];
+                playerSortedIndex[sortedPlayerAddresses[i]] = i;
+            }
+            sortedPlayerAddresses[left] = player;
+        }
+    }
+
+    function _updatePlayerPosition(address player) internal {
+        uint256 oldIndex = playerSortedIndex[player];
+        uint256 playerPoints = players[player].points;
+        uint256 arrayLength = sortedPlayerAddresses.length;
+
+        if (oldIndex > 0 && players[sortedPlayerAddresses[oldIndex - 1]].points < playerPoints) {
+            uint256 newIndex = oldIndex;
+            while (newIndex > 0 && players[sortedPlayerAddresses[newIndex - 1]].points < playerPoints) {
+                newIndex--;
+            }
+            
+            if (newIndex != oldIndex) {
+                for (uint256 i = oldIndex; i > newIndex; i--) {
+                    sortedPlayerAddresses[i] = sortedPlayerAddresses[i - 1];
+                    playerSortedIndex[sortedPlayerAddresses[i]] = i;
+                }
+                sortedPlayerAddresses[newIndex] = player;
+                playerSortedIndex[player] = newIndex;
+            }
+        } else if (oldIndex < arrayLength - 1 && players[sortedPlayerAddresses[oldIndex + 1]].points > playerPoints) {
+            uint256 newIndex = oldIndex;
+            while (newIndex < arrayLength - 1 && players[sortedPlayerAddresses[newIndex + 1]].points > playerPoints) {
+                newIndex++;
+            }
+            
+            if (newIndex != oldIndex) {
+                for (uint256 i = oldIndex; i < newIndex; i++) {
+                    sortedPlayerAddresses[i] = sortedPlayerAddresses[i + 1];
+                    playerSortedIndex[sortedPlayerAddresses[i]] = i;
+                }
+                sortedPlayerAddresses[newIndex] = player;
+                playerSortedIndex[player] = newIndex;
+            }
+        }
+    }
+
+    function getPlayerRank(address player) public view returns (uint256) {
+        if (!isPlayerRegistered[player]) {
+            return playerAddresses.length + mockPlayerCount + 1;
+        }
+        
+        uint256 sortedIndex = playerSortedIndex[player];
+        uint256 playerPoints = players[player].points;
+        uint256 rank = sortedIndex + 1;
+
+        for (uint256 i = sortedIndex; i > 0; i--) {
+            if (players[sortedPlayerAddresses[i - 1]].points != playerPoints) {
+                break;
+            }
+            rank = i;
+        }
+
+        return rank + mockPlayerCount;
     }
 
     function getTotalPlayers() public view returns (uint256) {
@@ -738,7 +820,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     }
 
     function getLeaderboard(uint256 limit) external view returns (LeaderboardEntry[] memory) {
-        uint256 totalRealPlayers = playerAddresses.length;
+        uint256 totalRealPlayers = sortedPlayerAddresses.length;
         uint256 totalSlots = totalRealPlayers + mockPlayerCount;
 
         if (limit < totalSlots) {
@@ -747,29 +829,15 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
         LeaderboardEntry[] memory entries = new LeaderboardEntry[](totalSlots);
 
-        address[] memory sortedPlayers = new address[](totalRealPlayers);
-        for (uint256 i = 0; i < totalRealPlayers; i++) {
-            sortedPlayers[i] = playerAddresses[i];
-        }
-
-        for (uint256 i = 0; i < totalRealPlayers; i++) {
-            for (uint256 j = i + 1; j < totalRealPlayers; j++) {
-                if (players[sortedPlayers[j]].points > players[sortedPlayers[i]].points) {
-                    address temp = sortedPlayers[i];
-                    sortedPlayers[i] = sortedPlayers[j];
-                    sortedPlayers[j] = temp;
-                }
-            }
-        }
-
         uint256 entryIndex = 0;
 
         for (uint256 i = 0; i < totalRealPlayers && entryIndex < totalSlots; i++) {
+            address player = sortedPlayerAddresses[i];
             entries[entryIndex] = LeaderboardEntry({
-                playerAddress: sortedPlayers[i],
-                points: players[sortedPlayers[i]].points,
-                wins: players[sortedPlayers[i]].wins,
-                losses: players[sortedPlayers[i]].losses,
+                playerAddress: player,
+                points: players[player].points,
+                wins: players[player].wins,
+                losses: players[player].losses,
                 isMock: false
             });
             entryIndex++;

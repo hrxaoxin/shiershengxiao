@@ -386,12 +386,9 @@
                                 <div class="text-white text-lg font-bold text-center">VS</div>
                                 <div class="mt-3 w-full">
                                     <div class="flex gap-2 mb-3">
-                                        <button id="modePointsBtn" class="flex-1 mode-tab py-2 px-3 rounded-lg border border-white/20 text-gray-300 text-sm hover:bg-white/5 transition-all active" onclick="setChallengeMode(0)">
+                                        <div id="currentModeDisplay" class="flex-1 py-2 px-3 rounded-lg border border-blue-500/50 bg-blue-500/10 text-blue-400 text-sm text-center font-medium">
                                             积分模式
-                                        </button>
-                                        <button id="modeRankBtn" class="flex-1 mode-tab py-2 px-3 rounded-lg border border-white/20 text-gray-300 text-sm hover:bg-white/5 transition-all" onclick="setChallengeMode(1)">
-                                            排名挑战
-                                        </button>
+                                        </div>
                                     </div>
                                     <button id="challengeBtn" class="w-full btn-primary text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                                         发起挑战
@@ -590,29 +587,29 @@
                     <div id="battleAttackerTeam" class="space-y-2">
                         <div class="grid grid-cols-3 gap-2">
                             <div class="text-center p-2 bg-blue-500/20 rounded-lg" id="attackerFront1">
-                                <div class="text-3xl mb-1">🐀</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">前排1</div>
                             </div>
                             <div class="text-center p-2 bg-blue-500/20 rounded-lg" id="attackerFront2">
-                                <div class="text-3xl mb-1">🐂</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">前排2</div>
                             </div>
                             <div class="text-center p-2 bg-blue-500/20 rounded-lg" id="attackerFront3">
-                                <div class="text-3xl mb-1">🐅</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">前排3</div>
                             </div>
                         </div>
                         <div class="grid grid-cols-3 gap-2">
                             <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="attackerBack1">
-                                <div class="text-3xl mb-1">🐇</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">后排1</div>
                             </div>
                             <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="attackerBack2">
-                                <div class="text-3xl mb-1">🐉</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">后排2</div>
                             </div>
                             <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="attackerBack3">
-                                <div class="text-3xl mb-1">🐍</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">后排3</div>
                             </div>
                         </div>
@@ -637,29 +634,29 @@
                     <div id="battleDefenderTeam" class="space-y-2">
                         <div class="grid grid-cols-3 gap-2">
                             <div class="text-center p-2 bg-green-500/20 rounded-lg" id="defenderFront1">
-                                <div class="text-3xl mb-1">🐎</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">前排1</div>
                             </div>
                             <div class="text-center p-2 bg-green-500/20 rounded-lg" id="defenderFront2">
-                                <div class="text-3xl mb-1">🐑</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">前排2</div>
                             </div>
                             <div class="text-center p-2 bg-green-500/20 rounded-lg" id="defenderFront3">
-                                <div class="text-3xl mb-1">🐒</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">前排3</div>
                             </div>
                         </div>
                         <div class="grid grid-cols-3 gap-2">
                             <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="defenderBack1">
-                                <div class="text-3xl mb-1">🐓</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">后排1</div>
                             </div>
                             <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="defenderBack2">
-                                <div class="text-3xl mb-1">🐕</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">后排2</div>
                             </div>
                             <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="defenderBack3">
-                                <div class="text-3xl mb-1">🐷</div>
+                                <img src="https://via.placeholder.com/48" alt="" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-xs text-gray-300">后排3</div>
                             </div>
                         </div>
@@ -777,16 +774,14 @@
             document.getElementById('clearBattleTeamBtn').addEventListener('click', clearBattleTeam);
             document.getElementById('saveBattleTeamBtn').addEventListener('click', saveBattleTeam);
             document.getElementById('rechargeBtn').addEventListener('click', rechargeAttempts);
-            document.getElementById('modePointsBtn').addEventListener('click', () => setChallengeMode(0));
-            document.getElementById('modeRankBtn').addEventListener('click', () => setChallengeMode(1));
         }
 
-        function setChallengeMode(mode) {
-            currentChallengeMode = mode;
-            document.getElementById('modePointsBtn').classList.toggle('active', mode === 0);
-            document.getElementById('modeRankBtn').classList.toggle('active', mode === 1);
-            document.getElementById('battleModeText').textContent = mode === 0 ? '积分模式' : '排名挑战';
-            updateChallengeBtn();
+        function updateCurrentModeDisplay(mode) {
+            const modeText = mode === 0 ? '积分模式' : '排名挑战';
+            const modeColor = mode === 0 ? 'blue' : 'purple';
+            document.getElementById('currentModeDisplay').textContent = modeText;
+            document.getElementById('currentModeDisplay').className = `flex-1 py-2 px-3 rounded-lg border border-${modeColor}-500/50 bg-${modeColor}-500/10 text-${modeColor}-400 text-sm text-center font-medium`;
+            document.getElementById('battleModeText').textContent = modeText;
         }
 
         async function connectWallet() {
@@ -1040,10 +1035,8 @@
                 btn.textContent = '请设置战队';
             } else if (!selectedOpponent) {
                 btn.textContent = '请选择对手';
-            } else if (currentChallengeMode === 0) {
-                btn.textContent = '发起挑战（积分模式）';
             } else {
-                btn.textContent = '发起挑战（排名挑战）';
+                btn.textContent = '发起挑战';
             }
         }
 
@@ -1447,8 +1440,8 @@
             
             if (newHpPercent <= 0 && slot) {
                 slot.style.opacity = '0.3';
-                const emoji = slot.querySelector('.battle-emoji');
-                if (emoji) emoji.textContent = '💀';
+                const img = slot.querySelector('img');
+                if (img) img.src = 'https://via.placeholder.com/48?text=💀';
             }
         }
 

@@ -380,12 +380,9 @@
                                 <div class="text-white text-lg font-bold text-center">VS</div>
                                 <div class="mt-3 w-full">
                                     <div class="flex gap-2 mb-3">
-                                        <button id="modePointsBtn" class="flex-1 mode-tab py-2 px-3 rounded-lg border border-white/20 text-gray-300 text-sm hover:bg-white/5 transition-all active" onclick="setChallengeMode(0)">
+                                        <div id="currentModeDisplay" class="flex-1 py-2 px-3 rounded-lg border border-blue-500/50 bg-blue-500/10 text-blue-400 text-sm text-center font-medium">
                                             积分模式
-                                        </button>
-                                        <button id="modeRankBtn" class="flex-1 mode-tab py-2 px-3 rounded-lg border border-white/20 text-gray-300 text-sm hover:bg-white/5 transition-all" onclick="setChallengeMode(1)">
-                                            排名挑战
-                                        </button>
+                                        </div>
                                     </div>
                                     <button id="challengeBtn" class="w-full btn-primary text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                                         发起挑战
@@ -755,9 +752,34 @@
             Dark: '🌑'
         };
 
-        const ZODIAC_EMOJIS = ['🐀', '🐂', '🐅', '🐇', '🐉', '🐍', '🐎', '🐑', '🐒', '🐓', '🐕', '🐷'];
         const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
         const ELEMENT_NAMES = ['Water', 'Wind', 'Fire', 'Dark', 'Light'];
+        const ZODIAC_SPEEDS = [95, 40, 70, 90, 80, 85, 100, 35, 110, 55, 60, 30];
+        
+        const ELEMENT_FOLDERS = {
+            Fire: 'huo',
+            Wind: 'feng',
+            Water: 'shui',
+            Dark: 'an',
+            Light: 'guang'
+        };
+        
+        const ZODIAC_FOLDERS = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
+        
+        const IPFS_BASE_URL = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/';
+        const IPFS_BASE_URL2 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/';
+        
+        function getNftImageUrl(element, zodiacIndex, gender) {
+            const elementFolder = ELEMENT_FOLDERS[element];
+            const zodiacFolder = ZODIAC_FOLDERS[zodiacIndex];
+            const genderSuffix = gender === 1 ? '_1' : '_0';
+            const fileName = `${elementFolder}${zodiacFolder}${genderSuffix}.png`;
+            
+            const url1 = `${IPFS_BASE_URL}${fileName}`;
+            const url2 = `${IPFS_BASE_URL2}${fileName}`;
+            
+            return url1;
+        }
 
         const SKILL_TYPE_LABELS = {
             'Attack': '攻击',
@@ -921,16 +943,14 @@
             document.getElementById('fightBtn').addEventListener('click', startBattle);
             document.getElementById('clearBattleTeamBtn').addEventListener('click', clearBattleTeam);
             document.getElementById('saveBattleTeamBtn').addEventListener('click', saveBattleTeam);
-            document.getElementById('modePointsBtn').addEventListener('click', () => setChallengeMode(0));
-            document.getElementById('modeRankBtn').addEventListener('click', () => setChallengeMode(1));
         }
 
-        function setChallengeMode(mode) {
-            currentChallengeMode = mode;
-            document.getElementById('modePointsBtn').classList.toggle('active', mode === 0);
-            document.getElementById('modeRankBtn').classList.toggle('active', mode === 1);
-            document.getElementById('battleModeText').textContent = mode === 0 ? '积分模式' : '排名挑战';
-            updateChallengeBtn();
+        function updateCurrentModeDisplay(mode) {
+            const modeText = mode === 0 ? '积分模式' : '排名挑战';
+            const modeColor = mode === 0 ? 'blue' : 'purple';
+            document.getElementById('currentModeDisplay').textContent = modeText;
+            document.getElementById('currentModeDisplay').className = `flex-1 py-2 px-3 rounded-lg border border-${modeColor}-500/50 bg-${modeColor}-500/10 text-${modeColor}-400 text-sm text-center font-medium`;
+            document.getElementById('battleModeText').textContent = modeText;
         }
 
         function rechargeAttempts() {
@@ -941,26 +961,26 @@
 
         function loadMockNfts() {
             myNfts = [
-                { tokenId: 1, tokenType: 25, level: 5, attr: 'Wind', zodiacIndex: 4, name: '风龙·雄', imagePath: `${IPFS_BASE_1}fenglong_1.png`, skill: FULL_SKILLS.wind[4], inBattleTeam: false },
-                { tokenId: 2, tokenType: 49, level: 5, attr: 'Fire', zodiacIndex: 0, name: '火鼠·雄', imagePath: `${IPFS_BASE_1}huoshu_1.png`, skill: FULL_SKILLS.fire[0], inBattleTeam: false },
-                { tokenId: 3, tokenType: 2, level: 4, attr: 'Water', zodiacIndex: 1, name: '水牛·雌', imagePath: `${IPFS_BASE_1}shuiniu_1.png`, skill: FULL_SKILLS.water[1], inBattleTeam: false },
-                { tokenId: 4, tokenType: 73, level: 4, attr: 'Dark', zodiacIndex: 3, name: '暗兔·雄', imagePath: `${IPFS_BASE_2}antu_1.png`, skill: FULL_SKILLS.dark[3], inBattleTeam: false },
-                { tokenId: 5, tokenType: 97, level: 3, attr: 'Light', zodiacIndex: 0, name: '光鼠·雄', imagePath: `${IPFS_BASE_2}guangshu_1.png`, skill: FULL_SKILLS.light[0], inBattleTeam: false },
-                { tokenId: 6, tokenType: 53, level: 5, attr: 'Fire', zodiacIndex: 4, name: '火龙·雄', imagePath: `${IPFS_BASE_1}huolong_1.png`, skill: FULL_SKILLS.fire[4], inBattleTeam: false },
-                { tokenId: 7, tokenType: 77, level: 3, attr: 'Dark', zodiacIndex: 7, name: '暗羊·雌', imagePath: `${IPFS_BASE_2}anyang_0.png`, skill: FULL_SKILLS.dark[7], inBattleTeam: false },
-                { tokenId: 8, tokenType: 101, level: 5, attr: 'Light', zodiacIndex: 4, name: '光龙·雄', imagePath: `${IPFS_BASE_2}guanglong_1.png`, skill: FULL_SKILLS.light[4], inBattleTeam: false },
-                { tokenId: 9, tokenType: 50, level: 4, attr: 'Fire', zodiacIndex: 1, name: '火牛·雌', imagePath: `${IPFS_BASE_1}huoniu_0.png`, skill: FULL_SKILLS.fire[1], inBattleTeam: false },
-                { tokenId: 10, tokenType: 26, level: 4, attr: 'Wind', zodiacIndex: 5, name: '风蛇·雌', imagePath: `${IPFS_BASE_1}fengshe_0.png`, skill: FULL_SKILLS.wind[5], inBattleTeam: false },
-                { tokenId: 11, tokenType: 7, level: 3, attr: 'Water', zodiacIndex: 6, name: '水马·雄', imagePath: `${IPFS_BASE_1}shuima_1.png`, skill: FULL_SKILLS.water[6], inBattleTeam: false },
-                { tokenId: 12, tokenType: 104, level: 2, attr: 'Light', zodiacIndex: 7, name: '光羊·雌', imagePath: `${IPFS_BASE_2}guangyang_0.png`, skill: FULL_SKILLS.light[7], inBattleTeam: false },
-                { tokenId: 13, tokenType: 10, level: 2, attr: 'Water', zodiacIndex: 9, name: '水鸡·雌', imagePath: `${IPFS_BASE_1}shuiji_0.png`, skill: FULL_SKILLS.water[9], inBattleTeam: false },
-                { tokenId: 14, tokenType: 32, level: 3, attr: 'Wind', zodiacIndex: 11, name: '风猪·雄', imagePath: `${IPFS_BASE_1}fengzhu_1.png`, skill: FULL_SKILLS.wind[11], inBattleTeam: false },
-                { tokenId: 15, tokenType: 85, level: 4, attr: 'Dark', zodiacIndex: 11, name: '暗猪·雄', imagePath: `${IPFS_BASE_2}anzhu_1.png`, skill: FULL_SKILLS.dark[11], inBattleTeam: false },
-                { tokenId: 16, tokenType: 109, level: 5, attr: 'Light', zodiacIndex: 10, name: '光狗·雌', imagePath: `${IPFS_BASE_2}guanggou_0.png`, skill: FULL_SKILLS.light[10], inBattleTeam: false },
-                { tokenId: 17, tokenType: 3, level: 1, attr: 'Water', zodiacIndex: 2, name: '水虎·雄', imagePath: `${IPFS_BASE_1}shuihu_1.png`, skill: FULL_SKILLS.water[2], inBattleTeam: false },
-                { tokenId: 18, tokenType: 28, level: 3, attr: 'Wind', zodiacIndex: 7, name: '风羊·雌', imagePath: `${IPFS_BASE_1}fengyang_0.png`, skill: FULL_SKILLS.wind[7], inBattleTeam: false },
-                { tokenId: 19, tokenType: 55, level: 4, attr: 'Fire', zodiacIndex: 6, name: '火马·雄', imagePath: `${IPFS_BASE_1}huoma_1.png`, skill: FULL_SKILLS.fire[6], inBattleTeam: false },
-                { tokenId: 20, tokenType: 79, level: 2, attr: 'Dark', zodiacIndex: 9, name: '暗鸡·雄', imagePath: `${IPFS_BASE_2}anji_1.png`, skill: FULL_SKILLS.dark[9], inBattleTeam: false }
+                { tokenId: 1, tokenType: 25, level: 5, attr: 'Wind', zodiacIndex: 4, name: '风龙·雄', imagePath: `${IPFS_BASE_1}fenglong_1.png`, skill: FULL_SKILLS.wind[4], speed: ZODIAC_SPEEDS[4], inBattleTeam: false },
+                { tokenId: 2, tokenType: 49, level: 5, attr: 'Fire', zodiacIndex: 0, name: '火鼠·雄', imagePath: `${IPFS_BASE_1}huoshu_1.png`, skill: FULL_SKILLS.fire[0], speed: ZODIAC_SPEEDS[0], inBattleTeam: false },
+                { tokenId: 3, tokenType: 2, level: 4, attr: 'Water', zodiacIndex: 1, name: '水牛·雌', imagePath: `${IPFS_BASE_1}shuiniu_1.png`, skill: FULL_SKILLS.water[1], speed: ZODIAC_SPEEDS[1], inBattleTeam: false },
+                { tokenId: 4, tokenType: 73, level: 4, attr: 'Dark', zodiacIndex: 3, name: '暗兔·雄', imagePath: `${IPFS_BASE_2}antu_1.png`, skill: FULL_SKILLS.dark[3], speed: ZODIAC_SPEEDS[3], inBattleTeam: false },
+                { tokenId: 5, tokenType: 97, level: 3, attr: 'Light', zodiacIndex: 0, name: '光鼠·雄', imagePath: `${IPFS_BASE_2}guangshu_1.png`, skill: FULL_SKILLS.light[0], speed: ZODIAC_SPEEDS[0], inBattleTeam: false },
+                { tokenId: 6, tokenType: 53, level: 5, attr: 'Fire', zodiacIndex: 4, name: '火龙·雄', imagePath: `${IPFS_BASE_1}huolong_1.png`, skill: FULL_SKILLS.fire[4], speed: ZODIAC_SPEEDS[4], inBattleTeam: false },
+                { tokenId: 7, tokenType: 77, level: 3, attr: 'Dark', zodiacIndex: 7, name: '暗羊·雌', imagePath: `${IPFS_BASE_2}anyang_0.png`, skill: FULL_SKILLS.dark[7], speed: ZODIAC_SPEEDS[7], inBattleTeam: false },
+                { tokenId: 8, tokenType: 101, level: 5, attr: 'Light', zodiacIndex: 4, name: '光龙·雄', imagePath: `${IPFS_BASE_2}guanglong_1.png`, skill: FULL_SKILLS.light[4], speed: ZODIAC_SPEEDS[4], inBattleTeam: false },
+                { tokenId: 9, tokenType: 50, level: 4, attr: 'Fire', zodiacIndex: 1, name: '火牛·雌', imagePath: `${IPFS_BASE_1}huoniu_0.png`, skill: FULL_SKILLS.fire[1], speed: ZODIAC_SPEEDS[1], inBattleTeam: false },
+                { tokenId: 10, tokenType: 26, level: 4, attr: 'Wind', zodiacIndex: 5, name: '风蛇·雌', imagePath: `${IPFS_BASE_1}fengshe_0.png`, skill: FULL_SKILLS.wind[5], speed: ZODIAC_SPEEDS[5], inBattleTeam: false },
+                { tokenId: 11, tokenType: 7, level: 3, attr: 'Water', zodiacIndex: 6, name: '水马·雄', imagePath: `${IPFS_BASE_1}shuima_1.png`, skill: FULL_SKILLS.water[6], speed: ZODIAC_SPEEDS[6], inBattleTeam: false },
+                { tokenId: 12, tokenType: 104, level: 2, attr: 'Light', zodiacIndex: 7, name: '光羊·雌', imagePath: `${IPFS_BASE_2}guangyang_0.png`, skill: FULL_SKILLS.light[7], speed: ZODIAC_SPEEDS[7], inBattleTeam: false },
+                { tokenId: 13, tokenType: 10, level: 2, attr: 'Water', zodiacIndex: 9, name: '水鸡·雌', imagePath: `${IPFS_BASE_1}shuiji_0.png`, skill: FULL_SKILLS.water[9], speed: ZODIAC_SPEEDS[9], inBattleTeam: false },
+                { tokenId: 14, tokenType: 32, level: 3, attr: 'Wind', zodiacIndex: 11, name: '风猪·雄', imagePath: `${IPFS_BASE_1}fengzhu_1.png`, skill: FULL_SKILLS.wind[11], speed: ZODIAC_SPEEDS[11], inBattleTeam: false },
+                { tokenId: 15, tokenType: 85, level: 4, attr: 'Dark', zodiacIndex: 11, name: '暗猪·雄', imagePath: `${IPFS_BASE_2}anzhu_1.png`, skill: FULL_SKILLS.dark[11], speed: ZODIAC_SPEEDS[11], inBattleTeam: false },
+                { tokenId: 16, tokenType: 109, level: 5, attr: 'Light', zodiacIndex: 10, name: '光狗·雌', imagePath: `${IPFS_BASE_2}guanggou_0.png`, skill: FULL_SKILLS.light[10], speed: ZODIAC_SPEEDS[10], inBattleTeam: false },
+                { tokenId: 17, tokenType: 3, level: 1, attr: 'Water', zodiacIndex: 2, name: '水虎·雄', imagePath: `${IPFS_BASE_1}shuihu_1.png`, skill: FULL_SKILLS.water[2], speed: ZODIAC_SPEEDS[2], inBattleTeam: false },
+                { tokenId: 18, tokenType: 28, level: 3, attr: 'Wind', zodiacIndex: 7, name: '风羊·雌', imagePath: `${IPFS_BASE_1}fengyang_0.png`, skill: FULL_SKILLS.wind[7], speed: ZODIAC_SPEEDS[7], inBattleTeam: false },
+                { tokenId: 19, tokenType: 55, level: 4, attr: 'Fire', zodiacIndex: 6, name: '火马·雄', imagePath: `${IPFS_BASE_1}huoma_1.png`, skill: FULL_SKILLS.fire[6], speed: ZODIAC_SPEEDS[6], inBattleTeam: false },
+                { tokenId: 20, tokenType: 79, level: 2, attr: 'Dark', zodiacIndex: 9, name: '暗鸡·雄', imagePath: `${IPFS_BASE_2}anji_1.png`, skill: FULL_SKILLS.dark[9], speed: ZODIAC_SPEEDS[9], inBattleTeam: false }
             ];
             
             renderNftSelectList();
@@ -997,56 +1017,56 @@
             { 
                 name: '竞技场霸主',
                 team: [
-                    { name: '火龙·霸', level: 5, element: 'Fire', emoji: '🐉', skill: FULL_SKILLS.fire[4], hp: 100 },
-                    { name: '风虎·猛', level: 5, element: 'Wind', emoji: '🐅', skill: FULL_SKILLS.wind[2], hp: 100 },
-                    { name: '水兔·敏', level: 5, element: 'Water', emoji: '🐇', skill: FULL_SKILLS.water[3], hp: 100 },
-                    { name: '光鸡·圣', level: 4, element: 'Light', emoji: '🐓', skill: FULL_SKILLS.light[9], hp: 100 },
-                    { name: '暗狗·凶', level: 4, element: 'Dark', emoji: '🐕', skill: FULL_SKILLS.dark[10], hp: 100 },
-                    { name: '火蛇·毒', level: 3, element: 'Fire', emoji: '🐍', skill: FULL_SKILLS.fire[5], hp: 100 }
+                    { name: '火龙·霸', level: 5, element: 'Fire', zodiacIndex: 4, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/huolong_1.png', skill: FULL_SKILLS.fire[4], hp: 100, speed: ZODIAC_SPEEDS[4] },
+                    { name: '风虎·猛', level: 5, element: 'Wind', zodiacIndex: 2, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/fenghu_1.png', skill: FULL_SKILLS.wind[2], hp: 100, speed: ZODIAC_SPEEDS[2] },
+                    { name: '水兔·敏', level: 5, element: 'Water', zodiacIndex: 3, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/shuitu_0.png', skill: FULL_SKILLS.water[3], hp: 100, speed: ZODIAC_SPEEDS[3] },
+                    { name: '光鸡·圣', level: 4, element: 'Light', zodiacIndex: 9, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/guangji_0.png', skill: FULL_SKILLS.light[9], hp: 100, speed: ZODIAC_SPEEDS[9] },
+                    { name: '暗狗·凶', level: 4, element: 'Dark', zodiacIndex: 10, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/angou_1.png', skill: FULL_SKILLS.dark[10], hp: 100, speed: ZODIAC_SPEEDS[10] },
+                    { name: '火蛇·毒', level: 3, element: 'Fire', zodiacIndex: 5, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/huoshe_0.png', skill: FULL_SKILLS.fire[5], hp: 100, speed: ZODIAC_SPEEDS[5] }
                 ]
             },
             { 
                 name: '五行大师',
                 team: [
-                    { name: '风马·疾', level: 5, element: 'Wind', emoji: '🐎', skill: FULL_SKILLS.wind[6], hp: 100 },
-                    { name: '水牛·厚', level: 5, element: 'Water', emoji: '🐂', skill: FULL_SKILLS.water[1], hp: 100 },
-                    { name: '光猪·福', level: 5, element: 'Light', emoji: '🐷', skill: FULL_SKILLS.light[11], hp: 100 },
-                    { name: '暗鼠·诡', level: 4, element: 'Dark', emoji: '🐀', skill: FULL_SKILLS.dark[0], hp: 100 },
-                    { name: '火龙·焰', level: 4, element: 'Fire', emoji: '🐉', skill: FULL_SKILLS.fire[4], hp: 100 },
-                    { name: '风虎·啸', level: 3, element: 'Wind', emoji: '🐅', skill: FULL_SKILLS.wind[2], hp: 100 }
+                    { name: '风马·疾', level: 5, element: 'Wind', zodiacIndex: 6, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/fengma_1.png', skill: FULL_SKILLS.wind[6], hp: 100, speed: ZODIAC_SPEEDS[6] },
+                    { name: '水牛·厚', level: 5, element: 'Water', zodiacIndex: 1, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/shuiniu_0.png', skill: FULL_SKILLS.water[1], hp: 100, speed: ZODIAC_SPEEDS[1] },
+                    { name: '光猪·福', level: 5, element: 'Light', zodiacIndex: 11, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/guangzhu_0.png', skill: FULL_SKILLS.light[11], hp: 100, speed: ZODIAC_SPEEDS[11] },
+                    { name: '暗鼠·诡', level: 4, element: 'Dark', zodiacIndex: 0, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/an shu_0.png', skill: FULL_SKILLS.dark[0], hp: 100, speed: ZODIAC_SPEEDS[0] },
+                    { name: '火龙·焰', level: 4, element: 'Fire', zodiacIndex: 4, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/huolong_1.png', skill: FULL_SKILLS.fire[4], hp: 100, speed: ZODIAC_SPEEDS[4] },
+                    { name: '风虎·啸', level: 3, element: 'Wind', zodiacIndex: 2, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/fenghu_1.png', skill: FULL_SKILLS.wind[2], hp: 100, speed: ZODIAC_SPEEDS[2] }
                 ]
             },
             { 
                 name: '暗影刺客',
                 team: [
-                    { name: '暗龙·影', level: 5, element: 'Dark', emoji: '🐉', skill: FULL_SKILLS.dark[4], hp: 100 },
-                    { name: '暗蛇·噬', level: 5, element: 'Dark', emoji: '🐍', skill: FULL_SKILLS.dark[5], hp: 100 },
-                    { name: '暗鼠·偷', level: 4, element: 'Dark', emoji: '🐀', skill: FULL_SKILLS.dark[0], hp: 100 },
-                    { name: '暗虎·猛', level: 4, element: 'Dark', emoji: '🐅', skill: FULL_SKILLS.dark[2], hp: 100 },
-                    { name: '暗兔·捷', level: 3, element: 'Dark', emoji: '🐇', skill: FULL_SKILLS.dark[3], hp: 100 },
-                    { name: '暗狗·猎', level: 3, element: 'Dark', emoji: '🐕', skill: FULL_SKILLS.dark[10], hp: 100 }
+                    { name: '暗龙·影', level: 5, element: 'Dark', zodiacIndex: 4, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/anlong_1.png', skill: FULL_SKILLS.dark[4], hp: 100, speed: ZODIAC_SPEEDS[4] },
+                    { name: '暗蛇·噬', level: 5, element: 'Dark', zodiacIndex: 5, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/anshe_0.png', skill: FULL_SKILLS.dark[5], hp: 100, speed: ZODIAC_SPEEDS[5] },
+                    { name: '暗鼠·偷', level: 4, element: 'Dark', zodiacIndex: 0, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/anshu_0.png', skill: FULL_SKILLS.dark[0], hp: 100, speed: ZODIAC_SPEEDS[0] },
+                    { name: '暗虎·猛', level: 4, element: 'Dark', zodiacIndex: 2, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/anhu_1.png', skill: FULL_SKILLS.dark[2], hp: 100, speed: ZODIAC_SPEEDS[2] },
+                    { name: '暗兔·捷', level: 3, element: 'Dark', zodiacIndex: 3, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/antu_0.png', skill: FULL_SKILLS.dark[3], hp: 100, speed: ZODIAC_SPEEDS[3] },
+                    { name: '暗狗·猎', level: 3, element: 'Dark', zodiacIndex: 10, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/angou_1.png', skill: FULL_SKILLS.dark[10], hp: 100, speed: ZODIAC_SPEEDS[10] }
                 ]
             },
             { 
                 name: '圣光守护',
                 team: [
-                    { name: '光龙·耀', level: 5, element: 'Light', emoji: '🐉', skill: FULL_SKILLS.light[4], hp: 100 },
-                    { name: '光羊·慈', level: 5, element: 'Light', emoji: '🐑', skill: FULL_SKILLS.light[7], hp: 100 },
-                    { name: '光猪·瑞', level: 5, element: 'Light', emoji: '🐷', skill: FULL_SKILLS.light[11], hp: 100 },
-                    { name: '光猴·灵', level: 4, element: 'Light', emoji: '🐒', skill: FULL_SKILLS.light[16], hp: 100 },
-                    { name: '光鸡·鸣', level: 4, element: 'Light', emoji: '🐓', skill: FULL_SKILLS.light[18], hp: 100 },
-                    { name: '光兔·洁', level: 3, element: 'Light', emoji: '🐇', skill: FULL_SKILLS.light[3], hp: 100 }
+                    { name: '光龙·耀', level: 5, element: 'Light', zodiacIndex: 4, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/guanglong_1.png', skill: FULL_SKILLS.light[4], hp: 100, speed: ZODIAC_SPEEDS[4] },
+                    { name: '光羊·慈', level: 5, element: 'Light', zodiacIndex: 7, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/guangyang_0.png', skill: FULL_SKILLS.light[7], hp: 100, speed: ZODIAC_SPEEDS[7] },
+                    { name: '光猪·瑞', level: 5, element: 'Light', zodiacIndex: 11, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/guangzhu_0.png', skill: FULL_SKILLS.light[11], hp: 100, speed: ZODIAC_SPEEDS[11] },
+                    { name: '光猴·灵', level: 4, element: 'Light', zodiacIndex: 8, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/guanghou_1.png', skill: FULL_SKILLS.light[16], hp: 100, speed: ZODIAC_SPEEDS[8] },
+                    { name: '光鸡·鸣', level: 4, element: 'Light', zodiacIndex: 9, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/guangji_0.png', skill: FULL_SKILLS.light[18], hp: 100, speed: ZODIAC_SPEEDS[9] },
+                    { name: '光兔·洁', level: 3, element: 'Light', zodiacIndex: 3, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/guangtu_0.png', skill: FULL_SKILLS.light[3], hp: 100, speed: ZODIAC_SPEEDS[3] }
                 ]
             },
             { 
                 name: '均衡大师',
                 team: [
-                    { name: '水牛·稳', level: 5, element: 'Water', emoji: '🐂', skill: FULL_SKILLS.water[1], hp: 100 },
-                    { name: '风龙·变', level: 5, element: 'Wind', emoji: '🐉', skill: FULL_SKILLS.wind[4], hp: 100 },
-                    { name: '火蛇·缠', level: 4, element: 'Fire', emoji: '🐍', skill: FULL_SKILLS.fire[5], hp: 100 },
-                    { name: '水马·奔', level: 4, element: 'Water', emoji: '🐎', skill: FULL_SKILLS.water[6], hp: 100 },
-                    { name: '风虎·跃', level: 3, element: 'Wind', emoji: '🐅', skill: FULL_SKILLS.wind[2], hp: 100 },
-                    { name: '光羊·善', level: 3, element: 'Light', emoji: '🐑', skill: FULL_SKILLS.light[7], hp: 100 }
+                    { name: '水牛·稳', level: 5, element: 'Water', zodiacIndex: 1, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/shuiniu_0.png', skill: FULL_SKILLS.water[1], hp: 100, speed: ZODIAC_SPEEDS[1] },
+                    { name: '风龙·变', level: 5, element: 'Wind', zodiacIndex: 4, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/fenglong_1.png', skill: FULL_SKILLS.wind[4], hp: 100, speed: ZODIAC_SPEEDS[4] },
+                    { name: '火蛇·缠', level: 4, element: 'Fire', zodiacIndex: 5, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/huoshe_0.png', skill: FULL_SKILLS.fire[5], hp: 100, speed: ZODIAC_SPEEDS[5] },
+                    { name: '水马·奔', level: 4, element: 'Water', zodiacIndex: 6, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/shuima_1.png', skill: FULL_SKILLS.water[6], hp: 100, speed: ZODIAC_SPEEDS[6] },
+                    { name: '风虎·跃', level: 3, element: 'Wind', zodiacIndex: 2, gender: 1, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/fenghu_1.png', skill: FULL_SKILLS.wind[2], hp: 100, speed: ZODIAC_SPEEDS[2] },
+                    { name: '光羊·善', level: 3, element: 'Light', zodiacIndex: 7, gender: 0, imageUrl: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/guangyang_0.png', skill: FULL_SKILLS.light[7], hp: 100, speed: ZODIAC_SPEEDS[7] }
                 ]
             }
         ];
@@ -1067,10 +1087,10 @@
             display.innerHTML = `
                 <div class="text-center text-gray-300 text-sm mb-2">${selectedOpponent.name}</div>
                 <div class="flex flex-wrap justify-center gap-2">
-                    ${selectedOpponent.team.slice(0, 3).map(nft => `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center text-xl">${nft.emoji}</div>`).join('')}
+                    ${selectedOpponent.team.slice(0, 3).map(nft => `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center overflow-hidden"><img src="${nft.imagePath || nft.imageUrl}" alt="${nft.name}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/40'"></div>`).join('')}
                 </div>
                 <div class="flex flex-wrap justify-center gap-2 mt-2">
-                    ${selectedOpponent.team.slice(3, 6).map(nft => `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center text-xl">${nft.emoji}</div>`).join('')}
+                    ${selectedOpponent.team.slice(3, 6).map(nft => `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center overflow-hidden"><img src="${nft.imagePath || nft.imageUrl}" alt="${nft.name}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/40'"></div>`).join('')}
                 </div>
             `;
         }
@@ -1252,10 +1272,10 @@
             display.innerHTML = `
                 <div class="text-center text-gray-300 text-sm mb-2">我的战队 (${filled}/${TEAM_SIZE})</div>
                 <div class="flex flex-wrap justify-center gap-2">
-                    ${battleTeam.slice(0, 3).map(nft => nft ? `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center text-xl">${ZODIAC_EMOJIS[nft.zodiacIndex]}</div>` : `<div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-xl opacity-50">?</div>`).join('')}
+                    ${battleTeam.slice(0, 3).map(nft => nft ? `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center overflow-hidden"><img src="${nft.imagePath}" alt="${nft.name}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/40'"></div>` : `<div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-xl opacity-50">?</div>`).join('')}
                 </div>
                 <div class="flex flex-wrap justify-center gap-2 mt-2">
-                    ${battleTeam.slice(3, 6).map(nft => nft ? `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center text-xl">${ZODIAC_EMOJIS[nft.zodiacIndex]}</div>` : `<div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-xl opacity-50">?</div>`).join('')}
+                    ${battleTeam.slice(3, 6).map(nft => nft ? `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center overflow-hidden"><img src="${nft.imagePath}" alt="${nft.name}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/40'"></div>` : `<div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-xl opacity-50">?</div>`).join('')}
                 </div>
             `;
         }
@@ -1299,7 +1319,8 @@
             for (let i = 1; i <= 6; i++) {
                 const attackerNft = battleTeam[i - 1];
                 if (attackerNft) {
-                    document.getElementById(`attackerImg${i}`).textContent = ZODIAC_EMOJIS[attackerNft.zodiacIndex];
+                    const attackerImgUrl = attackerNft.imagePath || attackerNft.imageUrl;
+                    document.getElementById(`attackerImg${i}`).innerHTML = `<img src="${attackerImgUrl}" alt="${attackerNft.name}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/60'">`;
                     document.getElementById(`attackerName${i}`).textContent = attackerNft.name;
                     document.getElementById(`attackerHp${i}`).style.width = '100%';
                     document.getElementById(`attackerHpText${i}`).textContent = '100%';
@@ -1307,7 +1328,8 @@
                 
                 const defenderNft = selectedOpponent.team[i - 1];
                 if (defenderNft) {
-                    document.getElementById(`defenderImg${i}`).textContent = defenderNft.emoji;
+                    const defenderImgUrl = defenderNft.imagePath || defenderNft.imageUrl;
+                    document.getElementById(`defenderImg${i}`).innerHTML = `<img src="${defenderImgUrl}" alt="${defenderNft.name}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/60'">`;
                     document.getElementById(`defenderName${i}`).textContent = defenderNft.name;
                     document.getElementById(`defenderHp${i}`).style.width = '100%';
                     document.getElementById(`defenderHpText${i}`).textContent = '100%';
@@ -1354,30 +1376,117 @@
             
             document.getElementById('currentRound').textContent = `第 ${battleRound} 回合`;
             
-            let roundAttackerWins = 0;
-            let roundDefenderWins = 0;
-            
-            const promises = [];
+            const actionQueue = [];
             
             for (let i = 0; i < 6; i++) {
-                promises.push(new Promise(resolve => {
-                    setTimeout(() => {
-                        if (attackerHps[i] > 0 && defenderHps[i] > 0) {
-                            executeBattle(i);
-                            resolve();
-                        } else {
-                            resolve();
-                        }
-                    }, i * 800);
-                }));
+                if (attackerHps[i] > 0) {
+                    const attackerSpeed = battleTeam[i].speed || 50;
+                    actionQueue.push({ 
+                        side: 'attacker', 
+                        slotIndex: i, 
+                        speed: attackerSpeed,
+                        nft: battleTeam[i] 
+                    });
+                }
+                if (defenderHps[i] > 0) {
+                    const defenderSpeed = selectedOpponent.team[i].speed || 50;
+                    actionQueue.push({ 
+                        side: 'defender', 
+                        slotIndex: i, 
+                        speed: defenderSpeed,
+                        nft: selectedOpponent.team[i] 
+                    });
+                }
             }
             
-            Promise.all(promises).then(() => {
-                setTimeout(() => {
-                    battleRound++;
-                    processBattleRound();
-                }, 1000);
-            });
+            actionQueue.sort((a, b) => b.speed - a.speed);
+            
+            let actionIndex = 0;
+            
+            function executeNextAction() {
+                if (actionIndex >= actionQueue.length) {
+                    setTimeout(() => {
+                        battleRound++;
+                        processBattleRound();
+                    }, 1000);
+                    return;
+                }
+                
+                const action = actionQueue[actionIndex];
+                actionIndex++;
+                
+                if (action.side === 'attacker') {
+                    const targetIndex = findTarget('defender', action.slotIndex);
+                    if (targetIndex !== -1 && attackerHps[action.slotIndex] > 0) {
+                        executeAttack(action.side, action.slotIndex, targetIndex);
+                    }
+                } else {
+                    const targetIndex = findTarget('attacker', action.slotIndex);
+                    if (targetIndex !== -1 && defenderHps[action.slotIndex] > 0) {
+                        executeAttack(action.side, action.slotIndex, targetIndex);
+                    }
+                }
+                
+                setTimeout(executeNextAction, 600);
+            }
+            
+            executeNextAction();
+        }
+        
+        function findTarget(side, attackerSlot) {
+            const targetTeam = side === 'attacker' ? battleTeam : selectedOpponent.team;
+            const targetHps = side === 'attacker' ? attackerHps : defenderHps;
+            
+            if (targetHps[attackerSlot] > 0) {
+                return attackerSlot;
+            }
+            
+            for (let i = 0; i < 6; i++) {
+                if (targetHps[i] > 0) {
+                    return i;
+                }
+            }
+            
+            return -1;
+        }
+        
+        function executeAttack(attackerSide, attackerSlot, targetSlot) {
+            const attackerTeam = attackerSide === 'attacker' ? battleTeam : selectedOpponent.team;
+            const defenderTeam = attackerSide === 'attacker' ? selectedOpponent.team : battleTeam;
+            const attackerHpsArray = attackerSide === 'attacker' ? attackerHps : defenderHps;
+            const defenderHpsArray = attackerSide === 'attacker' ? defenderHps : attackerHps;
+            const attackerElement = attackerSide === 'attacker' ? 'attacker' : 'defender';
+            const defenderElement = attackerSide === 'attacker' ? 'defender' : 'attacker';
+            
+            const attackerNft = attackerTeam[attackerSlot];
+            const defenderNft = defenderTeam[targetSlot];
+            
+            const attackerSkill = attackerNft.skill;
+            let damage = calculateDamage(attackerSkill, attackerNft.level, attackerNft.attr || attackerNft.element, defenderNft.element || defenderNft.attr);
+            
+            const isCrit = Math.random() < 0.2;
+            if (isCrit) {
+                damage *= 1.5;
+            }
+            
+            defenderHpsArray[targetSlot] = Math.max(0, defenderHpsArray[targetSlot] - damage);
+            updateHpBar(defenderElement, targetSlot + 1, defenderHpsArray[targetSlot]);
+            
+            let log = `${attackerSide === 'attacker' ? '进攻方' : '防守方'} ${attackerNft.name} 使用【${attackerSkill.name}】`;
+            if (isCrit) log += '(暴击!)';
+            log += ` 造成 ${Math.round(damage)} 伤害`;
+            
+            if (defenderHpsArray[targetSlot] <= 0) {
+                log += ' - 击败对手!';
+                if (attackerSide === 'attacker') {
+                    attackerWinCount++;
+                    document.getElementById('attackerWinCount').textContent = attackerWinCount;
+                } else {
+                    defenderWinCount++;
+                    document.getElementById('defenderWinCount').textContent = defenderWinCount;
+                }
+            }
+            addBattleProcessLog(log);
         }
 
         function executeBattle(slotIndex) {
@@ -1387,26 +1496,18 @@
             if (!attackerNft || !defenderNft) return;
             
             const attackerSkill = attackerNft.skill;
-            const defenderSkill = defenderNft.skill;
             
             let attackerDamage = calculateDamage(attackerSkill, attackerNft.level, attackerNft.attr, defenderNft.element);
-            let defenderDamage = calculateDamage(defenderSkill, defenderNft.level, defenderNft.element, attackerNft.attr);
             
             const attackerCrit = Math.random() < 0.2;
-            const defenderCrit = Math.random() < 0.2;
             
             if (attackerCrit) {
                 attackerDamage *= 1.5;
             }
-            if (defenderCrit) {
-                defenderDamage *= 1.5;
-            }
             
             defenderHps[slotIndex] = Math.max(0, defenderHps[slotIndex] - attackerDamage);
-            attackerHps[slotIndex] = Math.max(0, attackerHps[slotIndex] - defenderDamage);
             
             updateHpBar(`defender`, slotIndex + 1, defenderHps[slotIndex]);
-            updateHpBar(`attacker`, slotIndex + 1, attackerHps[slotIndex]);
             
             let log = `${attackerNft.name} 使用【${attackerSkill.name}】`;
             if (attackerCrit) log += '(暴击!)';
@@ -1414,16 +1515,10 @@
             
             if (defenderHps[slotIndex] <= 0) {
                 log += ' - 击败对手!';
-            }
-            addBattleProcessLog(log);
-            
-            if (attackerHps[slotIndex] > 0 && defenderHps[slotIndex] <= 0) {
                 attackerWinCount++;
                 document.getElementById('attackerWinCount').textContent = attackerWinCount;
-            } else if (defenderHps[slotIndex] > 0 && attackerHps[slotIndex] <= 0) {
-                defenderWinCount++;
-                document.getElementById('defenderWinCount').textContent = defenderWinCount;
             }
+            addBattleProcessLog(log);
         }
 
         function calculateDamage(skill, level, attackerElement, defenderElement) {
