@@ -29,6 +29,21 @@ interface ITokenBurner {
     function burnAndMint(address user, bool isRare) external returns (bool);
     
     /**
+     * @dev 销毁代币并十连铸造
+     * @param user 用户地址
+     * @param isRare 是否稀有铸造
+     * @return bool 是否成功
+     */
+    function burnAndMintTen(address user, bool isRare) external returns (bool);
+    
+    /**
+     * @dev 销毁代币并指定铸造
+     * @param user 用户地址
+     * @return bool 是否成功
+     */
+    function burnAndMintTargeted(address user) external returns (bool);
+    
+    /**
      * @dev 获取普通铸造费用
      * @return uint256 费用（代币数量）
      */
@@ -39,6 +54,25 @@ interface ITokenBurner {
      * @return uint256 费用（代币数量）
      */
     function rareMintCost() external view returns (uint256);
+    
+    /**
+     * @dev 获取普通十连铸造费用
+     * @return uint256 费用（代币数量）
+     */
+    function normalMintTenCost() external view returns (uint256);
+    
+    /**
+     * @dev 获取稀有十连铸造费用
+     * @return uint256 费用（代币数量）
+     */
+    function rareMintTenCost() external view returns (uint256);
+    
+    /**
+     * @dev 获取指定铸造费用
+     * @return uint256 normalPart 普通铸造部分费用
+     * @return uint256 rarePart 光暗铸造部分费用
+     */
+    function targetedMintCost() external view returns (uint256, uint256);
     
     /**
      * @dev 设置授权的NFT合约地址
@@ -194,6 +228,28 @@ interface INFTMint {
      * @return uint256 新NFT ID
      */
     function mintBreedResult(address to, NFTDataTypes.ZodiacType zodiacType) external returns (uint256);
+    
+    /**
+     * @dev 普通十连铸造
+     * @param to 接收地址
+     * @return uint256[] 新NFT ID数组
+     */
+    function mintNormalTen(address to) external returns (uint256[] memory);
+    
+    /**
+     * @dev 光暗十连铸造
+     * @param to 接收地址
+     * @return uint256[] 新NFT ID数组
+     */
+    function mintRareTen(address to) external returns (uint256[] memory);
+    
+    /**
+     * @dev 指定铸造
+     * @param to 接收地址
+     * @param baseZodiac 基础生肖类型
+     * @return uint256[] 新NFT ID数组
+     */
+    function mintTargeted(address to, NFTDataTypes.BaseZodiac baseZodiac) external returns (uint256[] memory);
     
     /**
      * @dev 使用NFT升级

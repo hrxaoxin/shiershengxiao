@@ -245,6 +245,89 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     }
 
     /**
+     * @dev 普通十连铸造：消耗普通铸造10倍的代币，随机铸造10张NFT，以普通铸造的概率
+     * 概率分布：水(32%)、火(32%)、风(32%)、光(2%)、暗(2%)
+     * @param to 接收NFT的地址
+     * @return uint256[] 新铸造的NFT ID数组
+     */
+    function mintNormalTen(address to) external nonReentrant returns (uint256[] memory) {
+        require(tokenBurner != address(0) && rewardManager != address(0), "E2");
+        require(ITokenBurner(tokenBurner).burnAndMintTen(to, false), "E6");
+        return _mintTenTo(to, true);
+    }
+
+    /**
+     * @dev 光暗十连铸造：消耗光暗铸造10倍的代币，随机铸造10张NFT，以光暗铸造的概率
+     * 概率分布：光(50%)、暗(50%)
+     * @param to 接收NFT的地址
+     * @return uint256[] 新铸造的NFT ID数组
+     */
+    function mintRareTen(address to) external nonReentrant returns (uint256[] memory) {
+        require(tokenBurner != address(0) && rewardManager != address(0), "E2");
+        require(ITokenBurner(tokenBurner).burnAndMintTen(to, true), "E6");
+        return _mintTenTo(to, false);
+    }
+
+    /**
+     * @dev 指定铸造：用户选择一个生肖，消耗6x普通铸造的代币+4x光暗铸造的代币
+     * 铸造该生肖所有的属性和性别的NFT（共10张：5属性x2性别）
+     * @param to 接收NFT的地址
+     * @param baseZodiac 基础生肖类型
+     * @return uint256[] 新铸造的NFT ID数组
+     */
+    function mintTargeted(address to, NFTDataTypes.BaseZodiac baseZodiac) external nonReentrant returns (uint256[] memory) {
+        require(tokenBurner != address(0) && rewardManager != address(0), "E2");
+        require(uint256(baseZodiac) < 12, "E28: Invalid zodiac");
+        require(ITokenBurner(tokenBurner).burnAndMintTargeted(to), "E6");
+        return _mintTargetedTo(to, baseZodiac);
+    }
+
+    /**
+     * @dev 十连铸造统一逻辑（内部函数）
+     * @param to 接收NFT的地址
+     * @param isNormal 是否普通铸造（true为普通概率，false为光暗概率）
+     * @return uint256[] 新铸造的NFT ID数组
+     */
+    function _mintTenTo(address to, bool isNormal) internal returns (uint256[] memory) {
+        uint256[] memory tokenIds = new uint256[](10);
+        for (uint i = 0; i < 10; i++) {
+            NFTDataTypes.ZodiacType t;
+            if (isNormal) {
+                t = _getRandomNormalType();
+            } else {
+                t = _getRandomRareType();
+            }
+            tokenIds[i] = _mintTo(to, t);
+        }
+        emit TenCardsMinted(tokenIds, to, isNormal, uint64(block.timestamp));
+        return tokenIds;
+    }
+
+    /**
+     * @dev 指定铸造统一逻辑（内部函数）
+     * 铸造指定生肖的所有属性和性别组合（5属性x2性别=10张）
+     * @param to 接收NFT的地址
+     * @param baseZodiac 基础生肖类型
+     * @return uint256[] 新铸造的NFT ID数组
+     */
+    function _mintTargetedTo(address to, NFTDataTypes.BaseZodiac baseZodiac) internal returns (uint256[] memory) {
+        uint256[] memory tokenIds = new uint256[](10);
+        uint256 zodiacIndex = uint256(baseZodiac) * 2;
+        
+        // 铸造5种属性的公母各一张（共10张）
+        // 属性顺序: 水(0)、风(1)、火(2)、暗(3)、光(4)
+        for (uint i = 0; i < 5; i++) {
+            uint256 baseIndex = i * 24 + zodiacIndex;
+            // 母 (gender=0)
+            tokenIds[i * 2] = _mintTo(to, NFTDataTypes.ZodiacType(baseIndex));
+            // 公 (gender=1)
+            tokenIds[i * 2 + 1] = _mintTo(to, NFTDataTypes.ZodiacType(baseIndex + 1));
+        }
+        emit TargetedMintCompleted(tokenIds, to, baseZodiac, uint64(block.timestamp));
+        return tokenIds;
+    }
+
+    /**
      * @dev 统一铸造逻辑（内部函数）
      * @param to 接收NFT的地址
      * @param t NFT的类型
@@ -832,4 +915,22 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
      * @param timestamp 时间戳
      */
     event CardUpgraded(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, address indexed owner, uint64 timestamp);
+
+    /**
+     * @dev 十连铸造事件
+     * @param tokenIds 新铸造的NFT ID数组
+     * @param owner 接收地址
+     * @param isNormal 是否普通铸造
+     * @param timestamp 时间戳
+     */
+    event TenCardsMinted(uint256[] indexed tokenIds, address indexed owner, bool isNormal, uint64 timestamp);
+
+    /**
+     * @dev 指定铸造完成事件
+     * @param tokenIds 新铸造的NFT ID数组
+     * @param owner 接收地址
+     * @param baseZodiac 基础生肖类型
+     * @param timestamp 时间戳
+     */
+    event TargetedMintCompleted(uint256[] indexed tokenIds, address indexed owner, NFTDataTypes.BaseZodiac indexed baseZodiac, uint64 timestamp);
 }

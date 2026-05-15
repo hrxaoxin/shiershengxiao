@@ -88,6 +88,84 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     }
     
     /**
+     * @dev 销毁代币用于十连铸造（仅限授权的NFT合约或管理员调用）
+     * @param user 用户地址
+     * @param isRare 是否光暗十连（true为光暗，false为普通）
+     * @return bool 是否成功
+     */
+    function burnAndMintTen(address user, bool isRare) external returns (bool) {
+        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
+        require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
+        require(msg.sender == authorizedNFTContract || msg.sender == authorizer, "TokenBurner: Unauthorized caller");
+        require(user != address(0), "TokenBurner: Zero user address");
+        
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        uint256 cost = isRare ? rareMintCost * 10 : normalMintCost * 10;
+        require(cost > 0, "TokenBurner: Invalid cost");
+        require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
+        require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
+        
+        bool success = token.transferFrom(user, BLACK_HOLE, cost);
+        require(success, "TokenBurner: Token transfer failed");
+        
+        emit TokenBurned(user, cost, block.timestamp);
+        return true;
+    }
+    
+    /**
+     * @dev 销毁代币用于指定铸造（仅限授权的NFT合约或管理员调用）
+     * 消耗6x普通铸造代币 + 4x光暗铸造代币
+     * @param user 用户地址
+     * @return bool 是否成功
+     */
+    function burnAndMintTargeted(address user) external returns (bool) {
+        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
+        require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
+        require(msg.sender == authorizedNFTContract || msg.sender == authorizer, "TokenBurner: Unauthorized caller");
+        require(user != address(0), "TokenBurner: Zero user address");
+        
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        uint256 normalPart = normalMintCost * 6;  // 6倍普通铸造
+        uint256 rarePart = rareMintCost * 4;      // 4倍光暗铸造
+        uint256 totalCost = normalPart + rarePart;
+        
+        require(totalCost > 0, "TokenBurner: Invalid cost");
+        require(token.balanceOf(user) >= totalCost, "TokenBurner: Insufficient balance");
+        require(token.allowance(user, address(this)) >= totalCost, "TokenBurner: Insufficient allowance");
+        
+        bool success = token.transferFrom(user, BLACK_HOLE, totalCost);
+        require(success, "TokenBurner: Token transfer failed");
+        
+        emit TokenBurned(user, totalCost, block.timestamp);
+        return true;
+    }
+    
+    /**
+     * @dev 获取普通十连铸造费用
+     * @return uint256 费用（代币数量）
+     */
+    function normalMintTenCost() external view returns (uint256) {
+        return normalMintCost * 10;
+    }
+    
+    /**
+     * @dev 获取光暗十连铸造费用
+     * @return uint256 费用（代币数量）
+     */
+    function rareMintTenCost() external view returns (uint256) {
+        return rareMintCost * 10;
+    }
+    
+    /**
+     * @dev 获取指定铸造费用
+     * @return uint256 normalPart 普通铸造部分费用（6倍）
+     * @return uint256 rarePart 光暗铸造部分费用（4倍）
+     */
+    function targetedMintCost() external view returns (uint256, uint256) {
+        return (normalMintCost * 6, rareMintCost * 4);
+    }
+    
+    /**
      * @dev 设置授权的NFT合约地址
      * @param nftContract NFT合约地址
      */

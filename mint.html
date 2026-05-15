@@ -227,6 +227,50 @@
             <button class="btn-secondary w-full py-4 text-lg font-bold bg-gradient-to-r from-purple-500 to-yellow-500 text-white" id="mintLightDarkBtn" disabled>
                 <i class="fas fa-star mr-2"></i> 光暗铸造（消耗88888代币）
             </button>
+            
+            <!-- 十连铸造区域 -->
+            <div class="border-t border-gray-200 pt-6 mt-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-layer-group mr-2 text-blue-500"></i> 十连铸造
+                </h3>
+                <button class="btn-primary w-full py-4 text-lg font-bold bg-gradient-to-r from-blue-500 to-cyan-500 mb-3" id="mintNormalTenBtn" disabled>
+                    <i class="fas fa-layer-group mr-2"></i> 普通十连（消耗88880代币）
+                </button>
+                <button class="btn-secondary w-full py-4 text-lg font-bold bg-gradient-to-r from-purple-500 to-pink-500 text-white mb-3" id="mintRareTenBtn" disabled>
+                    <i class="fas fa-fire mr-2"></i> 光暗十连（消耗888880代币）
+                </button>
+            </div>
+            
+            <!-- 指定铸造区域 -->
+            <div class="border-t border-gray-200 pt-6 mt-6">
+                <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                    <i class="fas fa-crosshairs mr-2 text-purple-500"></i> 指定铸造
+                </h3>
+                <p class="text-sm text-gray-600 mb-4">选择一个生肖，铸造该生肖所有属性和性别的NFT（10张）</p>
+                <p class="text-sm text-gray-600 mb-4">消耗：6x普通铸造代币 + 4x光暗铸造代币</p>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">选择生肖：</label>
+                    <select id="targetedZodiacSelect" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">-- 请选择生肖 --</option>
+                        <option value="0">🐭 鼠</option>
+                        <option value="1">🐮 牛</option>
+                        <option value="2">🐯 虎</option>
+                        <option value="3">🐰 兔</option>
+                        <option value="4">🐉 龙</option>
+                        <option value="5">🐍 蛇</option>
+                        <option value="6">🐴 马</option>
+                        <option value="7">🐐 羊</option>
+                        <option value="8">🐵 猴</option>
+                        <option value="9">🐔 鸡</option>
+                        <option value="10">🐕 狗</option>
+                        <option value="11">🐷 猪</option>
+                    </select>
+                </div>
+                <button class="btn-secondary w-full py-4 text-lg font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white" id="mintTargetedBtn" disabled>
+                    <i class="fas fa-bullseye mr-2"></i> 指定铸造
+                </button>
+            </div>
+            
             <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4" id="mintStatus">
                 <p class="text-yellow-700">请先授权代币，然后点击铸造按钮</p>
             </div>
@@ -237,7 +281,10 @@
             <ul class="space-y-2 text-yellow-700">
                 <li>• <strong>普通铸造</strong>：消耗8888枚代币，随机获得生肖NFT</li>
                 <li>• <strong>光暗铸造</strong>：消耗88888枚代币，必定获得光/暗属性NFT</li>
-                <li>• 普通铸造概率：水/风/火属性各约32.67%，暗/光属性各2%</li>
+                <li>• <strong>普通十连</strong>：消耗88880枚代币，随机获得10张生肖NFT（普通铸造概率）</li>
+                <li>• <strong>光暗十连</strong>：消耗888880枚代币，随机获得10张光/暗属性NFT</li>
+                <li>• <strong>指定铸造</strong>：消耗6x普通+4x光暗代币，获得指定生肖所有属性NFT（10张）</li>
+                <li>• 普通铸造概率：水/风/火属性各约32%，暗/光属性各2%</li>
                 <li>• 持有生肖NFT即可享受对应的税收分红</li>
                 <li>• 首次铸造需要授权代币，之后无需重复授权</li>
             </ul>
@@ -275,6 +322,10 @@
         let nftMintContract;
         let MINT_PRICE = 8888;
         let LIGHT_DARK_COST = 88888;
+        let NORMAL_TEN_COST = 88880;
+        let RARE_TEN_COST = 888880;
+        let TARGETED_NORMAL_PART = 53328; // 6x normal
+        let TARGETED_RARE_PART = 355552; // 4x rare
 
         document.addEventListener('DOMContentLoaded', function() {
             particlesJS('particles-js', {
@@ -373,10 +424,27 @@
                 if (!tokenBurnerContract) return;
                 MINT_PRICE = parseInt(await tokenBurnerContract.methods.normalMintCost().call());
                 LIGHT_DARK_COST = parseInt(await tokenBurnerContract.methods.rareMintCost().call());
+                
+                // 尝试获取十连和指定铸造费用（如果合约支持）
+                try {
+                    NORMAL_TEN_COST = parseInt(await tokenBurnerContract.methods.normalMintTenCost().call());
+                    RARE_TEN_COST = parseInt(await tokenBurnerContract.methods.rareMintTenCost().call());
+                    const targetedCosts = await tokenBurnerContract.methods.targetedMintCost().call();
+                    TARGETED_NORMAL_PART = parseInt(targetedCosts.normalPart);
+                    TARGETED_RARE_PART = parseInt(targetedCosts.rarePart);
+                } catch (e) {
+                    // 如果合约不支持，使用默认值（10倍和6x+4x）
+                    NORMAL_TEN_COST = MINT_PRICE * 10;
+                    RARE_TEN_COST = LIGHT_DARK_COST * 10;
+                    TARGETED_NORMAL_PART = MINT_PRICE * 6;
+                    TARGETED_RARE_PART = LIGHT_DARK_COST * 4;
+                }
 
                 document.getElementById('mintPriceDisplay').textContent = `${MINT_PRICE} 代币`;
                 document.getElementById('mintBtn').innerHTML = `<i class="fas fa-magic mr-2"></i> 普通铸造（消耗${MINT_PRICE}代币）`;
                 document.getElementById('mintLightDarkBtn').innerHTML = `<i class="fas fa-star mr-2"></i> 光暗铸造（消耗${LIGHT_DARK_COST}代币）`;
+                document.getElementById('mintNormalTenBtn').innerHTML = `<i class="fas fa-layer-group mr-2"></i> 普通十连（消耗${NORMAL_TEN_COST}代币）`;
+                document.getElementById('mintRareTenBtn').innerHTML = `<i class="fas fa-fire mr-2"></i> 光暗十连（消耗${RARE_TEN_COST}代币）`;
             } catch (error) {
                 console.log('获取铸造费用失败，使用默认值:', error);
             }
@@ -451,23 +519,40 @@
                 if (!account || !tokenContract) {
                     document.getElementById('mintBtn').disabled = true;
                     document.getElementById('mintLightDarkBtn').disabled = true;
+                    document.getElementById('mintNormalTenBtn').disabled = true;
+                    document.getElementById('mintRareTenBtn').disabled = true;
+                    document.getElementById('mintTargetedBtn').disabled = true;
                     document.getElementById('mintStatus').innerHTML = '<p class="text-yellow-700">请先连接钱包</p>';
                     return;
                 }
 
                 const amountInWei = web3.utils.toWei(MINT_PRICE.toString(), 'ether');
                 const lightDarkCostInWei = web3.utils.toWei(LIGHT_DARK_COST.toString(), 'ether');
+                const normalTenCostInWei = web3.utils.toWei(NORMAL_TEN_COST.toString(), 'ether');
+                const rareTenCostInWei = web3.utils.toWei(RARE_TEN_COST.toString(), 'ether');
+                const targetedCostInWei = web3.utils.toWei((TARGETED_NORMAL_PART + TARGETED_RARE_PART).toString(), 'ether');
+                
                 const allowance = await tokenContract.methods.allowance(account, window.contractAddresses.tokenBurner).call();
                 const balance = await tokenContract.methods.balanceOf(account).call();
                 const hasEnoughBalance = parseInt(balance) >= parseInt(amountInWei);
                 const hasEnoughBalanceForLightDark = parseInt(balance) >= parseInt(lightDarkCostInWei);
+                const hasEnoughBalanceForNormalTen = parseInt(balance) >= parseInt(normalTenCostInWei);
+                const hasEnoughBalanceForRareTen = parseInt(balance) >= parseInt(rareTenCostInWei);
+                const hasEnoughBalanceForTargeted = parseInt(balance) >= parseInt(targetedCostInWei);
                 const hasApproval = parseInt(allowance) >= parseInt(amountInWei);
                 const hasLightDarkApproval = parseInt(allowance) >= parseInt(lightDarkCostInWei);
+                const hasNormalTenApproval = parseInt(allowance) >= parseInt(normalTenCostInWei);
+                const hasRareTenApproval = parseInt(allowance) >= parseInt(rareTenCostInWei);
+                const hasTargetedApproval = parseInt(allowance) >= parseInt(targetedCostInWei);
 
                 document.getElementById('mintBtn').disabled = !(hasApproval && hasEnoughBalance);
                 document.getElementById('mintLightDarkBtn').disabled = !(hasLightDarkApproval && hasEnoughBalanceForLightDark);
+                document.getElementById('mintNormalTenBtn').disabled = !(hasNormalTenApproval && hasEnoughBalanceForNormalTen);
+                document.getElementById('mintRareTenBtn').disabled = !(hasRareTenApproval && hasEnoughBalanceForRareTen);
+                document.getElementById('mintTargetedBtn').disabled = !(hasTargetedApproval && hasEnoughBalanceForTargeted);
 
                 let statusText = '';
+                const selectedZodiac = document.getElementById('targetedZodiacSelect').value;
                 if (!hasEnoughBalance) {
                     statusText = `<p class="text-red-700">代币余额不足，普通铸造需要${MINT_PRICE}枚代币，光暗铸造需要${LIGHT_DARK_COST}枚代币</p>`;
                 } else if (!hasApproval) {
@@ -479,6 +564,9 @@
             } catch (error) {
                 document.getElementById('mintBtn').disabled = true;
                 document.getElementById('mintLightDarkBtn').disabled = true;
+                document.getElementById('mintNormalTenBtn').disabled = true;
+                document.getElementById('mintRareTenBtn').disabled = true;
+                document.getElementById('mintTargetedBtn').disabled = true;
                 document.getElementById('mintStatus').innerHTML = '<p class="text-yellow-700">请先连接钱包</p>';
             }
         }
@@ -601,6 +689,208 @@
             window.location.href = 'collection.html';
         });
         document.getElementById('refreshWallet').addEventListener('click', initWeb3);
+        
+        // 普通十连铸造
+        document.getElementById('mintNormalTenBtn').addEventListener('click', async function() {
+            if (!account || !nftMintContract) return;
+
+            const btn = this;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 铸造中...';
+            btn.disabled = true;
+
+            try {
+                const confirm = await ZODIAC_UI.showConfirmModal(
+                    '确认普通十连铸造',
+                    `将消耗 ${NORMAL_TEN_COST} 枚代币铸造10张NFT，确定继续？`
+                );
+
+                if (!confirm) {
+                    btn.innerHTML = `<i class="fas fa-layer-group mr-2"></i> 普通十连（消耗${NORMAL_TEN_COST}代币）`;
+                    btn.disabled = false;
+                    return;
+                }
+
+                const gas = await ZODIAC_UI.estimateGas(nftMintContract, 'mintNormalTen', [account], account);
+                const tx = await nftMintContract.methods.mintNormalTen(account).send({
+                    from: account,
+                    gas: gas
+                });
+
+                const currentNextCardId = await nftMintContract.methods.nextCardId().call();
+                const mintedIds = [];
+                for (let i = 1; i <= 10; i++) {
+                    mintedIds.push(parseInt(currentNextCardId) - i);
+                }
+                mintedIds.reverse();
+                
+                displayTenCardsInfo(mintedIds);
+                document.getElementById('mintSuccessModal').classList.remove('hidden');
+
+                await updateTokenBalance();
+                await updateMintStatus();
+                ZODIAC_UI.showToast('普通十连铸造成功！', 'success');
+            } catch (error) {
+                let errorMsg = '铸造失败';
+                if (error.code === 4001) {
+                    errorMsg = '用户取消了交易';
+                } else if (error.message) {
+                    errorMsg += ': ' + error.message;
+                }
+                ZODIAC_UI.showToast(errorMsg, 'error');
+            } finally {
+                btn.innerHTML = `<i class="fas fa-layer-group mr-2"></i> 普通十连（消耗${NORMAL_TEN_COST}代币）`;
+                btn.disabled = false;
+            }
+        });
+
+        // 光暗十连铸造
+        document.getElementById('mintRareTenBtn').addEventListener('click', async function() {
+            if (!account || !nftMintContract) return;
+
+            const btn = this;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 铸造中...';
+            btn.disabled = true;
+
+            try {
+                const confirm = await ZODIAC_UI.showConfirmModal(
+                    '确认光暗十连铸造',
+                    `将消耗 ${RARE_TEN_COST} 枚代币铸造10张光暗属性NFT，确定继续？`
+                );
+
+                if (!confirm) {
+                    btn.innerHTML = `<i class="fas fa-fire mr-2"></i> 光暗十连（消耗${RARE_TEN_COST}代币）`;
+                    btn.disabled = false;
+                    return;
+                }
+
+                const gas = await ZODIAC_UI.estimateGas(nftMintContract, 'mintRareTen', [account], account);
+                const tx = await nftMintContract.methods.mintRareTen(account).send({
+                    from: account,
+                    gas: gas
+                });
+
+                const currentNextCardId = await nftMintContract.methods.nextCardId().call();
+                const mintedIds = [];
+                for (let i = 1; i <= 10; i++) {
+                    mintedIds.push(parseInt(currentNextCardId) - i);
+                }
+                mintedIds.reverse();
+                
+                displayTenCardsInfo(mintedIds);
+                document.getElementById('mintSuccessModal').classList.remove('hidden');
+
+                await updateTokenBalance();
+                await updateMintStatus();
+                ZODIAC_UI.showToast('光暗十连铸造成功！', 'success');
+            } catch (error) {
+                let errorMsg = '铸造失败';
+                if (error.code === 4001) {
+                    errorMsg = '用户取消了交易';
+                } else if (error.message) {
+                    errorMsg += ': ' + error.message;
+                }
+                ZODIAC_UI.showToast(errorMsg, 'error');
+            } finally {
+                btn.innerHTML = `<i class="fas fa-fire mr-2"></i> 光暗十连（消耗${RARE_TEN_COST}代币）`;
+                btn.disabled = false;
+            }
+        });
+
+        // 指定铸造
+        document.getElementById('mintTargetedBtn').addEventListener('click', async function() {
+            if (!account || !nftMintContract) return;
+
+            const zodiacIndex = document.getElementById('targetedZodiacSelect').value;
+            if (zodiacIndex === '') {
+                ZODIAC_UI.showToast('请先选择一个生肖', 'warning');
+                return;
+            }
+
+            const btn = this;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 铸造中...';
+            btn.disabled = true;
+
+            const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+            const totalCost = TARGETED_NORMAL_PART + TARGETED_RARE_PART;
+
+            try {
+                const confirm = await ZODIAC_UI.showConfirmModal(
+                    '确认指定铸造',
+                    `将消耗 ${TARGETED_NORMAL_PART} + ${TARGETED_RARE_PART} = ${totalCost} 枚代币铸造${zodiacNames[zodiacIndex]}生肖的所有属性NFT（10张），确定继续？`
+                );
+
+                if (!confirm) {
+                    btn.innerHTML = `<i class="fas fa-bullseye mr-2"></i> 指定铸造`;
+                    btn.disabled = false;
+                    return;
+                }
+
+                const gas = await ZODIAC_UI.estimateGas(nftMintContract, 'mintTargeted', [account, parseInt(zodiacIndex)], account);
+                const tx = await nftMintContract.methods.mintTargeted(account, parseInt(zodiacIndex)).send({
+                    from: account,
+                    gas: gas
+                });
+
+                const currentNextCardId = await nftMintContract.methods.nextCardId().call();
+                const mintedIds = [];
+                for (let i = 1; i <= 10; i++) {
+                    mintedIds.push(parseInt(currentNextCardId) - i);
+                }
+                mintedIds.reverse();
+                
+                displayTenCardsInfo(mintedIds);
+                document.getElementById('mintSuccessModal').classList.remove('hidden');
+
+                await updateTokenBalance();
+                await updateMintStatus();
+                ZODIAC_UI.showToast(`指定铸造成功！获得${zodiacNames[zodiacIndex]}生肖全属性NFT`, 'success');
+            } catch (error) {
+                let errorMsg = '铸造失败';
+                if (error.code === 4001) {
+                    errorMsg = '用户取消了交易';
+                } else if (error.message) {
+                    errorMsg += ': ' + error.message;
+                }
+                ZODIAC_UI.showToast(errorMsg, 'error');
+            } finally {
+                btn.innerHTML = `<i class="fas fa-bullseye mr-2"></i> 指定铸造`;
+                btn.disabled = false;
+            }
+        });
+
+        // 指定铸造生肖选择变化时更新按钮状态
+        document.getElementById('targetedZodiacSelect').addEventListener('change', updateMintStatus);
+
+        // 显示多张NFT信息
+        function displayTenCardsInfo(cardIds) {
+            const container = document.getElementById('mintedCardInfo');
+            let html = '<div class="grid grid-cols-5 gap-2 mb-4">';
+            
+            for (let i = 0; i < cardIds.length && i < 10; i++) {
+                const cardId = cardIds[i];
+                const cardTypePromise = nftMintContract.methods.tokenType(cardId).call();
+                cardTypePromise.then(cardType => {
+                    const cardTypeInt = parseInt(cardType);
+                    const nftInfo = window.ZODIAC_UTILS.getNFTInfo(cardTypeInt);
+                    const cardEl = document.querySelector(`[data-card-index="${i}"]`);
+                    if (cardEl) {
+                        cardEl.querySelector('img').src = nftInfo.imagePath;
+                        cardEl.querySelector('.card-name').textContent = nftInfo.name;
+                    }
+                });
+                html += `
+                    <div class="text-center" data-card-index="${i}">
+                        <div class="w-16 h-16 mx-auto rounded-lg overflow-hidden bg-gray-100">
+                            <img src="" alt="NFT" class="w-full h-full object-cover" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        </div>
+                        <p class="text-xs mt-1 card-name truncate">加载中...</p>
+                    </div>
+                `;
+            }
+            html += '</div>';
+            html += '<p class="text-center text-gray-600 text-sm">铸造了 ' + cardIds.length + ' 张NFT</p>';
+            container.innerHTML = html;
+        }
 
         function openMobileMenu() {
             document.getElementById('mobileMenu').classList.remove('translate-x-full');
