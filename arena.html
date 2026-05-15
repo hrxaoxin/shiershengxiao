@@ -583,9 +583,9 @@
             </div>
 
             <div class="flex-1 flex flex-col md:flex-row gap-2 md:gap-3 overflow-hidden relative">
-                <!-- 防守方 -->
-                <div class="flex-1 flex flex-col order-2 md:order-1">
-                    <h3 class="text-red-400 font-semibold text-center mb-1 md:mb-2 text-sm">防守方</h3>
+                <!-- 进攻方 -->
+                <div class="flex-1 flex flex-col order-1">
+                    <h3 class="text-blue-400 font-semibold text-center mb-1 md:mb-2 text-sm">进攻方</h3>
                     <div class="flex-1 flex flex-col justify-around min-h-0">
                         <div class="space-y-0.5">
                             <div class="text-center text-gray-500 text-xs mb-0.5">前排</div>
@@ -652,29 +652,29 @@
                     </div>
                 </div>
 
-                <!-- 中间控制区域 - 桌面端左侧 -->
-                <div class="hidden md:flex md:w-28 flex-shrink-0 flex-col items-center justify-center gap-3 order-1">
+                <!-- 中间控制区域 -->
+                <div class="flex-shrink-0 flex flex-col items-center justify-center gap-2 md:gap-3 order-2">
                     <div class="text-center">
-                        <div class="text-4xl mb-2" id="battleResult">VS</div>
-                        <div class="text-gray-400 text-sm" id="battleMessage">战斗即将开始...</div>
-                        <div class="text-gray-500 text-xs" id="currentRound">第 1 回合</div>
+                        <div class="text-2xl md:text-4xl mb-1 md:mb-2" id="battleResult">VS</div>
+                        <div class="text-gray-400 text-xs md:text-sm" id="battleMessage">战斗即将开始...</div>
+                        <div class="text-gray-500 text-[10px] md:text-xs" id="currentRound">第 1 回合</div>
                     </div>
-                    <div class="flex flex-col gap-2 w-full">
-                        <button id="fightBtn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                    <div class="flex flex-col gap-1.5 md:gap-2 w-full md:w-auto px-2 md:px-0">
+                        <button id="fightBtn" class="w-full md:w-28 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
                             开始战斗
                         </button>
-                        <button id="skipBtn" class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-lg transition-colors text-sm" style="display: none;">
+                        <button id="skipBtn" class="w-full md:w-28 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold py-2 px-3 rounded-lg transition-colors text-sm" style="display: none;">
                             ⏭️ 跳过战斗
                         </button>
-                        <button id="closeBattleBtn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        <button id="closeBattleBtn" class="w-full md:w-28 bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
                             关闭
                         </button>
                     </div>
                 </div>
 
-                <!-- 进攻方 -->
+                <!-- 防守方 -->
                 <div class="flex-1 flex flex-col order-3">
-                    <h3 class="text-blue-400 font-semibold text-center mb-1 md:mb-2 text-sm">进攻方</h3>
+                    <h3 class="text-red-400 font-semibold text-center mb-1 md:mb-2 text-sm">防守方</h3>
                     <div class="flex-1 flex flex-col justify-around min-h-0">
                         <div class="space-y-0.5">
                             <div class="text-center text-gray-500 text-xs mb-0.5">前排</div>
@@ -740,27 +740,6 @@
                         <div class="text-gray-400 text-[10px]">获胜数</div>
                     </div>
                 </div>
-
-                <!-- 手机端中间控制区域 - 放在两队之间 -->
-                <div class="md:hidden flex items-center justify-center py-2 border-y border-white/10 order-1 bg-gray-800/80 backdrop-blur-sm">
-                    <div class="flex items-center gap-4 px-2">
-                        <div class="text-center">
-                            <div class="text-2xl" id="mobileBattleResult">VS</div>
-                        </div>
-                        <div class="flex flex-col gap-1 min-w-[120px]">
-                            <div class="text-gray-400 text-xs text-center" id="mobileBattleMessage">战斗即将开始...</div>
-                            <div class="text-gray-500 text-[10px] text-center" id="mobileCurrentRound">第 1 回合</div>
-                        </div>
-                        <div class="flex flex-col gap-1">
-                            <button id="mobileFightBtn" class="bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors">
-                                开始战斗
-                            </button>
-                            <button id="mobileSkipBtn" class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors" style="display: none;">
-                                ⏭️ 跳过
-                            </button>
-                        </div>
-                    </div>
-                </div>
             </div>
 
             <div class="flex items-center justify-between mt-2 md:mt-3 bg-gray-800/50 rounded-lg p-2 md:p-3 max-h-24 md:max-h-32 overflow-y-auto">
@@ -770,10 +749,15 @@
                 </div>
             </div>
 
-            <!-- 手机端关闭按钮 -->
-            <button id="mobileCloseBattleBtn" class="md:hidden mt-2 w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-                关闭
-            </button>
+            <!-- 手机端可滚动区域 -->
+            <div class="md:hidden flex-1 min-h-0 overflow-y-auto mt-2">
+                <div class="flex flex-col gap-2 pb-2">
+                    <!-- 手机端关闭按钮 -->
+                    <button id="mobileCloseBattleBtn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                        关闭
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
