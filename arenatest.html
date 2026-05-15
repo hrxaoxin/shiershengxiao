@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>生肖竞技场测试版 - Twelve Zodiacs Arena</title>
+    <title>生肖竞技场测试版 - Twelve Zodiacs Arena Test</title>
     <meta name="description" content="生肖NFT竞技场测试版，使用模拟数据测试战斗效果">
     <link rel="icon" href="images/fu-cards/shuishu_1.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -18,6 +18,155 @@
             min-height: 100vh;
             overflow-x: hidden;
         }
+        
+        .team-slot {
+            cursor: pointer;
+        }
+
+        .battle-arena {
+            position: relative;
+            z-index: 1;
+        }
+
+        @keyframes attack {
+            0% { transform: translateX(0) scale(1); }
+            30% { transform: translateX(30px) scale(1.1); }
+            60% { transform: translateX(-10px) scale(1); }
+            100% { transform: translateX(0) scale(1); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0) translateY(0); }
+            20% { transform: translateX(-5px) translateY(-2px); }
+            40% { transform: translateX(5px) translateY(2px); }
+            60% { transform: translateX(-5px) translateY(2px); }
+            80% { transform: translateX(5px) translateY(-2px); }
+        }
+
+        @keyframes damage-flash {
+            0%, 100% { filter: brightness(1); }
+            50% { filter: brightness(2) saturate(0); }
+        }
+
+        @keyframes float-up {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(-80px); opacity: 0; }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 10px currentColor; }
+            50% { box-shadow: 0 0 30px currentColor, 0 0 50px currentColor; }
+        }
+
+        @keyframes skill-flash {
+            0%, 100% { box-shadow: 0 0 10px #fbbf24; }
+            50% { box-shadow: 0 0 40px #fbbf24, 0 0 60px #f59e0b; }
+        }
+
+        .attack-animation {
+            animation: attack 0.6s ease-in-out;
+        }
+
+        .damage-shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        .damage-flash {
+            animation: damage-flash 0.3s ease-in-out;
+        }
+
+        .damage-number {
+            position: absolute;
+            font-size: 28px;
+            font-weight: bold;
+            pointer-events: none;
+            animation: float-up 1.5s ease-out forwards;
+            text-shadow: 0 0 10px currentColor;
+        }
+
+        .damage-number.critical {
+            color: #f59e0b;
+            font-size: 36px;
+        }
+
+        .damage-number.normal {
+            color: #ef4444;
+        }
+
+        .damage-number.heal {
+            color: #22c55e;
+        }
+
+        .advantage-glow {
+            animation: pulse-glow 1.5s infinite;
+            color: #22c55e;
+        }
+
+        .disadvantage-glow {
+            animation: pulse-glow 1.5s infinite;
+            color: #ef4444;
+        }
+
+        .skill-glow {
+            animation: skill-flash 0.8s ease-in-out;
+        }
+
+        .health-bar {
+            transition: width 0.5s ease-out;
+        }
+
+        .nft-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .nft-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .nft-card.selected {
+            box-shadow: 0 0 20px #3b82f6, 0 0 40px rgba(59, 130, 246, 0.5);
+            border-color: #3b82f6;
+        }
+
+        .nft-card.in-team {
+            border-color: #f59e0b;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+        }
+
+        .element-fire { border-color: #ef4444; }
+        .element-wind { border-color: #22c55e; }
+        .element-water { border-color: #3b82f6; }
+        .element-light { border-color: #fbbf24; }
+        .element-dark { border-color: #8b5cf6; }
+
+        .rank-badge {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+
+        .battle-log {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .battle-log::-webkit-scrollbar { width: 6px; }
+        .battle-log::-webkit-scrollbar-track { background: rgba(255,255,255,0.1); }
+        .battle-log::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); border-radius: 3px; }
+
+        .skill-tag {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .skill-attack { background: #ef4444; }
+        .skill-defense { background: #3b82f6; }
+        .skill-heal { background: #22c55e; }
+        .skill-special { background: #f59e0b; }
+        .skill-counter { background: #8b5cf6; }
+        .skill-lifesteal { background: #ec4899; }
+        .skill-shield { background: #06b6d4; }
+        .skill-buff { background: #10b981; }
+        .skill-debuff { background: #f97316; }
 
         .team-slot {
             min-height: 120px;
@@ -44,36 +193,6 @@
         .team-slot.back-row {
             border-color: #8b5cf6;
         }
-
-        .nft-card.in-team {
-            border-color: #f59e0b;
-            box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
-        }
-
-        .rank-badge {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-        }
-
-        .battle-log {
-            max-height: 250px;
-            overflow-y: auto;
-        }
-
-        .skill-tag {
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 4px;
-        }
-
-        .skill-attack { background: #ef4444; }
-        .skill-defense { background: #3b82f6; }
-        .skill-heal { background: #22c55e; }
-        .skill-special { background: #f59e0b; }
-        .skill-counter { background: #8b5cf6; }
-        .skill-lifesteal { background: #ec4899; }
-        .skill-shield { background: #06b6d4; }
-        .skill-buff { background: #10b981; }
-        .skill-debuff { background: #f97316; }
 
         .btn-primary {
             background: linear-gradient(135deg, #3b82f6, #1d4ed8);
@@ -111,35 +230,172 @@
     </style>
 </head>
 <body>
-    <main class="pt-10 pb-10 px-4">
+    <nav class="navbar fixed bottom-0 left-0 right-0 z-10 md:hidden bg-white shadow-lg">
+        <div class="flex justify-around items-center py-2 px-4">
+            <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1">🏠</div>
+                <span class="text-xs font-bold text-gray-700">首页</span>
+            </a>
+            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1">🃏</div>
+                <span class="text-xs font-bold text-gray-700">铸造</span>
+            </a>
+            <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1">🎁</div>
+                <span class="text-xs font-bold text-gray-700">生肖</span>
+            </a>
+            <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1">🏆</div>
+                <span class="text-xs font-bold text-gray-700">奖励</span>
+            </a>
+            <button id="moreMenuBtn" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1">☰</div>
+                <span class="text-xs font-bold text-gray-700">更多</span>
+            </button>
+        </div>
+    </nav>
+
+    <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 z-40 md:hidden hidden" onclick="closeMobileMenu()"></div>
+    <div id="mobileMenu" class="fixed right-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50 md:hidden transform translate-x-full transition-transform duration-300 overflow-y-auto">
+        <div class="p-4 border-b">
+            <div class="flex justify-between items-center">
+                <span class="font-bold text-gray-800">导航菜单</span>
+                <button id="closeMenuBtn" class="p-2 hover:bg-gray-100 rounded-lg" onclick="closeMobileMenu()">
+                    <i class="fas fa-times text-gray-600"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-4 space-y-2">
+            <a href="index.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">🏠</span>
+                <span class="text-gray-700">首页</span>
+            </a>
+            <a href="mint.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">🃏</span>
+                <span class="text-gray-700">铸造</span>
+            </a>
+            <a href="collection.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">🎁</span>
+                <span class="text-gray-700">生肖</span>
+            </a>
+            <a href="rewards.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">🏆</span>
+                <span class="text-gray-700">奖励</span>
+            </a>
+            <a href="upgrade.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">⭐</span>
+                <span class="text-gray-700">升阶</span>
+            </a>
+            <a href="trading.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">💰</span>
+                <span class="text-gray-700">交易</span>
+            </a>
+            <a href="breeding.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">🐾</span>
+                <span class="text-gray-700">孕育</span>
+            </a>
+            <a href="staking.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">⚡</span>
+                <span class="text-gray-700">挖矿</span>
+            </a>
+            <a href="arenatest.html" class="flex items-center px-4 py-3 rounded-lg bg-gray-100">
+                <span class="text-xl mr-3">⚔️</span>
+                <span class="text-gray-700">测试竞技</span>
+            </a>
+        </div>
+    </div>
+
+    <nav class="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-white shadow-lg z-20 overflow-y-auto">
+        <div class="p-6">
+            <div class="text-center mb-8">
+                <div class="text-4xl mb-2">🐾</div>
+                <h1 class="text-xl font-bold text-gray-800">十二生肖</h1>
+                <p class="text-sm text-gray-500">Twelve Zodiacs</p>
+            </div>
+            <div class="space-y-2">
+                <a href="index.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🏠</span>
+                    <span class="text-gray-700">首页</span>
+                </a>
+                <a href="mint.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🃏</span>
+                    <span class="text-gray-700">铸造</span>
+                </a>
+                <a href="collection.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🎁</span>
+                    <span class="text-gray-700">生肖</span>
+                </a>
+                <a href="rewards.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🏆</span>
+                    <span class="text-gray-700">奖励</span>
+                </a>
+                <a href="upgrade.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">⭐</span>
+                    <span class="text-gray-700">升阶</span>
+                </a>
+                <a href="trading.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">💰</span>
+                    <span class="text-gray-700">交易</span>
+                </a>
+                <a href="breeding.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🐾</span>
+                    <span class="text-gray-700">孕育</span>
+                </a>
+                <a href="staking.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">⚡</span>
+                    <span class="text-gray-700">挖矿</span>
+                </a>
+                <a href="arenatest.html" class="flex items-center px-4 py-3 rounded-lg bg-red-50 text-red-600">
+                    <span class="text-xl mr-3">⚔️</span>
+                    <span class="font-medium">测试竞技</span>
+                </a>
+            </div>
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <div class="text-center text-gray-500 text-sm mb-2">🚀 测试模式</div>
+                <div class="text-center text-gray-400 text-xs">使用模拟数据</div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="battle-arena pt-10 pb-24 md:pl-72 px-4">
         <div class="container mx-auto max-w-7xl">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2 space-y-6">
                     <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
                         <div class="text-center mb-6">
                             <h2 class="text-2xl font-bold text-white mb-2">⚔️ 发起挑战</h2>
-                            <p class="text-gray-300">选择对手并发起挑战</p>
+                            <p class="text-gray-300">选择对手并发起挑战（测试模式）</p>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div class="bg-white/5 rounded-xl p-4 border border-white/10">
-                                <h3 class="text-white font-semibold mb-4">我的进攻组</h3>
+                                <h3 class="text-white font-semibold mb-4">我的战队</h3>
                                 <div id="myBattleTeamDisplay" class="text-center text-gray-400 py-4">
-                                    请先设置进攻组
+                                    请先设置战队
                                 </div>
                             </div>
 
                             <div class="bg-white/5 rounded-xl p-4 border border-white/10 flex flex-col items-center justify-center">
                                 <div class="text-6xl mb-4">⚔️</div>
                                 <div class="text-white text-lg font-bold text-center">VS</div>
-                                <button id="challengeBtn" class="mt-4 w-full btn-primary text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50" disabled>
-                                    发起挑战
-                                </button>
+                                <div class="mt-3 w-full">
+                                    <div class="flex gap-2 mb-3">
+                                        <button id="modePointsBtn" class="flex-1 mode-tab py-2 px-3 rounded-lg border border-white/20 text-gray-300 text-sm hover:bg-white/5 transition-all active" onclick="setChallengeMode(0)">
+                                            积分模式
+                                        </button>
+                                        <button id="modeRankBtn" class="flex-1 mode-tab py-2 px-3 rounded-lg border border-white/20 text-gray-300 text-sm hover:bg-white/5 transition-all" onclick="setChallengeMode(1)">
+                                            排名挑战
+                                        </button>
+                                    </div>
+                                    <button id="challengeBtn" class="w-full btn-primary text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                        发起挑战
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="bg-white/5 rounded-xl p-4 border border-white/10">
-                                <h3 class="text-white font-semibold mb-4">对手防守组</h3>
-                                <div id="opponentDefenseTeam" class="text-center text-gray-400 py-4">
+                                <h3 class="text-white font-semibold mb-4">对手战队</h3>
+                                <div id="opponentBattleTeam" class="text-center text-gray-400 py-4">
                                     选择对手后显示
                                 </div>
                             </div>
@@ -147,92 +403,60 @@
                     </div>
 
                     <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
-                        <div class="text-center mb-6">
-                            <h1 class="text-3xl font-bold text-white mb-2">🏆 竞技场队伍配置</h1>
-                            <p class="text-gray-300">设置你的进攻组和防守组（各6张NFT）</p>
+                        <div class="flex items-center justify-between mb-6">
+                            <div>
+                                <h1 class="text-3xl font-bold text-white mb-2">🏆 竞技场战队配置</h1>
+                                <p class="text-gray-300">设置你的战队（6张NFT）</p>
+                            </div>
+                            <div class="flex gap-3">
+                                <div class="text-center bg-white/5 rounded-lg px-4 py-2">
+                                    <div class="text-white font-bold" id="remainingAttempts">5</div>
+                                    <div class="text-gray-400 text-xs">剩余挑战次数</div>
+                                </div>
+                                <button id="rechargeBtn" class="btn-success text-white font-semibold py-2 px-4 rounded-lg transition-colors" onclick="rechargeAttempts()">
+                                    <i class="fas fa-plus-circle mr-1"></i> 充值次数
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                            <div>
-                                <div class="flex items-center justify-between mb-4">
-                                    <h3 class="text-white font-semibold flex items-center">
-                                        <span class="mr-2">⚔️</span> 进攻组
-                                    </h3>
-                                    <span class="text-gray-400 text-sm">前排3张 · 后排3张</span>
-                                </div>
-                                <div id="attackTeamSlots" class="space-y-3">
-                                    <div class="grid grid-cols-3 gap-2">
-                                        <div class="team-slot front-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">前排1</span>
-                                        </div>
-                                        <div class="team-slot front-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">前排2</span>
-                                        </div>
-                                        <div class="team-slot front-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">前排3</span>
-                                        </div>
+                        <div>
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-white font-semibold flex items-center">
+                                    <span class="mr-2">⚔️</span> 我的战队
+                                </h3>
+                                <span class="text-gray-400 text-sm">前排3张 · 后排3张</span>
+                            </div>
+                            <div id="battleTeamSlots" class="space-y-3">
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div class="team-slot front-row flex items-center justify-center">
+                                        <span class="text-gray-500 text-xs">前排1</span>
                                     </div>
-                                    <div class="grid grid-cols-3 gap-2">
-                                        <div class="team-slot back-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">后排1</span>
-                                        </div>
-                                        <div class="team-slot back-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">后排2</span>
-                                        </div>
-                                        <div class="team-slot back-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">后排3</span>
-                                        </div>
+                                    <div class="team-slot front-row flex items-center justify-center">
+                                        <span class="text-gray-500 text-xs">前排2</span>
+                                    </div>
+                                    <div class="team-slot front-row flex items-center justify-center">
+                                        <span class="text-gray-500 text-xs">前排3</span>
                                     </div>
                                 </div>
-                                <div class="mt-3 flex gap-2">
-                                    <button id="saveAttackTeamBtn" class="flex-1 btn-primary text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50" disabled>
-                                        保存进攻组
-                                    </button>
-                                    <button id="clearAttackTeamBtn" class="btn-danger text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-                                        清空
-                                    </button>
+                                <div class="grid grid-cols-3 gap-2">
+                                    <div class="team-slot back-row flex items-center justify-center">
+                                        <span class="text-gray-500 text-xs">后排1</span>
+                                    </div>
+                                    <div class="team-slot back-row flex items-center justify-center">
+                                        <span class="text-gray-500 text-xs">后排2</span>
+                                    </div>
+                                    <div class="team-slot back-row flex items-center justify-center">
+                                        <span class="text-gray-500 text-xs">后排3</span>
+                                    </div>
                                 </div>
                             </div>
-
-                            <div>
-                                <div class="flex items-center justify-between mb-4">
-                                    <h3 class="text-white font-semibold flex items-center">
-                                        <span class="mr-2">🛡️</span> 防守组
-                                    </h3>
-                                    <span class="text-gray-400 text-sm">排行榜显示此队伍</span>
-                                </div>
-                                <div id="defenseTeamSlots" class="space-y-3">
-                                    <div class="grid grid-cols-3 gap-2">
-                                        <div class="team-slot front-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">前排1</span>
-                                        </div>
-                                        <div class="team-slot front-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">前排2</span>
-                                        </div>
-                                        <div class="team-slot front-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">前排3</span>
-                                        </div>
-                                    </div>
-                                    <div class="grid grid-cols-3 gap-2">
-                                        <div class="team-slot back-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">后排1</span>
-                                        </div>
-                                        <div class="team-slot back-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">后排2</span>
-                                        </div>
-                                        <div class="team-slot back-row flex items-center justify-center">
-                                            <span class="text-gray-500 text-xs">后排3</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="mt-3 flex gap-2">
-                                    <button id="saveDefenseTeamBtn" class="flex-1 btn-primary text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50" disabled>
-                                        保存防守组
-                                    </button>
-                                    <button id="clearDefenseTeamBtn" class="btn-danger text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-                                        清空
-                                    </button>
-                                </div>
+                            <div class="mt-3 flex gap-2">
+                                <button id="saveBattleTeamBtn" class="flex-1 btn-primary text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                    保存战队
+                                </button>
+                                <button id="clearBattleTeamBtn" class="btn-danger text-white font-semibold py-2 px-4 rounded-lg transition-colors" onclick="clearBattleTeam()">
+                                    清空战队
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -251,9 +475,9 @@
                             <span class="mr-2">🏆</span> 赛季奖励池
                         </h3>
                         <div id="rewardPoolDisplay" class="text-center mb-4 p-4 bg-yellow-500/10 rounded-lg">
-                            <div class="text-yellow-400 text-2xl font-bold" id="rewardPoolAmount">--</div>
+                            <div class="text-yellow-400 text-2xl font-bold" id="rewardPoolAmount">5.2</div>
                             <div class="text-gray-400 text-sm mt-1">ETH 总奖励</div>
-                            <div class="text-gray-500 text-xs mt-2" id="rewardRateInfo">奖励比例: --</div>
+                            <div class="text-gray-500 text-xs mt-2" id="rewardRateInfo">奖励比例: 0.2%</div>
                         </div>
                     </div>
 
@@ -270,22 +494,26 @@
                         <h3 class="text-white font-semibold mb-4 flex items-center">
                             <span class="mr-2">📊</span> 我的战绩
                         </h3>
-                        <div class="space-y-3">
+                        <div id="myStats" class="space-y-3">
                             <div class="flex justify-between items-center">
                                 <span class="text-gray-400">积分</span>
-                                <span class="text-white font-bold">8500</span>
+                                <span class="text-white font-bold" id="myPoints">8500</span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-gray-400">胜利</span>
-                                <span class="text-green-400 font-bold">28</span>
+                                <span class="text-green-400 font-bold" id="myWins">28</span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-gray-400">失败</span>
-                                <span class="text-red-400 font-bold">12</span>
+                                <span class="text-red-400 font-bold" id="myLosses">12</span>
                             </div>
                             <div class="flex justify-between items-center">
                                 <span class="text-gray-400">胜率</span>
-                                <span class="text-white font-bold">70%</span>
+                                <span class="text-white font-bold" id="myWinRate">70%</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-400">排名</span>
+                                <span class="text-yellow-400 font-bold" id="myRank">4</span>
                             </div>
                         </div>
                     </div>
@@ -312,6 +540,10 @@
                             <div>• 前排3张，后排3张</div>
                             <div>• 优先攻击同排对手</div>
                             <div>• 前排全阵亡后攻击后排</div>
+                            <div>• 积分模式：战斗增减积分</div>
+                            <div>• 排名挑战：3局2胜换排名</div>
+                            <div>• 每天5次挑战机会</div>
+                            <div>• 测试模式：数据已模拟</div>
                         </div>
                     </div>
                 </div>
@@ -323,35 +555,36 @@
         <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 max-w-6xl w-full mx-4 border border-white/10 max-h-[90vh] overflow-y-auto">
             <div class="text-center mb-6">
                 <h2 class="text-2xl font-bold text-white mb-2">⚔️ 6v6 战斗开始！</h2>
+                <div class="text-gray-400" id="battleModeText">积分模式</div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div>
                     <h3 class="text-blue-400 font-semibold text-center mb-3">进攻方</h3>
-                    <div class="space-y-2">
+                    <div id="battleAttackerTeam" class="space-y-2">
                         <div class="grid grid-cols-3 gap-2">
                             <div class="text-center p-2 bg-blue-500/20 rounded-lg" id="attackerFront1">
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp1"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">前排1</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="attackerImg1">?</div>
+                                <div class="text-xs text-gray-300" id="attackerName1">前排1</div>
                                 <div class="text-xs text-green-400" id="attackerHpText1">100%</div>
                             </div>
                             <div class="text-center p-2 bg-blue-500/20 rounded-lg" id="attackerFront2">
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp2"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">前排2</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="attackerImg2">?</div>
+                                <div class="text-xs text-gray-300" id="attackerName2">前排2</div>
                                 <div class="text-xs text-green-400" id="attackerHpText2">100%</div>
                             </div>
                             <div class="text-center p-2 bg-blue-500/20 rounded-lg" id="attackerFront3">
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp3"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">前排3</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="attackerImg3">?</div>
+                                <div class="text-xs text-gray-300" id="attackerName3">前排3</div>
                                 <div class="text-xs text-green-400" id="attackerHpText3">100%</div>
                             </div>
                         </div>
@@ -360,31 +593,31 @@
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp4"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">后排1</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="attackerImg4">?</div>
+                                <div class="text-xs text-gray-300" id="attackerName4">后排1</div>
                                 <div class="text-xs text-green-400" id="attackerHpText4">100%</div>
                             </div>
                             <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="attackerBack2">
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp5"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">后排2</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="attackerImg5">?</div>
+                                <div class="text-xs text-gray-300" id="attackerName5">后排2</div>
                                 <div class="text-xs text-green-400" id="attackerHpText5">100%</div>
                             </div>
                             <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="attackerBack3">
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp6"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">后排3</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="attackerImg6">?</div>
+                                <div class="text-xs text-gray-300" id="attackerName6">后排3</div>
                                 <div class="text-xs text-green-400" id="attackerHpText6">100%</div>
                             </div>
                         </div>
                     </div>
                     <div class="mt-3 text-center">
                         <div class="text-white font-bold" id="attackerWinCount">0</div>
-                        <div class="text-gray-400 text-xs">存活数</div>
+                        <div class="text-gray-400 text-xs">获胜数</div>
                     </div>
                 </div>
 
@@ -399,30 +632,30 @@
 
                 <div>
                     <h3 class="text-red-400 font-semibold text-center mb-3">防守方</h3>
-                    <div class="space-y-2">
+                    <div id="battleDefenderTeam" class="space-y-2">
                         <div class="grid grid-cols-3 gap-2">
                             <div class="text-center p-2 bg-green-500/20 rounded-lg" id="defenderFront1">
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp1"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">前排1</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="defenderImg1">?</div>
+                                <div class="text-xs text-gray-300" id="defenderName1">前排1</div>
                                 <div class="text-xs text-green-400" id="defenderHpText1">100%</div>
                             </div>
                             <div class="text-center p-2 bg-green-500/20 rounded-lg" id="defenderFront2">
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp2"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">前排2</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="defenderImg2">?</div>
+                                <div class="text-xs text-gray-300" id="defenderName2">前排2</div>
                                 <div class="text-xs text-green-400" id="defenderHpText2">100%</div>
                             </div>
                             <div class="text-center p-2 bg-green-500/20 rounded-lg" id="defenderFront3">
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp3"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">前排3</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="defenderImg3">?</div>
+                                <div class="text-xs text-gray-300" id="defenderName3">前排3</div>
                                 <div class="text-xs text-green-400" id="defenderHpText3">100%</div>
                             </div>
                         </div>
@@ -431,31 +664,31 @@
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp4"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">后排1</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="defenderImg4">?</div>
+                                <div class="text-xs text-gray-300" id="defenderName4">后排1</div>
                                 <div class="text-xs text-green-400" id="defenderHpText4">100%</div>
                             </div>
                             <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="defenderBack2">
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp5"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">后排2</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="defenderImg5">?</div>
+                                <div class="text-xs text-gray-300" id="defenderName5">后排2</div>
                                 <div class="text-xs text-green-400" id="defenderHpText5">100%</div>
                             </div>
                             <div class="text-center p-2 bg-purple-500/20 rounded-lg" id="defenderBack3">
                                 <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
                                     <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp6"></div>
                                 </div>
-                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1"></div>
-                                <div class="text-xs text-gray-300">后排3</div>
+                                <div class="w-12 h-12 rounded-lg bg-gray-700 mx-auto mb-1 flex items-center justify-center text-2xl" id="defenderImg6">?</div>
+                                <div class="text-xs text-gray-300" id="defenderName6">后排3</div>
                                 <div class="text-xs text-green-400" id="defenderHpText6">100%</div>
                             </div>
                         </div>
                     </div>
                     <div class="mt-3 text-center">
                         <div class="text-white font-bold" id="defenderWinCount">0</div>
-                        <div class="text-gray-400 text-xs">存活数</div>
+                        <div class="text-gray-400 text-xs">获胜数</div>
                     </div>
                 </div>
             </div>
@@ -467,7 +700,7 @@
 
             <div class="flex gap-3">
                 <button id="closeBattleModal" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">关闭</button>
-                <button id="surrenderBtn" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors hidden">投降</button>
+                <button id="surrenderBtn" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors hidden">认输</button>
             </div>
         </div>
     </div>
@@ -476,19 +709,19 @@
         <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 max-w-4xl w-full mx-4 border border-white/10 max-h-[85vh] overflow-y-auto">
             <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-bold text-white">选择NFT</h2>
-                <button id="closeNftModal" class="text-gray-400 hover:text-white transition-colors">
+                <button id="closeNftModal" class="text-gray-400 hover:text-white transition-colors" onclick="closeNftSelectModal()">
                     <i class="fas fa-times text-xl"></i>
                 </button>
             </div>
             
-            <div class="text-gray-300 text-sm mb-4" id="nftModalHint">点击选择一张NFT放入队伍槽位</div>
+            <div class="text-gray-300 text-sm mb-4" id="nftModalHint">点击选择一张NFT放入战队槽位</div>
             
             <div id="nftSelectList" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 <div class="text-center text-gray-400 py-8">加载中...</div>
             </div>
             
             <div class="mt-4 flex gap-2">
-                <button id="clearSlotBtn" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                <button id="clearSlotBtn" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors" onclick="clearSelectedSlot()">
                     清空此槽位
                 </button>
             </div>
@@ -496,18 +729,47 @@
     </div>
 
     <script>
-        let myNfts = [];
-        let attackTeam = [];
-        let defenseTeam = [];
+        let selectedNft = null;
         let selectedOpponent = null;
-        let selectedSlot = { teamType: '', index: -1 };
+        let myNfts = [];
+        let battleTeam = [];
+        let currentChallengeMode = 0;
+        let remainingAttempts = 5;
 
         const TEAM_SIZE = 6;
         const FRONT_ROW_SIZE = 3;
 
-        const ELEMENT_EMOJIS = { Fire: '🔥', Wind: '🪁', Water: '💧', Light: '✨', Dark: '🌑' };
+        const ELEMENT_COLORS = {
+            Fire: 'element-fire',
+            Wind: 'element-wind',
+            Water: 'element-water',
+            Light: 'element-light',
+            Dark: 'element-dark'
+        };
+
+        const ELEMENT_EMOJIS = {
+            Fire: '🔥',
+            Wind: '🪁',
+            Water: '💧',
+            Light: '✨',
+            Dark: '🌑'
+        };
+
         const ZODIAC_EMOJIS = ['🐀', '🐂', '🐅', '🐇', '🐉', '🐍', '🐎', '🐑', '🐒', '🐓', '🐕', '🐷'];
         const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+        const ELEMENT_NAMES = ['Water', 'Wind', 'Fire', 'Dark', 'Light'];
+
+        const SKILL_TYPE_LABELS = {
+            'Attack': '攻击',
+            'Defense': '防御',
+            'Heal': '治疗',
+            'Special': '特殊',
+            'Buff': '增益',
+            'Debuff': '减益',
+            'Counter': '反击',
+            'Lifesteal': '吸血',
+            'Shield': '护盾'
+        };
 
         const FULL_SKILLS = {
             fire: [
@@ -642,17 +904,13 @@
             ]
         };
 
-        function getSkillByTokenType(tokenType) {
-            const elementIndex = Math.floor(tokenType / 24);
-            const indexInElement = tokenType % 24;
-            const elements = ['water', 'wind', 'fire', 'dark', 'light'];
-            const element = elements[elementIndex];
-            return FULL_SKILLS[element][indexInElement];
-        }
+        const IPFS_BASE_1 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/';
+        const IPFS_BASE_2 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/';
+
+        let selectedSlot = { teamType: '', index: -1 };
 
         function init() {
             loadMockNfts();
-            loadRewardPool();
             loadLeaderboard();
             setupDropZones();
             
@@ -661,83 +919,61 @@
                 document.getElementById('battleModal').classList.add('hidden');
             });
             document.getElementById('fightBtn').addEventListener('click', startBattle);
-            document.getElementById('clearAttackTeamBtn').addEventListener('click', clearAttackTeam);
-            document.getElementById('clearDefenseTeamBtn').addEventListener('click', clearDefenseTeam);
-            document.getElementById('saveAttackTeamBtn').addEventListener('click', saveAttackTeam);
-            document.getElementById('saveDefenseTeamBtn').addEventListener('click', () => alert('防守组保存成功！'));
-            document.getElementById('closeNftModal').addEventListener('click', closeNftSelectModal);
-            document.getElementById('clearSlotBtn').addEventListener('click', clearSelectedSlot);
+            document.getElementById('clearBattleTeamBtn').addEventListener('click', clearBattleTeam);
+            document.getElementById('saveBattleTeamBtn').addEventListener('click', saveBattleTeam);
+            document.getElementById('modePointsBtn').addEventListener('click', () => setChallengeMode(0));
+            document.getElementById('modeRankBtn').addEventListener('click', () => setChallengeMode(1));
+        }
+
+        function setChallengeMode(mode) {
+            currentChallengeMode = mode;
+            document.getElementById('modePointsBtn').classList.toggle('active', mode === 0);
+            document.getElementById('modeRankBtn').classList.toggle('active', mode === 1);
+            document.getElementById('battleModeText').textContent = mode === 0 ? '积分模式' : '排名挑战';
+            updateChallengeBtn();
+        }
+
+        function rechargeAttempts() {
+            remainingAttempts = Math.min(remainingAttempts + 5, 10);
+            document.getElementById('remainingAttempts').textContent = remainingAttempts;
+            addBattleLog('✅ 成功充值5次挑战机会');
         }
 
         function loadMockNfts() {
-            const IPFS_BASE_1 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/';
-            const IPFS_BASE_2 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/';
-            const ELEMENT_NAMES = ['Water', 'Wind', 'Fire', 'Dark', 'Light'];
-            const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
-            
             myNfts = [
-                { tokenId: 1, tokenType: 25, level: 5, attr: 'Wind', zodiacIndex: 4, name: '风龙·雄', imagePath: `${IPFS_BASE_1}fenglong_1.png`, skill: FULL_SKILLS.wind[4], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 2, tokenType: 49, level: 5, attr: 'Fire', zodiacIndex: 0, name: '火鼠·雄', imagePath: `${IPFS_BASE_1}huoshu_1.png`, skill: FULL_SKILLS.fire[0], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 3, tokenType: 2, level: 4, attr: 'Water', zodiacIndex: 1, name: '水牛·雌', imagePath: `${IPFS_BASE_1}shuiniu_1.png`, skill: FULL_SKILLS.water[1], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 4, tokenType: 73, level: 4, attr: 'Dark', zodiacIndex: 3, name: '暗兔·雄', imagePath: `${IPFS_BASE_2}antu_1.png`, skill: FULL_SKILLS.dark[3], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 5, tokenType: 97, level: 3, attr: 'Light', zodiacIndex: 8, name: '光猴·雄', imagePath: `${IPFS_BASE_2}guanghou_1.png`, skill: FULL_SKILLS.light[8], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 6, tokenType: 53, level: 5, attr: 'Fire', zodiacIndex: 4, name: '火龙·雄', imagePath: `${IPFS_BASE_1}huolong_1.png`, skill: FULL_SKILLS.fire[4], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 7, tokenType: 77, level: 3, attr: 'Dark', zodiacIndex: 7, name: '暗羊·雌', imagePath: `${IPFS_BASE_2}anyang_0.png`, skill: FULL_SKILLS.dark[7], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 8, tokenType: 101, level: 5, attr: 'Light', zodiacIndex: 11, name: '光猪·雄', imagePath: `${IPFS_BASE_2}guangzhu_1.png`, skill: FULL_SKILLS.light[11], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 9, tokenType: 50, level: 4, attr: 'Fire', zodiacIndex: 1, name: '火牛·雌', imagePath: `${IPFS_BASE_1}huoniu_0.png`, skill: FULL_SKILLS.fire[1], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 10, tokenType: 26, level: 4, attr: 'Wind', zodiacIndex: 5, name: '风蛇·雌', imagePath: `${IPFS_BASE_1}fengshe_0.png`, skill: FULL_SKILLS.wind[5], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 11, tokenType: 7, level: 3, attr: 'Water', zodiacIndex: 6, name: '水马·雄', imagePath: `${IPFS_BASE_1}shuima_1.png`, skill: FULL_SKILLS.water[6], inAttackTeam: false, inDefenseTeam: false },
-                { tokenId: 12, tokenType: 104, level: 2, attr: 'Light', zodiacIndex: 3, name: '光兔·雌', imagePath: `${IPFS_BASE_2}guangtu_0.png`, skill: FULL_SKILLS.light[3], inAttackTeam: false, inDefenseTeam: false }
+                { tokenId: 1, tokenType: 25, level: 5, attr: 'Wind', zodiacIndex: 4, name: '风龙·雄', imagePath: `${IPFS_BASE_1}fenglong_1.png`, skill: FULL_SKILLS.wind[4], inBattleTeam: false },
+                { tokenId: 2, tokenType: 49, level: 5, attr: 'Fire', zodiacIndex: 0, name: '火鼠·雄', imagePath: `${IPFS_BASE_1}huoshu_1.png`, skill: FULL_SKILLS.fire[0], inBattleTeam: false },
+                { tokenId: 3, tokenType: 2, level: 4, attr: 'Water', zodiacIndex: 1, name: '水牛·雌', imagePath: `${IPFS_BASE_1}shuiniu_1.png`, skill: FULL_SKILLS.water[1], inBattleTeam: false },
+                { tokenId: 4, tokenType: 73, level: 4, attr: 'Dark', zodiacIndex: 3, name: '暗兔·雄', imagePath: `${IPFS_BASE_2}antu_1.png`, skill: FULL_SKILLS.dark[3], inBattleTeam: false },
+                { tokenId: 5, tokenType: 97, level: 3, attr: 'Light', zodiacIndex: 0, name: '光鼠·雄', imagePath: `${IPFS_BASE_2}guangshu_1.png`, skill: FULL_SKILLS.light[0], inBattleTeam: false },
+                { tokenId: 6, tokenType: 53, level: 5, attr: 'Fire', zodiacIndex: 4, name: '火龙·雄', imagePath: `${IPFS_BASE_1}huolong_1.png`, skill: FULL_SKILLS.fire[4], inBattleTeam: false },
+                { tokenId: 7, tokenType: 77, level: 3, attr: 'Dark', zodiacIndex: 7, name: '暗羊·雌', imagePath: `${IPFS_BASE_2}anyang_0.png`, skill: FULL_SKILLS.dark[7], inBattleTeam: false },
+                { tokenId: 8, tokenType: 101, level: 5, attr: 'Light', zodiacIndex: 4, name: '光龙·雄', imagePath: `${IPFS_BASE_2}guanglong_1.png`, skill: FULL_SKILLS.light[4], inBattleTeam: false },
+                { tokenId: 9, tokenType: 50, level: 4, attr: 'Fire', zodiacIndex: 1, name: '火牛·雌', imagePath: `${IPFS_BASE_1}huoniu_0.png`, skill: FULL_SKILLS.fire[1], inBattleTeam: false },
+                { tokenId: 10, tokenType: 26, level: 4, attr: 'Wind', zodiacIndex: 5, name: '风蛇·雌', imagePath: `${IPFS_BASE_1}fengshe_0.png`, skill: FULL_SKILLS.wind[5], inBattleTeam: false },
+                { tokenId: 11, tokenType: 7, level: 3, attr: 'Water', zodiacIndex: 6, name: '水马·雄', imagePath: `${IPFS_BASE_1}shuima_1.png`, skill: FULL_SKILLS.water[6], inBattleTeam: false },
+                { tokenId: 12, tokenType: 104, level: 2, attr: 'Light', zodiacIndex: 7, name: '光羊·雌', imagePath: `${IPFS_BASE_2}guangyang_0.png`, skill: FULL_SKILLS.light[7], inBattleTeam: false },
+                { tokenId: 13, tokenType: 10, level: 2, attr: 'Water', zodiacIndex: 9, name: '水鸡·雌', imagePath: `${IPFS_BASE_1}shuiji_0.png`, skill: FULL_SKILLS.water[9], inBattleTeam: false },
+                { tokenId: 14, tokenType: 32, level: 3, attr: 'Wind', zodiacIndex: 11, name: '风猪·雄', imagePath: `${IPFS_BASE_1}fengzhu_1.png`, skill: FULL_SKILLS.wind[11], inBattleTeam: false },
+                { tokenId: 15, tokenType: 85, level: 4, attr: 'Dark', zodiacIndex: 11, name: '暗猪·雄', imagePath: `${IPFS_BASE_2}anzhu_1.png`, skill: FULL_SKILLS.dark[11], inBattleTeam: false },
+                { tokenId: 16, tokenType: 109, level: 5, attr: 'Light', zodiacIndex: 10, name: '光狗·雌', imagePath: `${IPFS_BASE_2}guanggou_0.png`, skill: FULL_SKILLS.light[10], inBattleTeam: false },
+                { tokenId: 17, tokenType: 3, level: 1, attr: 'Water', zodiacIndex: 2, name: '水虎·雄', imagePath: `${IPFS_BASE_1}shuihu_1.png`, skill: FULL_SKILLS.water[2], inBattleTeam: false },
+                { tokenId: 18, tokenType: 28, level: 3, attr: 'Wind', zodiacIndex: 7, name: '风羊·雌', imagePath: `${IPFS_BASE_1}fengyang_0.png`, skill: FULL_SKILLS.wind[7], inBattleTeam: false },
+                { tokenId: 19, tokenType: 55, level: 4, attr: 'Fire', zodiacIndex: 6, name: '火马·雄', imagePath: `${IPFS_BASE_1}huoma_1.png`, skill: FULL_SKILLS.fire[6], inBattleTeam: false },
+                { tokenId: 20, tokenType: 79, level: 2, attr: 'Dark', zodiacIndex: 9, name: '暗鸡·雄', imagePath: `${IPFS_BASE_2}anji_1.png`, skill: FULL_SKILLS.dark[9], inBattleTeam: false }
             ];
             
             renderNftSelectList();
         }
 
-        let mockRewardPool = {
-            totalReward: 5.2,
-            rewardRate: 0.2
-        };
-
-        const rewardTiers = [
-            { startRank: 1, endRank: 1, percentage: 30 },
-            { startRank: 2, endRank: 3, percentage: 15 },
-            { startRank: 4, endRank: 6, percentage: 8 },
-            { startRank: 7, endRank: 10, percentage: 4 },
-        ];
-
-        function calculateRewardForRank(rank, totalReward) {
-            let reward = 0;
-            for (let tier of rewardTiers) {
-                if (rank >= tier.startRank && rank <= tier.endRank) {
-                    reward = (totalReward * tier.percentage) / 100;
-                    break;
-                }
-            }
-            return reward.toFixed(3);
-        }
-
-        function loadRewardPool() {
-            try {
-                document.getElementById('rewardPoolAmount').textContent = mockRewardPool.totalReward.toString();
-                document.getElementById('rewardRateInfo').textContent = `奖励比例: ${mockRewardPool.rewardRate}% (赛季结束发放)`;
-            } catch (error) {
-                console.error('加载奖励池失败:', error);
-            }
-        }
-
         function loadLeaderboard() {
             const topPlayers = [
-                { name: '竞技场霸主', address: '0x1234...5678', points: 15000, wins: 145, losses: 32, team: ['🐉', '🐅', '🐇', '🐓', '🐕', '🐍'] },
-                { name: '五行大师', address: '0x2345...6789', points: 12500, wins: 128, losses: 45, team: ['🐎', '🐂', '🐷', '🐀', '🐉', '🐅'] },
-                { name: '暗影刺客', address: '0x3456...7890', points: 10000, wins: 102, losses: 38, team: ['🐉', '🐍', '🐀', '🐅', '🐇', '🐕'] },
-                { name: '圣光守护', address: '0x4567...8901', points: 8500, wins: 88, losses: 42, team: ['🐉', '🐑', '🐷', '🐒', '🐓', '🐇'] },
-                { name: '均衡大师', address: '0x5678...9012', points: 7000, wins: 72, losses: 50, team: ['🐂', '🐉', '🐍', '🐎', '🐅', '🐑'] }
+                { name: '竞技场霸主', points: 15000, wins: 145, losses: 32, team: ['🐉', '🐅', '🐇', '🐓', '🐕', '🐍'], rank: 1 },
+                { name: '五行大师', points: 12500, wins: 128, losses: 45, team: ['🐎', '🐂', '🐷', '🐀', '🐉', '🐅'], rank: 2 },
+                { name: '暗影刺客', points: 10000, wins: 102, losses: 38, team: ['🐉', '🐍', '🐀', '🐅', '🐇', '🐕'], rank: 3 },
+                { name: '圣光守护', points: 8500, wins: 88, losses: 42, team: ['🐉', '🐑', '🐷', '🐒', '🐓', '🐇'], rank: 4 },
+                { name: '均衡大师', points: 7000, wins: 72, losses: 50, team: ['🐂', '🐉', '🐍', '🐎', '🐅', '🐑'], rank: 5 }
             ];
-
-            const rewards = [];
-            for (let i = 0; i < topPlayers.length; i++) {
-                rewards.push(calculateRewardForRank(i + 1, mockRewardPool.totalReward));
-            }
 
             const leaderboard = document.getElementById('leaderboard');
             leaderboard.innerHTML = topPlayers.map((player, index) => `
@@ -749,10 +985,6 @@
                             ${player.wins}/${player.losses} 胜/负
                         </div>
                     </div>
-                    <div class="text-right mr-4">
-                        <div class="text-yellow-400 font-bold text-sm">${parseFloat(rewards[index]) > 0 ? rewards[index] : '--'} ETH</div>
-                        <div class="text-gray-400 text-xs">预计奖励</div>
-                    </div>
                     <div class="text-right">
                         <div class="text-white font-bold text-sm">${player.points}</div>
                         <div class="text-gray-400 text-xs">积分</div>
@@ -761,406 +993,105 @@
             `).join('');
         }
 
-        const IPFS_BASE_1 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/';
-        const IPFS_BASE_2 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/';
-        
         const mockOpponents = [
             { 
                 name: '竞技场霸主',
                 team: [
-                    { name: '火龙·霸', level: 5, element: 'Fire', emoji: '🐉', skill: FULL_SKILLS.fire[4], imagePath: `${IPFS_BASE_1}huolong_1.png` },
-                    { name: '风虎·猛', level: 5, element: 'Wind', emoji: '🐅', skill: FULL_SKILLS.wind[2], imagePath: `${IPFS_BASE_1}fenghu_1.png` },
-                    { name: '水兔·敏', level: 5, element: 'Water', emoji: '🐇', skill: FULL_SKILLS.water[3], imagePath: `${IPFS_BASE_1}shuitu_1.png` },
-                    { name: '光鸡·圣', level: 4, element: 'Light', emoji: '🐓', skill: FULL_SKILLS.light[9], imagePath: `${IPFS_BASE_2}guangji_1.png` },
-                    { name: '暗狗·凶', level: 4, element: 'Dark', emoji: '🐕', skill: FULL_SKILLS.dark[10], imagePath: `${IPFS_BASE_2}angou_1.png` },
-                    { name: '火蛇·毒', level: 3, element: 'Fire', emoji: '🐍', skill: FULL_SKILLS.fire[5], imagePath: `${IPFS_BASE_1}huoshe_1.png` }
+                    { name: '火龙·霸', level: 5, element: 'Fire', emoji: '🐉', skill: FULL_SKILLS.fire[4], hp: 100 },
+                    { name: '风虎·猛', level: 5, element: 'Wind', emoji: '🐅', skill: FULL_SKILLS.wind[2], hp: 100 },
+                    { name: '水兔·敏', level: 5, element: 'Water', emoji: '🐇', skill: FULL_SKILLS.water[3], hp: 100 },
+                    { name: '光鸡·圣', level: 4, element: 'Light', emoji: '🐓', skill: FULL_SKILLS.light[9], hp: 100 },
+                    { name: '暗狗·凶', level: 4, element: 'Dark', emoji: '🐕', skill: FULL_SKILLS.dark[10], hp: 100 },
+                    { name: '火蛇·毒', level: 3, element: 'Fire', emoji: '🐍', skill: FULL_SKILLS.fire[5], hp: 100 }
                 ]
             },
             { 
                 name: '五行大师',
                 team: [
-                    { name: '风马·疾', level: 5, element: 'Wind', emoji: '🐎', skill: FULL_SKILLS.wind[6], imagePath: `${IPFS_BASE_1}fengma_1.png` },
-                    { name: '水牛·厚', level: 5, element: 'Water', emoji: '🐂', skill: FULL_SKILLS.water[1], imagePath: `${IPFS_BASE_1}shuiniu_1.png` },
-                    { name: '光猪·福', level: 5, element: 'Light', emoji: '🐷', skill: FULL_SKILLS.light[11], imagePath: `${IPFS_BASE_2}guangzhu_1.png` },
-                    { name: '暗鼠·诡', level: 4, element: 'Dark', emoji: '🐀', skill: FULL_SKILLS.dark[0], imagePath: `${IPFS_BASE_2}anshu_1.png` },
-                    { name: '火龙·焰', level: 4, element: 'Fire', emoji: '🐉', skill: FULL_SKILLS.fire[4], imagePath: `${IPFS_BASE_1}huolong_1.png` },
-                    { name: '风虎·啸', level: 3, element: 'Wind', emoji: '🐅', skill: FULL_SKILLS.wind[2], imagePath: `${IPFS_BASE_1}fenghu_1.png` }
+                    { name: '风马·疾', level: 5, element: 'Wind', emoji: '🐎', skill: FULL_SKILLS.wind[6], hp: 100 },
+                    { name: '水牛·厚', level: 5, element: 'Water', emoji: '🐂', skill: FULL_SKILLS.water[1], hp: 100 },
+                    { name: '光猪·福', level: 5, element: 'Light', emoji: '🐷', skill: FULL_SKILLS.light[11], hp: 100 },
+                    { name: '暗鼠·诡', level: 4, element: 'Dark', emoji: '🐀', skill: FULL_SKILLS.dark[0], hp: 100 },
+                    { name: '火龙·焰', level: 4, element: 'Fire', emoji: '🐉', skill: FULL_SKILLS.fire[4], hp: 100 },
+                    { name: '风虎·啸', level: 3, element: 'Wind', emoji: '🐅', skill: FULL_SKILLS.wind[2], hp: 100 }
                 ]
             },
             { 
                 name: '暗影刺客',
                 team: [
-                    { name: '暗龙·影', level: 5, element: 'Dark', emoji: '🐉', skill: FULL_SKILLS.dark[4], imagePath: `${IPFS_BASE_2}anlong_1.png` },
-                    { name: '暗蛇·噬', level: 5, element: 'Dark', emoji: '🐍', skill: FULL_SKILLS.dark[5], imagePath: `${IPFS_BASE_2}anshe_1.png` },
-                    { name: '暗鼠·偷', level: 4, element: 'Dark', emoji: '🐀', skill: FULL_SKILLS.dark[0], imagePath: `${IPFS_BASE_2}anshu_1.png` },
-                    { name: '暗虎·猛', level: 4, element: 'Dark', emoji: '🐅', skill: FULL_SKILLS.dark[2], imagePath: `${IPFS_BASE_2}anhu_1.png` },
-                    { name: '暗兔·捷', level: 3, element: 'Dark', emoji: '🐇', skill: FULL_SKILLS.dark[3], imagePath: `${IPFS_BASE_2}antu_1.png` },
-                    { name: '暗狗·猎', level: 3, element: 'Dark', emoji: '🐕', skill: FULL_SKILLS.dark[10], imagePath: `${IPFS_BASE_2}angou_1.png` }
+                    { name: '暗龙·影', level: 5, element: 'Dark', emoji: '🐉', skill: FULL_SKILLS.dark[4], hp: 100 },
+                    { name: '暗蛇·噬', level: 5, element: 'Dark', emoji: '🐍', skill: FULL_SKILLS.dark[5], hp: 100 },
+                    { name: '暗鼠·偷', level: 4, element: 'Dark', emoji: '🐀', skill: FULL_SKILLS.dark[0], hp: 100 },
+                    { name: '暗虎·猛', level: 4, element: 'Dark', emoji: '🐅', skill: FULL_SKILLS.dark[2], hp: 100 },
+                    { name: '暗兔·捷', level: 3, element: 'Dark', emoji: '🐇', skill: FULL_SKILLS.dark[3], hp: 100 },
+                    { name: '暗狗·猎', level: 3, element: 'Dark', emoji: '🐕', skill: FULL_SKILLS.dark[10], hp: 100 }
                 ]
             },
             { 
                 name: '圣光守护',
                 team: [
-                    { name: '光龙·耀', level: 5, element: 'Light', emoji: '🐉', skill: FULL_SKILLS.light[4], imagePath: `${IPFS_BASE_2}guanglong_1.png` },
-                    { name: '光羊·慈', level: 5, element: 'Light', emoji: '🐑', skill: FULL_SKILLS.light[7], imagePath: `${IPFS_BASE_2}guangyang_1.png` },
-                    { name: '光猪·福', level: 5, element: 'Light', emoji: '🐷', skill: FULL_SKILLS.light[11], imagePath: `${IPFS_BASE_2}guangzhu_1.png` },
-                    { name: '光猴·灵', level: 4, element: 'Light', emoji: '🐒', skill: FULL_SKILLS.light[8], imagePath: `${IPFS_BASE_2}guanghou_1.png` },
-                    { name: '光鸡·鸣', level: 4, element: 'Light', emoji: '🐓', skill: FULL_SKILLS.light[9], imagePath: `${IPFS_BASE_2}guangji_1.png` },
-                    { name: '光兔·洁', level: 3, element: 'Light', emoji: '🐇', skill: FULL_SKILLS.light[3], imagePath: `${IPFS_BASE_2}guangtu_0.png` }
+                    { name: '光龙·耀', level: 5, element: 'Light', emoji: '🐉', skill: FULL_SKILLS.light[4], hp: 100 },
+                    { name: '光羊·慈', level: 5, element: 'Light', emoji: '🐑', skill: FULL_SKILLS.light[7], hp: 100 },
+                    { name: '光猪·瑞', level: 5, element: 'Light', emoji: '🐷', skill: FULL_SKILLS.light[11], hp: 100 },
+                    { name: '光猴·灵', level: 4, element: 'Light', emoji: '🐒', skill: FULL_SKILLS.light[16], hp: 100 },
+                    { name: '光鸡·鸣', level: 4, element: 'Light', emoji: '🐓', skill: FULL_SKILLS.light[18], hp: 100 },
+                    { name: '光兔·洁', level: 3, element: 'Light', emoji: '🐇', skill: FULL_SKILLS.light[3], hp: 100 }
                 ]
             },
             { 
                 name: '均衡大师',
                 team: [
-                    { name: '火牛·勇', level: 4, element: 'Fire', emoji: '🐂', skill: FULL_SKILLS.fire[1], imagePath: `${IPFS_BASE_1}huoniu_0.png` },
-                    { name: '风龙·速', level: 4, element: 'Wind', emoji: '🐉', skill: FULL_SKILLS.wind[4], imagePath: `${IPFS_BASE_1}fenglong_1.png` },
-                    { name: '水蛇·柔', level: 4, element: 'Water', emoji: '🐍', skill: FULL_SKILLS.water[5], imagePath: `${IPFS_BASE_1}shuishe_1.png` },
-                    { name: '光马·圣', level: 3, element: 'Light', emoji: '🐎', skill: FULL_SKILLS.light[6], imagePath: `${IPFS_BASE_2}guangma_1.png` },
-                    { name: '暗虎·威', level: 3, element: 'Dark', emoji: '🐅', skill: FULL_SKILLS.dark[2], imagePath: `${IPFS_BASE_2}anhu_1.png` },
-                    { name: '水羊·善', level: 3, element: 'Water', emoji: '🐑', skill: FULL_SKILLS.water[7], imagePath: `${IPFS_BASE_1}shuiyang_1.png` }
+                    { name: '水牛·稳', level: 5, element: 'Water', emoji: '🐂', skill: FULL_SKILLS.water[1], hp: 100 },
+                    { name: '风龙·变', level: 5, element: 'Wind', emoji: '🐉', skill: FULL_SKILLS.wind[4], hp: 100 },
+                    { name: '火蛇·缠', level: 4, element: 'Fire', emoji: '🐍', skill: FULL_SKILLS.fire[5], hp: 100 },
+                    { name: '水马·奔', level: 4, element: 'Water', emoji: '🐎', skill: FULL_SKILLS.water[6], hp: 100 },
+                    { name: '风虎·跃', level: 3, element: 'Wind', emoji: '🐅', skill: FULL_SKILLS.wind[2], hp: 100 },
+                    { name: '光羊·善', level: 3, element: 'Light', emoji: '🐑', skill: FULL_SKILLS.light[7], hp: 100 }
                 ]
             }
         ];
 
         function selectOpponent(index) {
-            selectedOpponent = mockOpponents[index % mockOpponents.length];
+            selectedOpponent = mockOpponents[index];
+            updateOpponentDisplay();
             updateChallengeBtn();
-            showOpponentTeam(selectedOpponent);
         }
 
-        function showOpponentTeam(opponent) {
-            const opponentDiv = document.getElementById('opponentDefenseTeam');
-            opponentDiv.innerHTML = `
-                <div class="space-y-2">
-                    <div class="grid grid-cols-3 gap-2">
-                        ${opponent.team.slice(0, 3).map(nft => `
-                            <div class="text-center p-2 bg-green-500/20 rounded-lg">
-                                <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
-                                <div class="text-white text-xs">${nft.name}</div>
-                                <div class="text-gray-400 text-xs">Lv.${nft.level}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        ${opponent.team.slice(3, 6).map(nft => `
-                            <div class="text-center p-2 bg-purple-500/20 rounded-lg">
-                                <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
-                                <div class="text-white text-xs">${nft.name}</div>
-                                <div class="text-gray-400 text-xs">Lv.${nft.level}</div>
-                            </div>
-                        `).join('')}
-                    </div>
+        function updateOpponentDisplay() {
+            const display = document.getElementById('opponentBattleTeam');
+            if (!selectedOpponent) {
+                display.innerHTML = '<div class="text-center text-gray-400 py-4">选择对手后显示</div>';
+                return;
+            }
+            
+            display.innerHTML = `
+                <div class="text-center text-gray-300 text-sm mb-2">${selectedOpponent.name}</div>
+                <div class="flex flex-wrap justify-center gap-2">
+                    ${selectedOpponent.team.slice(0, 3).map(nft => `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center text-xl">${nft.emoji}</div>`).join('')}
+                </div>
+                <div class="flex flex-wrap justify-center gap-2 mt-2">
+                    ${selectedOpponent.team.slice(3, 6).map(nft => `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center text-xl">${nft.emoji}</div>`).join('')}
                 </div>
             `;
         }
 
-        function openBattleModal() {
-            if (!selectedOpponent) return;
-            
-            const modal = document.getElementById('battleModal');
-            modal.classList.remove('hidden');
-            
-            updateBattleDisplay();
-            document.getElementById('battleResult').textContent = 'VS';
-            document.getElementById('battleMessage').textContent = '战斗即将开始...';
-            document.getElementById('currentRound').textContent = '第 1 回合';
-            document.getElementById('attackerWinCount').textContent = '0';
-            document.getElementById('defenderWinCount').textContent = '0';
-            document.getElementById('battleProcessLog').innerHTML = '';
-            
-            setTimeout(() => startBattle(), 1500);
-        }
-
-        function updateBattleDisplay() {
-            const currentAttackTeam = attackTeam.filter(n => n);
-            const defenderTeam = selectedOpponent.team;
-            
-            currentAttackTeam.forEach((nft, index) => {
-                const slot = document.getElementById(`attacker${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
-                if (slot && nft) {
-                    slot.innerHTML = `
-                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="attackerHp${index + 1}"></div>
-                        </div>
-                        <img src="${nft.imagePath}" alt="${nft.name}" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
-                        <div class="text-xs text-gray-300">${nft.name}</div>
-                        <div class="text-xs text-gray-500">Lv.${nft.level}</div>
-                        <div class="text-xs text-green-400" id="attackerHpText${index + 1}">100%</div>
-                    `;
-                }
-            });
-            
-            defenderTeam.forEach((nft, index) => {
-                const slot = document.getElementById(`defender${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
-                if (slot && nft) {
-                    slot.innerHTML = `
-                        <div class="hp-bar-container h-1.5 bg-gray-700 rounded-full mb-1 overflow-hidden">
-                            <div class="hp-bar h-full bg-green-500 transition-all duration-300" id="defenderHp${index + 1}"></div>
-                        </div>
-                        <img src="${nft.imagePath}" alt="${nft.name}" class="w-12 h-12 rounded-lg object-cover mx-auto mb-1">
-                        <div class="text-xs text-gray-300">${nft.name}</div>
-                        <div class="text-xs text-gray-500">Lv.${nft.level}</div>
-                        <div class="text-xs text-green-400" id="defenderHpText${index + 1}">100%</div>
-                    `;
-                }
-            });
-
-            initHpBars();
-        }
-
-        function initHpBars() {
-            for (let i = 1; i <= 6; i++) {
-                const attackerHp = document.getElementById(`attackerHp${i}`);
-                const attackerHpText = document.getElementById(`attackerHpText${i}`);
-                const defenderHp = document.getElementById(`defenderHp${i}`);
-                const defenderHpText = document.getElementById(`defenderHpText${i}`);
-
-                if (attackerHp) {
-                    attackerHp.style.width = '100%';
-                    attackerHp.style.backgroundColor = '#22c55e';
-                }
-                if (attackerHpText) attackerHpText.textContent = '100%';
-                if (defenderHp) {
-                    defenderHp.style.width = '100%';
-                    defenderHp.style.backgroundColor = '#22c55e';
-                }
-                if (defenderHpText) defenderHpText.textContent = '100%';
-            }
-        }
-
-        function updateHpBar(isAttacker, index, newHpPercent) {
-            const prefix = isAttacker ? 'attacker' : 'defender';
-            const hpBar = document.getElementById(`${prefix}Hp${index + 1}`);
-            const hpText = document.getElementById(`${prefix}HpText${index + 1}`);
-            const slot = document.getElementById(`${prefix}${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
-
-            if (hpBar) {
-                hpBar.style.width = `${newHpPercent}%`;
-                if (newHpPercent > 60) {
-                    hpBar.style.backgroundColor = '#22c55e';
-                } else if (newHpPercent > 30) {
-                    hpBar.style.backgroundColor = '#eab308';
-                } else {
-                    hpBar.style.backgroundColor = '#ef4444';
-                }
-            }
-            if (hpText) hpText.textContent = `${Math.round(newHpPercent)}%`;
-
-            if (newHpPercent <= 0 && slot) {
-                slot.style.opacity = '0.3';
-            }
-        }
-
-        function addBattleLog(message) {
-            const log = document.getElementById('battleProcessLog');
-            const logEntry = document.createElement('div');
-            logEntry.textContent = message;
-            log.appendChild(logEntry);
-            log.scrollTop = log.scrollHeight;
-        }
-
-        function checkAdvantage(attacker, defender) {
-            const advantages = { Fire: 'Wind', Wind: 'Water', Water: 'Fire', Light: 'Dark', Dark: 'Light' };
-            return advantages[attacker] === defender;
-        }
-
-        function findAliveIndex(aliveArray, preferFrontRow) {
-            if (preferFrontRow) {
-                for (let i = 0; i < FRONT_ROW_SIZE; i++) {
-                    if (aliveArray[i]) return i;
-                }
-            }
-            for (let i = FRONT_ROW_SIZE; i < TEAM_SIZE; i++) {
-                if (aliveArray[i]) return i;
-            }
-            if (!preferFrontRow) {
-                for (let i = 0; i < FRONT_ROW_SIZE; i++) {
-                    if (aliveArray[i]) return i;
-                }
-            }
-            return -1;
-        }
-
-        function delay(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
-        }
-
-        async function startBattle() {
-            const fightBtn = document.getElementById('fightBtn');
-            const surrenderBtn = document.getElementById('surrenderBtn');
-            fightBtn.style.display = 'none';
-            surrenderBtn.style.display = 'block';
-
-            surrenderBtn.onclick = () => {
-                document.getElementById('battleResult').textContent = '🏳️';
-                document.getElementById('battleMessage').textContent = '你选择了认输！';
-                surrenderBtn.style.display = 'none';
-            };
-
-            const attackerTeam = attackTeam.filter(n => n);
-            const defenderTeam = selectedOpponent.team;
-
-            const MAX_HP = 1000;
-            const attackerHp = attackerTeam.map(n => MAX_HP);
-            const defenderHp = defenderTeam.map(n => MAX_HP);
-            const attackerAlive = attackerTeam.map(() => true);
-            const defenderAlive = defenderTeam.map(() => true);
-
-            addBattleLog(`⚔️ 6v6战斗开始！`);
-            await delay(800);
-
-            let battleRound = 0;
-            while (attackerAlive.some(a => a) && defenderAlive.some(d => d)) {
-                battleRound++;
-                document.getElementById('currentRound').textContent = `第 ${battleRound} 回合`;
-
-                for (let i = 0; i < attackerTeam.length; i++) {
-                    if (!attackerAlive[i]) continue;
-
-                    const attackerIndex = i;
-                    const defenderIndex = findAliveIndex(defenderAlive, attackerIndex < FRONT_ROW_SIZE);
-
-                    if (defenderIndex === -1) {
-                        addBattleLog('⚠️ 防守方已无可用单位！');
-                        break;
-                    }
-
-                    const attacker = attackerTeam[attackerIndex];
-                    const defender = defenderTeam[defenderIndex];
-
-                    addBattleLog(`\n🎯 ${attacker.name} → ${defender.name}`);
-                    await delay(300);
-
-                    const attackerAdvantage = checkAdvantage(attacker.attr, defender.element);
-                    if (attackerAdvantage) {
-                        addBattleLog(`🔥 属性克制！`);
-                    }
-
-                    await delay(200);
-
-                    let attackerDamage = attacker.level * 50;
-
-                    if (attackerAdvantage) attackerDamage = Math.floor(attackerDamage * 1.5);
-
-                    addBattleLog(`✨ ${attacker.name} 发起攻击！`);
-                    await delay(300);
-
-                    addBattleLog(`💥 造成 ${attackerDamage} 点伤害！`);
-                    defenderHp[defenderIndex] -= attackerDamage;
-                    const defenderHpPercent = Math.max(0, (defenderHp[defenderIndex] / MAX_HP) * 100);
-                    updateHpBar(false, defenderIndex, defenderHpPercent);
-                    await delay(400);
-
-                    if (defenderHp[defenderIndex] <= 0) {
-                        defenderAlive[defenderIndex] = false;
-                        addBattleLog(`💀 ${defender.name} 被击败！`);
-                    }
-
-                    if (!defenderAlive.some(d => d)) break;
-                }
-
-                if (!defenderAlive.some(d => d)) break;
-
-                for (let i = 0; i < defenderTeam.length; i++) {
-                    if (!defenderAlive[i]) continue;
-
-                    const defenderIndex = i;
-                    const attackerIndex = findAliveIndex(attackerAlive, defenderIndex < FRONT_ROW_SIZE);
-
-                    if (attackerIndex === -1) {
-                        addBattleLog('⚠️ 进攻方已无可用单位！');
-                        break;
-                    }
-
-                    const defender = defenderTeam[defenderIndex];
-                    const attacker = attackerTeam[attackerIndex];
-
-                    addBattleLog(`\n🛡️ ${defender.name} → ${attacker.name}`);
-                    await delay(300);
-
-                    const defenderAdvantage = checkAdvantage(defender.element, attacker.attr);
-                    if (defenderAdvantage) {
-                        addBattleLog(`🔥 属性克制！`);
-                    }
-
-                    await delay(200);
-
-                    let defenderDamage = defender.level * 50;
-
-                    if (defenderAdvantage) defenderDamage = Math.floor(defenderDamage * 1.5);
-
-                    addBattleLog(`✨ ${defender.name} 发起攻击！`);
-                    await delay(300);
-
-                    addBattleLog(`💥 造成 ${defenderDamage} 点伤害！`);
-                    attackerHp[attackerIndex] -= defenderDamage;
-                    const attackerHpPercent = Math.max(0, (attackerHp[attackerIndex] / MAX_HP) * 100);
-                    updateHpBar(true, attackerIndex, attackerHpPercent);
-                    await delay(400);
-
-                    if (attackerHp[attackerIndex] <= 0) {
-                        attackerAlive[attackerIndex] = false;
-                        addBattleLog(`💀 ${attacker.name} 被击败！`);
-                    }
-
-                    if (!attackerAlive.some(a => a)) break;
-                }
-
-                await delay(500);
-
-                const attackerWins = attackerAlive.filter(a => a).length;
-                const defenderWins = defenderAlive.filter(d => d).length;
-
-                document.getElementById('attackerWinCount').textContent = attackerWins.toString();
-                document.getElementById('defenderWinCount').textContent = defenderWins.toString();
-            }
-
-            const attackerSurvivors = attackerAlive.filter(a => a).length;
-            const defenderSurvivors = defenderAlive.filter(d => d).length;
-
-            await delay(500);
-
-            if (attackerSurvivors > defenderSurvivors) {
-                document.getElementById('battleResult').textContent = '🎉';
-                document.getElementById('battleMessage').textContent = `胜利！存活 ${attackerSurvivors}:${defenderSurvivors}`;
-                addBattleLog(`\n🏆 进攻方获胜！存活 ${attackerSurvivors} 人`);
-            } else if (defenderSurvivors > attackerSurvivors) {
-                document.getElementById('battleResult').textContent = '💀';
-                document.getElementById('battleMessage').textContent = `失败！存活 ${attackerSurvivors}:${defenderSurvivors}`;
-                addBattleLog(`\n💔 防守方获胜！存活 ${defenderSurvivors} 人`);
-            } else {
-                document.getElementById('battleResult').textContent = '🤝';
-                document.getElementById('battleMessage').textContent = '平局！';
-                addBattleLog(`\n🤝 平局！双方同归于尽`);
-            }
-
-            document.getElementById('surrenderBtn').style.display = 'none';
-        }
-
         function setupDropZones() {
-            const attackSlots = document.querySelectorAll('#attackTeamSlots .team-slot');
-            const defenseSlots = document.querySelectorAll('#defenseTeamSlots .team-slot');
-
-            attackSlots.forEach((slot, index) => {
-                slot.addEventListener('click', () => openNftSelectModal('attack', index));
-            });
-
-            defenseSlots.forEach((slot, index) => {
-                slot.addEventListener('click', () => openNftSelectModal('defense', index));
+            const battleSlots = document.querySelectorAll('#battleTeamSlots .team-slot');
+            battleSlots.forEach((slot, index) => {
+                slot.addEventListener('click', () => openNftSelectModal('battle', index));
             });
         }
 
         function openNftSelectModal(teamType, slotIndex) {
             selectedSlot = { teamType, index: slotIndex };
-
-            const team = teamType === 'attack' ? attackTeam : defenseTeam;
+            const team = teamType === 'battle' ? battleTeam : battleTeam;
             const currentNft = team[slotIndex];
-
+            
             const hintText = currentNft 
                 ? `当前：${currentNft.name} - 点击更换或清空` 
                 : '点击选择一张NFT放入此槽位';
             document.getElementById('nftModalHint').textContent = hintText;
-
+            
             renderNftSelectList();
             document.getElementById('nftSelectModal').classList.remove('hidden');
         }
@@ -1172,53 +1103,51 @@
 
         function clearSelectedSlot() {
             if (selectedSlot.teamType === '') return;
-
-            const team = selectedSlot.teamType === 'attack' ? attackTeam : defenseTeam;
+            
+            const team = selectedSlot.teamType === 'battle' ? battleTeam : battleTeam;
             const slotIndex = selectedSlot.index;
-
+            
             if (team[slotIndex]) {
                 const existingNft = myNfts.find(n => n.tokenId === team[slotIndex].tokenId);
                 if (existingNft) {
-                    existingNft[selectedSlot.teamType === 'attack' ? 'inAttackTeam' : 'inDefenseTeam'] = false;
+                    existingNft[selectedSlot.teamType === 'battle' ? 'inBattleTeam' : 'inBattleTeam'] = false;
                 }
                 team[slotIndex] = null;
             }
-
-            renderTeamSlots(selectedSlot.teamType);
+            
+            renderTeamSlots();
             updateSaveButtons();
             updateChallengeBtn();
-            updateBattleTeamDisplay();
             closeNftSelectModal();
         }
 
         function selectNftForSlot(nftIndex) {
             if (selectedSlot.teamType === '') return;
-
+            
             const nft = myNfts[nftIndex];
-            const team = selectedSlot.teamType === 'attack' ? attackTeam : defenseTeam;
+            const team = selectedSlot.teamType === 'battle' ? battleTeam : battleTeam;
             const slotIndex = selectedSlot.index;
-
+            
             const isInTeam = team.some(t => t && t.tokenId === nft.tokenId && team.indexOf(t) !== slotIndex);
-
+            
             if (isInTeam) {
                 alert('同一张NFT不能在同一队伍中重复使用！');
                 return;
             }
-
+            
             if (team[slotIndex]) {
                 const existingNft = myNfts.find(n => n.tokenId === team[slotIndex].tokenId);
                 if (existingNft) {
-                    existingNft[selectedSlot.teamType === 'attack' ? 'inAttackTeam' : 'inDefenseTeam'] = false;
+                    existingNft[selectedSlot.teamType === 'battle' ? 'inBattleTeam' : 'inBattleTeam'] = false;
                 }
             }
-
+            
             team[slotIndex] = { ...nft };
-            nft[selectedSlot.teamType === 'attack' ? 'inAttackTeam' : 'inDefenseTeam'] = true;
-
-            renderTeamSlots(selectedSlot.teamType);
+            nft[selectedSlot.teamType === 'battle' ? 'inBattleTeam' : 'inBattleTeam'] = true;
+            
+            renderTeamSlots();
             updateSaveButtons();
             updateChallengeBtn();
-            updateBattleTeamDisplay();
             closeNftSelectModal();
         }
 
@@ -1228,19 +1157,19 @@
                 nftList.innerHTML = '<div class="text-center text-gray-400 py-8">暂无NFT</div>';
                 return;
             }
-
-            const team = selectedSlot.teamType === 'attack' ? attackTeam : defenseTeam;
-
+            
+            const team = selectedSlot.teamType === 'battle' ? battleTeam : battleTeam;
+            
             nftList.innerHTML = myNfts.map((nft, index) => {
                 const isInTeam = team.some(t => t && t.tokenId === nft.tokenId && team.indexOf(t) !== selectedSlot.index);
                 const isDisabled = isInTeam;
                 const isCurrent = team[selectedSlot.index] && team[selectedSlot.index].tokenId === nft.tokenId;
-
+                
                 return `
-                    <div class="nft-card bg-white/5 rounded-lg p-3 border-2 cursor-pointer transition-all ${isDisabled ? 'opacity-50 cursor-not-allowed border-gray-600' : isCurrent ? 'border-green-500' : 'hover:border-blue-500 border-white/20'}" 
+                    <div class="nft-card bg-white/5 rounded-lg p-3 border-2 cursor-pointer transition-all ${isDisabled ? 'opacity-50 cursor-not-allowed border-gray-600' : isCurrent ? 'border-green-500' : 'hover:border-blue-500'}" 
                          onclick="${isDisabled ? '' : `selectNftForSlot(${index})`}">
                         <div class="flex flex-col items-center text-center">
-                            <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mb-1">
+                            <img src="${nft.imagePath}" alt="${nft.name}" class="w-12 h-12 rounded-lg object-cover mb-2">
                             <div class="text-white text-sm font-medium">${nft.name}</div>
                             <div class="text-gray-400 text-xs">Lv.${nft.level} ${ELEMENT_EMOJIS[nft.attr]}</div>
                             ${isCurrent ? '<div class="text-xs text-green-400 mt-1">✓ 当前选中</div>' : ''}
@@ -1251,23 +1180,27 @@
             }).join('');
         }
 
-        function renderTeamSlots(teamType) {
-            const team = teamType === 'attack' ? attackTeam : defenseTeam;
-            const container = document.getElementById(`${teamType}TeamSlots`);
+        function renderTeamSlots() {
+            renderTeam('battle');
+        }
 
+        function renderTeam(teamType) {
+            const team = teamType === 'battle' ? battleTeam : battleTeam;
+            const container = document.getElementById(`${teamType}TeamSlots`);
+            
             let html = '';
             for (let i = 0; i < TEAM_SIZE; i++) {
                 const isFrontRow = i < FRONT_ROW_SIZE;
                 const nft = team[i];
                 const slotClass = nft ? 'filled ' : '';
                 const rowClass = isFrontRow ? 'front-row' : 'back-row';
-
+                
                 if (i === 0 || i === FRONT_ROW_SIZE) {
                     html += '<div class="grid grid-cols-3 gap-2">';
                 }
-
+                
                 html += `
-                    <div class="team-slot ${slotClass}${rowClass} flex items-center justify-center">
+                    <div class="team-slot ${slotClass}${rowClass} flex items-center justify-center relative">
                         ${nft ? `
                             <div class="text-center p-1 w-full">
                                 <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
@@ -1279,101 +1212,310 @@
                         `}
                     </div>
                 `;
-
+                
                 if (i === FRONT_ROW_SIZE - 1 || i === TEAM_SIZE - 1) {
                     html += '</div>';
                 }
             }
-
+            
             container.innerHTML = html;
             setupDropZones();
         }
 
         function updateSaveButtons() {
-            const attackBtn = document.getElementById('saveAttackTeamBtn');
-            const defenseBtn = document.getElementById('saveDefenseTeamBtn');
-            attackBtn.disabled = attackTeam.filter(n => n).length !== TEAM_SIZE;
-            defenseBtn.disabled = defenseTeam.filter(n => n).length !== TEAM_SIZE;
+            const battleBtn = document.getElementById('saveBattleTeamBtn');
+            battleBtn.disabled = battleTeam.filter(n => n).length !== TEAM_SIZE;
         }
 
         function updateChallengeBtn() {
             const btn = document.getElementById('challengeBtn');
-            const hasAttackTeam = attackTeam.filter(n => n).length === TEAM_SIZE;
-            btn.disabled = !hasAttackTeam || !selectedOpponent;
-
-            if (!hasAttackTeam) {
-                btn.textContent = '请设置进攻组';
-            } else if (!selectedOpponent) {
-                btn.textContent = '请选择对手';
-            } else {
-                btn.textContent = '发起挑战';
-            }
+            const hasTeam = battleTeam.filter(n => n).length === TEAM_SIZE;
+            const hasOpponent = selectedOpponent !== null;
+            btn.disabled = !(hasTeam && hasOpponent && remainingAttempts > 0);
         }
 
-        function clearAttackTeam() {
-            attackTeam.forEach(nft => {
-                if (nft) {
-                    const myNft = myNfts.find(n => n.tokenId === nft.tokenId);
-                    if (myNft) myNft.inAttackTeam = false;
-                }
-            });
-            attackTeam = [];
-            renderTeamSlots('attack');
-            updateSaveButtons();
+        function saveBattleTeam() {
+            alert('战队保存成功！（测试模式）');
             updateChallengeBtn();
-            updateBattleTeamDisplay();
+            updateMyTeamDisplay();
         }
 
-        function clearDefenseTeam() {
-            defenseTeam.forEach(nft => {
-                if (nft) {
-                    const myNft = myNfts.find(n => n.tokenId === nft.tokenId);
-                    if (myNft) myNft.inDefenseTeam = false;
-                }
-            });
-            defenseTeam = [];
-            renderTeamSlots('defense');
-            updateSaveButtons();
-        }
-
-        function saveAttackTeam() {
-            if (attackTeam.filter(n => n).length !== TEAM_SIZE) return;
-            alert('进攻组保存成功！');
-        }
-
-        function updateBattleTeamDisplay() {
-            const displayDiv = document.getElementById('myBattleTeamDisplay');
-
-            if (attackTeam.filter(n => n).length !== TEAM_SIZE) {
-                displayDiv.innerHTML = '<div class="text-center text-gray-400 py-4">请先设置进攻组</div>';
+        function updateMyTeamDisplay() {
+            const display = document.getElementById('myBattleTeamDisplay');
+            const filled = battleTeam.filter(n => n).length;
+            
+            if (filled === 0) {
+                display.innerHTML = '<div class="text-center text-gray-400 py-4">请先设置战队</div>';
                 return;
             }
-
-            displayDiv.innerHTML = `
-                <div class="space-y-2">
-                    <div class="grid grid-cols-3 gap-2">
-                        ${attackTeam.slice(0, 3).map(nft => `
-                            <div class="text-center p-2 bg-blue-500/20 rounded-lg">
-                                <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
-                                <div class="text-white text-xs">${nft.name}</div>
-                                <div class="text-gray-400 text-xs">Lv.${nft.level}</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                    <div class="grid grid-cols-3 gap-2">
-                        ${attackTeam.slice(3, 6).map(nft => `
-                            <div class="text-center p-2 bg-purple-500/20 rounded-lg">
-                                <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
-                                <div class="text-white text-xs">${nft.name}</div>
-                                <div class="text-gray-400 text-xs">Lv.${nft.level}</div>
-                            </div>
-                        `).join('')}
-                    </div>
+            
+            display.innerHTML = `
+                <div class="text-center text-gray-300 text-sm mb-2">我的战队 (${filled}/${TEAM_SIZE})</div>
+                <div class="flex flex-wrap justify-center gap-2">
+                    ${battleTeam.slice(0, 3).map(nft => nft ? `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center text-xl">${ZODIAC_EMOJIS[nft.zodiacIndex]}</div>` : `<div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-xl opacity-50">?</div>`).join('')}
+                </div>
+                <div class="flex flex-wrap justify-center gap-2 mt-2">
+                    ${battleTeam.slice(3, 6).map(nft => nft ? `<div class="w-10 h-10 rounded-lg bg-gray-700 flex items-center justify-center text-xl">${ZODIAC_EMOJIS[nft.zodiacIndex]}</div>` : `<div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center text-xl opacity-50">?</div>`).join('')}
                 </div>
             `;
         }
 
-        window.addEventListener('load', init);
+        function clearBattleTeam() {
+            battleTeam.forEach((nft, index) => {
+                if (nft) {
+                    const existingNft = myNfts.find(n => n.tokenId === nft.tokenId);
+                    if (existingNft) {
+                        existingNft.inBattleTeam = false;
+                    }
+                }
+            });
+            battleTeam = [];
+            renderTeamSlots();
+            updateSaveButtons();
+            updateChallengeBtn();
+            updateMyTeamDisplay();
+            alert('战队已清空');
+        }
+
+        function addBattleLog(message) {
+            const log = document.getElementById('battleLog');
+            const timestamp = new Date().toLocaleTimeString();
+            log.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function openBattleModal() {
+            if (!selectedOpponent) return;
+            
+            document.getElementById('battleModal').classList.remove('hidden');
+            document.getElementById('battleResult').textContent = 'VS';
+            document.getElementById('battleMessage').textContent = '战斗即将开始...';
+            document.getElementById('currentRound').textContent = '第 1 回合';
+            
+            initBattleDisplay();
+        }
+
+        function initBattleDisplay() {
+            for (let i = 1; i <= 6; i++) {
+                const attackerNft = battleTeam[i - 1];
+                if (attackerNft) {
+                    document.getElementById(`attackerImg${i}`).textContent = ZODIAC_EMOJIS[attackerNft.zodiacIndex];
+                    document.getElementById(`attackerName${i}`).textContent = attackerNft.name;
+                    document.getElementById(`attackerHp${i}`).style.width = '100%';
+                    document.getElementById(`attackerHpText${i}`).textContent = '100%';
+                }
+                
+                const defenderNft = selectedOpponent.team[i - 1];
+                if (defenderNft) {
+                    document.getElementById(`defenderImg${i}`).textContent = defenderNft.emoji;
+                    document.getElementById(`defenderName${i}`).textContent = defenderNft.name;
+                    document.getElementById(`defenderHp${i}`).style.width = '100%';
+                    document.getElementById(`defenderHpText${i}`).textContent = '100%';
+                }
+            }
+            
+            document.getElementById('attackerWinCount').textContent = '0';
+            document.getElementById('defenderWinCount').textContent = '0';
+            document.getElementById('battleProcessLog').innerHTML = '';
+        }
+
+        let battleRound = 1;
+        let attackerHps = [100, 100, 100, 100, 100, 100];
+        let defenderHps = [100, 100, 100, 100, 100, 100];
+        let attackerWinCount = 0;
+        let defenderWinCount = 0;
+        let isBattleRunning = false;
+
+        function startBattle() {
+            if (isBattleRunning) return;
+            isBattleRunning = true;
+            
+            battleRound = 1;
+            attackerHps = [100, 100, 100, 100, 100, 100];
+            defenderHps = [100, 100, 100, 100, 100, 100];
+            attackerWinCount = 0;
+            defenderWinCount = 0;
+            
+            document.getElementById('fightBtn').disabled = true;
+            document.getElementById('battleProcessLog').innerHTML = '';
+            
+            addBattleProcessLog('⚔️ 战斗开始！');
+            
+            setTimeout(() => {
+                processBattleRound();
+            }, 1000);
+        }
+
+        function processBattleRound() {
+            if (attackerWinCount >= 3 || defenderWinCount >= 3) {
+                endBattle();
+                return;
+            }
+            
+            document.getElementById('currentRound').textContent = `第 ${battleRound} 回合`;
+            
+            let roundAttackerWins = 0;
+            let roundDefenderWins = 0;
+            
+            const promises = [];
+            
+            for (let i = 0; i < 6; i++) {
+                promises.push(new Promise(resolve => {
+                    setTimeout(() => {
+                        if (attackerHps[i] > 0 && defenderHps[i] > 0) {
+                            executeBattle(i);
+                            resolve();
+                        } else {
+                            resolve();
+                        }
+                    }, i * 800);
+                }));
+            }
+            
+            Promise.all(promises).then(() => {
+                setTimeout(() => {
+                    battleRound++;
+                    processBattleRound();
+                }, 1000);
+            });
+        }
+
+        function executeBattle(slotIndex) {
+            const attackerNft = battleTeam[slotIndex];
+            const defenderNft = selectedOpponent.team[slotIndex];
+            
+            if (!attackerNft || !defenderNft) return;
+            
+            const attackerSkill = attackerNft.skill;
+            const defenderSkill = defenderNft.skill;
+            
+            let attackerDamage = calculateDamage(attackerSkill, attackerNft.level, attackerNft.attr, defenderNft.element);
+            let defenderDamage = calculateDamage(defenderSkill, defenderNft.level, defenderNft.element, attackerNft.attr);
+            
+            const attackerCrit = Math.random() < 0.2;
+            const defenderCrit = Math.random() < 0.2;
+            
+            if (attackerCrit) {
+                attackerDamage *= 1.5;
+            }
+            if (defenderCrit) {
+                defenderDamage *= 1.5;
+            }
+            
+            defenderHps[slotIndex] = Math.max(0, defenderHps[slotIndex] - attackerDamage);
+            attackerHps[slotIndex] = Math.max(0, attackerHps[slotIndex] - defenderDamage);
+            
+            updateHpBar(`defender`, slotIndex + 1, defenderHps[slotIndex]);
+            updateHpBar(`attacker`, slotIndex + 1, attackerHps[slotIndex]);
+            
+            let log = `${attackerNft.name} 使用【${attackerSkill.name}】`;
+            if (attackerCrit) log += '(暴击!)';
+            log += ` 造成 ${Math.round(attackerDamage)} 伤害`;
+            
+            if (defenderHps[slotIndex] <= 0) {
+                log += ' - 击败对手!';
+            }
+            addBattleProcessLog(log);
+            
+            if (attackerHps[slotIndex] > 0 && defenderHps[slotIndex] <= 0) {
+                attackerWinCount++;
+                document.getElementById('attackerWinCount').textContent = attackerWinCount;
+            } else if (defenderHps[slotIndex] > 0 && attackerHps[slotIndex] <= 0) {
+                defenderWinCount++;
+                document.getElementById('defenderWinCount').textContent = defenderWinCount;
+            }
+        }
+
+        function calculateDamage(skill, level, attackerElement, defenderElement) {
+            let baseDamage = skill.value * (1 + (level - 1) * 0.1);
+            
+            const advantage = getElementAdvantage(attackerElement, defenderElement);
+            baseDamage *= (1 + advantage);
+            
+            const variance = 0.9 + Math.random() * 0.2;
+            return baseDamage * variance;
+        }
+
+        function getElementAdvantage(attackerElement, defenderElement) {
+            const advantages = {
+                'Fire': { 'Wind': 0.5 },
+                'Wind': { 'Water': 0.5 },
+                'Water': { 'Fire': 0.5 },
+                'Light': { 'Dark': 0.5 },
+                'Dark': { 'Light': 0.5 }
+            };
+            
+            if (advantages[attackerElement] && advantages[attackerElement][defenderElement]) {
+                return advantages[attackerElement][defenderElement];
+            }
+            
+            if (advantages[defenderElement] && advantages[defenderElement][attackerElement]) {
+                return -0.3;
+            }
+            
+            return 0;
+        }
+
+        function updateHpBar(side, slot, hp) {
+            const bar = document.getElementById(`${side}Hp${slot}`);
+            const text = document.getElementById(`${side}HpText${slot}`);
+            
+            bar.style.width = `${hp}%`;
+            text.textContent = `${Math.round(hp)}%`;
+            
+            if (hp > 60) {
+                bar.style.backgroundColor = '#22c55e';
+            } else if (hp > 30) {
+                bar.style.backgroundColor = '#f59e0b';
+            } else {
+                bar.style.backgroundColor = '#ef4444';
+            }
+        }
+
+        function addBattleProcessLog(message) {
+            const log = document.getElementById('battleProcessLog');
+            log.innerHTML += `<div>${message}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function endBattle() {
+            isBattleRunning = false;
+            document.getElementById('fightBtn').disabled = false;
+            
+            const isVictory = attackerWinCount >= 3;
+            
+            if (isVictory) {
+                document.getElementById('battleResult').textContent = '🎉';
+                document.getElementById('battleMessage').textContent = '胜利！';
+                addBattleProcessLog('🎉 恭喜！你获得了胜利！');
+                addBattleLog(`✅ 挑战成功！${selectedOpponent.name} 被击败！`);
+                
+                const pointsGain = Math.floor(Math.random() * 200) + 100;
+                document.getElementById('myPoints').textContent = parseInt(document.getElementById('myPoints').textContent) + pointsGain;
+                document.getElementById('myWins').textContent = parseInt(document.getElementById('myWins').textContent) + 1;
+            } else {
+                document.getElementById('battleResult').textContent = '💀';
+                document.getElementById('battleMessage').textContent = '失败...';
+                addBattleProcessLog('💀 战斗失败...');
+                addBattleLog(`❌ 挑战失败，被 ${selectedOpponent.name} 击败`);
+                document.getElementById('myLosses').textContent = parseInt(document.getElementById('myLosses').textContent) + 1;
+            }
+            
+            remainingAttempts--;
+            document.getElementById('remainingAttempts').textContent = remainingAttempts;
+            updateChallengeBtn();
+            updateWinRate();
+        }
+
+        function updateWinRate() {
+            const wins = parseInt(document.getElementById('myWins').textContent);
+            const losses = parseInt(document.getElementById('myLosses').textContent);
+            const total = wins + losses;
+            const rate = total > 0 ? Math.round((wins / total) * 100) : 0;
+            document.getElementById('myWinRate').textContent = `${rate}%`;
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>
 </html>

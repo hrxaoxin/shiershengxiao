@@ -19,7 +19,7 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     uint256 public constant TEAM_SIZE = 6;
     uint256 public constant FRONT_ROW_SIZE = 3;
     
-    enum Element { Fire, Wind, Water, Light, Dark }
+    enum Element { Water, Wind, Fire, Dark, Light }
     
     enum SkillType { 
         Attack,    // 攻击型技能
@@ -125,11 +125,11 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @notice 初始化所有技能（内部函数）
      */
     function _initAllSkills() internal {
-        _initFireSkills();
-        _initWindSkills();
         _initWaterSkills();
-        _initLightSkills();
+        _initWindSkills();
+        _initFireSkills();
         _initDarkSkills();
+        _initLightSkills();
     }
     
     /**
@@ -768,6 +768,11 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         require(zodiacIndex < 12, "Invalid zodiac");
         require(gender < 2, "Invalid gender");
         fullSkills[elementIndex][zodiacIndex][gender] = skill;
+    }
+
+    function setNFTContract(address _nftContract) external onlyOwner {
+        require(_nftContract != address(0), "Invalid NFT contract address");
+        nftContract = INFTMint(_nftContract);
     }
 
     function setAuthorizer(address a) external onlyOwner {

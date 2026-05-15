@@ -7,14 +7,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "./Battle.sol";
 import "./NFTInterface.sol";
 
-interface IArenaRanking {
-    function setBattleTeam(uint256[] calldata tokenIds) external;
-    function clearBattleTeam() external;
-    function challenge(address defender, uint8 mode) external returns (bool, uint256, uint256);
-    function rechargeChallengeAttempts() external;
-    function getRemainingAttempts(address player) external view returns (uint256);
-}
-
 contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, IArenaRanking {
     Battle public battleContract;
     INFTMint public nftContract;
@@ -111,6 +103,8 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     mapping(uint256 => bool) public isMockPlayerActive;
 
     RewardTier[] public rewardTiers;
+
+    ChallengeMode public currentMode;
 
     event ChallengeCompleted(
         address indexed attacker,
@@ -227,6 +221,14 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
         require(totalPercentage <= BPS, "Total percentage cannot exceed 100%");
         emit RewardTiersUpdated();
+    }
+
+    event ChallengeModeUpdated(ChallengeMode oldMode, ChallengeMode newMode);
+
+    function setChallengeMode(ChallengeMode _mode) external onlyOwner {
+        ChallengeMode oldMode = currentMode;
+        currentMode = _mode;
+        emit ChallengeModeUpdated(oldMode, _mode);
     }
 
     function _initializeMockPlayers() internal {
@@ -434,7 +436,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         emit ChallengeRecharged(msg.sender, RECHARGE_AMOUNT);
     }
 
-    function challenge(address defender, uint8 mode) external nonReentrant returns (bool, uint256, uint256) {
+    function challenge(address defender) external nonReentrant returns (bool, uint256, uint256) {
         require(seasons[currentSeason].isActive, "E02: Season not active");
 
         Player storage attacker = players[msg.sender];
@@ -477,7 +479,9 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
         require(defenderHasTeam, "E06: Defender must set battle team");
 
-        if (mode == uint8(ChallengeMode.RankSwap)) {
+        ChallengeMode mode = currentMode;
+
+        if (mode == ChallengeMode.RankSwap) {
             if (isMockDefender) {
                 require(attackerRank < _getMockPlayerRank(defender), "E24: Can only challenge higher ranked players");
             }
@@ -487,7 +491,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
             _registerPlayer(defender);
         }
 
-        if (mode == uint8(ChallengeMode.RankSwap)) {
+        if (mode == ChallengeMode.RankSwap) {
             return _challengeRankSwapWithMock(msg.sender, defender, attackerRank, defenderRank, defenderTeam, isMockDefender);
         } else {
             return _challengePointsWithMock(msg.sender, defender, attackerRank, defenderRank, defenderTeam, isMockDefender);
