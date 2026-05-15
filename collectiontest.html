@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>我的生肖 - 测试模式</title>
+    <link rel="icon" href="images/fu-cards/shuishu_1.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: #f5f5f5;
+            background-image: linear-gradient(135deg, #f5f5f5 0%, #e8f5e8 100%);
+            overflow-x: hidden;
+        }
+        #particles-js { position: fixed; width: 100%; height: 100%; top: 0; left: 0; z-index: -1; }
+        .navbar { background-color: #ffffff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); }
+        .zodiac-card {
+            position: relative;
+            background: white;
+            border-radius: 12px;
+            padding: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+        }
+        .zodiac-card:hover:not(.locked) { transform: translateY(-5px); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
+        .zodiac-card.locked {
+            opacity: 0.4;
+            filter: grayscale(100%);
+            cursor: not-allowed;
+        }
+        .zodiac-card.locked:hover {
+            transform: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        .zodiac-card.locked img {
+            filter: grayscale(100%);
+        }
+        .zodiac-card.locked::before {
+            content: '?';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 32px;
+            font-weight: bold;
+            color: #999;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .zodiac-card.has-item {
+            border: 2px solid #22c55e;
+        }
+        .zodiac-card img { width: 60px; height: 60px; object-fit: contain; margin: 0 auto 8px; border-radius: 8px; position: relative; z-index: 1; }
+        .zodiac-card h4 { font-size: 12px; font-weight: 500; color: #333; }
+        .zodiac-card p { font-size: 10px; color: #666; }
+        .btn-primary { background-color: #3b82f6; color: white; border-radius: 8px; padding: 10px 20px; font-weight: 500; transition: all 0.3s ease; }
+        .btn-primary:hover { background-color: #2563eb; }
+        .btn-secondary { background-color: white; color: #3b82f6; border: 1px solid #3b82f6; border-radius: 8px; padding: 10px 20px; font-weight: 500; transition: all 0.3s ease; }
+        .btn-secondary:hover { background-color: #f8f9fa; }
+        .attribute-tab { padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; font-weight: 500; }
+        .attribute-tab.active { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+        .tab-water { background-color: #e0f2fe; color: #0369a1; }
+        .tab-water.active { background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%); color: white; }
+        .tab-wind { background-color: #dcfce7; color: #15803d; }
+        .tab-wind.active { background: linear-gradient(135deg, #22c55e 0%, #15803d 100%); color: white; }
+        .tab-fire { background-color: #fee2e2; color: #b91c1c; }
+        .tab-fire.active { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
+        .tab-dark { background-color: #ede9fe; color: #6d28d9; }
+        .tab-dark.active { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; }
+        .tab-light { background-color: #fef3c7; color: #d97706; }
+        .tab-light.active { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .empty-collection { text-align: center; padding: 60px 20px; }
+        .empty-collection .icon { font-size: 64px; margin-bottom: 16px; }
+        .mode-tab {
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            background-color: #e5e7eb;
+            color: #374151;
+        }
+        .mode-tab.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+        .collection-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background-color: #22c55e;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 2px 6px;
+            border-radius: 10px;
+            z-index: 2;
+        }
+        .progress-bar {
+            height: 4px;
+            background-color: #e5e7eb;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        .test-badge {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div id="particles-js"></div>
+
+    <nav class="navbar fixed bottom-0 left-0 right-0 z-10 md:hidden">
+        <div class="flex justify-around items-center py-2 px-4">
+            <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1">🏠</div>
+                <span class="text-xs font-bold text-gray-700">首页</span>
+            </a>
+            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1">🃏</div>
+                <span class="text-xs font-bold text-gray-700">铸造</span>
+            </a>
+            <a href="collectiontest.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl bg-gray-100">
+                <div class="text-2xl mb-1">🎁</div>
+                <span class="text-xs font-bold text-gray-700">生肖</span>
+            </a>
+            <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1">🏆</div>
+                <span class="text-xs font-bold text-gray-700">奖励</span>
+            </a>
+            <button id="moreMenuBtn" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
+                <div class="text-2xl mb-1">☰</div>
+                <span class="text-xs font-bold text-gray-700">更多</span>
+            </button>
+        </div>
+    </nav>
+
+    <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 z-40 md:hidden hidden" onclick="closeMobileMenu()"></div>
+    <div id="mobileMenu" class="fixed right-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50 md:hidden transform translate-x-full transition-transform duration-300 overflow-y-auto">
+        <div class="p-4 border-b">
+            <div class="flex justify-between items-center">
+                <span class="font-bold text-gray-800">导航菜单</span>
+                <button id="closeMenuBtn" class="p-2 hover:bg-gray-100 rounded-lg" onclick="closeMobileMenu()">
+                    <i class="fas fa-times text-gray-600"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-4 space-y-2">
+            <a href="index.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">🏠</span>
+                <span class="text-gray-700">首页</span>
+            </a>
+            <a href="mint.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">🃏</span>
+                <span class="text-gray-700">铸造</span>
+            </a>
+            <a href="collectiontest.html" class="flex items-center px-4 py-3 rounded-lg bg-gray-100">
+                <span class="text-xl mr-3">🎁</span>
+                <span class="text-gray-700">生肖</span>
+            </a>
+            <a href="rewards.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">🏆</span>
+                <span class="text-gray-700">奖励</span>
+            </a>
+            <a href="upgrade.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">⭐</span>
+                <span class="text-gray-700">升阶</span>
+            </a>
+            <a href="trading.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">💰</span>
+                <span class="text-gray-700">交易</span>
+            </a>
+            <a href="breeding.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">🐾</span>
+                <span class="text-gray-700">孕育</span>
+            </a>
+            <a href="staking.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">⚡</span>
+                <span class="text-gray-700">挖矿</span>
+            </a>
+            <a href="arenatest.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-xl mr-3">⚔️</span>
+                <span class="text-gray-700">竞技</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-white shadow-lg z-20 overflow-y-auto">
+        <div class="p-6">
+            <div class="text-center mb-8">
+                <div class="text-4xl mb-2">🐾</div>
+                <h1 class="text-xl font-bold text-gray-800">十二生肖</h1>
+                <p class="text-sm text-gray-500">Twelve Zodiacs</p>
+            </div>
+            <div class="space-y-2">
+                <a href="index.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🏠</span>
+                    <span class="text-gray-700">首页</span>
+                </a>
+                <a href="mint.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🃏</span>
+                    <span class="text-gray-700">铸造</span>
+                </a>
+                <a href="collectiontest.html" class="flex items-center px-4 py-3 rounded-lg bg-green-50 text-green-600">
+                    <span class="text-xl mr-3">🎁</span>
+                    <span class="font-medium">生肖</span>
+                </a>
+                <a href="rewards.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🏆</span>
+                    <span class="text-gray-700">奖励</span>
+                </a>
+                <a href="upgrade.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">⭐</span>
+                    <span class="text-gray-700">升阶</span>
+                </a>
+                <a href="trading.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">💰</span>
+                    <span class="text-gray-700">交易</span>
+                </a>
+                <a href="breeding.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">🐾</span>
+                    <span class="text-gray-700">孕育</span>
+                </a>
+                <a href="staking.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">⚡</span>
+                    <span class="text-gray-700">挖矿</span>
+                </a>
+                <a href="arenatest.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+                    <span class="text-xl mr-3">⚔️</span>
+                    <span class="text-gray-700">竞技</span>
+                </a>
+            </div>
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <div class="flex items-center justify-between mb-4">
+                    <span class="text-sm text-gray-500">测试模式</span>
+                    <span class="test-badge">🚀 测试</span>
+                </div>
+                <div class="text-center py-2 bg-gray-50 rounded-lg">
+                    <p class="text-xs text-gray-500">无需连接钱包</p>
+                    <p class="text-xs text-gray-500">数据仅供演示</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="px-4 pt-6 pb-24 md:pl-72">
+        <div class="flex items-center mb-4">
+            <div class="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+                <span class="text-white text-2xl font-bold">生</span>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">我的生肖</h1>
+                <span class="test-badge ml-2">测试模式</span>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl p-4 shadow-md mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <p class="text-sm text-gray-500">测试账户</p>
+                    <p class="text-lg font-semibold text-gray-800">0xTestAccount123</p>
+                </div>
+                <div class="flex space-x-2">
+                    <span class="test-badge">🚀 测试模式</span>
+                </div>
+            </div>
+            <div class="grid grid-cols-4 gap-4">
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-blue-600" id="totalCards">42</p>
+                    <p class="text-xs text-gray-500">拥有生肖</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-green-600" id="uniqueTypes">35</p>
+                    <p class="text-xs text-gray-500">不同种类</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-purple-600" id="totalDividends">128.50</p>
+                    <p class="text-xs text-gray-500">可领取分红</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-2xl font-bold text-orange-600" id="collectionProgress">29%</p>
+                    <p class="text-xs text-gray-500">图鉴进度</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">显示模式</h3>
+            <div class="flex flex-wrap gap-2">
+                <button class="mode-tab active" onclick="switchViewMode('collection')">📚 图鉴模式</button>
+                <button class="mode-tab" onclick="switchViewMode('my')">🎒 我的收藏</button>
+            </div>
+        </div>
+
+        <div class="mb-6">
+            <h3 class="text-lg font-bold text-gray-800 mb-3">筛选属性</h3>
+            <div class="flex flex-wrap gap-2">
+                <button class="attribute-tab tab-water active" onclick="switchAttribute('water')">💧 水</button>
+                <button class="attribute-tab tab-wind" onclick="switchAttribute('wind')">🌬️ 风</button>
+                <button class="attribute-tab tab-fire" onclick="switchAttribute('fire')">🔥 火</button>
+                <button class="attribute-tab tab-dark" onclick="switchAttribute('dark')">🌙 暗</button>
+                <button class="attribute-tab tab-light" onclick="switchAttribute('light')">☀️ 光</button>
+                <button class="attribute-tab active" style="background-color: #e5e7eb; color: #374151;" onclick="switchAttribute('all')">全部</button>
+            </div>
+        </div>
+
+        <div id="zodiacGrid" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+        </div>
+
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-8">
+            <h3 class="text-lg font-bold text-blue-800 mb-2">生肖收集进度</h3>
+            <div class="grid grid-cols-5 gap-2" id="progressGrid">
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-blue-600">水</p>
+                    <p class="text-xs text-gray-500"><span id="waterProgress">8</span>/24</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 33%"></div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-green-600">风</p>
+                    <p class="text-xs text-gray-500"><span id="windProgress">7</span>/24</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 29%"></div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-red-600">火</p>
+                    <p class="text-xs text-gray-500"><span id="fireProgress">9</span>/24</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 38%"></div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-purple-600">暗</p>
+                    <p class="text-xs text-gray-500"><span id="darkProgress">6</span>/24</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 25%"></div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-yellow-600">光</p>
+                    <p class="text-xs text-gray-500"><span id="lightProgress">5</span>/24</p>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 21%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="cardModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-sm w-full mx-4">
+            <div class="text-center mb-4">
+                <img id="modalCardImage" src="" alt="生肖" class="w-32 h-32 mx-auto mb-4 rounded-lg shadow-md">
+                <h3 id="modalCardName" class="text-xl font-bold text-gray-800 mb-2">生肖名称</h3>
+                <p id="modalCardDesc" class="text-gray-600 text-sm mb-4">描述</p>
+                <p class="text-sm text-gray-500">Token ID: <span id="modalCardId"></span></p>
+            </div>
+            <div class="flex space-x-4">
+                <button class="btn-secondary flex-1" id="closeModal">关闭</button>
+                <button class="btn-primary flex-1" id="listForSale">挂单出售</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let userTokens = [];
+        let ownedTypes = new Set();
+        let currentFilter = 'all';
+        let currentViewMode = 'collection';
+
+        const ELEMENTS = ['water', 'wind', 'fire', 'dark', 'light'];
+        const ELEMENT_NAMES = ['水', '风', '火', '暗', '光'];
+        const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+        const GENDERS = ['雄', '雌'];
+
+        const EMOJIS = {
+            water: '💧',
+            wind: '🌬️',
+            fire: '🔥',
+            dark: '🌙',
+            light: '☀️'
+        };
+
+        function generateMockNfts() {
+            let nfts = [];
+            let tokenId = 1;
+            
+            ELEMENTS.forEach((element, elementIndex) => {
+                ZODIAC_NAMES.forEach((zodiac, zodiacIndex) => {
+                    GENDERS.forEach((gender) => {
+                        const elementPinyin = {
+                            water: 'shui',
+                            wind: 'feng',
+                            fire: 'huo',
+                            dark: 'an',
+                            light: 'guang'
+                        };
+                        
+                        const zodiacPinyin = {
+                            '鼠': 'shu', '牛': 'niu', '虎': 'hu', '兔': 'tu', '龙': 'long', '蛇': 'she',
+                            '马': 'ma', '羊': 'yang', '猴': 'hou', '鸡': 'ji', '狗': 'gou', '猪': 'zhu'
+                        };
+                        
+                        const genderPinyin = gender === '雄' ? 'xiong' : 'ci';
+                        const imageUrl = `https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/QmPtYVJv7gD67uZ5y1TqM7pX5B8k8Y3q9Z6R7t8Y4eW3K9/${elementPinyin[element]}${zodiacPinyin[zodiac]}_${genderPinyin}.png`;
+                        
+                        nfts.push({
+                            tokenId: tokenId++,
+                            element: element,
+                            zodiac: zodiac,
+                            gender: gender,
+                            name: `${ELEMENT_NAMES[elementIndex]}${zodiac}・${gender}`,
+                            description: `${ELEMENT_NAMES[elementIndex]}属性的${zodiac}，${gender === '雄' ? '雄性' : '雌性'}`,
+                            imageUrl: imageUrl,
+                            level: Math.floor(Math.random() * 5) + 1,
+                            hp: 100 + Math.floor(Math.random() * 50),
+                            attack: 10 + Math.floor(Math.random() * 20),
+                            defense: 10 + Math.floor(Math.random() * 20),
+                            speed: 10 + Math.floor(Math.random() * 20)
+                        });
+                    });
+                });
+            });
+            
+            return nfts;
+        }
+
+        function generateOwnedTokens() {
+            let owned = [];
+            const allNfts = generateMockNfts();
+            
+            const waterIndices = [0, 1, 2, 3, 6, 7, 10, 11];
+            const windIndices = [24, 25, 26, 30, 31, 34, 35];
+            const fireIndices = [48, 49, 50, 51, 52, 53, 56, 57, 58];
+            const darkIndices = [72, 73, 74, 76, 77, 83];
+            const lightIndices = [96, 97, 100, 101, 102];
+            
+            const ownedIndices = [...waterIndices, ...windIndices, ...fireIndices, ...darkIndices, ...lightIndices];
+            
+            ownedIndices.forEach(index => {
+                if (allNfts[index]) {
+                    owned.push({
+                        ...allNfts[index],
+                        owned: true
+                    });
+                    ownedTypes.add(`${allNfts[index].element}-${allNfts[index].zodiac}-${allNfts[index].gender}`);
+                }
+            });
+            
+            return owned;
+        }
+
+        function init() {
+            userTokens = generateOwnedTokens();
+            renderZodiacGrid();
+            updateStats();
+        }
+
+        function renderZodiacGrid() {
+            const grid = document.getElementById('zodiacGrid');
+            grid.innerHTML = '';
+            
+            if (currentViewMode === 'collection') {
+                renderCollectionMode();
+            } else {
+                renderMyCollectionMode();
+            }
+        }
+
+        function renderCollectionMode() {
+            const grid = document.getElementById('zodiacGrid');
+            
+            ELEMENTS.forEach(element => {
+                if (currentFilter !== 'all' && currentFilter !== element) return;
+                
+                ZODIAC_NAMES.forEach(zodiac => {
+                    GENDERS.forEach(gender => {
+                        const key = `${element}-${zodiac}-${gender}`;
+                        const isOwned = ownedTypes.has(key);
+                        const nft = userTokens.find(t => t.element === element && t.zodiac === zodiac && t.gender === gender);
+                        
+                        const card = document.createElement('div');
+                        card.className = `zodiac-card ${isOwned ? 'has-item' : 'locked'}`;
+                        card.setAttribute('data-element', element);
+                        
+                        if (isOwned && nft) {
+                            card.innerHTML = `
+                                <img src="${nft.imageUrl}" alt="${nft.name}" onerror="this.src='https://via.placeholder.com/60'">
+                                <h4>${nft.name}</h4>
+                                <p>Lv.${nft.level}</p>
+                            `;
+                            card.onclick = () => openCardModal(nft);
+                        } else {
+                            card.innerHTML = `
+                                <img src="https://via.placeholder.com/60" alt="未知">
+                                <h4>${ELEMENT_NAMES[ELEMENTS.indexOf(element)]}${zodiac}・${gender}</h4>
+                                <p>未收集</p>
+                            `;
+                        }
+                        
+                        grid.appendChild(card);
+                    });
+                });
+            });
+        }
+
+        function renderMyCollectionMode() {
+            const grid = document.getElementById('zodiacGrid');
+            
+            const filteredTokens = userTokens.filter(t => {
+                if (currentFilter === 'all') return true;
+                return t.element === currentFilter;
+            });
+            
+            if (filteredTokens.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full empty-collection">
+                        <div class="icon">🃏</div>
+                        <p class="text-gray-600 mb-4">您还没有该属性的生肖NFT</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            filteredTokens.forEach(nft => {
+                const card = document.createElement('div');
+                card.className = 'zodiac-card has-item';
+                
+                card.innerHTML = `
+                    <img src="${nft.imageUrl}" alt="${nft.name}" onerror="this.src='https://via.placeholder.com/60'">
+                    <h4>${nft.name}</h4>
+                    <p>Lv.${nft.level}</p>
+                `;
+                card.onclick = () => openCardModal(nft);
+                
+                grid.appendChild(card);
+            });
+        }
+
+        function updateStats() {
+            document.getElementById('totalCards').textContent = userTokens.length;
+            document.getElementById('uniqueTypes').textContent = ownedTypes.size;
+            document.getElementById('totalDividends').textContent = (userTokens.length * 3.06).toFixed(2);
+            document.getElementById('collectionProgress').textContent = Math.round((ownedTypes.size / 120) * 100) + '%';
+            
+            ELEMENTS.forEach((element, index) => {
+                const count = userTokens.filter(t => t.element === element).length;
+                document.getElementById(`${element}Progress`).textContent = count;
+            });
+        }
+
+        function switchViewMode(mode) {
+            currentViewMode = mode;
+            
+            document.querySelectorAll('.mode-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            renderZodiacGrid();
+        }
+
+        function switchAttribute(attribute) {
+            currentFilter = attribute;
+            
+            document.querySelectorAll('.attribute-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            renderZodiacGrid();
+        }
+
+        function openCardModal(nft) {
+            document.getElementById('modalCardImage').src = nft.imageUrl;
+            document.getElementById('modalCardName').textContent = nft.name;
+            document.getElementById('modalCardDesc').textContent = nft.description;
+            document.getElementById('modalCardId').textContent = nft.tokenId;
+            document.getElementById('cardModal').classList.remove('hidden');
+        }
+
+        function closeMobileMenu() {
+            document.getElementById('mobileMenu').classList.add('translate-x-full');
+            document.getElementById('mobileMenuOverlay').classList.add('hidden');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            particlesJS('particles-js', {
+                particles: {
+                    number: { value: 80, density: { enable: true, value_area: 800 } },
+                    color: { value: '#3b82f6' },
+                    shape: { type: 'circle', stroke: { width: 0, color: '#000000' } },
+                    opacity: { value: 0.5, random: true, anim: { enable: true, speed: 1, opacity_min: 0.1, sync: false } },
+                    size: { value: 5, random: true, anim: { enable: true, speed: 2, size_min: 0.1, sync: false } },
+                    line_linked: { enable: true, distance: 150, color: '#3b82f6', opacity: 0.4, width: 1 },
+                    move: { enable: true, speed: 1, direction: 'none', random: false, straight: false, out_mode: 'out', bounce: false }
+                },
+                interactivity: {
+                    detect_on: 'canvas',
+                    events: { onhover: { enable: true, mode: 'grab' }, onclick: { enable: true, mode: 'push' }, resize: true },
+                    modes: { grab: { distance: 140, line_linked: { opacity: 1 } }, push: { particles_nb: 4 } }
+                },
+                retina_detect: true
+            });
+
+            init();
+
+            document.getElementById('closeModal').addEventListener('click', function() {
+                document.getElementById('cardModal').classList.add('hidden');
+            });
+
+            document.getElementById('listForSale').addEventListener('click', function() {
+                alert('挂单出售功能演示');
+            });
+
+            document.getElementById('moreMenuBtn').addEventListener('click', function() {
+                document.getElementById('mobileMenu').classList.remove('translate-x-full');
+                document.getElementById('mobileMenuOverlay').classList.remove('hidden');
+            });
+
+            document.getElementById('closeMenuBtn').addEventListener('click', closeMobileMenu);
+
+            document.getElementById('mobileMenuOverlay').addEventListener('click', closeMobileMenu);
+        });
+    </script>
+</body>
+</html>

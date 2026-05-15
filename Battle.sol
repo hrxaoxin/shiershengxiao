@@ -19,7 +19,7 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     uint256 public constant TEAM_SIZE = 6;
     uint256 public constant FRONT_ROW_SIZE = 3;
     
-    enum Element { Fire, Wind, Water, Light, Dark }
+    enum Element { Water, Wind, Fire, Dark, Light }
     
     enum SkillType { 
         Attack,    // 攻击型技能
@@ -67,6 +67,7 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         uint256 currentHealth; // 当前生命值
         uint256 maxHealth;     // 最大生命值
         uint256 level;         // NFT等级
+        uint256 growthValue;   // 成长值（10-100）
         uint256 tokenId;       // NFT ID
         Element element;       // 属性（五行）
         uint256 zodiac;        // 生肖索引（0-11）
@@ -125,11 +126,11 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @notice 初始化所有技能（内部函数）
      */
     function _initAllSkills() internal {
-        _initFireSkills();
-        _initWindSkills();
         _initWaterSkills();
-        _initLightSkills();
+        _initWindSkills();
+        _initFireSkills();
         _initDarkSkills();
+        _initLightSkills();
     }
     
     /**
@@ -395,33 +396,35 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         NFTStatus[] memory defenderTeam = new NFTStatus[](TEAM_SIZE);
         
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
-            (uint256 attackerType, uint8 attackerLevel) = _getTokenInfo(attackerTokens[i]);
-            (uint256 defenderType, uint8 defenderLevel) = _getTokenInfo(defenderTokens[i]);
+            (uint256 attackerType, uint8 attackerLevel, uint256 attackerGrowth) = _getTokenInfo(attackerTokens[i]);
+            (uint256 defenderType, uint8 defenderLevel, uint256 defenderGrowth) = _getTokenInfo(defenderTokens[i]);
             
             attackerTeam[i] = NFTStatus({
-                currentHealth: calculateHealth(attackerLevel),
-                maxHealth: calculateHealth(attackerLevel),
+                currentHealth: calculateHealth(attackerLevel, attackerGrowth),
+                maxHealth: calculateHealth(attackerLevel, attackerGrowth),
                 level: attackerLevel,
+                growthValue: attackerGrowth,
                 tokenId: attackerTokens[i],
                 element: getElementFromTokenType(attackerType),
                 zodiac: getZodiacIndex(attackerType),
                 gender: getGender(attackerType),
                 isFrontRow: i < FRONT_ROW_SIZE,
                 isAlive: true,
-                speed: zodiacSpeed[getZodiacIndex(attackerType)]
+                speed: calculateSpeed(zodiacSpeed[getZodiacIndex(attackerType)], attackerGrowth)
             });
             
             defenderTeam[i] = NFTStatus({
-                currentHealth: calculateHealth(defenderLevel),
-                maxHealth: calculateHealth(defenderLevel),
+                currentHealth: calculateHealth(defenderLevel, defenderGrowth),
+                maxHealth: calculateHealth(defenderLevel, defenderGrowth),
                 level: defenderLevel,
+                growthValue: defenderGrowth,
                 tokenId: defenderTokens[i],
                 element: getElementFromTokenType(defenderType),
                 zodiac: getZodiacIndex(defenderType),
                 gender: getGender(defenderType),
                 isFrontRow: i < FRONT_ROW_SIZE,
                 isAlive: true,
-                speed: zodiacSpeed[getZodiacIndex(defenderType)]
+                speed: calculateSpeed(zodiacSpeed[getZodiacIndex(defenderType)], defenderGrowth)
             });
         }
         
@@ -509,7 +512,7 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @return 攻击者是否获胜、攻击者伤害、防守者伤害、攻击者技能名、防守者技能名、攻击者是否闪避、防守者是否闪避
      */
     function _singleBattle(NFTStatus memory attacker, NFTStatus memory defender, bool attackerFirst) 
-        internal view returns (bool, uint256, uint256, string memory, string memory, bool, bool) {
+        internal pure returns (bool, uint256, uint256, string memory, string memory, bool, bool) {
         
         FullSkill memory attackerSkill = fullSkills[uint256(attacker.element)][attacker.zodiac][attacker.gender];
         FullSkill memory defenderSkill = fullSkills[uint256(defender.element)][defender.zodiac][defender.gender];
@@ -517,8 +520,12 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         bool attackerDodged = false;
         bool defenderDodged = false;
         
-        uint256 attackerBaseDamage = attacker.level * 60;
-        uint256 defenderBaseDamage = defender.level * 60;
+        // 基础伤害 = 等级 × 60，成长值影响成长加成
+        uint256 attackerGrowthBonus = 1000 + (attacker.growthValue * 5); // 1000倍精度，10→1050，100→1500
+        uint256 defenderGrowthBonus = 1000 + (defender.growthValue * 5);
+        
+        uint256 attackerBaseDamage = (attacker.level * 60 * attackerGrowthBonus) / 1000;
+        uint256 defenderBaseDamage = (defender.level * 60 * defenderGrowthBonus) / 1000;
         
         uint256 attackerTotalDamage = calculateDamage(attackerBaseDamage, attacker.element, defender.element);
         uint256 defenderTotalDamage = calculateDamage(defenderBaseDamage, defender.element, attacker.element);
@@ -629,10 +636,25 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     /**
      * @notice 计算NFT生命值
      * @param level NFT等级
-     * @return 生命值（基础400 + 每级+100）
+     * @param growthValue 成长值（10-100），成长值越高生命值越高
+     * @return 生命值（基础400 + 每级+100）× 成长值系数
      */
-    function calculateHealth(uint256 level) public view returns (uint256) {
-        return baseHealth + (level - 1) * 100;
+    function calculateHealth(uint256 level, uint256 growthValue) public pure returns (uint256) {
+        // 成长值系数：10-100映射到0.9-1.5
+        uint256 growthMultiplier = 900 + (growthValue * 6); // 1000倍精度
+        return ((baseHealth + (level - 1) * 100) * growthMultiplier) / 1000;
+    }
+    
+    /**
+     * @notice 计算NFT速度（考虑成长值加成）
+     * @param baseSpeed 基础速度（生肖固定速度）
+     * @param growthValue 成长值（10-100），成长值越高速度越快
+     * @return 最终速度值
+     */
+    function calculateSpeed(uint256 baseSpeed, uint256 growthValue) public pure returns (uint256) {
+        // 成长值系数：10-100映射到0.95-1.2
+        uint256 growthMultiplier = 950 + (growthValue * 25) / 10; // 100倍精度
+        return (baseSpeed * growthMultiplier) / 100;
     }
     
     /**
@@ -654,12 +676,13 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     /**
      * @notice 获取NFT信息（内部函数）
      * @param tokenId NFT ID
-     * @return tokenType NFT类型编码、level NFT等级
+     * @return tokenType NFT类型编码、level NFT等级、growthValue 成长值
      */
-    function _getTokenInfo(uint256 tokenId) internal view returns (uint256, uint8) {
+    function _getTokenInfo(uint256 tokenId) internal view returns (uint256, uint8, uint256) {
         uint256 tokenType = uint256(nftContract.tokenType(tokenId));
         uint8 level = nftContract.tokenLevel(tokenId);
-        return (tokenType, level);
+        uint256 growthValue = nftContract.tokenGrowthValue(tokenId);
+        return (tokenType, level, growthValue);
     }
     
     /**
@@ -681,33 +704,35 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         NFTStatus[] memory defenderTeam = new NFTStatus[](TEAM_SIZE);
         
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
-            (uint256 attackerType, uint8 attackerLevel) = _getTokenInfo(attackerTokens[i]);
-            (uint256 defenderType, uint8 defenderLevel) = _getTokenInfo(defenderTokens[i]);
+            (uint256 attackerType, uint8 attackerLevel, uint256 attackerGrowth) = _getTokenInfo(attackerTokens[i]);
+            (uint256 defenderType, uint8 defenderLevel, uint256 defenderGrowth) = _getTokenInfo(defenderTokens[i]);
             
             attackerTeam[i] = NFTStatus({
-                currentHealth: calculateHealth(attackerLevel),
-                maxHealth: calculateHealth(attackerLevel),
+                currentHealth: calculateHealth(attackerLevel, attackerGrowth),
+                maxHealth: calculateHealth(attackerLevel, attackerGrowth),
                 level: attackerLevel,
+                growthValue: attackerGrowth,
                 tokenId: attackerTokens[i],
                 element: getElementFromTokenType(attackerType),
                 zodiac: getZodiacIndex(attackerType),
                 gender: getGender(attackerType),
                 isFrontRow: i < FRONT_ROW_SIZE,
                 isAlive: true,
-                speed: zodiacSpeed[getZodiacIndex(attackerType)]
+                speed: calculateSpeed(zodiacSpeed[getZodiacIndex(attackerType)], attackerGrowth)
             });
             
             defenderTeam[i] = NFTStatus({
-                currentHealth: calculateHealth(defenderLevel),
-                maxHealth: calculateHealth(defenderLevel),
+                currentHealth: calculateHealth(defenderLevel, defenderGrowth),
+                maxHealth: calculateHealth(defenderLevel, defenderGrowth),
                 level: defenderLevel,
+                growthValue: defenderGrowth,
                 tokenId: defenderTokens[i],
                 element: getElementFromTokenType(defenderType),
                 zodiac: getZodiacIndex(defenderType),
                 gender: getGender(defenderType),
                 isFrontRow: i < FRONT_ROW_SIZE,
                 isAlive: true,
-                speed: zodiacSpeed[getZodiacIndex(defenderType)]
+                speed: calculateSpeed(zodiacSpeed[getZodiacIndex(defenderType)], defenderGrowth)
             });
         }
         
@@ -768,6 +793,11 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         require(zodiacIndex < 12, "Invalid zodiac");
         require(gender < 2, "Invalid gender");
         fullSkills[elementIndex][zodiacIndex][gender] = skill;
+    }
+
+    function setNFTContract(address _nftContract) external onlyOwner {
+        require(_nftContract != address(0), "Invalid NFT contract address");
+        nftContract = INFTMint(_nftContract);
     }
 
     function setAuthorizer(address a) external onlyOwner {

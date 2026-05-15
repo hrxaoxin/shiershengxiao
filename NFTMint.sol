@@ -338,12 +338,26 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         INFTData m = INFTData(metadataContract);
         m.setTokenType(id, t);
         m.setTokenLevel(id, 1);
+        // 随机生成成长值（10-100），成长值影响战斗属性
+        uint256 growthValue = _generateGrowthValue();
+        m.setTokenGrowthValue(id, growthValue);
         m.addUserToken(to, t, id);
         _safeMint(to, id);
         // 更新权重缓存
         _updateUserWeight(to, id, 1, true);
         emit CardMinted(id, t, to, uint64(block.timestamp));
         return id;
+    }
+    
+    /**
+     * @dev 生成随机成长值（10-100）
+     * 成长值影响NFT在竞技场中的属性（生命值、攻击力、速度等）
+     * @return uint256 成长值
+     */
+    function _generateGrowthValue() internal returns (uint256) {
+        uint256 rand = _generateSecureRandom();
+        // 生成10-100的成长值
+        return 10 + (rand % 91);
     }
 
     /**
@@ -807,6 +821,16 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     function balanceOf(address owner) public view override returns (uint256) {
         INFTData m = INFTData(metadataContract);
         return m.userAllTokens(owner).length;
+    }
+
+    /**
+     * @dev 获取NFT成长值
+     * @param tokenId NFT ID
+     * @return uint256 成长值(10-100)
+     */
+    function tokenGrowthValue(uint256 tokenId) external view returns (uint256) {
+        INFTData m = INFTData(metadataContract);
+        return m.tokenGrowthValue(tokenId);
     }
 
     /**

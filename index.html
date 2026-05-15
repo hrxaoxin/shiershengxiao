@@ -51,6 +51,8 @@
             border: 2px solid rgba(59, 130, 246, 0.5);
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
             animation: desktopNavSlideIn 0.8s ease-out;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
         }
 
         @keyframes desktopNavSlideIn {
@@ -567,7 +569,7 @@
             </div>
         </div>
 
-        <nav class="hidden md:block fixed left-6 top-1/2 -translate-y-1/2 z-50 desktop-nav">
+        <nav class="hidden md:block fixed left-6 top-20 z-50 desktop-nav">
             <div class="p-3 space-y-3">
                 <a href="index.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="首页">
                     <div class="text-3xl">🏠</div>

@@ -605,4 +605,10 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
      * @dev 恢复合约
      */
     function unpause() external onlyOwner { _unpause(); }
+
+    function withdrawNFTs(uint256[] calldata tokenIds) external onlyOwner nonReentrant {
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            IERC721Upgradeable(nftContract).transferFrom(address(this), owner(), tokenIds[i]);
+        }
+    }
 }

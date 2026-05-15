@@ -200,6 +200,13 @@ interface INFTMint {
     function tokenLevel(uint256 tokenId) external view returns (uint8);
     
     /**
+     * @dev 获取NFT成长值
+     * @param tokenId NFT ID
+     * @return uint256 成长值(10-100)
+     */
+    function tokenGrowthValue(uint256 tokenId) external view returns (uint256);
+    
+    /**
      * @dev 普通铸造
      * @param to 接收地址
      * @return uint256 新NFT ID
@@ -572,6 +579,13 @@ interface INFTDataInterface {
     function tokenLevel(uint256 tokenId) external view returns (uint8);
     
     /**
+     * @dev 获取NFT成长值
+     * @param tokenId NFT ID
+     * @return uint256 成长值(10-100)
+     */
+    function tokenGrowthValue(uint256 tokenId) external view returns (uint256);
+    
+    /**
      * @dev 获取用户持有的指定类型NFT列表
      * @param user 用户地址
      * @param type_ 生肖类型
@@ -606,6 +620,13 @@ interface INFTDataInterface {
      * @param level 等级
      */
     function setTokenLevel(uint256 tokenId, uint8 level) external;
+    
+    /**
+     * @dev 设置NFT成长值
+     * @param tokenId NFT ID
+     * @param growth 成长值（10-100）
+     */
+    function setTokenGrowthValue(uint256 tokenId, uint256 growth) external;
     
     /**
      * @dev 添加用户NFT
@@ -1083,10 +1104,6 @@ interface ITokenStaking {
 }
 
 /**
- * @title IArenaRanking
- * @dev 竞技场排名合约接口
- */
-/**
  * @title IBattle
  * @dev 战斗合约接口
  */
@@ -1104,7 +1121,55 @@ interface IBattle {
     function setAuthorizer(address a) external;
 }
 
+/**
+ * @title IArenaRanking
+ * @dev 竞技场排名合约接口
+ */
 interface IArenaRanking {
+    /**
+     * @dev 设置战斗队伍
+     * @param tokenIds NFT ID数组（必须为6个）
+     */
+    function setBattleTeam(uint256[] calldata tokenIds) external;
+    
+    /**
+     * @dev 清除战斗队伍
+     */
+    function clearBattleTeam() external;
+    
+    /**
+     * @dev 挑战玩家
+     * @param defender 防守方地址
+     * @return bool 挑战是否成功
+     * @return uint256 攻击方胜利场数
+     * @return uint256 防守方胜利场数
+     */
+    function challenge(address defender) external returns (bool, uint256, uint256);
+    
+    /**
+     * @dev 充值挑战次数
+     */
+    function rechargeChallengeAttempts() external;
+    
+    /**
+     * @dev 获取剩余挑战次数
+     * @param player 玩家地址
+     * @return uint256 剩余次数
+     */
+    function getRemainingAttempts(address player) external view returns (uint256);
+    
+    /**
+     * @dev 设置挑战模式（仅所有者可调用）
+     * @param mode 模式（0=积分模式，1=排名交换模式）
+     */
+    function setChallengeMode(uint8 mode) external;
+    
+    /**
+     * @dev 获取当前挑战模式
+     * @return uint8 当前模式
+     */
+    function currentMode() external view returns (uint8);
+    
     /**
      * @dev 检查NFT是否在竞技场中
      * @param tokenId NFT ID
@@ -1117,6 +1182,12 @@ interface IArenaRanking {
      * @param _battleContract 战斗合约地址
      */
     function setBattleContract(address _battleContract) external;
+    
+    /**
+     * @dev 设置NFT合约地址
+     * @param _nftContract NFT合约地址
+     */
+    function setNFTContract(address _nftContract) external;
     
     /**
      * @dev 设置授权合约地址
