@@ -413,4 +413,16 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function getTotalStaked() external view returns (uint256) {
         return totalStakedTokens;
     }
+
+    function withdrawSpecificBNB(uint256 amount) external onlyOwner nonReentrant {
+        require(amount <= address(this).balance, "TokenStaking: insufficient BNB balance");
+        (bool success, ) = owner().call{value: amount}("");
+        require(success, "TokenStaking: BNB transfer failed");
+    }
+
+    function withdrawTokens(uint256 amount) external onlyOwner nonReentrant {
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        require(amount <= token.balanceOf(address(this)), "TokenStaking: insufficient token balance");
+        token.transfer(owner(), amount);
+    }
 }

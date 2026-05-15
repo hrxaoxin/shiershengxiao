@@ -977,6 +977,18 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         require(success, "E13: Transfer failed");
     }
 
+    function withdrawSpecificBNB(uint256 amount) external onlyOwner nonReentrant {
+        require(amount <= address(this).balance, "Insufficient BNB balance");
+        (bool success, ) = owner().call{value: amount}("");
+        require(success, "BNB transfer failed");
+    }
+
+    function withdrawNFTs(uint256[] calldata tokenIds) external onlyOwner nonReentrant {
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            nftContract.transferFrom(address(this), owner(), tokenIds[i]);
+        }
+    }
+
     function isNFTInArena(uint256 tokenId) external view returns (bool) {
         return isInBattleTeam[tokenId];
     }

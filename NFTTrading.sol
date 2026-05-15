@@ -1044,4 +1044,19 @@ contract NFTTrading is
     receive() external payable {
         revert("NFTTrading: direct BNB transfers are forbidden - use buyNFT()");
     }
+
+    function withdrawSpecificBNB(uint256 amount) external onlyOwner nonReentrant {
+        require(amount <= address(this).balance, "NFTTrading: insufficient balance");
+        (bool success, ) = owner().call{value: amount}("");
+        require(success, "NFTTrading: BNB transfer failed");
+    }
+
+    function withdrawNFTs(uint256[] calldata tokenIds) external onlyOwner nonReentrant {
+        INFTMint nft = INFTMint(_nftContract);
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            if (nft.ownerOf(tokenIds[i]) == address(this) && !listings[tokenIds[i]].isActive) {
+                nft.safeTransferFrom(address(this), owner(), tokenIds[i]);
+            }
+        }
+    }
 }

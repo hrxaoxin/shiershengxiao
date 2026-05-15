@@ -627,6 +627,7 @@
             const emptyState = document.getElementById('emptyState');
 
             emptyState.classList.add('hidden');
+            grid.innerHTML = '';
             
             if (currentViewMode === 'collection') {
                 renderCollectionView(grid);

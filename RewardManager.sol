@@ -1179,4 +1179,10 @@ contract RewardManager is
     function refreshTotalWeight() external onlyOwner {
         emit TotalWeightUpdated(totalWeight, totalWeight, block.timestamp);
     }
+
+    function withdrawSpecificBNB(uint256 amount) external onlyOwner nonReentrant {
+        require(amount <= address(this).balance, "RewardManager: insufficient balance");
+        (bool success, ) = owner().call{value: amount}("");
+        require(success, "RewardManager: BNB transfer failed");
+    }
 }
