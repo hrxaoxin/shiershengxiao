@@ -1,223 +1,16 @@
-// 十二生肖NFT项目统一UI工具函数
 window.ZODIAC_UI = (function() {
-    const WEB3_UTILS = window.ZODIAC_WEB3;
-
-    function initWalletButton(btnId, addressId, statusId) {
-        const btn = document.getElementById(btnId);
-        const addressEl = document.getElementById(addressId);
-        const statusEl = document.getElementById(statusId);
-
-        async function updateWalletUI(account = null) {
-            if (account) {
-                const shortAddress = account.substring(0, 4) + '...' + account.substring(account.length - 4);
-                if (addressEl) addressEl.textContent = shortAddress;
-                if (btn) {
-                    btn.textContent = shortAddress;
-                    btn.disabled = true;
-                    btn.style.background = 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)';
-                }
-                if (statusEl) {
-                    statusEl.textContent = '钱包已连接';
-                    statusEl.style.color = '#4CAF50';
-                }
-            } else {
-                if (addressEl) addressEl.textContent = '未连接钱包';
-                if (btn) {
-                    btn.textContent = '连接钱包';
-                    btn.disabled = false;
-                    btn.style.background = '';
-                }
-                if (statusEl) {
-                    statusEl.textContent = '请点击连接钱包';
-                    statusEl.style.color = '#666';
-                }
-            }
-        }
-
-        async function handleConnect() {
-            if (btn) btn.disabled = true;
-            if (statusEl) {
-                statusEl.textContent = '连接中...';
-                statusEl.style.color = '#ff9800';
-            }
-
-            try {
-                const result = await WEB3_UTILS.connectWallet();
-                if (result.success) {
-                    updateWalletUI(result.account);
-                    emitEvent('walletConnected', { account: result.account });
-                } else {
-                    updateWalletUI(null);
-                    showToast('连接失败: ' + result.error, 'error');
-                }
-            } catch (error) {
-                updateWalletUI(null);
-                showToast('连接失败: ' + error.message, 'error');
-            }
-        }
-
-        if (btn) {
-            btn.addEventListener('click', handleConnect);
-        }
-
-        WEB3_UTILS.on('connect', (data) => {
-            updateWalletUI(data.account);
-        });
-
-        WEB3_UTILS.on('disconnect', () => {
-            updateWalletUI(null);
-        });
-
-        WEB3_UTILS.on('accountChange', (data) => {
-            updateWalletUI(data.account);
-        });
-
-        return { updateWalletUI, handleConnect };
-    }
-
-    function showToast(message, type = 'info', duration = 3000) {
-        let toast = document.getElementById('zodiacToast');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.id = 'zodiacToast';
-            toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 px-6 py-3 rounded-lg text-white font-medium z-50 opacity-0 transition-all duration-300 max-w-90% text-center';
-            toast.style.cssText = `
-                position: fixed;
-                bottom: 120px;
-                left: 50%;
-                transform: translateX(-50%) translateY(10px);
-                padding: 12px 24px;
-                border-radius: 8px;
-                color: white;
-                font-weight: 500;
-                z-index: 1001;
-                opacity: 0;
-                transition: all 0.3s ease;
-                max-width: 90%;
-                text-align: center;
-            `;
-            document.body.appendChild(toast);
-        }
-
-        const colors = {
-            success: '#4CAF50',
-            error: '#dc3545',
-            warning: '#ff9800',
-            info: '#4f46e5'
-        };
-
-        toast.textContent = message;
-        toast.style.backgroundColor = colors[type] || colors.info;
-        toast.style.opacity = '1';
-        toast.style.transform = 'translateX(-50%) translateY(0)';
-
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateX(-50%) translateY(10px)';
-        }, duration);
-    }
-
-    function showLoading(message = '处理中...') {
-        let loading = document.getElementById('zodiacLoading');
-        if (!loading) {
-            loading = document.createElement('div');
-            loading.id = 'zodiacLoading';
-            loading.className = 'fixed inset-0 bg-black/50 flex flex-col items-center justify-center z-50';
-            loading.style.display = 'none';
-            loading.innerHTML = `
-                <div class="w-12 h-12 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
-                <div class="mt-4 text-white font-medium">${message}</div>
-            `;
-            document.body.appendChild(loading);
-        }
-        loading.style.display = 'flex';
-    }
-
-    function hideLoading() {
-        const loading = document.getElementById('zodiacLoading');
-        if (loading) {
-            loading.style.display = 'none';
-        }
-    }
-
-    function showConfirmModal(title, message, confirmText = '确认', cancelText = '取消') {
-        return new Promise((resolve) => {
-            let modal = document.getElementById('zodiacConfirmModal');
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = 'zodiacConfirmModal';
-                modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-50';
-                modal.style.display = 'none';
-                modal.innerHTML = `
-                    <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-                        <h3 class="text-xl font-bold text-gray-800 mb-3">${title}</h3>
-                        <p class="text-gray-600 mb-6">${message}</p>
-                        <div class="flex gap-4">
-                            <button id="modalCancel" class="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-medium">${cancelText}</button>
-                            <button id="modalConfirm" class="flex-1 bg-primary text-white py-2 rounded-lg font-medium">${confirmText}</button>
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-
-                document.getElementById('modalCancel').addEventListener('click', () => {
-                    modal.style.display = 'none';
-                    resolve(false);
-                });
-
-                document.getElementById('modalConfirm').addEventListener('click', () => {
-                    modal.style.display = 'none';
-                    resolve(true);
-                });
-
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) {
-                        modal.style.display = 'none';
-                        resolve(false);
-                    }
-                });
-            }
-            modal.style.display = 'flex';
-        });
-    }
-
-    async function sendTransaction(txPromise, onSuccess, onError, loadingMessage = '处理中...') {
-        showLoading(loadingMessage);
-        try {
-            const tx = await txPromise;
-            hideLoading();
-            showToast('操作成功！', 'success');
-            if (onSuccess) onSuccess(tx);
-            return tx;
-        } catch (error) {
-            hideLoading();
-            let errorMsg = '操作失败';
-            if (error.code === 4001) {
-                errorMsg = '用户取消了操作';
-            } else if (error.message && error.message.includes('insufficient funds')) {
-                errorMsg = 'Gas费用不足，请确保钱包中有足够的BNB';
-            } else if (error.message && error.message.includes('reverted')) {
-                errorMsg = '合约执行失败: ' + (error.reason || error.message);
-            } else if (error.message) {
-                errorMsg = error.message;
-            }
-            showToast(errorMsg, 'error');
-            if (onError) onError(error);
-            throw error;
-        }
-    }
-
-    async function estimateGas(contract, method, args, from) {
-        try {
-            const gas = await contract.methods[method](...args).estimateGas({ from });
-            return Math.floor(gas * 1.5);
-        } catch (error) {
-            console.warn('Gas estimation failed, using fallback:', error);
-            return 3000000;
-        }
-    }
-
     const eventListeners = {};
+
+    function emitEvent(eventName, data) {
+        if (!eventListeners[eventName]) return;
+        eventListeners[eventName].forEach(callback => {
+            try {
+                callback(data);
+            } catch (error) {
+                console.error('UI Event listener error:', error);
+            }
+        });
+    }
 
     function on(eventName, callback) {
         if (!eventListeners[eventName]) {
@@ -226,20 +19,359 @@ window.ZODIAC_UI = (function() {
         eventListeners[eventName].push(callback);
     }
 
-    function emitEvent(eventName, data) {
-        if (eventListeners[eventName]) {
-            eventListeners[eventName].forEach(callback => callback(data));
+    function showToast(message, type = 'info', duration = 3000) {
+        let toast = document.getElementById('toastNotification');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'toastNotification';
+            toast.className = 'toast';
+            document.body.appendChild(toast);
+        }
+        
+        toast.textContent = message;
+        toast.className = `toast toast-${type} toast-active`;
+        
+        setTimeout(() => {
+            toast.classList.remove('toast-active');
+        }, duration);
+    }
+
+    function showLoading(message = '处理中...', subText = '') {
+        let loadingOverlay = document.getElementById('loadingOverlay');
+        if (!loadingOverlay) {
+            loadingOverlay = document.createElement('div');
+            loadingOverlay.id = 'loadingOverlay';
+            loadingOverlay.className = 'loading-overlay';
+            loadingOverlay.innerHTML = `
+                <div class="loading-container">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">${message}</div>
+                    <div class="loading-subtext" style="${subText ? '' : 'display: none;'}">${subText}</div>
+                    <div class="loading-progress">
+                        <div class="loading-progress-bar"></div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(loadingOverlay);
+        } else {
+            const textEl = loadingOverlay.querySelector('.loading-text');
+            const subTextEl = loadingOverlay.querySelector('.loading-subtext');
+            if (textEl) textEl.textContent = message;
+            if (subTextEl) {
+                subTextEl.textContent = subText;
+                subTextEl.style.display = subText ? '' : 'none';
+            }
+        }
+        loadingOverlay.classList.add('loading-active');
+    }
+
+    function hideLoading() {
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        if (loadingOverlay) {
+            loadingOverlay.classList.remove('loading-active');
+        }
+    }
+
+    function showConfirmModal(title, message, confirmText = '确定', cancelText = '取消') {
+        return new Promise((resolve) => {
+            let modal = document.getElementById('confirmModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'confirmModal';
+                modal.className = 'modal-overlay';
+                modal.innerHTML = `
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 class="modal-title"></h3>
+                            <button class="modal-close" onclick="ZODIAC_UI.hideConfirmModal()">×</button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="modal-message"></p>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-cancel" onclick="ZODIAC_UI.hideConfirmModal(false)">${cancelText}</button>
+                            <button class="btn-confirm" onclick="ZODIAC_UI.hideConfirmModal(true)">${confirmText}</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+
+            modal.querySelector('.modal-title').textContent = title;
+            modal.querySelector('.modal-message').textContent = message;
+            modal.classList.add('modal-active');
+            
+            const confirmBtn = modal.querySelector('.btn-confirm');
+            const cancelBtn = modal.querySelector('.btn-cancel');
+            
+            const handleConfirm = () => {
+                resolve(true);
+                cleanup();
+            };
+            
+            const handleCancel = () => {
+                resolve(false);
+                cleanup();
+            };
+            
+            const cleanup = () => {
+                modal.classList.remove('modal-active');
+                confirmBtn.removeEventListener('click', handleConfirm);
+                cancelBtn.removeEventListener('click', handleCancel);
+            };
+            
+            confirmBtn.addEventListener('click', handleConfirm);
+            cancelBtn.addEventListener('click', handleCancel);
+        });
+    }
+
+    function hideConfirmModal(result) {
+        const modal = document.getElementById('confirmModal');
+        if (modal) {
+            modal.classList.remove('modal-active');
+        }
+        if (typeof result === 'boolean') {
+            emitEvent('confirmModalClosed', { result });
+        }
+    }
+
+    const transactionHistory = [];
+
+    async function sendTransaction(txPromise, options = {}) {
+        const { 
+            successMessage = '交易成功', 
+            errorMessage = '交易失败',
+            onSuccess = null,
+            onError = null,
+            rollbackActions = [],
+            confirmMessage = null
+        } = options;
+
+        if (confirmMessage) {
+            const confirmed = await showConfirmModal('确认交易', confirmMessage);
+            if (!confirmed) {
+                return { success: false, error: '用户取消交易' };
+            }
+        }
+
+        showLoading();
+        
+        const startTime = Date.now();
+        const transactionId = `tx_${startTime}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        try {
+            const result = await txPromise;
+            const txHash = result.transactionHash || result.hash;
+            
+            transactionHistory.push({
+                id: transactionId,
+                txHash,
+                status: 'success',
+                timestamp: startTime,
+                duration: Date.now() - startTime
+            });
+            
+            hideLoading();
+            showToast(successMessage, 'success');
+            
+            if (typeof onSuccess === 'function') {
+                try {
+                    onSuccess(result);
+                } catch (callbackError) {
+                    console.error('onSuccess callback error:', callbackError);
+                }
+            }
+            
+            return { success: true, result, txHash, transactionId };
+            
+        } catch (error) {
+            const errorMsg = error.message || error.error || errorMessage;
+            
+            transactionHistory.push({
+                id: transactionId,
+                status: 'failed',
+                timestamp: startTime,
+                duration: Date.now() - startTime,
+                error: errorMsg
+            });
+            
+            hideLoading();
+            showToast(errorMsg, 'error');
+            console.error('Transaction error:', error);
+            
+            for (const action of rollbackActions) {
+                try {
+                    await action();
+                    console.log('Rollback action executed:', action.name || 'anonymous');
+                } catch (rollbackError) {
+                    console.error('Rollback action failed:', rollbackError);
+                    showToast('回滚操作失败，请手动检查状态', 'warning');
+                }
+            }
+            
+            if (typeof onError === 'function') {
+                try {
+                    onError(error);
+                } catch (callbackError) {
+                    console.error('onError callback error:', callbackError);
+                }
+            }
+            
+            return { success: false, error: errorMsg, transactionId };
+        }
+    }
+
+    function getTransactionHistory() {
+        return [...transactionHistory];
+    }
+
+    function clearTransactionHistory() {
+        transactionHistory.length = 0;
+    }
+
+    async function initWalletButton(btnId, addrId, statusId) {
+        const btn = document.getElementById(btnId);
+        const addrEl = document.getElementById(addrId);
+        const statusEl = document.getElementById(statusId);
+
+        if (!btn) {
+            console.warn(`Wallet button with id "${btnId}" not found`);
+            return;
+        }
+
+        const updateUI = (isConnected, account) => {
+            if (isConnected && account) {
+                btn.innerHTML = '<i class="fas fa-check mr-1"></i> 已连接';
+                btn.classList.add('btn-connected');
+                btn.classList.remove('btn-primary');
+                if (addrEl) {
+                    addrEl.textContent = ZODIAC_UTILS.formatAddress(account);
+                }
+                if (statusEl) {
+                    statusEl.textContent = '钱包已连接';
+                }
+            } else {
+                btn.innerHTML = '<i class="fas fa-plug mr-1"></i> 连接钱包';
+                btn.classList.remove('btn-connected');
+                btn.classList.add('btn-primary');
+                if (addrEl) {
+                    addrEl.textContent = '未连接钱包';
+                }
+                if (statusEl) {
+                    statusEl.textContent = '请点击连接钱包';
+                }
+            }
+        };
+
+        btn.addEventListener('click', async () => {
+            if (ZODIAC_WEB3.isWalletConnected()) {
+                ZODIAC_WEB3.disconnectWallet();
+            } else {
+                const result = await ZODIAC_WEB3.connectWallet();
+                if (!result.success) {
+                    showToast(result.error || '连接失败', 'error');
+                }
+            }
+        });
+
+        ZODIAC_WEB3.on('connect', ({ account }) => {
+            updateUI(true, account);
+        });
+
+        ZODIAC_WEB3.on('disconnect', () => {
+            updateUI(false, null);
+        });
+
+        ZODIAC_WEB3.on('accountChange', ({ account }) => {
+            updateUI(true, account);
+        });
+
+        updateUI(ZODIAC_WEB3.isWalletConnected(), ZODIAC_WEB3.getAccount());
+    }
+
+    function initRefreshButton(btnId, refreshFn) {
+        const btn = document.getElementById(btnId);
+        if (btn) {
+            btn.addEventListener('click', async () => {
+                try {
+                    await refreshFn();
+                } catch (error) {
+                    showToast('刷新失败', 'error');
+                    console.error('Refresh error:', error);
+                }
+            });
+        }
+    }
+
+    function initNavigation(activePage) {
+        ZODIAC_COMPONENTS.initNavigation(activePage);
+    }
+
+    function renderNavigation(activePage) {
+        const mobileNavbar = ZODIAC_COMPONENTS.renderMobileNavbar(activePage);
+        const mobileMenu = ZODIAC_COMPONENTS.renderMobileMenu();
+        const desktopSidebar = ZODIAC_COMPONENTS.renderDesktopSidebar(activePage);
+        
+        return {
+            mobileNavbar,
+            mobileMenu,
+            desktopSidebar
+        };
+    }
+
+    function renderWalletInfo() {
+        return ZODIAC_COMPONENTS.renderWalletInfo();
+    }
+
+    function renderFooter() {
+        return ZODIAC_COMPONENTS.renderFooter();
+    }
+
+    function formatCurrency(value, decimals = 4) {
+        if (!value) return '0';
+        return parseFloat(value).toFixed(decimals);
+    }
+
+    function isValidAddress(address) {
+        if (!address) return false;
+        return /^0x[a-fA-F0-9]{40}$/.test(address);
+    }
+
+    function handleError(error, context = '') {
+        console.error(`Error in ${context}:`, error);
+        const message = error.message || error.error || '操作失败';
+        showToast(message, 'error');
+        emitEvent('error', { error, context });
+    }
+
+    async function withErrorHandling(fn, context = '') {
+        try {
+            return await fn();
+        } catch (error) {
+            handleError(error, context);
+            throw error;
         }
     }
 
     return {
-        initWalletButton,
         showToast,
         showLoading,
         hideLoading,
         showConfirmModal,
+        hideConfirmModal,
         sendTransaction,
-        estimateGas,
+        getTransactionHistory,
+        clearTransactionHistory,
+        initWalletButton,
+        initRefreshButton,
+        initNavigation,
+        renderNavigation,
+        renderWalletInfo,
+        renderFooter,
+        formatCurrency,
+        isValidAddress,
+        handleError,
+        withErrorHandling,
         on,
         emitEvent
     };

@@ -10,8 +10,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
-    <script src="abis.js"></script>
+    <script src="config.js"></script>
+    <script src="components.js"></script>
     <script src="utils.js"></script>
+    <script src="web3-utils.js"></script>
+    <script src="ui-utils.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
@@ -232,6 +235,66 @@
             to { opacity: 1; }
         }
 
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .loading-overlay.loading-active {
+            display: flex;
+        }
+
+        .loading-content {
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: white;
+            font-size: 16px;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 9998;
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+
+        .toast-active {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .toast-error { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+        .toast-info { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 10px; }
@@ -258,7 +321,10 @@
             </div>
         </header>
 
-        <main class="container mx-auto px-4 pt-4 pb-36 md:pt-0 md:pb-0">
+        <div id="desktopSidebarContainer"></div>
+        <div id="mobileNavbarContainer"></div>
+        <div id="mobileMenuContainer"></div>
+        <main class="container mx-auto px-4 pt-4 pb-36 md:pt-0 md:pb-0 md:ml-72">
             <div class="hero-section p-8 mb-12">
                 <h2 class="text-3xl font-bold mb-4">使用代币铸造生肖NFT，收集十二生肖享受分红</h2>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -378,7 +444,6 @@
                 <h3 class="text-2xl font-bold text-white mb-8 text-center">属性克制</h3>
 
                 <div class="grid md:grid-cols-2 gap-8">
-                    <!-- 左侧：三角循环 -->
                     <div class="flex flex-col items-center">
                         <div class="flex items-center gap-3 mb-4">
                             <span class="w-3 h-3 rounded-full bg-orange-500"></span>
@@ -388,7 +453,6 @@
                         <p class="text-slate-400 text-sm mb-6">火 · 水 · 风 循环</p>
 
                         <div class="flex flex-wrap items-center justify-center gap-2">
-                            <!-- 火 -->
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-2xl shadow-lg shadow-orange-500/30 ring-2 ring-orange-400/50">
                                     &#128293;
@@ -402,7 +466,6 @@
                                 <span class="text-xs text-slate-500 mt-1">风</span>
                             </div>
 
-                            <!-- 风 -->
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-2xl shadow-lg shadow-green-500/30 ring-2 ring-green-400/50">
                                     &#127788;
@@ -416,7 +479,6 @@
                                 <span class="text-xs text-slate-500 mt-1">水</span>
                             </div>
 
-                            <!-- 水 -->
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-2xl shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400/50">
                                     &#128167;
@@ -431,7 +493,6 @@
                         </div>
                     </div>
 
-                    <!-- 右侧：光暗互克 -->
                     <div class="flex flex-col items-center">
                         <div class="flex items-center gap-3 mb-4">
                             <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
@@ -440,7 +501,6 @@
                         <p class="text-slate-400 text-sm mb-6">光 · 暗 对立</p>
 
                         <div class="flex items-center gap-6">
-                            <!-- 光 -->
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 flex items-center justify-center text-2xl shadow-lg shadow-yellow-500/30 ring-2 ring-yellow-400/50">
                                     &#9728;
@@ -449,7 +509,6 @@
                                 <span class="text-xs text-slate-500">克暗</span>
                             </div>
 
-                            <!-- 中间 -->
                             <div class="flex flex-col items-center px-4">
                                 <div class="flex items-center gap-2">
                                     <span class="text-yellow-400">→</span>
@@ -459,7 +518,6 @@
                                 <span class="text-xs text-slate-500">互克</span>
                             </div>
 
-                            <!-- 暗 -->
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-600 to-purple-800 flex items-center justify-center text-2xl shadow-lg shadow-purple-500/30 ring-2 ring-purple-400/50">
                                     &#127769;
@@ -494,161 +552,7 @@
         </footer>
     </div>
 
-    <nav class="navbar fixed bottom-0 left-0 right-0 z-50 md:hidden">
-            <div class="flex justify-around items-center px-2 py-2">
-                <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
-                    <div class="text-2xl mb-1">🏠</div>
-                    <span class="text-xs font-bold text-gray-700">首页</span>
-                </a>
-                <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
-                    <div class="text-2xl mb-1">🃏</div>
-                    <span class="text-xs font-bold text-gray-700">铸造</span>
-                </a>
-                <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
-                    <div class="text-2xl mb-1">🎁</div>
-                    <span class="text-xs font-bold text-gray-700">生肖</span>
-                </a>
-                <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
-                    <div class="text-2xl mb-1">🏆</div>
-                    <span class="text-xs font-bold text-gray-700">奖励</span>
-                </a>
-                <button id="moreMenuBtn" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-white/10 nav-item">
-                    <div class="text-2xl mb-1">☰</div>
-                    <span class="text-xs font-bold text-gray-700">更多</span>
-                </button>
-            </div>
-        </nav>
-
-        <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 z-40 md:hidden hidden" onclick="closeMobileMenu()"></div>
-        <div id="mobileMenu" class="fixed right-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50 md:hidden transform translate-x-full transition-transform duration-300 overflow-y-auto">
-            <div class="p-4 border-b">
-                <div class="flex justify-between items-center">
-                    <span class="font-bold text-gray-800">导航菜单</span>
-                    <button id="closeMenuBtn" class="p-2 hover:bg-gray-100 rounded-lg" onclick="closeMobileMenu()">
-                        <i class="fas fa-times text-gray-600"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="p-4 space-y-2">
-                <a href="index.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🏠</span>
-                    <span class="text-gray-700">首页</span>
-                </a>
-                <a href="mint.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🃏</span>
-                    <span class="text-gray-700">铸造</span>
-                </a>
-                <a href="collection.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🎁</span>
-                    <span class="text-gray-700">生肖</span>
-                </a>
-                <a href="rewards.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🏆</span>
-                    <span class="text-gray-700">奖励</span>
-                </a>
-                <a href="upgrade.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">⭐</span>
-                    <span class="text-gray-700">升阶</span>
-                </a>
-                <a href="trading.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">💰</span>
-                    <span class="text-gray-700">交易</span>
-                </a>
-                <a href="breeding.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🐾</span>
-                    <span class="text-gray-700">孕育</span>
-                </a>
-                <a href="staking.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">⚡</span>
-                    <span class="text-gray-700">挖矿</span>
-                </a>
-                <a href="arena.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">⚔️</span>
-                    <span class="text-gray-700">竞技</span>
-                </a>
-            </div>
-        </div>
-
-        <nav class="hidden md:block fixed left-6 top-20 z-50 desktop-nav">
-            <div class="p-3 space-y-3">
-                <a href="index.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="首页">
-                    <div class="text-3xl">🏠</div>
-                    <span class="text-xs font-bold mt-1 text-gray-700">首页</span>
-                </a>
-                <a href="mint.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="铸造">
-                    <div class="text-3xl">🃏</div>
-                    <span class="text-xs font-bold mt-1 text-gray-700">铸造</span>
-                </a>
-                <a href="collection.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="我的生肖">
-                    <div class="text-3xl">🎁</div>
-                    <span class="text-xs font-bold mt-1 text-gray-700">生肖</span>
-                </a>
-                <a href="rewards.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="奖励">
-                    <div class="text-3xl">🏆</div>
-                    <span class="text-xs font-bold mt-1 text-gray-700">奖励</span>
-                </a>
-                <a href="upgrade.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="升阶">
-                    <div class="text-3xl">⭐</div>
-                    <span class="text-xs font-bold mt-1 text-gray-700">升阶</span>
-                </a>
-                <a href="trading.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="交易">
-                    <div class="text-3xl">💰</div>
-                    <span class="text-xs font-bold mt-1 text-gray-700">交易</span>
-                </a>
-                <a href="breeding.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="孕育">
-                    <div class="text-3xl">🐾</div>
-                    <span class="text-xs font-bold mt-1 text-gray-700">孕育</span>
-                </a>
-                <a href="staking.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="挖矿">
-                    <div class="text-3xl">⚡</div>
-                    <span class="text-xs font-bold mt-1 text-gray-700">挖矿</span>
-                </a>
-                <a href="arena.html" class="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all duration-300 group hover:bg-white/10 nav-item" title="竞技">
-                    <div class="text-3xl">⚔️</div>
-                    <span class="text-xs font-bold mt-1 text-gray-700">竞技</span>
-                </a>
-            </div>
-        </nav>
-
     <script>
-        const ZODIAC_DATA = {
-            water: {
-                name: '水',
-                color: 'water-card',
-                animals: ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
-                prefix: 'shui',
-                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
-            },
-            wind: {
-                name: '风',
-                color: 'wind-card',
-                animals: ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
-                prefix: 'feng',
-                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
-            },
-            fire: {
-                name: '火',
-                color: 'fire-card',
-                animals: ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
-                prefix: 'huo',
-                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/'
-            },
-            dark: {
-                name: '暗',
-                color: 'dark-card',
-                animals: ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
-                prefix: 'an',
-                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
-            },
-            light: {
-                name: '光',
-                color: 'light-card',
-                animals: ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
-                prefix: 'guang',
-                ipfsBase: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
-            }
-        };
-
         const ANIMAL_KEYS = {
             '鼠': 'shu', '牛': 'niu', '虎': 'hu', '兔': 'tu', '龙': 'long',
             '蛇': 'she', '马': 'ma', '羊': 'yang', '猴': 'hou', '鸡': 'ji',
@@ -663,32 +567,102 @@
 
         function renderZodiacCards(attr) {
             const grid = document.getElementById('zodiacGrid');
-            const data = ZODIAC_DATA[attr];
+            const config = ZODIAC_CONFIG || {};
+            const attrNames = config.ATTR_NAMES || { water: '水', wind: '风', fire: '火', dark: '暗', light: '光' };
+            const zodiacNames = config.ZODIAC_NAMES || ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+            const attrPrefixes = config.ATTR_PREFIXES || { water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang' };
+            const ipfsBases = config.IPFS_BASES || {
+                water: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+                wind: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+                fire: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+                dark: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/',
+                light: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
+            };
+
+            const colorClass = `${attr}-card`;
+            const prefix = attrPrefixes[attr];
+            const ipfsBase = ipfsBases[attr];
+            const attrName = attrNames[attr];
 
             let html = '';
-            data.animals.forEach((animal, index) => {
+            zodiacNames.forEach(animal => {
                 const animalKey = ANIMAL_KEYS[animal];
-                const maleFile = `${data.ipfsBase}${data.prefix}${animalKey}_1.png`;
-                const femaleFile = `${data.ipfsBase}${data.prefix}${animalKey}_0.png`;
+                const maleFile = `${ipfsBase}${prefix}${animalKey}_1.png`;
+                const femaleFile = `${ipfsBase}${prefix}${animalKey}_0.png`;
 
                 html += `
-                    <div class="zodiac-card ${data.color}">
-                        <img src="${maleFile}" alt="${data.name}${animal}公" onerror="this.src='${data.ipfsBase}${data.prefix}shu_1.png'">
-                        <h4>${data.name}${animal}（公）</h4>
+                    <div class="zodiac-card ${colorClass}">
+                        <img src="${maleFile}" alt="${attrName}${animal}公" onerror="this.src='${ipfsBase}${prefix}shu_1.png'">
+                        <h4>${attrName}${animal}（公）</h4>
                     </div>
-                    <div class="zodiac-card ${data.color}">
-                        <img src="${femaleFile}" alt="${data.name}${animal}母" onerror="this.src='${data.ipfsBase}${data.prefix}shu_0.png'">
-                        <h4>${data.name}${animal}（母）</h4>
+                    <div class="zodiac-card ${colorClass}">
+                        <img src="${femaleFile}" alt="${attrName}${animal}母" onerror="this.src='${ipfsBase}${prefix}shu_0.png'">
+                        <h4>${attrName}${animal}（母）</h4>
                     </div>
                 `;
             });
             grid.innerHTML = html;
         }
 
-        let web3;
-        let account;
+        async function loadFenHongData() {
+            const account = ZODIAC_WEB3.getAccount();
+            if (!account) {
+                document.getElementById('totalPool').textContent = '0.0000';
+                document.getElementById('distributed').textContent = '0.0000';
+                document.getElementById('unclaimedDividend').textContent = '0.0000';
+                document.getElementById('holders').textContent = '0';
+                return;
+            }
 
-        document.addEventListener('DOMContentLoaded', function() {
+            try {
+                ZODIAC_UI.showLoading('加载分红数据...');
+                const rewardManager = await ZODIAC_WEB3.getContract('rewardManager');
+
+                const [totalPool, distributed, holders] = await Promise.all([
+                    rewardManager.methods.dividendPool().call(),
+                    rewardManager.methods.totalDistributed().call(),
+                    rewardManager.methods.holdersCount().call()
+                ]);
+
+                document.getElementById('totalPool').textContent = (totalPool / 1e18).toFixed(4);
+                document.getElementById('distributed').textContent = (distributed / 1e18).toFixed(4);
+                document.getElementById('holders').textContent = holders;
+
+                const [userDiv] = await rewardManager.methods.calcUserDividend(account).call();
+                document.getElementById('unclaimedDividend').textContent = (userDiv / 1e18).toFixed(4);
+            } catch (error) {
+                console.error('Load dividend data failed:', error);
+                ZODIAC_UI.showToast('加载分红数据失败', 'error');
+            } finally {
+                ZODIAC_UI.hideLoading();
+            }
+        }
+
+        function initCountdown() {
+            updateCountdown();
+            setInterval(updateCountdown, 1000);
+        }
+
+        function updateCountdown() {
+            const now = new Date();
+            const minutes = now.getMinutes();
+            const seconds = now.getSeconds();
+            let targetMinutes = minutes < 30 ? 30 : 60;
+            let minutesLeft = targetMinutes - minutes - 1;
+            let secondsLeft = 60 - seconds;
+            const formattedMinutes = String(minutesLeft).padStart(2, '0');
+            const formattedSeconds = String(secondsLeft).padStart(2, '0');
+            const countdownElement = document.getElementById('countdown');
+            if (countdownElement) {
+                countdownElement.textContent = `下次分红: ${formattedMinutes}:${formattedSeconds}`;
+            }
+        }
+
+        function openMobileMenu() {
+            ZODIAC_COMPONENTS.openMobileMenu();
+        }
+
+        document.addEventListener('DOMContentLoaded', async function() {
             particlesJS('particles-js', {
                 particles: {
                     number: { value: 80, density: { enable: true, value_area: 800 } },
@@ -708,109 +682,28 @@
             });
 
             renderZodiacCards('water');
-            initWeb3();
+
+            ZODIAC_COMPONENTS.injectNavigation('home');
+
+            await ZODIAC_WEB3.initWeb3();
+            ZODIAC_UI.initWalletButton('walletBtn', null, null);
+
+            ZODIAC_WEB3.on('connect', () => {
+                loadFenHongData();
+            });
+
+            ZODIAC_WEB3.on('disconnect', () => {
+                document.getElementById('totalPool').textContent = '0.0000';
+                document.getElementById('distributed').textContent = '0.0000';
+                document.getElementById('unclaimedDividend').textContent = '0.0000';
+                document.getElementById('holders').textContent = '0';
+            });
+
+            loadFenHongData();
             initCountdown();
-        });
 
-        async function initWeb3() {
-            if (typeof window.ethereum !== 'undefined') {
-                web3 = new Web3(window.ethereum);
-                try {
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    account = accounts[0];
-                    updateWalletButton();
-                    loadFenHongData();
-                } catch (error) {
-                    console.error('Web3 init failed:', error);
-                }
-            }
-        }
-
-        function updateWalletButton() {
-            const walletBtn = document.getElementById('walletBtn');
-            if (account) {
-                const shortAddress = account.substring(0, 4) + '...' + account.substring(account.length - 4);
-                walletBtn.textContent = shortAddress;
-                walletBtn.style.background = 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)';
-            }
-        }
-
-        async function loadFenHongData() {
-            if (!account || !web3) {
-                document.getElementById('totalPool').textContent = '0.0000';
-                document.getElementById('distributed').textContent = '0.0000';
-                document.getElementById('unclaimedDividend').textContent = '0.0000';
-                document.getElementById('holders').textContent = '0';
-                return;
-            }
-
-            try {
-                const rewardManager = new web3.eth.Contract(window.rewardManagerABI, window.rewardManagerAddress);
-
-                const [totalPool, distributed, holders] = await Promise.all([
-                    rewardManager.methods.dividendPool().call(),
-                    rewardManager.methods.totalDistributed().call(),
-                    rewardManager.methods.holdersCount().call()
-                ]);
-
-                document.getElementById('totalPool').textContent = (totalPool / 1e18).toFixed(4);
-                document.getElementById('distributed').textContent = (distributed / 1e18).toFixed(4);
-                document.getElementById('holders').textContent = holders;
-
-                const [userDiv] = await rewardManager.methods.calcUserDividend(account).call();
-                document.getElementById('unclaimedDividend').textContent = (userDiv / 1e18).toFixed(4);
-            } catch (error) {
-                console.error('Load dividend data failed:', error);
-                document.getElementById('totalPool').textContent = '0.0000';
-                document.getElementById('distributed').textContent = '0.0000';
-                document.getElementById('unclaimedDividend').textContent = '0.0000';
-                document.getElementById('holders').textContent = '0';
-            }
-        }
-
-        document.getElementById('walletBtn').addEventListener('click', function() {
-            initWeb3();
-        });
-
-        function initCountdown() {
-            updateCountdown();
-            setInterval(updateCountdown, 1000);
-        }
-
-        function updateCountdown() {
-            const now = new Date();
-            const minutes = now.getMinutes();
-            const seconds = now.getSeconds();
-            let targetMinutes = minutes < 30 ? 30 : 60;
-            let minutesLeft = targetMinutes - minutes - 1;
-            let secondsLeft = 60 - seconds;
-            const totalSecondsLeft = minutesLeft * 60 + secondsLeft;
-            const formattedMinutes = String(minutesLeft).padStart(2, '0');
-            const formattedSeconds = String(secondsLeft).padStart(2, '0');
-            const countdownElement = document.getElementById('countdown');
-            if (countdownElement) {
-                countdownElement.textContent = `下次分红: ${formattedMinutes}:${formattedSeconds}`;
-            }
-        }
-
-        function openMobileMenu() {
-            document.getElementById('mobileMenu').classList.remove('translate-x-full');
-            document.getElementById('mobileMenuOverlay').classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeMobileMenu() {
-            document.getElementById('mobileMenu').classList.add('translate-x-full');
-            document.getElementById('mobileMenuOverlay').classList.add('hidden');
-            document.body.style.overflow = '';
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('menuBtn').addEventListener('click', openMobileMenu);
-            document.getElementById('moreMenuBtn').addEventListener('click', openMobileMenu);
-            document.getElementById('closeMenuBtn').addEventListener('click', closeMobileMenu);
         });
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
 </body>
 </html>

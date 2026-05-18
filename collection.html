@@ -9,7 +9,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
-    <script src="abis.js"></script>
+    <script src="config.js"></script>
+    <script src="components.js"></script>
     <script src="utils.js"></script>
     <script src="web3-utils.js"></script>
     <script src="ui-utils.js"></script>
@@ -152,12 +153,12 @@
         </div>
     </nav>
 
-    <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 z-40 md:hidden hidden" onclick="closeMobileMenu()"></div>
-    <div id="mobileMenu" class="fixed right-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50 md:hidden transform translate-x-full transition-transform duration-300 overflow-y-auto">
+    <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 z-40 md:hidden hidden" onclick="ZODIAC_COMPONENTS.closeMobileMenu()"></div>
+        <div id="mobileMenu" class="fixed right-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50 md:hidden transform translate-x-full transition-transform duration-300 overflow-y-auto">
         <div class="p-4 border-b">
             <div class="flex justify-between items-center">
                 <span class="font-bold text-gray-800">导航菜单</span>
-                <button id="closeMenuBtn" class="p-2 hover:bg-gray-100 rounded-lg" onclick="closeMobileMenu()">
+                <button id="closeMenuBtn" class="p-2 hover:bg-gray-100 rounded-lg" onclick="ZODIAC_COMPONENTS.closeMobileMenu()">
                     <i class="fas fa-times text-gray-600"></i>
                 </button>
             </div>
@@ -252,7 +253,7 @@
                     <span class="text-sm text-gray-500">钱包</span>
                     <span id="walletAddressDesktop" class="text-sm font-medium text-gray-700">未连接</span>
                 </div>
-                <button id="connectWalletBtnDesktop" class="w-full btn-primary py-2 rounded-lg text-white font-medium" onclick="handleConnectWallet()">
+                <button id="connectWalletBtnDesktop" class="w-full btn-primary py-2 rounded-lg text-white font-medium" onclick="ZODIAC_COMPONENTS.handleConnectWallet()">
                     <i class="fas fa-plug mr-2"></i> 连接钱包
                 </button>
             </div>
@@ -408,7 +409,7 @@
         function initWalletUI() {
             ZODIAC_UI.initWalletButton('connectWalletBtn', 'walletAddress', null);
             ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddressDesktop', null);
-            ZODIAC_UI.on('walletConnected', async () => {
+            window.ZODIAC_WEB3.on('connect', async () => {
                 await initContracts();
                 await loadUserTokens();
                 await updateDividends();

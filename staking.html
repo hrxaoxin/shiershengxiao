@@ -9,7 +9,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
-    <script src="abis.js"></script>
+    <script src="config.js"></script>
+    <script src="components.js"></script>
     <script src="utils.js"></script>
     <script src="web3-utils.js"></script>
     <script src="ui-utils.js"></script>
@@ -232,7 +233,7 @@
                     <span class="text-sm text-gray-500">钱包</span>
                     <span id="walletAddressDesktop" class="text-sm font-medium text-gray-700">未连接</span>
                 </div>
-                <button id="connectWalletBtnDesktop" class="w-full btn-primary py-2 rounded-lg text-white font-medium" onclick="handleConnectWallet()">
+                <button id="connectWalletBtnDesktop" class="w-full btn-primary py-2 rounded-lg text-white font-medium" onclick="ZODIAC_COMPONENTS.handleConnectWallet()">
                     <i class="fas fa-plug mr-2"></i> 连接钱包
                 </button>
             </div>
@@ -683,7 +684,7 @@
 
         async function loadContractInfo() {
             try {
-                const balance = await tokenContract.methods.balanceOf(window.contractAddresses.staking).call();
+                const balance = await tokenContract.methods.balanceOf(ZODIAC_CONFIG.CONTRACT_ADDRESSES.staking).call();
                 const balanceFormatted = web3.utils.fromWei(balance, 'ether');
                 document.getElementById('contractBalance').textContent = balanceFormatted.substring(0, 6);
 
@@ -699,7 +700,7 @@
 
         async function loadEstimatedReward() {
             try {
-                const balance = await tokenContract.methods.balanceOf(window.contractAddresses.staking).call();
+                const balance = await tokenContract.methods.balanceOf(ZODIAC_CONFIG.CONTRACT_ADDRESSES.staking).call();
                 const totalStakedNFTs = await stakingContract.methods.totalStakedNFTs().call();
                 const currentReleaseRatio = await stakingContract.methods.getCurrentReleaseRatio().call();
                 
@@ -734,7 +735,7 @@
         async function stakeNFTs() {
             if (selectedNFTs.length === 0) return;
 
-            const stakingAddress = window.contractAddresses.staking;
+            const stakingAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.staking;
             if (!stakingAddress || stakingAddress === '0x0000000000000000000000000000000000000000') {
                 ZODIAC_UI.showToast('质押合约地址未配置，请联系管理员部署合约', 'error');
                 return;
@@ -921,7 +922,7 @@
                 return;
             }
 
-            const tokenStakingAddress = window.contractAddresses.tokenStaking;
+            const tokenStakingAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenStaking;
             if (!tokenStakingAddress || tokenStakingAddress === '0x0000000000000000000000000000000000000000') {
                 ZODIAC_UI.showToast('代币质押合约地址未配置', 'error');
                 return;

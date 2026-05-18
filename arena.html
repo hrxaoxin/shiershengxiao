@@ -8,7 +8,12 @@
     <link rel="icon" href="images/fu-cards/shuishu_1.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/web3@4.1.0/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.7.3/dist/web3.min.js"></script>
+    <script src="config.js"></script>
+    <script src="components.js"></script>
+    <script src="utils.js"></script>
+    <script src="web3-utils.js"></script>
+    <script src="ui-utils.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
@@ -356,7 +361,7 @@
                     <span class="text-sm text-gray-500">钱包</span>
                     <span id="walletAddressDesktop" class="text-sm font-medium text-gray-700">未连接</span>
                 </div>
-                <button id="connectWalletBtnDesktop" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors" onclick="handleConnectWallet()">
+                <button id="connectWalletBtnDesktop" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors" onclick="ZODIAC_COMPONENTS.handleConnectWallet()">
                     <i class="fas fa-plug mr-2"></i> 连接钱包
                 </button>
             </div>
@@ -780,8 +785,6 @@
         </div>
     </div>
 
-    <script src="abis.js"></script>
-    <script src="utils.js"></script>
     <script>
         let selectedNft = null;
         let selectedOpponent = null;
@@ -944,9 +947,9 @@
         }
 
         async function initContracts() {
-            battleContract = new web3.eth.Contract(window.battleABI, window.contractAddresses.battle);
-            arenaContract = new web3.eth.Contract(window.arenaABI, window.contractAddresses.arena);
-            nftContract = new web3.eth.Contract(window.nftABI, window.contractAddresses.nft);
+            battleContract = new web3.eth.Contract(window.battleABI, ZODIAC_CONFIG.CONTRACT_ADDRESSES.battle);
+            arenaContract = new web3.eth.Contract(window.arenaABI, ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena);
+            nftContract = new web3.eth.Contract(window.nftABI, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nft);
         }
 
         async function loadMyNfts() {
@@ -1288,7 +1291,7 @@
                     rewardPoolWei = await arenaContract.methods.getCurrentRewardPool().call();
                 } catch (e) {
                     // 如果没有这个方法，使用合约余额计算
-                    const balance = await web3.eth.getBalance(window.contractAddresses.arena);
+                    const balance = await web3.eth.getBalance(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena);
                     const rewardRate = await arenaContract.methods.seasonRewardRate().call();
                     rewardPoolWei = (balance * rewardRate) / 10000;
                 }
