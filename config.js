@@ -28,8 +28,8 @@ window.ZODIAC_CONFIG = (function() {
     };
 
     const WEIGHTS = {
-        normal: { 1: 1, 2: 2, 3: 4, 4: 12, 5: 48 },
-        rare: { 1: 10, 2: 12, 3: 14, 4: 22, 5: 58 }
+        normal: { 1: 1, 2: 2, 3: 6, 4: 18, 5: 66 },
+        rare: { 1: 10, 2: 12, 3: 16, 4: 28, 5: 76 }
     };
 
     const TAX_RATES = {

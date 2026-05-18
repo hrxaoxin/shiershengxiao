@@ -112,6 +112,22 @@ window.ZODIAC_WEB3 = (function() {
         });
     }
 
+    function requireInitialized() {
+        if (!web3) {
+            const error = new Error('Web3 not initialized');
+            error.code = 'WEB3_NOT_INITIALIZED';
+            throw error;
+        }
+    }
+
+    function requireConnected() {
+        if (!isConnected) {
+            const error = new Error('Wallet not connected');
+            error.code = 'WALLET_NOT_CONNECTED';
+            throw error;
+        }
+    }
+
     function on(eventName, callback) {
         if (!eventListeners[eventName]) {
             eventListeners[eventName] = [];
@@ -464,6 +480,8 @@ window.ZODIAC_WEB3 = (function() {
         getCache,
         setCache,
         clearCache,
-        isCacheValid
+        isCacheValid,
+        requireInitialized: withErrorHandling(requireInitialized),
+        requireConnected: withErrorHandling(requireConnected)
     };
 })();

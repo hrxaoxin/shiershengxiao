@@ -86,137 +86,9 @@
 <body>
     <div id="particles-js"></div>
 
-    <nav class="navbar fixed bottom-0 left-0 right-0 z-10 md:hidden">
-        <div class="flex justify-around items-center py-2 px-4">
-            <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1">🏠</div>
-                <span class="text-xs font-bold text-gray-700">首页</span>
-            </a>
-            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl bg-gray-100">
-                <div class="text-2xl mb-1">🃏</div>
-                <span class="text-xs font-bold text-gray-700">铸造</span>
-            </a>
-            <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1">🎁</div>
-                <span class="text-xs font-bold text-gray-700">生肖</span>
-            </a>
-            <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1">🏆</div>
-                <span class="text-xs font-bold text-gray-700">奖励</span>
-            </a>
-            <button id="moreMenuBtn" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100" onclick="ZODIAC_COMPONENTS.openMobileMenu()">
-                <div class="text-2xl mb-1">☰</div>
-                <span class="text-xs font-bold text-gray-700">更多</span>
-            </button>
-        </div>
-    </nav>
-
-    <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 z-40 md:hidden hidden" onclick="ZODIAC_COMPONENTS.closeMobileMenu()"></div>
-    <div id="mobileMenu" class="fixed right-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50 md:hidden transform translate-x-full transition-transform duration-300 overflow-y-auto">
-        <div class="p-4 border-b">
-            <div class="flex justify-between items-center">
-                <span class="font-bold text-gray-800">导航菜单</span>
-                <button id="closeMenuBtn" class="p-2 hover:bg-gray-100 rounded-lg" onclick="ZODIAC_COMPONENTS.closeMobileMenu()">
-                    <i class="fas fa-times text-gray-600"></i>
-                </button>
-            </div>
-        </div>
-        <div class="p-4 space-y-2">
-            <a href="index.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">🏠</span>
-                <span class="text-gray-700">首页</span>
-            </a>
-            <a href="mint.html" class="flex items-center px-4 py-3 rounded-lg bg-gray-100">
-                <span class="text-xl mr-3">🃏</span>
-                <span class="text-gray-700">铸造</span>
-            </a>
-            <a href="collection.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">🎁</span>
-                <span class="text-gray-700">生肖</span>
-            </a>
-            <a href="rewards.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">🏆</span>
-                <span class="text-gray-700">奖励</span>
-            </a>
-            <a href="upgrade.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">⭐</span>
-                <span class="text-gray-700">升阶</span>
-            </a>
-            <a href="trading.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">💰</span>
-                <span class="text-gray-700">交易</span>
-            </a>
-            <a href="breeding.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">🐾</span>
-                <span class="text-gray-700">孕育</span>
-            </a>
-            <a href="staking.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">⚡</span>
-                <span class="text-gray-700">挖矿</span>
-            </a>
-            <a href="arena.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">⚔️</span>
-                <span class="text-gray-700">竞技</span>
-            </a>
-        </div>
-    </div>
-
-    <div class="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-white shadow-lg z-20 overflow-y-auto">
-        <div class="p-6">
-            <div class="text-center mb-8">
-                <div class="text-4xl mb-2">🐾</div>
-                <h1 class="text-xl font-bold text-gray-800">十二生肖</h1>
-                <p class="text-sm text-gray-500">Twelve Zodiacs</p>
-            </div>
-            <div class="space-y-2">
-                <a href="index.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🏠</span>
-                    <span class="text-gray-700">首页</span>
-                </a>
-                <a href="mint.html" class="flex items-center px-4 py-3 rounded-lg bg-blue-50 text-blue-600">
-                    <span class="text-xl mr-3">🃏</span>
-                    <span class="font-medium">铸造</span>
-                </a>
-                <a href="collection.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🎁</span>
-                    <span class="text-gray-700">生肖</span>
-                </a>
-                <a href="rewards.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🏆</span>
-                    <span class="text-gray-700">奖励</span>
-                </a>
-                <a href="upgrade.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">⭐</span>
-                    <span class="text-gray-700">升阶</span>
-                </a>
-                <a href="trading.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">💰</span>
-                    <span class="text-gray-700">交易</span>
-                </a>
-                <a href="breeding.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🐾</span>
-                    <span class="text-gray-700">孕育</span>
-                </a>
-                <a href="staking.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">⚡</span>
-                    <span class="text-gray-700">挖矿</span>
-                </a>
-                <a href="arena.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">⚔️</span>
-                    <span class="text-gray-700">竞技</span>
-                </a>
-            </div>
-            <div class="mt-8 pt-6 border-t border-gray-200">
-                <div class="flex items-center justify-between mb-4">
-                    <span class="text-sm text-gray-500">钱包</span>
-                    <span id="walletAddressDesktop" class="text-sm font-medium text-gray-700">未连接</span>
-                </div>
-                <button id="connectWalletBtnDesktop" class="w-full btn-primary py-2 rounded-lg text-white font-medium" onclick="ZODIAC_COMPONENTS.handleConnectWallet()">
-                    <i class="fas fa-plug mr-2"></i> 连接钱包
-                </button>
-            </div>
-        </div>
-    </div>
+    <div id="mobileNavbarContainer"></div>
+    <div id="mobileMenuContainer"></div>
+    <div id="desktopSidebarContainer"></div>
 
     <main class="px-4 pt-6 pb-24 md:pl-72">
         <div class="flex items-center mb-4">
@@ -354,8 +226,6 @@
     </div>
 
     <script>
-        let web3;
-        let account;
         let tokenContract;
         let tokenBurnerContract;
         let nftMintContract;
@@ -406,8 +276,6 @@
             ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddressDesktop', null);
 
             ZODIAC_WEB3.on('connect', async () => {
-                account = ZODIAC_WEB3.getAccount();
-                web3 = ZODIAC_WEB3.getWeb3();
                 await initContracts();
                 await fetchMintCosts();
                 await updateTokenBalance();
@@ -416,7 +284,6 @@
             });
 
             ZODIAC_WEB3.on('disconnect', () => {
-                account = null;
                 document.getElementById('tokenBalance').textContent = '0';
                 document.getElementById('approvalStatus').textContent = '未授权';
                 document.getElementById('approvalStatus').style.color = '#f44336';
@@ -437,6 +304,8 @@
 
         async function updateTokenBalance() {
             try {
+                const account = ZODIAC_WEB3.getAccount();
+                const web3 = ZODIAC_WEB3.getWeb3();
                 if (!account || !tokenContract) return;
                 const balance = await tokenContract.methods.balanceOf(account).call();
                 const balanceInTokens = web3.utils.fromWei(balance, 'ether');
@@ -479,6 +348,7 @@
 
         async function checkApprovalStatus() {
             try {
+                const account = ZODIAC_WEB3.getAccount();
                 if (!account || !tokenContract) return;
                 
                 const burnerAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenBurner;
@@ -555,6 +425,8 @@
                 }
 
                 const burnerAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenBurner;
+                const web3 = ZODIAC_WEB3.getWeb3();
+                const account = ZODIAC_WEB3.getAccount();
 
                 const amountInWei = web3.utils.toWei(MINT_PRICE.toString(), 'ether');
                 const lightDarkCostInWei = web3.utils.toWei(LIGHT_DARK_COST.toString(), 'ether');
@@ -626,6 +498,7 @@
         });
 
         async function handleMint(methodName, cost, displayName, btn, extraArgs = []) {
+            const account = ZODIAC_WEB3.getAccount();
             if (!account || !nftMintContract) return;
 
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 铸造中...';
@@ -691,6 +564,10 @@
         document.getElementById('viewCollection').addEventListener('click', function() {
             document.getElementById('mintSuccessModal').classList.add('hidden');
             window.location.href = 'collection.html';
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            ZODIAC_COMPONENTS.injectNavigation('mint');
         });
     </script>
 </body>

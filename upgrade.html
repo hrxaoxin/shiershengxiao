@@ -189,6 +189,10 @@
 <body>
     <div id="particles-js"></div>
 
+    <div id="mobileNavbarContainer"></div>
+    <div id="mobileMenuContainer"></div>
+    <div id="desktopSidebarContainer"></div>
+
     <div class="min-h-screen pb-20 md:pb-0">
         <header class="container mx-auto px-4 py-6 title-section md:pl-72">
             <div class="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -262,138 +266,6 @@
             <p class="mt-2">祝你心想事成，生肖大旺 🐾✨</p>
         </footer>
     </div>
-
-    <nav class="navbar fixed bottom-0 left-0 right-0 z-50 md:hidden">
-        <div class="flex justify-around items-center py-2 px-4">
-            <a href="index.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1">🏠</div>
-                <span class="text-xs font-bold text-gray-700">首页</span>
-            </a>
-            <a href="mint.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1">🃏</div>
-                <span class="text-xs font-bold text-gray-700">铸造</span>
-            </a>
-            <a href="collection.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1">🎁</div>
-                <span class="text-xs font-bold text-gray-700">生肖</span>
-            </a>
-            <a href="rewards.html" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100">
-                <div class="text-2xl mb-1">🏆</div>
-                <span class="text-xs font-bold text-gray-700">奖励</span>
-            </a>
-            <button id="moreMenuBtn" class="flex flex-col items-center justify-center w-full py-2 px-4 rounded-xl transition-all duration-300 hover:bg-gray-100" onclick="openMobileMenu()">
-                <div class="text-2xl mb-1">☰</div>
-                <span class="text-xs font-bold text-gray-700">更多</span>
-            </button>
-        </div>
-    </nav>
-
-    <div id="mobileMenuOverlay" class="fixed inset-0 bg-black/50 z-45 md:hidden hidden" onclick="ZODIAC_COMPONENTS.closeMobileMenu()"></div>
-        <div id="mobileMenu" class="fixed right-0 top-0 bottom-0 w-64 bg-white shadow-xl z-50 md:hidden transform translate-x-full transition-transform duration-300 overflow-y-auto">
-        <div class="p-4 border-b">
-            <div class="flex justify-between items-center">
-                <span class="font-bold text-gray-800">导航菜单</span>
-                <button id="closeMenuBtn" class="p-2 hover:bg-gray-100 rounded-lg" onclick="ZODIAC_COMPONENTS.closeMobileMenu()">
-                    <i class="fas fa-times text-gray-600"></i>
-                </button>
-            </div>
-        </div>
-        <div class="p-4 space-y-2">
-            <a href="index.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">🏠</span>
-                <span class="text-gray-700">首页</span>
-            </a>
-            <a href="mint.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">🃏</span>
-                <span class="text-gray-700">铸造</span>
-            </a>
-            <a href="collection.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">🎁</span>
-                <span class="text-gray-700">生肖</span>
-            </a>
-            <a href="rewards.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">🏆</span>
-                <span class="text-gray-700">奖励</span>
-            </a>
-            <a href="upgrade.html" class="flex items-center px-4 py-3 rounded-lg bg-gray-100">
-                <span class="text-xl mr-3">⭐</span>
-                <span class="text-gray-700">升阶</span>
-            </a>
-            <a href="trading.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">💰</span>
-                <span class="text-gray-700">交易</span>
-            </a>
-            <a href="breeding.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">🐾</span>
-                <span class="text-gray-700">孕育</span>
-            </a>
-            <a href="staking.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">⚡</span>
-                <span class="text-gray-700">挖矿</span>
-            </a>
-            <a href="arena.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-xl mr-3">⚔️</span>
-                <span class="text-gray-700">竞技</span>
-            </a>
-        </div>
-    </div>
-
-    <nav class="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-white shadow-lg z-20 overflow-y-auto">
-        <div class="p-6">
-            <div class="text-center mb-8">
-                <div class="text-4xl mb-2">🐾</div>
-                <h1 class="text-xl font-bold text-gray-800">十二生肖</h1>
-                <p class="text-sm text-gray-500">Twelve Zodiacs</p>
-            </div>
-            <div class="space-y-2">
-                <a href="index.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🏠</span>
-                    <span class="text-gray-700">首页</span>
-                </a>
-                <a href="mint.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🃏</span>
-                    <span class="text-gray-700">铸造</span>
-                </a>
-                <a href="collection.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🎁</span>
-                    <span class="text-gray-700">生肖</span>
-                </a>
-                <a href="rewards.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🏆</span>
-                    <span class="text-gray-700">奖励</span>
-                </a>
-                <a href="upgrade.html" class="flex items-center px-4 py-3 rounded-lg bg-purple-50 text-purple-600">
-                    <span class="text-xl mr-3">⭐</span>
-                    <span class="font-medium">升阶</span>
-                </a>
-                <a href="trading.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">💰</span>
-                    <span class="text-gray-700">交易</span>
-                </a>
-                <a href="breeding.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">🐾</span>
-                    <span class="text-gray-700">孕育</span>
-                </a>
-                <a href="staking.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">⚡</span>
-                    <span class="text-gray-700">挖矿</span>
-                </a>
-                <a href="arena.html" class="flex items-center px-4 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-                    <span class="text-xl mr-3">⚔️</span>
-                    <span class="text-gray-700">竞技</span>
-                </a>
-            </div>
-            <div class="mt-8 pt-6 border-t border-gray-200">
-                <div class="flex items-center justify-between mb-4">
-                    <span class="text-sm text-gray-500">钱包</span>
-                    <span id="walletAddressDesktop" class="text-sm font-medium text-gray-700">未连接</span>
-                </div>
-                <button id="connectWalletBtnDesktop" class="w-full wallet-button py-2 rounded-lg text-white font-medium" onclick="handleConnectWallet()">
-                    <i class="fas fa-plug mr-2"></i> 连接钱包
-                </button>
-            </div>
-        </div>
-    </nav>
 
     <script>
         let web3;
@@ -600,7 +472,7 @@
                     return;
                 }
 
-                const gas = await ZODIAC_UI.estimateGas(nftUpdateContract, 'upgradeWithNFT', [selectedNft.id], account);
+                const gas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithNFT', [selectedNft.id], account);
                 const result = await nftUpdateContract.methods.upgradeWithNFT(selectedNft.id).send({ 
                     from: account,
                     gas: gas
@@ -654,14 +526,14 @@
 
                 const allowance = await tokenContract.methods.allowance(account, nftUpdateAddress).call();
                 if (parseInt(allowance) < web3.utils.toWei(requiredTokens.toString(), 'ether')) {
-                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [nftUpdateAddress, web3.utils.toWei(requiredTokens.toString(), 'ether')], account);
+                    const approveGas = await ZODIAC_WEB3.estimateGas(tokenContract, 'approve', [nftUpdateAddress, web3.utils.toWei(requiredTokens.toString(), 'ether')], account);
                     await tokenContract.methods.approve(nftUpdateAddress, web3.utils.toWei(requiredTokens.toString(), 'ether')).send({ 
                         from: account,
                         gas: approveGas
                     });
                 }
 
-                const gas = await ZODIAC_UI.estimateGas(nftUpdateContract, 'upgradeWithToken', [selectedNft.id], account);
+                const gas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithToken', [selectedNft.id], account);
                 const result = await nftUpdateContract.methods.upgradeWithToken(selectedNft.id).send({ 
                     from: account,
                     gas: gas
@@ -729,7 +601,7 @@
                 const allowance = await tokenContract.methods.allowance(account, nftUpdateAddress).call();
                 if (parseInt(allowance) < requiredTokens) {
                     btn.textContent = '授权中...';
-                    const approveGas = await ZODIAC_UI.estimateGas(tokenContract, 'approve', [nftUpdateAddress, requiredTokens], account);
+                    const approveGas = await ZODIAC_WEB3.estimateGas(tokenContract, 'approve', [nftUpdateAddress, requiredTokens], account);
                     await tokenContract.methods.approve(nftUpdateAddress, requiredTokens).send({ 
                         from: account,
                         gas: approveGas
@@ -737,7 +609,7 @@
                 }
 
                 btn.textContent = '升级中...';
-                const gas = await ZODIAC_UI.estimateGas(nftUpdateContract, 'upgradeWithUSDValue', [selectedNft.id], account);
+                const gas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithUSDValue', [selectedNft.id], account);
                 const result = await nftUpdateContract.methods.upgradeWithUSDValue(selectedNft.id).send({ 
                     from: account,
                     gas: gas
@@ -811,17 +683,9 @@
             return window.ZODIAC_UTILS.getStars(parseInt(level));
         }
 
-        function openMobileMenu() {
-            document.getElementById('mobileMenu').classList.remove('translate-x-full');
-            document.getElementById('mobileMenuOverlay').classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-        }
-
-        function closeMobileMenu() {
-            document.getElementById('mobileMenu').classList.add('translate-x-full');
-            document.getElementById('mobileMenuOverlay').classList.add('hidden');
-            document.body.style.overflow = '';
-        }
+        document.addEventListener('DOMContentLoaded', function() {
+            ZODIAC_COMPONENTS.injectNavigation('upgrade');
+        });
     </script>
 </body>
 </html>
