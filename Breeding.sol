@@ -33,8 +33,6 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
     address public nftContract;
     /** @dev 授权合约地址 */
     address public authorizer;
-    /** @dev 竞技场排名合约地址（用于检查NFT是否在竞技场中）*/
-    address public arenaRankingContract;
 
     /**
      * @dev 繁殖订单结构体
@@ -166,13 +164,6 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         require(level1 == MIN_BREEDING_LEVEL, "Breeding: First NFT level too low");
         require(level2 == MIN_BREEDING_LEVEL, "Breeding: Second NFT level too low");
 
-        if (arenaRankingContract != address(0)) {
-            require(!IArenaRanking(arenaRankingContract).isNFTInArena(tokenId1), 
-                    "Breeding: First NFT is in arena team");
-            require(!IArenaRanking(arenaRankingContract).isNFTInArena(tokenId2), 
-                    "Breeding: Second NFT is in arena team");
-        }
-
         require(tokenToOrderId[tokenId1] == 0, "Breeding: Token1 already in breeding");
         require(tokenToOrderId[tokenId2] == 0, "Breeding: Token2 already in breeding");
 
@@ -224,11 +215,6 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         require(level == MIN_BREEDING_LEVEL, "Breeding: NFT level too low");
         require(tokenToOrderId[tokenId] == 0, "Breeding: Token already in breeding");
 
-        if (arenaRankingContract != address(0)) {
-            require(!IArenaRanking(arenaRankingContract).isNFTInArena(tokenId), 
-                    "Breeding: NFT is in arena team");
-        }
-
         require(nft.isApprovedForAll(msg.sender, address(this)) || nft.getApproved(tokenId) == address(this), 
                 "Breeding: Contract not approved");
 
@@ -274,11 +260,6 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         uint8 level = nft.tokenLevel(tokenId);
         require(level == MIN_BREEDING_LEVEL, "Breeding: NFT level too low");
         require(tokenToOrderId[tokenId] == 0, "Breeding: Token already in breeding");
-
-        if (arenaRankingContract != address(0)) {
-            require(!IArenaRanking(arenaRankingContract).isNFTInArena(tokenId), 
-                    "Breeding: NFT is in arena team");
-        }
 
         NFTDataTypes.ZodiacType type1 = nft.tokenType(order.tokenId1);
         NFTDataTypes.ZodiacType type2 = nft.tokenType(tokenId);
@@ -549,9 +530,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
      * @dev 设置竞技场排名合约地址
      * @param _arenaRankingContract 竞技场排名合约地址
      */
-    function setArenaRankingContract(address _arenaRankingContract) external onlyOwner {
-        arenaRankingContract = _arenaRankingContract;
-    }
+    
 
     /**
      * @dev 设置授权合约地址

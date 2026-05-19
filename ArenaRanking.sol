@@ -505,11 +505,17 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     }
 
     function _isMockPlayer(address player) internal view returns (bool) {
+        if (player == address(0)) {
+            return true;
+        }
         uint256 mockRank = _getMockPlayerRank(player);
         return mockRank > 0 && mockRank <= mockPlayerCount && isMockPlayerActive[mockRank];
     }
 
     function _getMockPlayerRank(address player) internal pure returns (uint256) {
+        if (player == address(0)) {
+            return 1;
+        }
         if (player >= address(1) && player <= address(20)) {
             return uint256(uint160(player));
         }

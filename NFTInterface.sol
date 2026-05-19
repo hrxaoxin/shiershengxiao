@@ -365,6 +365,20 @@ interface INFTMint {
 }
 
 /**
+ * @title IRewardManagerExt
+ * @dev 奖励管理合约扩展接口（用于Authorizer授权配置）
+ */
+interface IRewardManagerExt {
+    function setAuthorizedNFTContract(address nft, bool ok) external;
+    function setNFTContract(address _newNFTContract) external;
+    function setNFTDataContract(address _nftDataContract) external;
+    function setAuthorizer(address _authorizer) external;
+    function setStakingContract(address _stakingContract) external;
+    function setTokenStakingContract(address _tokenStakingContract) external;
+    function setArenaContract(address _arenaContract) external;
+}
+
+/**
  * @title IRewardManager
  * @dev 奖励管理合约接口
  */
@@ -851,23 +865,7 @@ interface IStaking {
     function setArenaRankingContract(address _arenaRankingContract) external;
 }
 
-/**
- * @title ITokenStaking
- * @dev 代币质押合约接口
- */
-interface ITokenStaking {
-    /**
-     * @dev 设置代币合约地址
-     * @param tokenContract 代币合约地址
-     */
-    function setTokenContract(address tokenContract) external;
-    
-    /**
-     * @dev 设置授权合约地址
-     * @param a 授权合约地址
-     */
-    function setAuthorizer(address a) external;
-}
+
 
 /**
  * @title INFTUpdate

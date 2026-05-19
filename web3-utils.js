@@ -4,7 +4,7 @@ window.ZODIAC_WEB3 = (function() {
     let isConnected = false;
     let contracts = {};
     let cacheData = {};
-    let cacheExpiryTime = 5 * 60 * 1000;
+    let cacheAccessOrder = [];
 
     function getCache(key) {
         const item = cacheData[key];
@@ -12,18 +12,33 @@ window.ZODIAC_WEB3 = (function() {
         
         if (Date.now() > item.expiry) {
             delete cacheData[key];
+            const idx = cacheAccessOrder.indexOf(key);
+            if (idx > -1) cacheAccessOrder.splice(idx, 1);
             return null;
         }
+        
+        const idx = cacheAccessOrder.indexOf(key);
+        if (idx > -1) cacheAccessOrder.splice(idx, 1);
+        cacheAccessOrder.push(key);
         
         return item.value;
     }
 
-    function setCache(key, value, ttl = cacheExpiryTime) {
+    function setCache(key, value, ttl = CACHE_TTL) {
+        if (cacheAccessOrder.length >= MAX_CACHE_SIZE) {
+            const oldestKey = cacheAccessOrder.shift();
+            delete cacheData[oldestKey];
+        }
+        
+        const existingIdx = cacheAccessOrder.indexOf(key);
+        if (existingIdx > -1) cacheAccessOrder.splice(existingIdx, 1);
+        
         cacheData[key] = {
             value,
             expiry: Date.now() + ttl,
             timestamp: Date.now()
         };
+        cacheAccessOrder.push(key);
     }
 
     function clearCache(key) {
@@ -39,6 +54,91 @@ window.ZODIAC_WEB3 = (function() {
         if (!item) return false;
         return Date.now() <= item.expiry;
     }
+
+    function getCacheStats() {
+        return {
+            size: Object.keys(cacheData).length,
+            maxSize: MAX_CACHE_SIZE,
+            ttl: CACHE_TTL
+        };
+    }
+    
+    async function subscribeToContractEvent(contractName, eventName, callback, options = {}) {
+        const key = `${contractName}:${eventName}:${JSON.stringify(options)}`;
+        
+        if (contractEventSubscriptions.has(key)) {
+            console.warn(`Subscription already exists for ${key}`);
+            return;
+        }
+        
+        try {
+            const contract = await getContract(contractName);
+            const eventOptions = {
+                fromBlock: options.fromBlock || 'latest',
+                ...options.filter || {}
+            };
+            
+            const subscription = contract.events[eventName](eventOptions, (error, event) => {
+                if (error) {
+                    console.error(`Event subscription error (${contractName}.${eventName}):`, error);
+                    return;
+                }
+                try {
+                    callback(event);
+                } catch (cbError) {
+                    console.error(`Event callback error (${contractName}.${eventName}):`, cbError);
+                }
+            });
+            
+            contractEventSubscriptions.set(key, {
+                subscription,
+                contractName,
+                eventName,
+                callback
+            });
+            
+            return key;
+        } catch (error) {
+            console.error(`Failed to subscribe to event ${contractName}.${eventName}:`, error);
+            throw error;
+        }
+    }
+
+    function unsubscribeFromContractEvent(subscriptionKey) {
+        const sub = contractEventSubscriptions.get(subscriptionKey);
+        if (!sub) {
+            console.warn(`No subscription found for key: ${subscriptionKey}`);
+            return false;
+        }
+        
+        try {
+            sub.subscription.unsubscribe((error, success) => {
+                if (error) {
+                    console.error(`Unsubscribe error:`, error);
+                }
+            });
+            contractEventSubscriptions.delete(subscriptionKey);
+            return true;
+        } catch (error) {
+            console.error(`Failed to unsubscribe from ${subscriptionKey}:`, error);
+            return false;
+        }
+    }
+
+    function unsubscribeAllContractEvents() {
+        contractEventSubscriptions.forEach((sub, key) => {
+            try {
+                sub.subscription.unsubscribe();
+            } catch (error) {
+                console.error(`Error unsubscribing ${key}:`, error);
+            }
+        });
+        contractEventSubscriptions.clear();
+    }
+
+    function getActiveSubscriptions() {
+        return Array.from(contractEventSubscriptions.keys());
+    }
     
     const eventListeners = {
         'connect': [],
@@ -48,6 +148,9 @@ window.ZODIAC_WEB3 = (function() {
     };
 
     const registeredListeners = new Map();
+    const contractEventSubscriptions = new Map();
+    const MAX_CACHE_SIZE = 1000;
+    const CACHE_TTL = 5 * 60 * 1000;
 
     const ERROR_CODES = {
         4001: '用户拒绝了操作',
@@ -481,6 +584,11 @@ window.ZODIAC_WEB3 = (function() {
         setCache,
         clearCache,
         isCacheValid,
+        getCacheStats,
+        subscribeToContractEvent: withErrorHandling(subscribeToContractEvent),
+        unsubscribeFromContractEvent,
+        unsubscribeAllContractEvents,
+        getActiveSubscriptions,
         requireInitialized: withErrorHandling(requireInitialized),
         requireConnected: withErrorHandling(requireConnected)
     };

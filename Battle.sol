@@ -19,8 +19,6 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     uint256 public constant TEAM_SIZE = 6;
     uint256 public constant FRONT_ROW_SIZE = 3;
     
-    enum Element { Water, Wind, Fire, Dark, Light }
-    
     enum SkillType { 
         Attack,    // 攻击型技能
         Defense,   // 防御型技能
@@ -69,7 +67,7 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         uint256 level;         // NFT等级
         uint256 growthValue;   // 成长值（10-100）
         uint256 tokenId;       // NFT ID
-        Element element;       // 属性（五行）
+        NFTDataTypes.ElementType element;       // 属性（五行）
         uint256 zodiac;        // 生肖索引（0-11）
         uint256 gender;        // 性别（0=雄，1=雌）
         bool isFrontRow;       // 是否在前排
@@ -339,13 +337,13 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @param tokenType NFT类型编码
      * @return Element 属性枚举值
      */
-    function getElementFromTokenType(uint256 tokenType) public pure returns (Element) {
+    function getElementFromTokenType(uint256 tokenType) public pure returns (NFTDataTypes.ElementType) {
         uint256 attrIndex = tokenType / 24;
-        if (attrIndex == 0) return Element.Water;
-        if (attrIndex == 1) return Element.Wind;
-        if (attrIndex == 2) return Element.Fire;
-        if (attrIndex == 3) return Element.Dark;
-        return Element.Light;
+        if (attrIndex == 0) return NFTDataTypes.ElementType.WATER;
+        if (attrIndex == 1) return NFTDataTypes.ElementType.WIND;
+        if (attrIndex == 2) return NFTDataTypes.ElementType.FIRE;
+        if (attrIndex == 3) return NFTDataTypes.ElementType.DARK;
+        return NFTDataTypes.ElementType.LIGHT;
     }
     
     /**
@@ -596,37 +594,37 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @param defenderElement 防守者属性
      * @return 最终伤害值
      */
-    function calculateDamage(uint256 baseDamage, Element attackerElement, Element defenderElement) 
+    function calculateDamage(uint256 baseDamage, NFTDataTypes.ElementType attackerElement, NFTDataTypes.ElementType defenderElement) 
         public pure returns (uint256) {
-        if (attackerElement == Element.Fire && defenderElement == Element.Wind) {
+        if (attackerElement == NFTDataTypes.ElementType.FIRE && defenderElement == NFTDataTypes.ElementType.WIND) {
             return (baseDamage * 15) / 10;
         }
-        if (attackerElement == Element.Wind && defenderElement == Element.Water) {
+        if (attackerElement == NFTDataTypes.ElementType.WIND && defenderElement == NFTDataTypes.ElementType.WATER) {
             return (baseDamage * 15) / 10;
         }
-        if (attackerElement == Element.Water && defenderElement == Element.Fire) {
+        if (attackerElement == NFTDataTypes.ElementType.WATER && defenderElement == NFTDataTypes.ElementType.FIRE) {
             return (baseDamage * 15) / 10;
         }
-        if (attackerElement == Element.Light && defenderElement == Element.Dark) {
+        if (attackerElement == NFTDataTypes.ElementType.LIGHT && defenderElement == NFTDataTypes.ElementType.DARK) {
             return (baseDamage * 15) / 10;
         }
-        if (attackerElement == Element.Dark && defenderElement == Element.Light) {
+        if (attackerElement == NFTDataTypes.ElementType.DARK && defenderElement == NFTDataTypes.ElementType.LIGHT) {
             return (baseDamage * 15) / 10;
         }
         
-        if (attackerElement == Element.Wind && defenderElement == Element.Fire) {
+        if (attackerElement == NFTDataTypes.ElementType.WIND && defenderElement == NFTDataTypes.ElementType.FIRE) {
             return (baseDamage * 7) / 10;
         }
-        if (attackerElement == Element.Water && defenderElement == Element.Wind) {
+        if (attackerElement == NFTDataTypes.ElementType.WATER && defenderElement == NFTDataTypes.ElementType.WIND) {
             return (baseDamage * 7) / 10;
         }
-        if (attackerElement == Element.Fire && defenderElement == Element.Water) {
+        if (attackerElement == NFTDataTypes.ElementType.FIRE && defenderElement == NFTDataTypes.ElementType.WATER) {
             return (baseDamage * 7) / 10;
         }
-        if (attackerElement == Element.Dark && defenderElement == Element.Light) {
+        if (attackerElement == NFTDataTypes.ElementType.DARK && defenderElement == NFTDataTypes.ElementType.LIGHT) {
             return (baseDamage * 7) / 10;
         }
-        if (attackerElement == Element.Light && defenderElement == Element.Dark) {
+        if (attackerElement == NFTDataTypes.ElementType.LIGHT && defenderElement == NFTDataTypes.ElementType.DARK) {
             return (baseDamage * 7) / 10;
         }
         
@@ -686,8 +684,99 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     }
     
     /**
+     * @notice 生成战斗随机种子（用于链下计算）
+     * @dev 返回一个可验证的随机种子，用于链下计算后在上链验证
+     * @param attackerTokens 攻击方NFT ID数组
+     * @param defenderTokens 防守方NFT ID数组
+     * @return bytes32 随机种子
+     */
+    function generateBattleSeed(uint256[] calldata attackerTokens, uint256[] calldata defenderTokens) 
+        external view returns (bytes32) {
+        return keccak256(abi.encodePacked(
+            block.timestamp,
+            block.number,
+            msg.sender,
+            attackerTokens,
+            defenderTokens
+        ));
+    }
+
+    /**
+     * @notice 验证链下战斗结果
+     * @dev 允许用户提交链下计算的战斗结果进行验证，减少链上计算消耗
+     * @param attackerTokens 攻击方NFT ID数组（必须6个）
+     * @param defenderTokens 防守方NFT ID数组（必须6个）
+     * @param claimedResult 声称的攻击方获胜场次
+     * @param defenderWins 声称的防守方获胜场次
+     * @param seed 随机种子（用于验证结果一致性）
+     * @return bool 是否验证通过
+     */
+    function verifyBattleResult(
+        uint256[] calldata attackerTokens,
+        uint256[] calldata defenderTokens,
+        uint256 claimedAttackerWins,
+        uint256 claimedDefenderWins,
+        bytes32 seed
+    ) external view returns (bool) {
+        require(attackerTokens.length == TEAM_SIZE, "E01: Attacker must have 6 NFTs");
+        require(defenderTokens.length == TEAM_SIZE, "E02: Defender must have 6 NFTs");
+        require(claimedAttackerWins + claimedDefenderWins <= TEAM_SIZE, "E03: Invalid win counts");
+        
+        bytes32 expectedSeed = keccak256(abi.encodePacked(
+            block.timestamp,
+            block.number,
+            msg.sender,
+            attackerTokens,
+            defenderTokens
+        ));
+        
+        if (seed != expectedSeed) {
+            return false;
+        }
+        
+        (bool, uint256 actualAttackerWins, uint256 actualDefenderWins) = simulateBattle(attackerTokens, defenderTokens);
+        
+        return actualAttackerWins == claimedAttackerWins && actualDefenderWins == claimedDefenderWins;
+    }
+
+    /**
+     * @notice 提交链下计算的战斗结果（轻量版本）
+     * @dev 先验证结果再记录，减少链上计算压力
+     * @param attackerTokens 攻击方NFT ID数组（必须6个）
+     * @param defenderTokens 防守方NFT ID数组（必须6个）
+     * @param claimedAttackerWins 声称的攻击方获胜场次
+     * @param claimedDefenderWins 声称的防守方获胜场次
+     * @param seed 随机种子
+     * @return bool 攻击方是否获胜
+     */
+    function commitBattleResult(
+        uint256[] calldata attackerTokens,
+        uint256[] calldata defenderTokens,
+        uint256 claimedAttackerWins,
+        uint256 claimedDefenderWins,
+        bytes32 seed
+    ) external nonReentrant returns (bool) {
+        require(verifyBattleResult(attackerTokens, defenderTokens, claimedAttackerWins, claimedDefenderWins, seed), "E04: Invalid battle result");
+        
+        bool attackerWon = claimedAttackerWins > claimedDefenderWins;
+        
+        BattleResult storage result = battleHistory[nextBattleId];
+        result.attacker = msg.sender;
+        result.defender = tx.origin;
+        result.attackerWinCount = claimedAttackerWins;
+        result.defenderWinCount = claimedDefenderWins;
+        result.timestamp = block.timestamp;
+        
+        nextBattleId++;
+        
+        emit BattleCompleted(msg.sender, tx.origin, attackerWon, claimedAttackerWins, claimedDefenderWins);
+        
+        return attackerWon;
+    }
+
+    /**
      * @notice 模拟战斗（只读）
-     * @dev 不消耗gas，用于预览战斗结果
+     * @dev 不消耗gas，用于预览战斗结果和验证链下计算
      * @param attackerTokens 攻击方NFT ID数组（必须6个）
      * @param defenderTokens 防守方NFT ID数组（必须6个）
      * @return 攻击方是否获胜、攻击方获胜场次、防守方获胜场次

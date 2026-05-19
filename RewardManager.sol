@@ -141,6 +141,26 @@ contract RewardManager is
     /** @dev 权重缓存有效期（默认5分钟） */
     uint256 public weightCacheDuration = 5 minutes;
 
+    /** @dev 分红快照结构 */
+    struct DividendSnapshot {
+        uint256 snapshotId;
+        uint256 timestamp;
+        uint256 totalWeight;
+        uint256 dividendPool;
+        mapping(address => uint256) userWeights;
+        mapping(address => uint256) claimedAmounts;
+        bool isFinalized;
+    }
+
+    /** @dev 快照数组 */
+    DividendSnapshot[] public dividendSnapshots;
+    /** @dev 当前活跃的快照ID */
+    uint256 public activeSnapshotId;
+    /** @dev 用户最后领取分红的快照ID */
+    mapping(address => uint256) public lastClaimedSnapshotId;
+    /** @dev 快照创建间隔（默认24小时） */
+    uint256 public snapshotInterval = 24 hours;
+
     /**
      * @dev 卡牌更新事件
      * @param user 用户地址
@@ -668,6 +688,7 @@ contract RewardManager is
      */
     function batchRefreshUserWeightCache(address[] calldata users) external onlyOp {
         if (nftDataContract == address(0)) return;
+        require(users.length <= 100, "RM: Batch size exceeds limit (max 100)");
         
         INFTDataInterface nftData = INFTDataInterface(nftDataContract);
         for (uint256 i = 0; i < users.length; i++) {
@@ -1049,6 +1070,7 @@ contract RewardManager is
                 IStakingContract(targetContract).depositToken(tokenAmount);
             }
         } catch {
+            emit AutoSwapFailed(amount, targetContract, block.timestamp);
         }
     }
 
@@ -1185,4 +1207,174 @@ contract RewardManager is
         (bool success, ) = owner().call{value: amount}("");
         require(success, "RewardManager: BNB transfer failed");
     }
+
+    /**
+     * @dev 创建分红快照
+     * @return snapshotId 新创建的快照ID
+     */
+    function createDividendSnapshot() external onlyOwner returns (uint256) {
+        uint256 snapshotId = dividendSnapshots.length;
+        DividendSnapshot storage snapshot = dividendSnapshots.push();
+        snapshot.snapshotId = snapshotId;
+        snapshot.timestamp = block.timestamp;
+        snapshot.totalWeight = totalWeight;
+        snapshot.dividendPool = dividendPool;
+        snapshot.isFinalized = false;
+        
+        activeSnapshotId = snapshotId;
+        
+        emit DividendSnapshotCreated(snapshotId, block.timestamp, totalWeight, dividendPool);
+        
+        return snapshotId;
+    }
+
+    /**
+     * @dev 手动创建快照（带用户权重记录）
+     * @param users 需要记录权重的用户列表
+     * @return snapshotId 新创建的快照ID
+     */
+    function createSnapshotWithUsers(address[] calldata users) external onlyOwner returns (uint256) {
+        uint256 snapshotId = dividendSnapshots.length;
+        DividendSnapshot storage snapshot = dividendSnapshots.push();
+        snapshot.snapshotId = snapshotId;
+        snapshot.timestamp = block.timestamp;
+        snapshot.totalWeight = totalWeight;
+        snapshot.dividendPool = dividendPool;
+        snapshot.isFinalized = false;
+        
+        for (uint256 i = 0; i < users.length; i++) {
+            address user = users[i];
+            snapshot.userWeights[user] = user == owner() ? ownerWeight : userWeight[user];
+        }
+        
+        activeSnapshotId = snapshotId;
+        
+        emit DividendSnapshotCreated(snapshotId, block.timestamp, totalWeight, dividendPool);
+        
+        return snapshotId;
+    }
+
+    /**
+     * @dev 完成快照（冻结权重数据）
+     * @param snapshotId 快照ID
+     */
+    function finalizeSnapshot(uint256 snapshotId) external onlyOwner {
+        require(snapshotId < dividendSnapshots.length, "RM: Invalid snapshot ID");
+        DividendSnapshot storage snapshot = dividendSnapshots[snapshotId];
+        require(!snapshot.isFinalized, "RM: Snapshot already finalized");
+        
+        snapshot.isFinalized = true;
+        
+        emit DividendSnapshotFinalized(snapshotId, block.timestamp);
+    }
+
+    /**
+     * @dev 根据快照领取分红
+     * @param snapshotId 快照ID
+     */
+    function claimDividendFromSnapshot(uint256 snapshotId) external nonReentrant whenNotPaused {
+        require(snapshotId < dividendSnapshots.length, "RM: Invalid snapshot ID");
+        DividendSnapshot storage snapshot = dividendSnapshots[snapshotId];
+        require(snapshot.isFinalized, "RM: Snapshot not finalized");
+        
+        address user = msg.sender;
+        uint256 userW = snapshot.userWeights[user];
+        require(userW > 0, "RM: User has no weight in snapshot");
+        
+        uint256 claimed = snapshot.claimedAmounts[user];
+        require(claimed == 0, "RM: Dividend already claimed for this snapshot");
+        
+        uint256 totalW = snapshot.totalWeight;
+        require(totalW > 0 && snapshot.dividendPool > 0, "RM: No dividends available");
+        
+        uint256 baseReward = (snapshot.dividendPool * userW) / totalW;
+        require(baseReward > 0, "RM: No reward amount to claim");
+        
+        snapshot.claimedAmounts[user] = baseReward;
+        lastClaimedSnapshotId[user] = snapshotId;
+        
+        emit DividendClaimedFromSnapshot(user, snapshotId, baseReward, block.timestamp);
+        
+        (bool success, ) = payable(user).call{value: baseReward}("");
+        require(success, "RM: Failed to transfer dividend");
+    }
+
+    /**
+     * @dev 获取快照中用户的权重
+     * @param snapshotId 快照ID
+     * @param user 用户地址
+     * @return 用户在快照中的权重
+     */
+    function getUserWeightInSnapshot(uint256 snapshotId, address user) external view returns (uint256) {
+        require(snapshotId < dividendSnapshots.length, "RM: Invalid snapshot ID");
+        return dividendSnapshots[snapshotId].userWeights[user];
+    }
+
+    /**
+     * @dev 获取用户在快照中的可领取分红
+     * @param snapshotId 快照ID
+     * @param user 用户地址
+     * @return 可领取的分红金额
+     */
+    function getUserDividendInSnapshot(uint256 snapshotId, address user) external view returns (uint256) {
+        require(snapshotId < dividendSnapshots.length, "RM: Invalid snapshot ID");
+        DividendSnapshot storage snapshot = dividendSnapshots[snapshotId];
+        
+        uint256 userW = snapshot.userWeights[user];
+        if (userW == 0 || snapshot.totalWeight == 0 || snapshot.dividendPool == 0) {
+            return 0;
+        }
+        
+        return (snapshot.dividendPool * userW) / snapshot.totalWeight;
+    }
+
+    /**
+     * @dev 设置快照间隔时间
+     * @param interval 间隔时间（秒）
+     */
+    function setSnapshotInterval(uint256 interval) external onlyOwner {
+        require(interval > 0, "RM: Interval must be > 0");
+        snapshotInterval = interval;
+    }
+
+    /**
+     * @dev 获取快照数量
+     * @return 快照总数
+     */
+    function getSnapshotCount() external view returns (uint256) {
+        return dividendSnapshots.length;
+    }
+
+    /**
+     * @dev 快照创建事件
+     * @param snapshotId 快照ID
+     * @param timestamp 创建时间
+     * @param totalWeight 总权重
+     * @param dividendPool 分红池余额
+     */
+    event DividendSnapshotCreated(uint256 indexed snapshotId, uint256 timestamp, uint256 totalWeight, uint256 dividendPool);
+    
+    /**
+     * @dev 快照完成事件
+     * @param snapshotId 快照ID
+     * @param timestamp 完成时间
+     */
+    event DividendSnapshotFinalized(uint256 indexed snapshotId, uint256 timestamp);
+    
+    /**
+     * @dev 自动兑换失败事件
+     * @param amount 尝试兑换的金额
+     * @param targetContract 目标合约
+     * @param timestamp 时间戳
+     */
+    event AutoSwapFailed(uint256 amount, address targetContract, uint256 timestamp);
+    
+    /**
+     * @dev 快照分红领取事件
+     * @param user 用户地址
+     * @param snapshotId 快照ID
+     * @param amount 领取金额
+     * @param timestamp 时间戳
+     */
+    event DividendClaimedFromSnapshot(address indexed user, uint256 indexed snapshotId, uint256 amount, uint256 timestamp);
 }

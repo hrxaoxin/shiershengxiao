@@ -284,22 +284,40 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     }
 
     /**
-     * @dev 十连铸造统一逻辑（内部函数）
+     * @dev 十连铸造统一逻辑（内部函数）- 批量优化版本
+     * 通过合并状态更新减少SLOAD/SSTORE次数，降低Gas消耗
      * @param to 接收NFT的地址
      * @param isNormal 是否普通铸造（true为普通概率，false为光暗概率）
      * @return uint256[] 新铸造的NFT ID数组
      */
     function _mintTenTo(address to, bool isNormal) internal returns (uint256[] memory) {
         uint256[] memory tokenIds = new uint256[](10);
+        NFTDataTypes.ZodiacType[] memory types = new NFTDataTypes.ZodiacType[](10);
+        uint256[] memory growthValues = new uint256[](10);
+        
+        INFTData m = INFTData(metadataContract);
+        
         for (uint i = 0; i < 10; i++) {
-            NFTDataTypes.ZodiacType t;
             if (isNormal) {
-                t = _getRandomNormalType();
+                types[i] = _getRandomNormalType();
             } else {
-                t = _getRandomRareType();
+                types[i] = _getRandomRareType();
             }
-            tokenIds[i] = _mintTo(to, t);
+            growthValues[i] = _generateGrowthValue();
+            tokenIds[i] = nextCardId++;
         }
+        
+        for (uint i = 0; i < 10; i++) {
+            uint256 id = tokenIds[i];
+            NFTDataTypes.ZodiacType t = types[i];
+            m.setTokenType(id, t);
+            m.setTokenLevel(id, 1);
+            m.setTokenGrowthValue(id, growthValues[i]);
+            m.addUserToken(to, t, id);
+            _safeMint(to, id);
+            _updateUserWeight(to, id, 1, true);
+        }
+        
         emit TenCardsMinted(tokenIds, to, isNormal, uint64(block.timestamp));
         return tokenIds;
     }
