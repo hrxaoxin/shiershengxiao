@@ -1,17 +1,71 @@
 window.ZODIAC_CONFIG = (function() {
-    const CONTRACT_ADDRESSES = {
-        tokenContract: '0x1234567890abcdef1234567890abcdef12345678',
-        rewardManager: '0xabcdef1234567890abcdef1234567890abcdef12',
-        tokenBurner: '0xabcdef1234567890abcdef1234567890abcdef13',
-        nftMint: '0xabcdef1234567890abcdef1234567890abcdef14',
-        nftUpdate: '0xabcdef1234567890abcdef1234567890abcdef15',
-        nftTrading: '0xabcdef1234567890abcdef1234567890abcdef16',
-        breeding: '0xabcdef1234567890abcdef1234567890abcdef17',
-        staking: '0xabcdef1234567890abcdef1234567890abcdef18',
-        tokenStaking: '0xabcdef1234567890abcdef1234567890abcdef19',
-        arena: '0xabcdef1234567890abcdef1234567890abcdef20',
-        battle: '0xabcdef1234567890abcdef1234567890abcdef21'
+    const NETWORKS = {
+        MAINNET: 56,
+        TESTNET: 97,
+        ETHEREUM: 1,
+        GOERLI: 5
     };
+
+    const CONTRACT_ADDRESSES_BY_NETWORK = {
+        [NETWORKS.MAINNET]: {
+            tokenContract: '0x1234567890abcdef1234567890abcdef12345678',
+            rewardManager: '0xabcdef1234567890abcdef1234567890abcdef12',
+            tokenBurner: '0xabcdef1234567890abcdef1234567890abcdef13',
+            nftMint: '0xabcdef1234567890abcdef1234567890abcdef14',
+            nftUpdate: '0xabcdef1234567890abcdef1234567890abcdef15',
+            nftTrading: '0xabcdef1234567890abcdef1234567890abcdef16',
+            breeding: '0xabcdef1234567890abcdef1234567890abcdef17',
+            staking: '0xabcdef1234567890abcdef1234567890abcdef18',
+            tokenStaking: '0xabcdef1234567890abcdef1234567890abcdef19',
+            arena: '0xabcdef1234567890abcdef1234567890abcdef20',
+            battle: '0xabcdef1234567890abcdef1234567890abcdef21'
+        },
+        [NETWORKS.TESTNET]: {
+            tokenContract: '0x0000000000000000000000000000000000000001',
+            rewardManager: '0x0000000000000000000000000000000000000002',
+            tokenBurner: '0x0000000000000000000000000000000000000003',
+            nftMint: '0x0000000000000000000000000000000000000004',
+            nftUpdate: '0x0000000000000000000000000000000000000005',
+            nftTrading: '0x0000000000000000000000000000000000000006',
+            breeding: '0x0000000000000000000000000000000000000007',
+            staking: '0x0000000000000000000000000000000000000008',
+            tokenStaking: '0x0000000000000000000000000000000000000009',
+            arena: '0x000000000000000000000000000000000000000a',
+            battle: '0x000000000000000000000000000000000000000b'
+        },
+        [NETWORKS.ETHEREUM]: {
+            tokenContract: '0x0000000000000000000000000000000000000011',
+            rewardManager: '0x0000000000000000000000000000000000000012',
+            tokenBurner: '0x0000000000000000000000000000000000000013',
+            nftMint: '0x0000000000000000000000000000000000000014',
+            nftUpdate: '0x0000000000000000000000000000000000000015',
+            nftTrading: '0x0000000000000000000000000000000000000016',
+            breeding: '0x0000000000000000000000000000000000000017',
+            staking: '0x0000000000000000000000000000000000000018',
+            tokenStaking: '0x0000000000000000000000000000000000000019',
+            arena: '0x000000000000000000000000000000000000001a',
+            battle: '0x000000000000000000000000000000000000001b'
+        },
+        [NETWORKS.GOERLI]: {
+            tokenContract: '0x0000000000000000000000000000000000000021',
+            rewardManager: '0x0000000000000000000000000000000000000022',
+            tokenBurner: '0x0000000000000000000000000000000000000023',
+            nftMint: '0x0000000000000000000000000000000000000024',
+            nftUpdate: '0x0000000000000000000000000000000000000025',
+            nftTrading: '0x0000000000000000000000000000000000000026',
+            breeding: '0x0000000000000000000000000000000000000027',
+            staking: '0x0000000000000000000000000000000000000028',
+            tokenStaking: '0x0000000000000000000000000000000000000029',
+            arena: '0x000000000000000000000000000000000000002a',
+            battle: '0x000000000000000000000000000000000000002b'
+        }
+    };
+
+    function getContractAddresses(chainId) {
+        return CONTRACT_ADDRESSES_BY_NETWORK[chainId] || CONTRACT_ADDRESSES_BY_NETWORK[NETWORKS.TESTNET];
+    }
+
+    const CONTRACT_ADDRESSES = CONTRACT_ADDRESSES_BY_NETWORK[NETWORKS.TESTNET];
 
     const MINT_COSTS = {
         normal: 8888,
@@ -204,6 +258,9 @@ window.ZODIAC_CONFIG = (function() {
 
     return {
         CONTRACT_ADDRESSES,
+        CONTRACT_ADDRESSES_BY_NETWORK,
+        NETWORKS,
+        getContractAddresses,
         MINT_COSTS,
         UPGRADE_COSTS,
         WEIGHTS,

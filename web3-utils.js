@@ -6,6 +6,127 @@ window.ZODIAC_WEB3 = (function() {
     let cacheData = {};
     let cacheAccessOrder = [];
 
+    const registeredListeners = new Map();
+    const contractEventSubscriptions = new Map();
+    const MAX_CACHE_SIZE = 1000;
+    const CACHE_TTL = 5 * 60 * 1000;
+
+    const GAS_LIMITS = {
+        default: 3000000,
+        mint: {
+            normal: 2000000,
+            rare: 2000000,
+            normalTen: 5000000,
+            rareTen: 5000000,
+            targeted: 2500000
+        },
+        upgrade: {
+            withNFT: 2500000,
+            withToken: 1500000,
+            withUSDValue: 2000000
+        },
+        trading: {
+            list: 1000000,
+            buy: 1500000,
+            delist: 1000000
+        },
+        breeding: {
+            breed: 3000000,
+            claimBaby: 1000000
+        },
+        staking: {
+            stakeNFT: 1500000,
+            unstakeNFT: 1500000,
+            stakeTokens: 1000000,
+            unstakeTokens: 1000000,
+            claimRewards: 1000000
+        },
+        arena: {
+            challenge: 4000000,
+            setBattleTeam: 2000000,
+            claimReward: 1000000,
+            recharge: 1000000
+        },
+        reward: {
+            claimDividend: 1000000
+        }
+    };
+
+    const CACHE_INVALIDATION_RULES = {
+        nftMint: {
+            Transfer: ['nftMint:*', 'staking:*', 'userTokens:*'],
+            Mint: ['nftMint:*', 'userTokens:*']
+        },
+        nftUpdate: {
+            Upgrade: ['nftMint:*', 'nftUpdate:*', 'staking:*', 'arena:*']
+        },
+        nftTrading: {
+            Listed: ['nftTrading:*'],
+            Sold: ['nftTrading:*', 'nftMint:*', 'userTokens:*'],
+            Delisted: ['nftTrading:*']
+        },
+        breeding: {
+            Breed: ['breeding:*'],
+            BabyClaimed: ['breeding:*', 'nftMint:*']
+        },
+        staking: {
+            Staked: ['staking:*'],
+            Unstaked: ['staking:*'],
+            RewardsClaimed: ['staking:*']
+        },
+        tokenStaking: {
+            Staked: ['tokenStaking:*'],
+            Unstaked: ['tokenStaking:*'],
+            RewardsClaimed: ['tokenStaking:*']
+        },
+        arena: {
+            Challenge: ['arena:*'],
+            TeamSet: ['arena:*'],
+            RewardClaimed: ['arena:*']
+        },
+        rewardManager: {
+            DividendClaimed: ['rewardManager:*']
+        }
+    };
+
+    const eventListeners = {
+        'connect': [],
+        'disconnect': [],
+        'accountChange': [],
+        'chainChange': [],
+        'cacheInvalidated': []
+    };
+
+    const ERROR_CODES = {
+        4001: '用户拒绝了操作',
+        -32000: 'RPC错误',
+        -32601: '方法不存在',
+        -32602: '参数无效'
+    };
+
+    const ERROR_PATTERNS = [
+        { pattern: /MetaMask not detected/i, message: '未检测到MetaMask钱包，请安装后重试' },
+        { pattern: /User rejected the request/i, message: '用户拒绝了操作' },
+        { pattern: /Wallet not connected/i, message: '钱包未连接，请先连接钱包' },
+        { pattern: /Web3 not initialized/i, message: 'Web3初始化失败，请刷新页面重试' },
+        { pattern: /insufficient funds/i, message: '余额不足，请确保钱包有足够的资金' },
+        { pattern: /Gas estimation failed/i, message: 'Gas估算失败，请稍后重试' },
+        { pattern: /reverted/i, message: '交易执行失败，合约调用被拒绝' },
+        { pattern: /execution reverted/i, message: '交易执行失败，合约调用被拒绝' },
+        { pattern: /invalid opcode/i, message: '无效操作码，合约执行失败' },
+        { pattern: /out of gas/i, message: 'Gas不足，交易失败' },
+        { pattern: /nonce too low/i, message: '交易序号过低，请等待上一笔交易完成' },
+        { pattern: /already known/i, message: '交易已存在，正在处理中' },
+        { pattern: /unknown contract/i, message: '未知合约，请检查配置' },
+        { pattern: /address not configured/i, message: '合约地址未配置' },
+        { pattern: /contract method not found/i, message: '合约方法不存在' },
+        { pattern: /invalid address/i, message: '无效的钱包地址' },
+        { pattern: /block gas limit/i, message: '区块Gas限制不足' },
+        { pattern: /max priority fee per gas/i, message: 'Gas费用设置不合理' },
+        { pattern: /replacement transaction underpriced/i, message: '替换交易价格过低' },
+        { pattern: /cannot estimate gas/i, message: '无法估算Gas，请检查合约状态' }
+    ];
+
     function getCache(key) {
         const item = cacheData[key];
         if (!item) return null;
@@ -43,10 +164,33 @@ window.ZODIAC_WEB3 = (function() {
 
     function clearCache(key) {
         if (key) {
-            delete cacheData[key];
+            if (typeof key === 'string' && key.includes('*')) {
+                const pattern = new RegExp('^' + key.replace(/\*/g, '.*') + '$');
+                Object.keys(cacheData).forEach(cacheKey => {
+                    if (pattern.test(cacheKey)) {
+                        delete cacheData[cacheKey];
+                        const idx = cacheAccessOrder.indexOf(cacheKey);
+                        if (idx > -1) cacheAccessOrder.splice(idx, 1);
+                    }
+                });
+            } else if (typeof key === 'string' && cacheData[key]) {
+                delete cacheData[key];
+                const idx = cacheAccessOrder.indexOf(key);
+                if (idx > -1) cacheAccessOrder.splice(idx, 1);
+            } else if (Array.isArray(key)) {
+                key.forEach(k => {
+                    if (cacheData[k]) {
+                        delete cacheData[k];
+                        const idx = cacheAccessOrder.indexOf(k);
+                        if (idx > -1) cacheAccessOrder.splice(idx, 1);
+                    }
+                });
+            }
         } else {
             cacheData = {};
+            cacheAccessOrder = [];
         }
+        emitEvent('cacheInvalidated', { key });
     }
 
     function isCacheValid(key) {
@@ -62,7 +206,70 @@ window.ZODIAC_WEB3 = (function() {
             ttl: CACHE_TTL
         };
     }
-    
+
+    function getGasLimitForOperation(contractName, methodName) {
+        const operationMap = {
+            nftMint: {
+                mintNormal: GAS_LIMITS.mint.normal,
+                mintRare: GAS_LIMITS.mint.rare,
+                mintNormalTen: GAS_LIMITS.mint.normalTen,
+                mintRareTen: GAS_LIMITS.mint.rareTen,
+                mintTargeted: GAS_LIMITS.mint.targeted
+            },
+            nftUpdate: {
+                upgradeWithNFT: GAS_LIMITS.upgrade.withNFT,
+                upgradeWithToken: GAS_LIMITS.upgrade.withToken,
+                upgradeWithUSDValue: GAS_LIMITS.upgrade.withUSDValue,
+                upgradeLevel: GAS_LIMITS.upgrade.withNFT,
+                upgradeToLevel: GAS_LIMITS.upgrade.withNFT
+            },
+            nftTrading: {
+                listNFT: GAS_LIMITS.trading.list,
+                buyNFT: GAS_LIMITS.trading.buy,
+                delistNFT: GAS_LIMITS.trading.delist
+            },
+            breeding: {
+                breed: GAS_LIMITS.breeding.breed,
+                claimBaby: GAS_LIMITS.breeding.claimBaby
+            },
+            staking: {
+                stakeNFT: GAS_LIMITS.staking.stakeNFT,
+                unstakeNFT: GAS_LIMITS.staking.unstakeNFT,
+                claimRewards: GAS_LIMITS.staking.claimRewards
+            },
+            tokenStaking: {
+                stakeTokens: GAS_LIMITS.staking.stakeTokens,
+                unstakeTokens: GAS_LIMITS.staking.unstakeTokens,
+                claimRewards: GAS_LIMITS.staking.claimRewards
+            },
+            arena: {
+                challenge: GAS_LIMITS.arena.challenge,
+                setBattleTeam: GAS_LIMITS.arena.setBattleTeam,
+                claimReward: GAS_LIMITS.arena.claimReward,
+                rechargeChallengeAttempts: GAS_LIMITS.arena.recharge
+            },
+            rewardManager: {
+                claimDividend: GAS_LIMITS.reward.claimDividend
+            }
+        };
+
+        if (operationMap[contractName] && operationMap[contractName][methodName]) {
+            return operationMap[contractName][methodName];
+        }
+        
+        return GAS_LIMITS.default;
+    }
+
+    function invalidateCacheForEvent(contractName, eventName) {
+        const rules = CACHE_INVALIDATION_RULES[contractName];
+        if (!rules || !rules[eventName]) return;
+        
+        const cacheKeys = rules[eventName];
+        cacheKeys.forEach(pattern => {
+            clearCache(pattern);
+        });
+    }
+
     async function subscribeToContractEvent(contractName, eventName, callback, options = {}) {
         const key = `${contractName}:${eventName}:${JSON.stringify(options)}`;
         
@@ -78,13 +285,18 @@ window.ZODIAC_WEB3 = (function() {
                 ...options.filter || {}
             };
             
+            const enhancedCallback = (event) => {
+                invalidateCacheForEvent(contractName, eventName);
+                callback(event);
+            };
+            
             const subscription = contract.events[eventName](eventOptions, (error, event) => {
                 if (error) {
                     console.error(`Event subscription error (${contractName}.${eventName}):`, error);
                     return;
                 }
                 try {
-                    callback(event);
+                    enhancedCallback(event);
                 } catch (cbError) {
                     console.error(`Event callback error (${contractName}.${eventName}):`, cbError);
                 }
@@ -139,48 +351,6 @@ window.ZODIAC_WEB3 = (function() {
     function getActiveSubscriptions() {
         return Array.from(contractEventSubscriptions.keys());
     }
-    
-    const eventListeners = {
-        'connect': [],
-        'disconnect': [],
-        'accountChange': [],
-        'chainChange': []
-    };
-
-    const registeredListeners = new Map();
-    const contractEventSubscriptions = new Map();
-    const MAX_CACHE_SIZE = 1000;
-    const CACHE_TTL = 5 * 60 * 1000;
-
-    const ERROR_CODES = {
-        4001: '用户拒绝了操作',
-        -32000: 'RPC错误',
-        -32601: '方法不存在',
-        -32602: '参数无效'
-    };
-
-    const ERROR_PATTERNS = [
-        { pattern: /MetaMask not detected/i, message: '未检测到MetaMask钱包，请安装后重试' },
-        { pattern: /User rejected the request/i, message: '用户拒绝了操作' },
-        { pattern: /Wallet not connected/i, message: '钱包未连接，请先连接钱包' },
-        { pattern: /Web3 not initialized/i, message: 'Web3初始化失败，请刷新页面重试' },
-        { pattern: /insufficient funds/i, message: '余额不足，请确保钱包有足够的资金' },
-        { pattern: /Gas estimation failed/i, message: 'Gas估算失败，请稍后重试' },
-        { pattern: /reverted/i, message: '交易执行失败，合约调用被拒绝' },
-        { pattern: /execution reverted/i, message: '交易执行失败，合约调用被拒绝' },
-        { pattern: /invalid opcode/i, message: '无效操作码，合约执行失败' },
-        { pattern: /out of gas/i, message: 'Gas不足，交易失败' },
-        { pattern: /nonce too low/i, message: '交易序号过低，请等待上一笔交易完成' },
-        { pattern: /already known/i, message: '交易已存在，正在处理中' },
-        { pattern: /unknown contract/i, message: '未知合约，请检查配置' },
-        { pattern: /address not configured/i, message: '合约地址未配置' },
-        { pattern: /contract method not found/i, message: '合约方法不存在' },
-        { pattern: /invalid address/i, message: '无效的钱包地址' },
-        { pattern: /block gas limit/i, message: '区块Gas限制不足' },
-        { pattern: /max priority fee per gas/i, message: 'Gas费用设置不合理' },
-        { pattern: /replacement transaction underpriced/i, message: '替换交易价格过低' },
-        { pattern: /cannot estimate gas/i, message: '无法估算Gas，请检查合约状态' }
-    ];
 
     function getErrorMessage(error) {
         const errorStr = error.message || error.toString();
@@ -302,6 +472,7 @@ window.ZODIAC_WEB3 = (function() {
                 account = accounts[0];
                 isConnected = true;
                 contracts = {};
+                clearCache();
                 emitEvent('connect', { account });
                 return { success: true, account };
             }
@@ -316,6 +487,7 @@ window.ZODIAC_WEB3 = (function() {
         account = null;
         isConnected = false;
         contracts = {};
+        clearCache();
         emitEvent('disconnect', {});
     }
 
@@ -348,7 +520,8 @@ window.ZODIAC_WEB3 = (function() {
         }
 
         const config = window.ZODIAC_CONFIG || {};
-        const addresses = config.CONTRACT_ADDRESSES || window.contractAddresses || {};
+        const chainId = await getChainId();
+        const addresses = config.getContractAddresses ? config.getContractAddresses(chainId) : (config.CONTRACT_ADDRESSES || window.contractAddresses || {});
         const abis = config.ABIS || {};
         
         const abiMap = {
@@ -410,6 +583,7 @@ window.ZODIAC_WEB3 = (function() {
         try {
             const tokenContract = await getContract('tokenContract');
             const tx = await tokenContract.methods.approve(spender, amount).send({ from: account });
+            clearCache('tokenApproval:*');
             return tx;
         } catch (error) {
             console.error('Approve token error:', error);
@@ -448,6 +622,7 @@ window.ZODIAC_WEB3 = (function() {
         try {
             const nftContract = await getContract('nftMint');
             const tx = await nftContract.methods.setApprovalForAll(spender, approved).send({ from: account });
+            clearCache('nftApproval:*');
             return tx;
         } catch (error) {
             console.error('Approve for all error:', error);
@@ -455,13 +630,15 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
-    async function estimateGas(contract, method, args, from) {
+    async function estimateGas(contract, method, args, from, contractName = '') {
         try {
             const gas = await contract.methods[method](...args).estimateGas({ from });
-            return Math.floor(gas * 1.5);
+            const estimatedGas = Math.floor(gas * 1.5);
+            const configuredGas = getGasLimitForOperation(contractName, method);
+            return Math.min(estimatedGas, configuredGas);
         } catch (error) {
             console.warn('Gas estimation failed, using fallback:', error);
-            return 3000000;
+            return getGasLimitForOperation(contractName, method);
         }
     }
 
@@ -492,6 +669,7 @@ window.ZODIAC_WEB3 = (function() {
                 account = accounts[0];
                 isConnected = true;
                 contracts = {};
+                clearCache();
                 emitEvent('accountChange', { account });
             } else {
                 disconnectWallet();
@@ -504,6 +682,8 @@ window.ZODIAC_WEB3 = (function() {
     window.ethereum?.on('chainChanged', (chainId) => {
         try {
             console.warn(`Chain changed to ${chainId}. Please refresh the page to continue.`);
+            contracts = {};
+            clearCache();
             emitEvent('chainChange', { chainId });
         } catch (error) {
             console.error('Chain changed error:', error);
@@ -537,7 +717,7 @@ window.ZODIAC_WEB3 = (function() {
             const { send = false, from = account, value = 0, gas = null } = options;
             
             if (send) {
-                const gasLimit = gas || await estimateGas(contract, methodName, args, from);
+                const gasLimit = gas || await estimateGas(contract, methodName, args, from, contractName);
                 const txOptions = { from };
                 if (value > 0) txOptions.value = web3.utils.toWei(value.toString(), 'ether');
                 if (gasLimit) txOptions.gas = gasLimit;
@@ -590,6 +770,7 @@ window.ZODIAC_WEB3 = (function() {
         unsubscribeAllContractEvents,
         getActiveSubscriptions,
         requireInitialized: withErrorHandling(requireInitialized),
-        requireConnected: withErrorHandling(requireConnected)
+        requireConnected: withErrorHandling(requireConnected),
+        getGasLimitForOperation
     };
 })();
