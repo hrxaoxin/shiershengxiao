@@ -241,6 +241,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             initWeb3();
             initWalletUI();
+            ZODIAC_COMPONENTS.injectNavigation('rewards');
         });
 
         function initWalletUI() {
@@ -344,17 +345,7 @@
                 ZODIAC_UI.showToast('领取成功！', 'success');
                 await loadBNBReward();
             } catch (error) {
-                let errorMsg = '领取失败';
-                if (error.code === 4001) {
-                    errorMsg = '用户取消了操作';
-                } else if (error.message && error.message.includes('insufficient funds')) {
-                    errorMsg = 'Gas费用不足，请确保钱包中有足够的BNB';
-                } else if (error.message && error.message.includes('reverted')) {
-                    errorMsg = '合约执行失败: ' + (error.reason || error.message);
-                } else if (error.message) {
-                    errorMsg += ': ' + error.message;
-                }
-                ZODIAC_UI.showToast(errorMsg, 'error');
+                ZODIAC_UI.handleError(error, '领取分红');
             } finally {
                 btn.innerHTML = '一键领取所有BNB';
                 btn.disabled = false;
@@ -362,10 +353,6 @@
         });
 
         document.getElementById('refreshWallet').addEventListener('click', initWeb3);
-
-        document.addEventListener('DOMContentLoaded', function() {
-            ZODIAC_COMPONENTS.injectNavigation('rewards');
-        });
     </script>
 </body>
 </html>

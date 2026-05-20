@@ -341,6 +341,7 @@
             initWeb3();
             initWalletUI();
             initTabSwitch();
+            ZODIAC_COMPONENTS.injectNavigation('staking');
         });
 
         function initTabSwitch() {
@@ -386,7 +387,7 @@
         function initWalletUI() {
             ZODIAC_UI.initWalletButton('connectWalletBtn', 'walletAddress', 'connectionStatus');
             ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddressDesktop', null);
-            ZODIAC_UI.on('walletConnected', async () => {
+            ZODIAC_WEB3.on('connect', async () => {
                 await initContracts();
                 await loadEligibleNFTs();
                 await loadMyStakes();
@@ -625,26 +626,45 @@
             btn.textContent = '质押中...';
 
             try {
-                for (const tokenId of selectedNFTs) {
-                    const gas = await ZODIAC_WEB3.estimateGas(nftContract, 'approve', [stakingAddress, tokenId], account);
+                const approveGasEstimates = await Promise.all(
+                    selectedNFTs.map(tokenId => 
+                        ZODIAC_WEB3.estimateGas(nftContract, 'approve', [stakingAddress, tokenId], account)
+                    )
+                );
+                
+                const stakeGasEstimates = await Promise.all(
+                    selectedNFTs.map(tokenId => 
+                        ZODIAC_WEB3.estimateGas(stakingContract, 'stakeNFT', [tokenId], account)
+                    )
+                );
+                
+                const maxApproveGas = Math.max(...approveGasEstimates) + 50000;
+                const maxStakeGas = Math.max(...stakeGasEstimates) + 50000;
+
+                for (let i = 0; i < selectedNFTs.length; i++) {
+                    const tokenId = selectedNFTs[i];
+                    
                     await nftContract.methods.approve(stakingAddress, tokenId).send({
                         from: account,
-                        gas: gas
+                        gas: maxApproveGas
                     });
                     
-                    const stakeGas = await ZODIAC_WEB3.estimateGas(stakingContract, 'stakeNFT', [tokenId], account);
                     await stakingContract.methods.stakeNFT(tokenId).send({
                         from: account,
-                        gas: stakeGas
+                        gas: maxStakeGas
                     });
+                    
+                    btn.textContent = `质押中... (${i + 1}/${selectedNFTs.length})`;
                 }
 
                 ZODIAC_UI.showToast('质押成功！', 'success');
                 selectedNFTs = [];
-                loadEligibleNFTs();
-                loadMyStakes();
-                loadRewards();
-                loadContractInfo();
+                await Promise.all([
+                    loadEligibleNFTs(),
+                    loadMyStakes(),
+                    loadRewards(),
+                    loadContractInfo()
+                ]);
             } catch (error) {
                 console.error('质押失败:', error);
                 ZODIAC_UI.showToast('质押失败: ' + (error.message || '未知错误'), 'error');
@@ -902,10 +922,6 @@
                 btn.textContent = '领取BNB奖励';
             }
         }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            ZODIAC_COMPONENTS.injectNavigation('staking');
-        });
     </script>
 </body>
 </html>

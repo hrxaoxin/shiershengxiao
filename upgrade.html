@@ -297,6 +297,7 @@
             initWeb3();
             initWalletUI();
             initEventListeners();
+            ZODIAC_COMPONENTS.injectNavigation('upgrade');
         });
 
         function initEventListeners() {
@@ -682,10 +683,6 @@
         function getStars(level) {
             return window.ZODIAC_UTILS.getStars(parseInt(level));
         }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            ZODIAC_COMPONENTS.injectNavigation('upgrade');
-        });
     </script>
 </body>
 </html>

@@ -230,19 +230,10 @@
         let tokenBurnerContract;
         let nftMintContract;
         
-        const CONFIG = ZODIAC_CONFIG || {
-            MINT_COSTS: {
-                normal: 8888,
-                rare: 88888,
-                normalTen: 88880,
-                rareTen: 888880
-            }
-        };
-
-        let MINT_PRICE = CONFIG.MINT_COSTS.normal;
-        let LIGHT_DARK_COST = CONFIG.MINT_COSTS.rare;
-        let NORMAL_TEN_COST = CONFIG.MINT_COSTS.normalTen;
-        let RARE_TEN_COST = CONFIG.MINT_COSTS.rareTen;
+        let MINT_PRICE = ZODIAC_CONFIG.MINT_COSTS.normal;
+        let LIGHT_DARK_COST = ZODIAC_CONFIG.MINT_COSTS.rare;
+        let NORMAL_TEN_COST = ZODIAC_CONFIG.MINT_COSTS.normalTen;
+        let RARE_TEN_COST = ZODIAC_CONFIG.MINT_COSTS.rareTen;
         let TARGETED_NORMAL_PART = MINT_PRICE * 6;
         let TARGETED_RARE_PART = LIGHT_DARK_COST * 4;
 
@@ -267,20 +258,33 @@
 
             await ZODIAC_WEB3.initWeb3();
             initWalletUI();
+            ZODIAC_COMPONENTS.injectNavigation('mint');
 
             document.getElementById('targetedZodiacSelect').addEventListener('change', updateMintStatus);
         });
 
         function initWalletUI() {
-            ZODIAC_UI.initWalletButton('connectWalletBtn', 'walletAddress', 'connectionStatus');
-            ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddressDesktop', null);
+            const connectBtn = document.getElementById('connectWalletBtn');
+            const desktopBtn = document.getElementById('connectWalletBtnDesktop');
+            
+            if (connectBtn) {
+                ZODIAC_UI.initWalletButton('connectWalletBtn', 'walletAddress', 'connectionStatus');
+            }
+            if (desktopBtn) {
+                ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddressDesktop', null);
+            }
 
             ZODIAC_WEB3.on('connect', async () => {
-                await initContracts();
-                await fetchMintCosts();
-                await updateTokenBalance();
-                await checkApprovalStatus();
-                await updateMintStatus();
+                try {
+                    await initContracts();
+                    await fetchMintCosts();
+                    await updateTokenBalance();
+                    await checkApprovalStatus();
+                    await updateMintStatus();
+                } catch (error) {
+                    console.error('Wallet connect handler error:', error);
+                    ZODIAC_UI.showToast('连接成功但部分数据加载失败', 'warning');
+                }
             });
 
             ZODIAC_WEB3.on('disconnect', () => {
@@ -370,6 +374,9 @@
         }
 
         document.getElementById('approveToken').addEventListener('click', async function() {
+            const account = ZODIAC_WEB3.getAccount();
+            const tokenContract = await ZODIAC_WEB3.getContract('tokenContract').catch(() => null);
+            
             if (!account || !tokenContract) {
                 ZODIAC_UI.showToast('请先连接钱包', 'warning');
                 return;
@@ -418,6 +425,7 @@
 
         async function updateMintStatus() {
             try {
+                const account = ZODIAC_WEB3.getAccount();
                 if (!account || !tokenContract) {
                     disableAllButtons();
                     document.getElementById('mintStatus').innerHTML = '<p class="text-yellow-700">请先连接钱包</p>';
@@ -426,7 +434,6 @@
 
                 const burnerAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenBurner;
                 const web3 = ZODIAC_WEB3.getWeb3();
-                const account = ZODIAC_WEB3.getAccount();
 
                 const amountInWei = web3.utils.toWei(MINT_PRICE.toString(), 'ether');
                 const lightDarkCostInWei = web3.utils.toWei(LIGHT_DARK_COST.toString(), 'ether');
@@ -564,10 +571,6 @@
         document.getElementById('viewCollection').addEventListener('click', function() {
             document.getElementById('mintSuccessModal').classList.add('hidden');
             window.location.href = 'collection.html';
-        });
-
-        document.addEventListener('DOMContentLoaded', function() {
-            ZODIAC_COMPONENTS.injectNavigation('mint');
         });
     </script>
 </body>

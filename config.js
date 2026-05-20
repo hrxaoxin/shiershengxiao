@@ -1,71 +1,138 @@
 window.ZODIAC_CONFIG = (function() {
-    const NETWORKS = {
-        MAINNET: 56,
-        TESTNET: 97,
-        ETHEREUM: 1,
-        GOERLI: 5
+    const NETWORK_ID = 56;
+    const NETWORK_NAME = 'Binance Mainnet';
+    const NETWORK_LABEL = 'BNB主网';
+
+    const ERROR_CODES = {
+        4001: '用户拒绝了操作',
+        '-32000': 'RPC错误',
+        '-32601': '方法不存在',
+        '-32602': '参数无效'
     };
 
-    const CONTRACT_ADDRESSES_BY_NETWORK = {
-        [NETWORKS.MAINNET]: {
-            tokenContract: '0x1234567890abcdef1234567890abcdef12345678',
-            rewardManager: '0xabcdef1234567890abcdef1234567890abcdef12',
-            tokenBurner: '0xabcdef1234567890abcdef1234567890abcdef13',
-            nftMint: '0xabcdef1234567890abcdef1234567890abcdef14',
-            nftUpdate: '0xabcdef1234567890abcdef1234567890abcdef15',
-            nftTrading: '0xabcdef1234567890abcdef1234567890abcdef16',
-            breeding: '0xabcdef1234567890abcdef1234567890abcdef17',
-            staking: '0xabcdef1234567890abcdef1234567890abcdef18',
-            tokenStaking: '0xabcdef1234567890abcdef1234567890abcdef19',
-            arena: '0xabcdef1234567890abcdef1234567890abcdef20',
-            battle: '0xabcdef1234567890abcdef1234567890abcdef21'
-        },
-        [NETWORKS.TESTNET]: {
-            tokenContract: '0x0000000000000000000000000000000000000001',
-            rewardManager: '0x0000000000000000000000000000000000000002',
-            tokenBurner: '0x0000000000000000000000000000000000000003',
-            nftMint: '0x0000000000000000000000000000000000000004',
-            nftUpdate: '0x0000000000000000000000000000000000000005',
-            nftTrading: '0x0000000000000000000000000000000000000006',
-            breeding: '0x0000000000000000000000000000000000000007',
-            staking: '0x0000000000000000000000000000000000000008',
-            tokenStaking: '0x0000000000000000000000000000000000000009',
-            arena: '0x000000000000000000000000000000000000000a',
-            battle: '0x000000000000000000000000000000000000000b'
-        },
-        [NETWORKS.ETHEREUM]: {
-            tokenContract: '0x0000000000000000000000000000000000000011',
-            rewardManager: '0x0000000000000000000000000000000000000012',
-            tokenBurner: '0x0000000000000000000000000000000000000013',
-            nftMint: '0x0000000000000000000000000000000000000014',
-            nftUpdate: '0x0000000000000000000000000000000000000015',
-            nftTrading: '0x0000000000000000000000000000000000000016',
-            breeding: '0x0000000000000000000000000000000000000017',
-            staking: '0x0000000000000000000000000000000000000018',
-            tokenStaking: '0x0000000000000000000000000000000000000019',
-            arena: '0x000000000000000000000000000000000000001a',
-            battle: '0x000000000000000000000000000000000000001b'
-        },
-        [NETWORKS.GOERLI]: {
-            tokenContract: '0x0000000000000000000000000000000000000021',
-            rewardManager: '0x0000000000000000000000000000000000000022',
-            tokenBurner: '0x0000000000000000000000000000000000000023',
-            nftMint: '0x0000000000000000000000000000000000000024',
-            nftUpdate: '0x0000000000000000000000000000000000000025',
-            nftTrading: '0x0000000000000000000000000000000000000026',
-            breeding: '0x0000000000000000000000000000000000000027',
-            staking: '0x0000000000000000000000000000000000000028',
-            tokenStaking: '0x0000000000000000000000000000000000000029',
-            arena: '0x000000000000000000000000000000000000002a',
-            battle: '0x000000000000000000000000000000000000002b'
+    const ERROR_PATTERNS = [
+        { pattern: /MetaMask not detected/i, message: '未检测到MetaMask钱包，请安装后重试' },
+        { pattern: /User rejected the request/i, message: '用户拒绝了操作' },
+        { pattern: /Wallet not connected/i, message: '钱包未连接，请先连接钱包' },
+        { pattern: /Web3 not initialized/i, message: 'Web3初始化失败，请刷新页面重试' },
+        { pattern: /insufficient funds/i, message: '余额不足，请确保钱包有足够的资金' },
+        { pattern: /Gas estimation failed/i, message: 'Gas估算失败，请稍后重试' },
+        { pattern: /reverted/i, message: '交易执行失败，合约调用被拒绝' },
+        { pattern: /execution reverted/i, message: '交易执行失败，合约调用被拒绝' },
+        { pattern: /invalid opcode/i, message: '无效操作码，合约执行失败' },
+        { pattern: /out of gas/i, message: 'Gas不足，交易失败' },
+        { pattern: /nonce too low/i, message: '交易序号过低，请等待上一笔交易完成' },
+        { pattern: /already known/i, message: '交易已存在，正在处理中' },
+        { pattern: /unknown contract/i, message: '未知合约，请检查配置' },
+        { pattern: /address not configured/i, message: '合约地址未配置' },
+        { pattern: /contract method not found/i, message: '合约方法不存在' },
+        { pattern: /invalid address/i, message: '无效的钱包地址' },
+        { pattern: /block gas limit/i, message: '区块Gas限制不足' },
+        { pattern: /max priority fee per gas/i, message: 'Gas费用设置不合理' },
+        { pattern: /replacement transaction underpriced/i, message: '替换交易价格过低' },
+        { pattern: /cannot estimate gas/i, message: '无法估算Gas，请检查合约状态' }
+    ];
+
+    const UI_ERROR_CODES = {
+        WEB3_NOT_INITIALIZED: '请先连接钱包',
+        WALLET_NOT_CONNECTED: '钱包未连接，请先连接钱包',
+        INSUFFICIENT_FUNDS: '余额不足，请确保钱包有足够的资金',
+        INVALID_ADDRESS: '无效的钱包地址',
+        CONTRACT_ERROR: '合约调用失败',
+        NETWORK_ERROR: '网络连接失败，请检查网络',
+        USER_REJECTED: '用户拒绝了操作',
+        TIMEOUT: '操作超时，请重试',
+        UNKNOWN_ERROR: '操作失败，请稍后重试'
+    };
+
+    function getErrorCodeMessage(code) {
+        if (ERROR_CODES[code] !== undefined) {
+            return ERROR_CODES[code];
         }
-    };
-
-    function getContractAddresses(chainId) {
-        return CONTRACT_ADDRESSES_BY_NETWORK[chainId] || CONTRACT_ADDRESSES_BY_NETWORK[NETWORKS.TESTNET];
+        const stringCode = String(code);
+        if (ERROR_CODES[stringCode] !== undefined) {
+            return ERROR_CODES[stringCode];
+        }
+        return null;
     }
 
-    const CONTRACT_ADDRESSES = CONTRACT_ADDRESSES_BY_NETWORK[NETWORKS.TESTNET];
+    function getErrorMessage(error) {
+        const errorStr = error.message || error.toString();
+
+        if (error.code !== undefined && error.code !== null) {
+            const codeMessage = getErrorCodeMessage(error.code);
+            if (codeMessage) {
+                return codeMessage;
+            }
+        }
+
+        for (const { pattern, message } of ERROR_PATTERNS) {
+            if (pattern.test(errorStr)) {
+                return message;
+            }
+        }
+
+        if (errorStr.includes('0x')) {
+            const hexError = errorStr.match(/0x[0-9a-fA-F]+/);
+            if (hexError) {
+                return `交易失败 (错误码: ${hexError[0]})`;
+            }
+        }
+
+        return errorStr.length > 100 ? '操作失败，请稍后重试' : errorStr;
+    }
+
+    function getEnvContractAddress(key, defaultAddress) {
+        const envKey = `ZODIAC_${key.toUpperCase()}_ADDRESS`;
+        const envValue = typeof window !== 'undefined' ? window[envKey] : null;
+        if (envValue && /^0x[a-fA-F0-9]{40}$/.test(envValue)) {
+            return envValue;
+        }
+        return defaultAddress;
+    }
+
+    const CONTRACT_ADDRESSES = {
+        tokenContract: getEnvContractAddress('token', '0x1234567890abcdef1234567890abcdef12345678'),
+        rewardManager: getEnvContractAddress('rewardManager', '0xabcdef1234567890abcdef1234567890abcdef12'),
+        tokenBurner: getEnvContractAddress('tokenBurner', '0xabcdef1234567890abcdef1234567890abcdef13'),
+        nftMint: getEnvContractAddress('nftMint', '0xabcdef1234567890abcdef1234567890abcdef14'),
+        nftUpdate: getEnvContractAddress('nftUpdate', '0xabcdef1234567890abcdef1234567890abcdef15'),
+        nftTrading: getEnvContractAddress('nftTrading', '0xabcdef1234567890abcdef1234567890abcdef16'),
+        breeding: getEnvContractAddress('breeding', '0xabcdef1234567890abcdef1234567890abcdef17'),
+        staking: getEnvContractAddress('staking', '0xabcdef1234567890abcdef1234567890abcdef18'),
+        tokenStaking: getEnvContractAddress('tokenStaking', '0xabcdef1234567890abcdef1234567890abcdef19'),
+        arena: getEnvContractAddress('arena', '0xabcdef1234567890abcdef1234567890abcdef20'),
+        battle: getEnvContractAddress('battle', '0xabcdef1234567890abcdef1234567890abcdef21')
+    };
+
+    function getContractAddresses() {
+        return CONTRACT_ADDRESSES;
+    }
+
+    function validateContractAddresses() {
+        const INVALID_ADDRESS = '0x0000000000000000000000000000000000000000';
+        const TEST_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{8}0{32}$/;
+        
+        const invalidAddresses = Object.entries(CONTRACT_ADDRESSES)
+            .filter(([name, addr]) => {
+                if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) return true;
+                if (addr === INVALID_ADDRESS) return true;
+                return TEST_ADDRESS_PATTERN.test(addr);
+            });
+        
+        if (invalidAddresses.length > 0) {
+            console.error('[ZODIAC_CONFIG] Invalid contract addresses detected:', invalidAddresses);
+            if (typeof window !== 'undefined' && window.console) {
+                const warningMsg = `警告: 检测到 ${invalidAddresses.length} 个无效合约地址，请检查环境变量配置。\n\n无效地址列表:\n${invalidAddresses.map(([name, addr]) => `  ${name}: ${addr}`).join('\n')}`;
+                console.warn(warningMsg);
+                if (typeof alert === 'function' && window.location.hostname !== 'localhost') {
+                    alert(warningMsg);
+                }
+            }
+        }
+        
+        return invalidAddresses.length === 0;
+    }
 
     const MINT_COSTS = {
         normal: 8888,
@@ -75,10 +142,10 @@ window.ZODIAC_CONFIG = (function() {
     };
 
     const UPGRADE_COSTS = {
-        '1': { nft: 1, tokens: 10000, usdtValue: 1 },
-        '2': { nft: 2, tokens: 40000, usdtValue: 4 },
-        '3': { nft: 3, tokens: 120000, usdtValue: 12 },
-        '4': { nft: 4, tokens: 480000, usdtValue: 48 }
+        1: { nft: 1, tokens: 10000, usdtValue: 1 },
+        2: { nft: 2, tokens: 40000, usdtValue: 4 },
+        3: { nft: 3, tokens: 120000, usdtValue: 12 },
+        4: { nft: 4, tokens: 480000, usdtValue: 48 }
     };
 
     const WEIGHTS = {
@@ -180,12 +247,14 @@ window.ZODIAC_CONFIG = (function() {
         ],
         NFTTradingABI: [
             {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"},{"internalType":"uint256","name":"price","type":"uint256"}],"name":"listNFT","outputs":[],"stateMutability":"nonpayable","type":"function"},
-            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"delistNFT","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"cancelListing","outputs":[],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"buyNFT","outputs":[],"stateMutability":"payable","type":"function"},
+            {"inputs":[],"name":"getAllListings","outputs":[{"internalType":"uint256[]","name":"tokenIds","type":"uint256[]"},{"internalType":"address[]","name":"sellers","type":"address[]"},{"internalType":"uint256[]","name":"prices","type":"uint256[]"},{"internalType":"bool[]","name":"actives","type":"bool[]"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"getListing","outputs":[{"internalType":"address","name":"seller","type":"address"},{"internalType":"uint256","name":"price","type":"uint256"},{"internalType":"bool","name":"active","type":"bool"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"seller","type":"address"}],"name":"getSellerListings","outputs":[{"internalType":"uint256[]","name":"","type":"uint256[]"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"isListed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"getAllListedNFTs","outputs":[{"components":[{"internalType":"uint256","name":"tokenId","type":"uint256"},{"internalType":"address","name":"seller","type":"address"},{"internalType":"uint256","name":"price","type":"uint256"},{"internalType":"uint256","name":"tokenType","type":"uint256"},{"internalType":"uint256","name":"level","type":"uint256"}],"internalType":"struct ListedNFT[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"getListedNFT","outputs":[{"components":[{"internalType":"uint256","name":"tokenId","type":"uint256"},{"internalType":"address","name":"seller","type":"address"},{"internalType":"uint256","name":"price","type":"uint256"},{"internalType":"uint256","name":"tokenType","type":"uint256"},{"internalType":"uint256","name":"level","type":"uint256"}],"internalType":"struct ListedNFT","name":"","type":"tuple"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"seller","type":"address"}],"name":"getSellerListings","outputs":[{"components":[{"internalType":"uint256","name":"tokenId","type":"uint256"},{"internalType":"address","name":"seller","type":"address"},{"internalType":"uint256","name":"price","type":"uint256"},{"internalType":"uint256","name":"tokenType","type":"uint256"},{"internalType":"uint256","name":"level","type":"uint256"}],"internalType":"struct ListedNFT[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"isListed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"getNFTPrice","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
         ],
         breedingABI: [
@@ -197,7 +266,16 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[],"name":"minBreedingLevel","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"selfBreedingDuration","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"marketBreedingDuration","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"uint256","name":"pairId","type":"uint256"}],"name":"claimBaby","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"}
+            {"inputs":[{"internalType":"uint256","name":"pairId","type":"uint256"}],"name":"claimBaby","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId1","type":"uint256"},{"internalType":"uint256","name":"tokenId2","type":"uint256"}],"name":"startSelfBreeding","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"orderId","type":"uint256"}],"name":"completeSelfBreeding","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"listForBreeding","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"orderId","type":"uint256"}],"name":"cancelListing","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"orderId","type":"uint256"},{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"joinBreeding","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"orderId","type":"uint256"}],"name":"completeMarketBreeding","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"getMarketBreedingOrders","outputs":[{"internalType":"uint256[]","name":"","type":"uint256[]"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getUserBreedingOrders","outputs":[{"internalType":"uint256[]","name":"","type":"uint256[]"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"orderId","type":"uint256"}],"name":"breedingOrders","outputs":[{"components":[{"internalType":"address","name":"owner1","type":"address"},{"internalType":"address","name":"owner2","type":"address"},{"internalType":"uint256","name":"tokenId1","type":"uint256"},{"internalType":"uint256","name":"tokenId2","type":"uint256"},{"internalType":"uint256","name":"startTime","type":"uint256"},{"internalType":"bool","name":"completed","type":"bool"},{"internalType":"bool","name":"owner1Claimed","type":"bool"},{"internalType":"bool","name":"owner2Claimed","type":"bool"}],"internalType":"struct BreedingOrder","name":"","type":"tuple"}],"stateMutability":"view","type":"function"}
         ],
         stakingABI: [
             {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"stakeNFT","outputs":[],"stateMutability":"nonpayable","type":"function"},
@@ -256,10 +334,13 @@ window.ZODIAC_CONFIG = (function() {
         ]
     };
 
+    validateContractAddresses();
+    
     return {
         CONTRACT_ADDRESSES,
-        CONTRACT_ADDRESSES_BY_NETWORK,
-        NETWORKS,
+        NETWORK_ID,
+        NETWORK_NAME,
+        NETWORK_LABEL,
         getContractAddresses,
         MINT_COSTS,
         UPGRADE_COSTS,
@@ -272,6 +353,12 @@ window.ZODIAC_CONFIG = (function() {
         ATTR_NAMES,
         ATTR_PREFIXES,
         ANIMAL_KEYS,
-        ABIS
+        ABIS,
+        ERROR_CODES,
+        ERROR_PATTERNS,
+        UI_ERROR_CODES,
+        getErrorCodeMessage,
+        getErrorMessage,
+        validateContractAddresses
     };
 })();

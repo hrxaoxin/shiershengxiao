@@ -675,6 +675,9 @@
         let defenderMatchWins = 0;
         let nftContract;
         let isBattleSkipped = false;
+        
+        let battleDomCache = {};
+        let hpBarCache = {};
 
         const TEAM_SIZE = 6;
         const FRONT_ROW_SIZE = 3;
@@ -696,8 +699,8 @@
         };
 
         const ZODIAC_EMOJIS = ['🐀', '🐂', '🐅', '🐇', '🐉', '🐍', '🐎', '🐑', '🐒', '🐓', '🐕', '🐷'];
-        const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
-        const ELEMENT_NAMES = ['Water', 'Wind', 'Fire', 'Dark', 'Light'];
+        const CONFIG = ZODIAC_UTILS.CONFIG;
+        const ELEMENTS = ['water', 'wind', 'fire', 'dark', 'light'];
 
         const SKILL_TYPE_MAP = {
             '0': 'Attack',
@@ -813,7 +816,7 @@
                     await loadRewardPool();
                 } catch (error) {
                     console.error('连接钱包失败:', error);
-                    alert('连接钱包失败: ' + error.message);
+                    ZODIAC_UI.handleError(error, '连接钱包');
                 }
             } else {
                 alert('请安装MetaMask钱包');
@@ -837,12 +840,9 @@
                     const tokenType = tokenInfo.tokenType;
                     const level = tokenInfo.level;
                     
-                    const attrIndex = Math.floor(tokenType / 24);
-                    const zodiacIndex = Math.floor((tokenType % 24) / 2);
-                    const gender = tokenType % 2;
-                    const attr = ELEMENT_NAMES[attrIndex];
-                    const zodiac = ZODIAC_NAMES[zodiacIndex];
-                    const name = `${attr === 'Water' ? '水' : attr === 'Wind' ? '风' : attr === 'Fire' ? '火' : attr === 'Dark' ? '暗' : '光'}${zodiac}${gender === 0 ? '·雄' : '·雌'}`;
+                    const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
+                    const zodiac = ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiacIndex];
+                    const name = `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`;
                     
                     const imagePath = getNFTImagePath(tokenType);
                     
@@ -1076,7 +1076,7 @@
                 updateBattleTeamDisplay();
             } catch (error) {
                 console.error('设置战队失败:', error);
-                alert('设置失败: ' + error.message);
+                ZODIAC_UI.handleError(error, '设置战队');
             }
         }
 
@@ -1087,7 +1087,7 @@
                 await loadRemainingAttempts();
             } catch (error) {
                 console.error('充值失败:', error);
-                alert('充值失败: ' + error.message);
+                ZODIAC_UI.handleError(error, '充值挑战次数');
             }
         }
 
@@ -1391,11 +1391,18 @@
             const attackerTeam = battleTeam.filter(n => n);
             const defenderTeam = selectedOpponent.team;
             
+            function getNFTImageUrl(imagePath) {
+                if (!imagePath) return 'https://via.placeholder.com/40';
+                if (imagePath.indexOf('http') === 0) return imagePath;
+                const defaultGateway = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/';
+                return `${defaultGateway}${imagePath}`;
+            }
+            
             attackerTeam.forEach((nft, index) => {
                 const imgDiv = document.getElementById(`attackerImg${index + 1}`);
                 const nameDiv = document.getElementById(`attackerName${index + 1}`);
                 if (imgDiv && nft) {
-                    const imageUrl = nft.imagePath && nft.imagePath.indexOf('http') === 0 ? nft.imagePath : `https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/${nft.imagePath}`;
+                    const imageUrl = getNFTImageUrl(nft.imagePath);
                     imgDiv.innerHTML = `<div class="relative w-full h-full"><img src="${imageUrl}" alt="${nft.name}" class="w-full h-full rounded-md object-cover" onerror="this.src='https://via.placeholder.com/40'"><div class="absolute top-0 right-0 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center text-[8px] font-bold text-black">${nft.level}</div></div>`;
                 }
                 if (nameDiv && nft) {
@@ -1407,7 +1414,7 @@
                 const imgDiv = document.getElementById(`defenderImg${index + 1}`);
                 const nameDiv = document.getElementById(`defenderName${index + 1}`);
                 if (imgDiv && nft) {
-                    const imageUrl = nft.imagePath && nft.imagePath.indexOf('http') === 0 ? nft.imagePath : `https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/${nft.imagePath}`;
+                    const imageUrl = getNFTImageUrl(nft.imagePath);
                     imgDiv.innerHTML = `<div class="relative w-full h-full"><img src="${imageUrl}" alt="${nft.name}" class="w-full h-full rounded-md object-cover" onerror="this.src='https://via.placeholder.com/40'"><div class="absolute top-0 right-0 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center text-[8px] font-bold text-black">${nft.level}</div></div>`;
                 }
                 if (nameDiv && nft) {
@@ -1438,11 +1445,33 @@
             }
         }
 
+        function cacheBattleElements() {
+            battleDomCache = {};
+            hpBarCache = {};
+            
+            ['attacker', 'defender'].forEach(prefix => {
+                for (let i = 1; i <= 6; i++) {
+                    const hpBarKey = `${prefix}Hp${i}`;
+                    const hpTextKey = `${prefix}HpText${i}`;
+                    const slotIndex = i - 1;
+                    const slotKey = `${prefix}${slotIndex < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(slotIndex % FRONT_ROW_SIZE) + 1}`;
+                    
+                    hpBarCache[hpBarKey] = document.getElementById(hpBarKey);
+                    hpBarCache[hpTextKey] = document.getElementById(hpTextKey);
+                    battleDomCache[slotKey] = document.getElementById(slotKey);
+                }
+            });
+        }
+
         function updateHpBar(isAttacker, index, newHpPercent) {
             const prefix = isAttacker ? 'attacker' : 'defender';
-            const hpBar = document.getElementById(`${prefix}Hp${index + 1}`);
-            const hpText = document.getElementById(`${prefix}HpText${index + 1}`);
-            const slot = document.getElementById(`${prefix}${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
+            const hpBarKey = `${prefix}Hp${index + 1}`;
+            const hpTextKey = `${prefix}HpText${index + 1}`;
+            const slotKey = `${prefix}${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`;
+            
+            const hpBar = hpBarCache[hpBarKey];
+            const hpText = hpBarCache[hpTextKey];
+            const slot = battleDomCache[slotKey];
             
             if (hpBar) {
                 hpBar.style.width = `${newHpPercent}%`;
@@ -1465,7 +1494,8 @@
 
         function addAttackEffect(isAttacker, index) {
             const prefix = isAttacker ? 'attacker' : 'defender';
-            const slot = document.getElementById(`${prefix}${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
+            const slotKey = `${prefix}${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`;
+            const slot = battleDomCache[slotKey] || document.getElementById(slotKey);
             
             if (slot) {
                 slot.style.transform = 'scale(1.1)';
@@ -1480,7 +1510,8 @@
 
         function addDamageEffect(isAttacker, index) {
             const prefix = isAttacker ? 'attacker' : 'defender';
-            const slot = document.getElementById(`${prefix}${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`);
+            const slotKey = `${prefix}${index < FRONT_ROW_SIZE ? 'Front' : 'Back'}${(index % FRONT_ROW_SIZE) + 1}`;
+            const slot = battleDomCache[slotKey] || document.getElementById(slotKey);
             
             if (slot) {
                 slot.style.filter = 'brightness(0.5) sepia(1) hue-rotate(-50deg)';
@@ -1492,6 +1523,8 @@
         }
 
         async function startBattle() {
+            cacheBattleElements();
+            
             const fightBtn = document.getElementById('fightBtn');
             fightBtn.style.display = 'none';
             
@@ -1500,7 +1533,8 @@
                 mobileFightBtn.style.display = 'none';
             }
             
-            document.getElementById('skipBtn').style.display = 'block';
+            const skipBtn = document.getElementById('skipBtn');
+            skipBtn.style.display = 'block';
             
             const mobileSkipBtn = document.getElementById('mobileSkipBtn');
             if (mobileSkipBtn) {
@@ -1852,8 +1886,17 @@
         }
 
         function checkAdvantage(attacker, defender) {
-            const advantages = { Fire: 'Wind', Wind: 'Water', Water: 'Fire', Light: 'Dark', Dark: 'Light' };
-            return advantages[attacker] === defender;
+            const attackerLower = attacker.toLowerCase();
+            const defenderLower = defender.toLowerCase();
+            
+            const advantages = { 
+                fire: 'wind', 
+                wind: 'water', 
+                water: 'fire', 
+                light: 'dark', 
+                dark: 'light' 
+            };
+            return advantages[attackerLower] === defenderLower;
         }
 
         function delay(ms) {
@@ -1864,11 +1907,18 @@
             return address.slice(0, 6) + '...' + address.slice(-4);
         }
 
+        function cleanup() {
+            battleDomCache = {};
+            hpBarCache = {};
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             ZODIAC_COMPONENTS.injectNavigation('arena');
         });
 
         window.addEventListener('load', init);
+        window.addEventListener('beforeunload', cleanup);
+        window.addEventListener('pagehide', cleanup);
     </script>
 </body>
 </html>

@@ -1,23 +1,25 @@
 window.ZODIAC_UTILS = (function() {
-    const CONFIG = window.ZODIAC_CONFIG || {
-        ZODIAC_NAMES: ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
-        ATTR_NAMES: { water: '水', wind: '风', fire: '火', dark: '暗', light: '光' },
-        ATTR_PREFIXES: { water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang' },
-        ANIMAL_KEYS: ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
-        IPFS_BASES: {
+    const GLOBAL_CONFIG = window.ZODIAC_CONFIG || {};
+    
+    const CONFIG = {
+        ZODIAC_NAMES: GLOBAL_CONFIG.ZODIAC_NAMES || ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'],
+        ATTR_NAMES: GLOBAL_CONFIG.ATTR_NAMES || { water: '水', wind: '风', fire: '火', dark: '暗', light: '光' },
+        ATTR_PREFIXES: GLOBAL_CONFIG.ATTR_PREFIXES || { water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang' },
+        ANIMAL_KEYS: GLOBAL_CONFIG.ANIMAL_KEYS || ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'],
+        IPFS_BASES: GLOBAL_CONFIG.IPFS_BASES || {
             water: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
             wind: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
             fire: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
             dark: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/',
             light: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
         },
-        UPGRADE_COSTS: {
-            '1': { nft: 1, tokens: 10000, usdtValue: 1 },
-            '2': { nft: 2, tokens: 40000, usdtValue: 4 },
-            '3': { nft: 3, tokens: 120000, usdtValue: 12 },
-            '4': { nft: 4, tokens: 480000, usdtValue: 48 }
+        UPGRADE_COSTS: GLOBAL_CONFIG.UPGRADE_COSTS || {
+            1: { nft: 1, tokens: 10000, usdtValue: 1 },
+            2: { nft: 2, tokens: 40000, usdtValue: 4 },
+            3: { nft: 3, tokens: 120000, usdtValue: 12 },
+            4: { nft: 4, tokens: 480000, usdtValue: 48 }
         },
-        WEIGHTS: {
+        WEIGHTS: GLOBAL_CONFIG.WEIGHTS || {
             normal: { 1: 1, 2: 2, 3: 6, 4: 18, 5: 66 },
             rare: { 1: 10, 2: 12, 3: 16, 4: 28, 5: 76 }
         }
@@ -96,7 +98,8 @@ window.ZODIAC_UTILS = (function() {
                 imagePath: 'images/fu-cards/shuishu_1.png',
                 isRare: false,
                 zodiacIndex: 0,
-                attrIndex: 0
+                attrIndex: 0,
+                typeId: validatedTypeId
             };
         }
 
@@ -118,7 +121,7 @@ window.ZODIAC_UTILS = (function() {
             zodiacIndex: zodiacIndex,
             attrIndex: attrIndex,
             isRare: attrIndex >= 3,
-            typeId: typeId
+            typeId: validatedTypeId
         };
     }
 
@@ -146,8 +149,25 @@ window.ZODIAC_UTILS = (function() {
     }
 
     function formatWeiToEther(wei) {
-        const validatedWei = validateNumber(wei, 0, undefined, 0);
-        return (validatedWei / 1e18).toFixed(4);
+        if (wei === null || wei === undefined || wei === '') {
+            return '0.0000';
+        }
+        
+        const weiStr = String(wei);
+        
+        if (!/^\d+$/.test(weiStr)) {
+            console.warn(`Invalid wei value: ${wei}, using 0`);
+            return '0.0000';
+        }
+        
+        const etherStr = weiStr.padStart(19, '0');
+        const integerPart = etherStr.slice(0, -18);
+        const decimalPart = etherStr.slice(-18).slice(0, 4);
+        
+        const formattedInteger = integerPart === '' ? '0' : integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        const formattedDecimal = decimalPart.padEnd(4, '0');
+        
+        return `${formattedInteger}.${formattedDecimal}`;
     }
 
     function calculateDividend(userWeight, totalWeight, dividendPool) {
@@ -170,6 +190,67 @@ window.ZODIAC_UTILS = (function() {
         return CONFIG.ATTR_NAMES[validatedAttr] || validatedAttr;
     }
 
+    function getNFTImageUrl(imagePath, ipfsBase) {
+        if (!imagePath) return 'https://via.placeholder.com/40';
+        if (imagePath.indexOf('http') === 0) return imagePath;
+        const defaultGateway = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/';
+        const base = ipfsBase !== undefined && ipfsBase !== null ? ipfsBase : defaultGateway;
+        return `${base}${imagePath}`;
+    }
+
+    function getElementAdvantage(attackerElement, defenderElement) {
+        const attacker = attackerElement.toLowerCase();
+        const defender = defenderElement.toLowerCase();
+        const advantages = { 
+            fire: 'wind', 
+            wind: 'water', 
+            water: 'fire', 
+            light: 'dark', 
+            dark: 'light' 
+        };
+        return advantages[attacker] === defender;
+    }
+
+    function getElementDisadvantage(attackerElement, defenderElement) {
+        const attacker = attackerElement.toLowerCase();
+        const defender = defenderElement.toLowerCase();
+        const disadvantages = { 
+            wind: 'fire', 
+            water: 'wind', 
+            fire: 'water', 
+            dark: 'light', 
+            light: 'dark' 
+        };
+        return disadvantages[attacker] === defender;
+    }
+
+    function generateRandomId() {
+        return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    }
+
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    function throttle(func, limit) {
+        let inThrottle;
+        return function executedFunction(...args) {
+            if (!inThrottle) {
+                func(...args);
+                inThrottle = true;
+                setTimeout(() => (inThrottle = false), limit);
+            }
+        };
+    }
+
     return {
         getNFTInfo: getNFTInfo,
         getUpgradeCost: getUpgradeCost,
@@ -180,6 +261,12 @@ window.ZODIAC_UTILS = (function() {
         calculateDividend: calculateDividend,
         getAttributeType: getAttributeType,
         getAttributeName: getAttributeName,
+        getNFTImageUrl: getNFTImageUrl,
+        getElementAdvantage: getElementAdvantage,
+        getElementDisadvantage: getElementDisadvantage,
+        generateRandomId: generateRandomId,
+        debounce: debounce,
+        throttle: throttle,
         validateNumber: validateNumber,
         validateBoolean: validateBoolean,
         validateAddress: validateAddress,

@@ -128,6 +128,16 @@
                     <p class="text-gray-600">加载市场数据中...</p>
                 </div>
             </div>
+            
+            <div id="paginationControls" class="flex justify-center items-center space-x-4 mt-8 hidden">
+                <button id="prevPageBtn" class="btn-secondary" disabled>
+                    <i class="fa fa-chevron-left mr-1"></i>上一页
+                </button>
+                <span id="pageInfo" class="text-gray-600">第 1 / 1 页</span>
+                <button id="nextPageBtn" class="btn-secondary" disabled>
+                    下一页 <i class="fa fa-chevron-right ml-1"></i>
+                </button>
+            </div>
         </div>
 
         <div id="listSection" class="mb-12 hidden">
@@ -268,10 +278,16 @@
         let currentTokenIdToBuy;
         let selectedTokenId = null;
         let userNftCache = null;
+        
+        const PAGE_SIZE = 16;
+        let currentPage = 1;
+        let totalPages = 1;
+        let allListings = [];
 
         document.addEventListener('DOMContentLoaded', function() {
             initWeb3();
             initWalletUI();
+            ZODIAC_COMPONENTS.injectNavigation('trading');
 
             document.getElementById('browseTab').addEventListener('click', () => {
                 document.getElementById('browseSection').classList.remove('hidden');
@@ -313,6 +329,22 @@
 
             document.getElementById('refreshBtn').addEventListener('click', () => {
                 loadMarketplace();
+            });
+
+            document.getElementById('prevPageBtn').addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    updatePagination();
+                    displayMarketplaceListings(getCurrentPageListings());
+                }
+            });
+
+            document.getElementById('nextPageBtn').addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    updatePagination();
+                    displayMarketplaceListings(getCurrentPageListings());
+                }
             });
 
             document.getElementById('filterType').addEventListener('change', () => {
@@ -544,11 +576,38 @@
                 listings.sort((a, b) => parseFloat(a.priceWei) - parseFloat(b.priceWei));
                 marketplaceCache = listings;
                 cacheTimestamp = Date.now();
-                displayMarketplaceListings(listings);
+                allListings = listings;
+                currentPage = 1;
+                updatePagination();
+                displayMarketplaceListings(getCurrentPageListings());
             } catch (error) {
                 console.error('加载市场数据失败:', error);
                 marketplaceGrid.innerHTML = '<div class="col-span-full text-center py-12"><p class="text-red-500">加载失败，请刷新页面</p></div>';
             }
+        }
+
+        function getCurrentPageListings() {
+            const startIndex = (currentPage - 1) * PAGE_SIZE;
+            const endIndex = startIndex + PAGE_SIZE;
+            return allListings.slice(startIndex, endIndex);
+        }
+
+        function updatePagination() {
+            totalPages = Math.ceil(allListings.length / PAGE_SIZE);
+            const paginationControls = document.getElementById('paginationControls');
+            const prevBtn = document.getElementById('prevPageBtn');
+            const nextBtn = document.getElementById('nextPageBtn');
+            const pageInfo = document.getElementById('pageInfo');
+
+            if (totalPages <= 1) {
+                paginationControls.classList.add('hidden');
+                return;
+            }
+
+            paginationControls.classList.remove('hidden');
+            pageInfo.textContent = `第 ${currentPage} / ${totalPages} 页`;
+            prevBtn.disabled = currentPage === 1;
+            nextBtn.disabled = currentPage >= totalPages;
         }
 
         function displayMarketplaceListings(listings) {
@@ -556,6 +615,7 @@
             
             if (listings.length === 0) {
                 marketplaceGrid.innerHTML = '<div class="col-span-full text-center py-12"><p class="text-gray-600">市场暂无NFT上架</p></div>';
+                document.getElementById('paginationControls').classList.add('hidden');
                 return;
             }
             
@@ -633,7 +693,10 @@
                 }
             }
             
-            displayMarketplaceListings(filteredListings);
+            allListings = filteredListings;
+            currentPage = 1;
+            updatePagination();
+            displayMarketplaceListings(getCurrentPageListings());
         }
 
         function showBuyModal(tokenId, price, seller, type) {
@@ -1047,10 +1110,6 @@
         document.getElementById('listingPrice').addEventListener('input', updateListButtonState);
 
         document.getElementById('refreshWallet').addEventListener('click', initWeb3);
-
-        document.addEventListener('DOMContentLoaded', function() {
-            ZODIAC_COMPONENTS.injectNavigation('trading');
-        });
     </script>
 </body>
 </html>

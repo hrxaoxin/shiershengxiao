@@ -320,6 +320,7 @@
         let myMarketOrders = [];
         let activeSelfOrder = null;
         let activePairOrders = [];
+        let countdownIntervals = {};
 
         particlesJS('particles-js', {
             particles: {
@@ -354,6 +355,7 @@
         window.addEventListener('load', function() {
             initWeb3();
             initWalletUI();
+            ZODIAC_COMPONENTS.injectNavigation('breeding');
         });
 
         function initWalletUI() {
@@ -585,7 +587,7 @@
                 updateSelectedPair();
             } catch (error) {
                 console.error('开始自我孕育失败:', error);
-                ZODIAC_UI.showToast('交易失败: ' + (error.message || '未知错误'), 'error');
+                ZODIAC_UI.handleError(error, '开始自我孕育');
             }
 
             btn.disabled = false;
@@ -622,17 +624,31 @@
         function showSelfBreedingStatus() {
             const statusSection = document.getElementById('selfBreedingStatus');
             statusSection.classList.remove('hidden');
+            
+            if (countdownIntervals['self']) {
+                clearInterval(countdownIntervals['self']);
+            }
+            
             updateSelfCountdown();
-            setInterval(updateSelfCountdown, 1000);
+            countdownIntervals['self'] = setInterval(updateSelfCountdown, 1000);
         }
 
-        function updateSelfCountdown() {
+        async function updateSelfCountdown() {
             if (!activeSelfOrder) return;
 
             const DURATION = 12 * 60 * 60;
             const startTime = parseInt(activeSelfOrder.startTime);
             const endTime = startTime + DURATION;
-            const now = Math.floor(Date.now() / 1000);
+            
+            let now;
+            try {
+                const block = await window.ZODIAC_WEB3.getWeb3().eth.getBlock('latest');
+                now = block.timestamp;
+            } catch (error) {
+                now = Math.floor(Date.now() / 1000);
+                console.warn('Failed to get block timestamp, using local time:', error);
+            }
+            
             const remaining = endTime - now;
 
             if (remaining <= 0) {
@@ -667,12 +683,18 @@
                 });
                 
                 ZODIAC_UI.showToast('恭喜！孕育完成！', 'success');
+                
+                if (countdownIntervals['self']) {
+                    clearInterval(countdownIntervals['self']);
+                    delete countdownIntervals['self'];
+                }
+                
                 activeSelfOrder = null;
                 document.getElementById('selfBreedingStatus').classList.add('hidden');
                 await loadNFTs();
             } catch (error) {
                 console.error('完成自我孕育失败:', error);
-                ZODIAC_UI.showToast('交易失败: ' + (error.message || '未知错误'), 'error');
+                ZODIAC_UI.handleError(error, '完成自我孕育');
                 btn.disabled = false;
                 btn.textContent = '完成孕育';
             }
@@ -712,7 +734,7 @@
                 document.getElementById('listForBreedingBtn').disabled = true;
             } catch (error) {
                 console.error('上架失败:', error);
-                ZODIAC_UI.showToast('交易失败: ' + (error.message || '未知错误'), 'error');
+                ZODIAC_UI.handleError(error, '上架孕育订单');
             }
 
             btn.disabled = false;
@@ -942,13 +964,25 @@
             
             container.innerHTML = html;
             
-            // 启动倒计时更新
-            setInterval(() => updatePairCountdowns(), 1000);
+            if (countdownIntervals['pair']) {
+                clearInterval(countdownIntervals['pair']);
+            }
+            
             updatePairCountdowns();
+            countdownIntervals['pair'] = setInterval(updatePairCountdowns, 1000);
         }
 
-        function updatePairCountdowns() {
+        async function updatePairCountdowns() {
             const DURATION = 24 * 60 * 60;
+            
+            let now;
+            try {
+                const block = await window.ZODIAC_WEB3.getWeb3().eth.getBlock('latest');
+                now = block.timestamp;
+            } catch (error) {
+                now = Math.floor(Date.now() / 1000);
+                console.warn('Failed to get block timestamp, using local time:', error);
+            }
             
             activePairOrders.forEach((order, index) => {
                 const countdownEl = document.getElementById(`pairCountdown-${index}`);
@@ -958,7 +992,6 @@
                 
                 const startTime = parseInt(order.startTime);
                 const endTime = startTime + DURATION;
-                const now = Math.floor(Date.now() / 1000);
                 const remaining = endTime - now;
                 
                 let canComplete = remaining <= 0;
@@ -1136,6 +1169,18 @@
             }
         }
 
+        function cleanup() {
+            for (const key in countdownIntervals) {
+                if (countdownIntervals[key]) {
+                    clearInterval(countdownIntervals[key]);
+                    delete countdownIntervals[key];
+                }
+            }
+        }
+
+        window.addEventListener('beforeunload', cleanup);
+        window.addEventListener('pagehide', cleanup);
+
         async function completeMarketBreeding(orderId) {
             try {
                 const account = getAccount();
@@ -1163,10 +1208,6 @@
             document.getElementById('selfSection').classList.toggle('hidden', tab !== 'self');
             document.getElementById('marketSection').classList.toggle('hidden', tab !== 'market');
         }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            ZODIAC_COMPONENTS.injectNavigation('breeding');
-        });
     </script>
 </body>
 </html>

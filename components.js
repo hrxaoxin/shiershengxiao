@@ -179,11 +179,25 @@ window.ZODIAC_COMPONENTS = (function() {
         window.ZODIAC_UI.emitEvent('walletConnectRequested');
     }
 
+    let navigationInitialized = false;
+
     function initNavigation(activeId) {
-        document.addEventListener('DOMContentLoaded', () => {
+        if (navigationInitialized) {
+            console.warn('Navigation already initialized, skipping duplicate initialization');
+            return;
+        }
+        
+        const handleDOMContentLoaded = () => {
             document.getElementById('moreMenuBtn')?.addEventListener('click', openMobileMenu);
             document.getElementById('closeMenuBtn')?.addEventListener('click', closeMobileMenu);
-        });
+            navigationInitialized = true;
+        };
+        
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', handleDOMContentLoaded);
+        } else {
+            handleDOMContentLoaded();
+        }
     }
 
     return {

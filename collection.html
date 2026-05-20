@@ -62,7 +62,9 @@
         .zodiac-card.has-item {
             border: 2px solid #22c55e;
         }
-        .zodiac-card img { width: 60px; height: 60px; object-fit: contain; margin: 0 auto 8px; border-radius: 8px; position: relative; z-index: 1; }
+        .zodiac-card img { width: 60px; height: 60px; object-fit: contain; margin: 0 auto 8px; border-radius: 8px; position: relative; z-index: 1; background-color: #f3f4f6; }
+        .zodiac-card img.lazy-image { background: linear-gradient(135deg, #f3f4f6 25%, #e5e7eb 25%, #e5e7eb 50%, #f3f4f6 50%, #f3f4f6 75%, #e5e7eb 75%, #e5e7eb); background-size: 20px 20px; animation: shimmer 1.5s linear infinite; }
+        @keyframes shimmer { 0% { background-position: 0 0; } 100% { background-position: 20px 20px; } }
         .zodiac-card h4 { font-size: 12px; font-weight: 500; color: #333; }
         .zodiac-card p { font-size: 10px; color: #666; }
         .btn-primary { background-color: #3b82f6; color: white; border-radius: 8px; padding: 10px 20px; font-weight: 500; transition: all 0.3s ease; }
@@ -251,9 +253,7 @@
         let currentFilter = 'all';
         let currentViewMode = 'collection';
 
-        const ELEMENTS = ['water', 'wind', 'fire', 'dark', 'light'];
-        const ELEMENT_NAMES = ['水', '风', '火', '暗', '光'];
-        const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+        const CONFIG = ZODIAC_UTILS.CONFIG;
 
         document.addEventListener('DOMContentLoaded', function() {
             particlesJS('particles-js', {
@@ -276,6 +276,7 @@
 
             initWeb3();
             initWalletUI();
+            ZODIAC_COMPONENTS.injectNavigation('collection');
         });
 
         function initWalletUI() {
@@ -383,7 +384,11 @@
             renderTokens();
         }
 
+        let cachedNftTypes = null;
         function getAllNftTypes() {
+            if (cachedNftTypes) {
+                return cachedNftTypes;
+            }
             const allTypes = [];
             for (let elementIndex = 0; elementIndex < 5; elementIndex++) {
                 for (let zodiacIndex = 0; zodiacIndex < 12; zodiacIndex++) {
@@ -398,58 +403,21 @@
                     }
                 }
             }
+            cachedNftTypes = allTypes;
             return allTypes;
         }
 
         function getNFTInfo(typeId) {
-            const elementIndex = Math.floor(typeId / 24);
-            const zodiacIndex = Math.floor((typeId % 24) / 2);
-            const gender = typeId % 2;
-            
-            const element = ELEMENT_NAMES[elementIndex];
-            const zodiac = ZODIAC_NAMES[zodiacIndex];
-            const genderText = gender === 0 ? '·雄' : '·雌';
-            const name = element + zodiac + genderText;
-            
-            const IPFS_BASE_1 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/';
-            const IPFS_BASE_2 = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/';
-            
-            let imageName = '';
-            if (element === '水') imageName = 'shui';
-            else if (element === '风') imageName = 'feng';
-            else if (element === '火') imageName = 'huo';
-            else if (element === '暗') imageName = 'an';
-            else if (element === '光') imageName = 'guang';
-            
-            if (zodiac === '鼠') imageName += 'shu';
-            else if (zodiac === '牛') imageName += 'niu';
-            else if (zodiac === '虎') imageName += 'hu';
-            else if (zodiac === '兔') imageName += 'tu';
-            else if (zodiac === '龙') imageName += 'long';
-            else if (zodiac === '蛇') imageName += 'she';
-            else if (zodiac === '马') imageName += 'ma';
-            else if (zodiac === '羊') imageName += 'yang';
-            else if (zodiac === '猴') imageName += 'hou';
-            else if (zodiac === '鸡') imageName += 'ji';
-            else if (zodiac === '狗') imageName += 'gou';
-            else if (zodiac === '猪') imageName += 'zhu';
-            
-            let imagePath = '';
-            if (elementIndex < 3) {
-                imagePath = `${IPFS_BASE_1}${imageName}_${gender}.png`;
-            } else {
-                imagePath = `${IPFS_BASE_2}${imageName}_${gender}.png`;
-            }
-            
+            const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
             return {
-                typeId: typeId,
-                element: element,
-                elementIndex: elementIndex,
-                zodiac: zodiac,
-                zodiacIndex: zodiacIndex,
-                gender: gender === 0 ? '雄' : '雌',
-                name: name,
-                imagePath: imagePath
+                typeId: nftInfo.typeId,
+                element: nftInfo.attrName,
+                elementIndex: nftInfo.attrIndex,
+                zodiac: nftInfo.zodiac,
+                zodiacIndex: nftInfo.zodiacIndex,
+                gender: nftInfo.gender,
+                name: nftInfo.name,
+                imagePath: nftInfo.imagePath
             };
         }
 
@@ -514,7 +482,8 @@
             
             let filteredTypes = allTypes;
             if (currentFilter !== 'all') {
-                const attrIndex = ELEMENTS.indexOf(currentFilter);
+                const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+                const attrIndex = attrs.indexOf(currentFilter);
                 filteredTypes = allTypes.filter(t => t.elementIndex === attrIndex);
             }
             
@@ -531,7 +500,7 @@
                 html += `
                     <div class="zodiac-card ${isOwned ? 'has-item' : 'locked'}" onclick="${isOwned ? `showCardModal(${typeId}, ${level})` : ''}">
                         ${count > 1 ? `<span class="collection-badge">x${count}</span>` : ''}
-                        <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
                         <h4>${nftInfo.name}</h4>
                         ${isOwned ? `<p>等级: ${getStars(level)}</p>` : '<p class="text-gray-400">未拥有</p>'}
                     </div>
@@ -539,6 +508,7 @@
             }
             
             grid.innerHTML = html;
+            lazyLoadImages();
         }
 
         function renderMyCollectionView(grid, emptyState) {
@@ -566,7 +536,7 @@
 
                 html += `
                     <div class="zodiac-card" onclick="showCardModal(${typeId}, ${level})">
-                        <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
                         <h4>${nftInfo.name}</h4>
                         <p>等级: ${getStars(level)}</p>
                         <p>拥有 ${token.count} 张</p>
@@ -575,6 +545,7 @@
             }
 
             grid.innerHTML = html;
+            lazyLoadImages();
         }
 
         function showCardModal(typeId, level) {
@@ -613,13 +584,50 @@
             await loadProgress();
         });
 
+        let imageObserver = null;
+
+        function lazyLoadImages() {
+            if (imageObserver) {
+                imageObserver.disconnect();
+            }
+
+            const lazyImages = document.querySelectorAll('img.lazy-image');
+
+            if ('IntersectionObserver' in window) {
+                imageObserver = new IntersectionObserver((entries, observer) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            const src = img.getAttribute('data-src');
+                            if (src) {
+                                img.src = src;
+                                img.classList.remove('lazy-image');
+                            }
+                            observer.unobserve(img);
+                        }
+                    });
+                }, {
+                    rootMargin: '50px',
+                    threshold: 0.1
+                });
+
+                lazyImages.forEach(img => {
+                    imageObserver.observe(img);
+                });
+            } else {
+                lazyImages.forEach(img => {
+                    const src = img.getAttribute('data-src');
+                    if (src) {
+                        img.src = src;
+                        img.classList.remove('lazy-image');
+                    }
+                });
+            }
+        }
+
         function getStars(level) {
             return window.ZODIAC_UTILS.getStars(parseInt(level));
         }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            ZODIAC_COMPONENTS.injectNavigation('collection');
-        });
     </script>
 </body>
 </html>
