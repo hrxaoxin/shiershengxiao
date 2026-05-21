@@ -5,6 +5,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "./NFTInterface.sol";
+import "./BattleSkills.sol";
 
 /**
  * @title Battle
@@ -13,69 +14,40 @@ import "./NFTInterface.sol";
  * @dev 支持五行相克、技能系统、闪避机制，包含120种独特技能（5属性×12生肖×2性别）
  */
 contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, IBattle {
+    using BattleSkills for *;
+    
     INFTMint public nftContract;
     address public authorizer;
     
     uint256 public constant TEAM_SIZE = 6;
     uint256 public constant FRONT_ROW_SIZE = 3;
     
-    enum SkillType { 
-        Attack,    // 攻击型技能
-        Defense,   // 防御型技能
-        Heal,      // 治疗型技能
-        Special,   // 特殊技能（范围攻击）
-        Buff,      // 增益型技能
-        Debuff,    // 减益型技能
-        Counter,   // 反击型技能
-        Lifesteal, // 吸血型技能
-        Shield     // 护盾型技能
-    }
-    
-    struct FullSkill {
-        string name;           // 技能名称
-        SkillType skillType;   // 技能类型
-        uint256 value;         // 技能数值（百分比）
-        uint256 cooldown;      // 冷却回合数
-        uint256 duration;      // 效果持续回合数
-        bool isAoe;            // 是否为范围攻击
-    }
+
     
     struct BattleResult {
-        address attacker;        // 攻击方地址
-        address defender;        // 防守方地址
-        uint256 attackerWinCount;// 攻击方获胜场次
-        uint256 defenderWinCount;// 防守方获胜场次
-        uint256 timestamp;       // 战斗时间戳
-        BattleRoundResult[] roundResults; // 每回合详细结果
-    }
-    
-    struct BattleRoundResult {
-        uint256 attackerTokenId; // 攻击方NFT ID
-        uint256 defenderTokenId; // 防守方NFT ID
-        bool attackerWon;        // 攻击方是否获胜
-        uint256 attackerDamage;  // 攻击方造成伤害
-        uint256 defenderDamage;  // 防守方造成伤害
-        string attackerSkill;    // 攻击方使用技能
-        string defenderSkill;    // 防守方使用技能
-        bool attackerDodged;     // 攻击方是否闪避
-        bool defenderDodged;     // 防守方是否闪避
+        address attacker;
+        address defender;
+        uint256 attackerWinCount;
+        uint256 defenderWinCount;
+        uint256 timestamp;
+        BattleSkills.BattleRoundResult[] roundResults;
     }
     
     struct NFTStatus {
-        uint256 currentHealth; // 当前生命值
-        uint256 maxHealth;     // 最大生命值
-        uint256 level;         // NFT等级
-        uint256 growthValue;   // 成长值（10-100）
-        uint256 tokenId;       // NFT ID
-        NFTDataTypes.ElementType element;       // 属性（五行）
-        uint256 zodiac;        // 生肖索引（0-11）
-        uint256 gender;        // 性别（0=雄，1=雌）
-        bool isFrontRow;       // 是否在前排
-        bool isAlive;          // 是否存活
-        uint256 speed;         // 速度值
+        uint256 currentHealth;
+        uint256 maxHealth;
+        uint256 level;
+        uint256 growthValue;
+        uint256 tokenId;
+        NFTDataTypes.ElementType element;
+        uint256 zodiac;
+        uint256 gender;
+        bool isFrontRow;
+        bool isAlive;
+        uint256 speed;
     }
     
-    mapping(uint256 => mapping(uint256 => mapping(uint256 => FullSkill))) public fullSkills;
+    mapping(uint256 => mapping(uint256 => mapping(uint256 => BattleSkills.FullSkill))) public fullSkills;
     mapping(uint256 => uint256) public zodiacSpeed;
     mapping(uint256 => BattleResult) public battleHistory;
     
@@ -124,193 +96,7 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @notice 初始化所有技能（内部函数）
      */
     function _initAllSkills() internal {
-        _initWaterSkills();
-        _initWindSkills();
-        _initFireSkills();
-        _initDarkSkills();
-        _initLightSkills();
-    }
-    
-    /**
-     * @notice 初始化火属性技能（内部函数）
-     * @dev 火属性技能偏向攻击，伤害较高，克制风属性，被水属性克制
-     * 技能数组结构: fullSkills[elementIndex][zodiacIndex][skillIndex]
-     * 元素索引: 0=火, 1=风, 2=水, 3=光, 4=暗
-     * 生肖索引: 0=鼠, 1=牛, 2=虎, 3=兔, 4=龙, 5=蛇, 6=马, 7=羊
-     * 技能索引: 0=主动技能, 1=被动技能
-     * 技能类型: Attack=攻击, Counter=反击, Shield=护盾, Debuff=减益, Defense=防御
-     *          Special=必杀, Lifesteal=吸血, Buff=增益, Heal=治疗
-     * 数值参数: [伤害/效果值, 冷却回合, 持续回合, 是否需蓄力]
-     */
-    function _initFireSkills() internal {
-        fullSkills[0][0][0] = FullSkill("烈焰穿梭", SkillType.Attack, 125, 3, 0, false);
-        fullSkills[0][0][1] = FullSkill("炎影反击", SkillType.Counter, 110, 4, 0, false);
-        fullSkills[0][1][0] = FullSkill("焚天巨力", SkillType.Attack, 145, 5, 0, false);
-        fullSkills[0][1][1] = FullSkill("炽焰守护", SkillType.Shield, 95, 4, 2, false);
-        fullSkills[0][2][0] = FullSkill("爆炎猛击", SkillType.Attack, 165, 5, 0, false);
-        fullSkills[0][2][1] = FullSkill("烈焰威慑", SkillType.Debuff, 85, 4, 2, false);
-        fullSkills[0][3][0] = FullSkill("疾风烈焰", SkillType.Attack, 130, 3, 0, false);
-        fullSkills[0][3][1] = FullSkill("火焰跃闪", SkillType.Defense, 80, 3, 0, false);
-        fullSkills[0][4][0] = FullSkill("龙焰焚天", SkillType.Special, 220, 6, 0, true);
-        fullSkills[0][4][1] = FullSkill("炎龙守护", SkillType.Shield, 120, 5, 2, false);
-        fullSkills[0][5][0] = FullSkill("火毒噬咬", SkillType.Lifesteal, 115, 4, 0, false);
-        fullSkills[0][5][1] = FullSkill("烈焰反击", SkillType.Counter, 125, 4, 0, false);
-        fullSkills[0][6][0] = FullSkill("燎原奔踏", SkillType.Attack, 140, 3, 0, false);
-        fullSkills[0][6][1] = FullSkill("火云疾驰", SkillType.Buff, 85, 4, 2, false);
-        fullSkills[0][7][0] = FullSkill("圣火治愈", SkillType.Heal, 110, 5, 0, false);
-        fullSkills[0][7][1] = FullSkill("烈焰祈福", SkillType.Heal, 130, 6, 0, false);
-        fullSkills[0][8][0] = FullSkill("火舞戏耍", SkillType.Attack, 115, 2, 0, false);
-        fullSkills[0][8][1] = FullSkill("赤炎变幻", SkillType.Defense, 90, 3, 0, false);
-        fullSkills[0][9][0] = FullSkill("火羽锐击", SkillType.Attack, 105, 3, 0, false);
-        fullSkills[0][9][1] = FullSkill("烈焰警戒", SkillType.Buff, 75, 3, 2, false);
-        fullSkills[0][10][0] = FullSkill("火獒追击", SkillType.Attack, 120, 4, 0, false);
-        fullSkills[0][10][1] = FullSkill("炎犬反击", SkillType.Counter, 115, 4, 0, false);
-        fullSkills[0][11][0] = FullSkill("火猪纳福", SkillType.Heal, 140, 6, 0, false);
-        fullSkills[0][11][1] = FullSkill("烈焰厚积", SkillType.Defense, 100, 5, 0, false);
-    }
-    
-    /**
-     * @notice 初始化风属性技能（内部函数）
-     * @dev 风属性技能速度快，闪避能力强，克制水属性，被火属性克制
-     * 技能数组结构: fullSkills[elementIndex][zodiacIndex][skillIndex]
-     * 元素索引: 0=火, 1=风, 2=水, 3=光, 4=暗
-     * 生肖索引: 0=鼠, 1=牛, 2=虎, 3=兔, 4=龙, 5=蛇, 6=马, 7=羊
-     * 技能索引: 0=主动技能, 1=被动技能
-     * 风属性特点: 攻击速度快，冷却时间短，闪避率高
-     */
-    function _initWindSkills() internal {
-        fullSkills[1][0][0] = FullSkill("疾风穿梭", SkillType.Attack, 135, 3, 0, false);
-        fullSkills[1][0][1] = FullSkill("风影反击", SkillType.Counter, 115, 4, 0, false);
-        fullSkills[1][1][0] = FullSkill("旋风巨力", SkillType.Attack, 130, 5, 0, false);
-        fullSkills[1][1][1] = FullSkill("风之壁垒", SkillType.Shield, 105, 4, 2, false);
-        fullSkills[1][2][0] = FullSkill("暴风猛击", SkillType.Attack, 155, 5, 0, false);
-        fullSkills[1][2][1] = FullSkill("风啸威慑", SkillType.Debuff, 90, 4, 2, false);
-        fullSkills[1][3][0] = FullSkill("风跃突袭", SkillType.Attack, 140, 3, 0, false);
-        fullSkills[1][3][1] = FullSkill("疾风闪避", SkillType.Defense, 100, 3, 0, false);
-        fullSkills[1][4][0] = FullSkill("风暴龙吟", SkillType.Special, 210, 6, 0, true);
-        fullSkills[1][4][1] = FullSkill("风龙护盾", SkillType.Shield, 115, 5, 2, false);
-        fullSkills[1][5][0] = FullSkill("风刃穿刺", SkillType.Attack, 125, 4, 0, false);
-        fullSkills[1][5][1] = FullSkill("旋风反击", SkillType.Counter, 120, 4, 0, false);
-        fullSkills[1][6][0] = FullSkill("追风踏燕", SkillType.Attack, 150, 3, 0, false);
-        fullSkills[1][6][1] = FullSkill("风驰电掣", SkillType.Buff, 90, 3, 2, false);
-        fullSkills[1][7][0] = FullSkill("清风治愈", SkillType.Heal, 105, 5, 0, false);
-        fullSkills[1][7][1] = FullSkill("风之祈福", SkillType.Heal, 120, 6, 0, false);
-        fullSkills[1][8][0] = FullSkill("风猴戏耍", SkillType.Attack, 120, 2, 0, false);
-        fullSkills[1][8][1] = FullSkill("疾风变幻", SkillType.Defense, 95, 3, 0, false);
-        fullSkills[1][9][0] = FullSkill("风羽振翅", SkillType.Attack, 110, 3, 0, false);
-        fullSkills[1][9][1] = FullSkill("风之警戒", SkillType.Buff, 80, 3, 2, false);
-        fullSkills[1][10][0] = FullSkill("风犬追击", SkillType.Attack, 125, 4, 0, false);
-        fullSkills[1][10][1] = FullSkill("疾风反击", SkillType.Counter, 110, 4, 0, false);
-        fullSkills[1][11][0] = FullSkill("风猪纳福", SkillType.Heal, 130, 6, 0, false);
-        fullSkills[1][11][1] = FullSkill("风之厚积", SkillType.Defense, 95, 5, 0, false);
-    }
-    
-    /**
-     * @notice 初始化水属性技能（内部函数）
-     * @dev 水属性技能平衡型，治疗能力较强，克制火属性，被风属性克制
-     * 技能数组结构: fullSkills[elementIndex][zodiacIndex][skillIndex]
-     * 元素索引: 0=火, 1=风, 2=水, 3=光, 4=暗
-     * 生肖索引: 0=鼠, 1=牛, 2=虎, 3=兔, 4=龙, 5=蛇, 6=马, 7=羊
-     * 技能索引: 0=主动技能, 1=被动技能
-     * 水属性特点: 攻防平衡，治疗能力突出，护盾持续时间长
-     */
-    function _initWaterSkills() internal {
-        fullSkills[2][0][0] = FullSkill("潮涌穿梭", SkillType.Attack, 120, 3, 0, false);
-        fullSkills[2][0][1] = FullSkill("水影反击", SkillType.Counter, 105, 4, 0, false);
-        fullSkills[2][1][0] = FullSkill("巨浪冲击", SkillType.Attack, 140, 5, 0, false);
-        fullSkills[2][1][1] = FullSkill("水之磐石", SkillType.Shield, 110, 4, 2, false);
-        fullSkills[2][2][0] = FullSkill("海啸猛击", SkillType.Attack, 160, 5, 0, false);
-        fullSkills[2][2][1] = FullSkill("寒水威慑", SkillType.Debuff, 85, 4, 2, false);
-        fullSkills[2][3][0] = FullSkill("水跃突袭", SkillType.Attack, 135, 3, 0, false);
-        fullSkills[2][3][1] = FullSkill("碧水闪避", SkillType.Defense, 95, 3, 0, false);
-        fullSkills[2][4][0] = FullSkill("海啸龙吟", SkillType.Special, 200, 6, 0, true);
-        fullSkills[2][4][1] = FullSkill("水龙护盾", SkillType.Shield, 110, 5, 2, false);
-        fullSkills[2][5][0] = FullSkill("毒水噬咬", SkillType.Lifesteal, 120, 4, 0, false);
-        fullSkills[2][5][1] = FullSkill("寒水反击", SkillType.Counter, 115, 4, 0, false);
-        fullSkills[2][6][0] = FullSkill("踏浪奔腾", SkillType.Attack, 145, 3, 0, false);
-        fullSkills[2][6][1] = FullSkill("水之疾驰", SkillType.Buff, 85, 3, 2, false);
-        fullSkills[2][7][0] = FullSkill("净水治愈", SkillType.Heal, 115, 5, 0, false);
-        fullSkills[2][7][1] = FullSkill("水之祈福", SkillType.Heal, 135, 6, 0, false);
-        fullSkills[2][8][0] = FullSkill("水猴戏耍", SkillType.Attack, 115, 2, 0, false);
-        fullSkills[2][8][1] = FullSkill("碧水变幻", SkillType.Defense, 90, 3, 0, false);
-        fullSkills[2][9][0] = FullSkill("水羽振翅", SkillType.Attack, 105, 3, 0, false);
-        fullSkills[2][9][1] = FullSkill("水之警戒", SkillType.Buff, 75, 3, 2, false);
-        fullSkills[2][10][0] = FullSkill("水犬追击", SkillType.Attack, 115, 4, 0, false);
-        fullSkills[2][10][1] = FullSkill("碧水反击", SkillType.Counter, 100, 4, 0, false);
-        fullSkills[2][11][0] = FullSkill("水猪纳福", SkillType.Heal, 145, 6, 0, false);
-        fullSkills[2][11][1] = FullSkill("水之厚积", SkillType.Defense, 105, 5, 0, false);
-    }
-    
-    /**
-     * @notice 初始化光属性技能（内部函数）
-     * @dev 光属性技能防御最强，护盾值最高，克制暗属性，被暗属性克制（光暗互克）
-     * 技能数组结构: fullSkills[elementIndex][zodiacIndex][skillIndex]
-     * 元素索引: 0=火, 1=风, 2=水, 3=光, 4=暗
-     * 生肖索引: 0=鼠, 1=牛, 2=虎, 3=兔, 4=龙, 5=蛇, 6=马, 7=羊
-     * 技能索引: 0=主动技能, 1=被动技能
-     * 光属性特点: 稀有属性，防御最强，治疗效果最高，护盾值最大
-     */
-    function _initLightSkills() internal {
-        fullSkills[3][0][0] = FullSkill("圣光穿梭", SkillType.Attack, 145, 3, 0, false);
-        fullSkills[3][0][1] = FullSkill("光影反击", SkillType.Counter, 135, 4, 0, false);
-        fullSkills[3][1][0] = FullSkill("光耀巨力", SkillType.Attack, 150, 5, 0, false);
-        fullSkills[3][1][1] = FullSkill("光之壁垒", SkillType.Shield, 115, 4, 2, false);
-        fullSkills[3][2][0] = FullSkill("圣光猛击", SkillType.Attack, 165, 5, 0, false);
-        fullSkills[3][2][1] = FullSkill("光明威慑", SkillType.Debuff, 90, 4, 2, false);
-        fullSkills[3][3][0] = FullSkill("光跃突袭", SkillType.Attack, 145, 3, 0, false);
-        fullSkills[3][3][1] = FullSkill("圣光闪避", SkillType.Defense, 110, 3, 0, false);
-        fullSkills[3][4][0] = FullSkill("圣光龙吟", SkillType.Special, 245, 6, 0, true);
-        fullSkills[3][4][1] = FullSkill("光龙护盾", SkillType.Shield, 140, 5, 2, false);
-        fullSkills[3][5][0] = FullSkill("光刃穿刺", SkillType.Attack, 135, 4, 0, false);
-        fullSkills[3][5][1] = FullSkill("圣光反击", SkillType.Counter, 140, 4, 0, false);
-        fullSkills[3][6][0] = FullSkill("踏光而行", SkillType.Attack, 160, 3, 0, false);
-        fullSkills[3][6][1] = FullSkill("光明疾驰", SkillType.Buff, 100, 3, 2, false);
-        fullSkills[3][7][0] = FullSkill("圣光治愈", SkillType.Heal, 140, 5, 0, false);
-        fullSkills[3][7][1] = FullSkill("光之祈福", SkillType.Heal, 160, 6, 0, false);
-        fullSkills[3][8][0] = FullSkill("灵猴戏耍", SkillType.Attack, 140, 2, 0, false);
-        fullSkills[3][8][1] = FullSkill("圣光变幻", SkillType.Defense, 115, 3, 0, false);
-        fullSkills[3][9][0] = FullSkill("光羽振翅", SkillType.Attack, 130, 3, 0, false);
-        fullSkills[3][9][1] = FullSkill("光之警戒", SkillType.Buff, 95, 3, 2, false);
-        fullSkills[3][10][0] = FullSkill("圣犬追击", SkillType.Attack, 145, 4, 0, false);
-        fullSkills[3][10][1] = FullSkill("圣光反击", SkillType.Counter, 130, 4, 0, false);
-        fullSkills[3][11][0] = FullSkill("圣猪纳福", SkillType.Heal, 165, 6, 0, false);
-        fullSkills[3][11][1] = FullSkill("光之厚积", SkillType.Defense, 115, 5, 0, false);
-    }
-    
-    /**
-     * @notice 初始化暗属性技能（内部函数）
-     * @dev 暗属性技能吸血能力最强，爆发最高，克制光属性，被光属性克制（光暗互克）
-     * 技能数组结构: fullSkills[elementIndex][zodiacIndex][skillIndex]
-     * 元素索引: 0=火, 1=风, 2=水, 3=光, 4=暗
-     * 生肖索引: 0=鼠, 1=牛, 2=虎, 3=兔, 4=龙, 5=蛇, 6=马, 7=羊
-     * 技能索引: 0=主动技能, 1=被动技能
-     * 暗属性特点: 稀有属性，攻击力最高，吸血能力强，爆发伤害突出
-     */
-    function _initDarkSkills() internal {
-        fullSkills[4][0][0] = FullSkill("暗影穿梭", SkillType.Attack, 150, 3, 0, false);
-        fullSkills[4][0][1] = FullSkill("幽冥反击", SkillType.Counter, 140, 4, 0, false);
-        fullSkills[4][1][0] = FullSkill("暗影重击", SkillType.Attack, 155, 5, 0, false);
-        fullSkills[4][1][1] = FullSkill("冥之壁垒", SkillType.Shield, 110, 4, 2, false);
-        fullSkills[4][2][0] = FullSkill("暗影猛击", SkillType.Attack, 170, 5, 0, false);
-        fullSkills[4][2][1] = FullSkill("幽冥威慑", SkillType.Debuff, 100, 4, 2, false);
-        fullSkills[4][3][0] = FullSkill("暗跃突袭", SkillType.Attack, 155, 3, 0, false);
-        fullSkills[4][3][1] = FullSkill("暗影闪避", SkillType.Defense, 115, 3, 0, false);
-        fullSkills[4][4][0] = FullSkill("暗影龙吟", SkillType.Special, 255, 6, 0, true);
-        fullSkills[4][4][1] = FullSkill("暗龙护盾", SkillType.Shield, 130, 5, 2, false);
-        fullSkills[4][5][0] = FullSkill("暗影吞噬", SkillType.Lifesteal, 145, 4, 0, false);
-        fullSkills[4][5][1] = FullSkill("幽冥反击", SkillType.Counter, 145, 4, 0, false);
-        fullSkills[4][6][0] = FullSkill("踏冥奔腾", SkillType.Attack, 165, 3, 0, false);
-        fullSkills[4][6][1] = FullSkill("暗影疾驰", SkillType.Buff, 105, 3, 2, false);
-        fullSkills[4][7][0] = FullSkill("暗影治愈", SkillType.Heal, 125, 5, 0, false);
-        fullSkills[4][7][1] = FullSkill("冥之祈福", SkillType.Heal, 140, 6, 0, false);
-        fullSkills[4][8][0] = FullSkill("冥猴戏耍", SkillType.Attack, 135, 2, 0, false);
-        fullSkills[4][8][1] = FullSkill("暗影变幻", SkillType.Defense, 110, 3, 0, false);
-        fullSkills[4][9][0] = FullSkill("暗羽振翅", SkillType.Attack, 125, 3, 0, false);
-        fullSkills[4][9][1] = FullSkill("冥之警戒", SkillType.Buff, 95, 3, 2, false);
-        fullSkills[4][10][0] = FullSkill("冥犬追击", SkillType.Attack, 150, 4, 0, false);
-        fullSkills[4][10][1] = FullSkill("暗影反击", SkillType.Counter, 135, 4, 0, false);
-        fullSkills[4][11][0] = FullSkill("冥猪纳福", SkillType.Heal, 150, 6, 0, false);
-        fullSkills[4][11][1] = FullSkill("冥之厚积", SkillType.Defense, 110, 5, 0, false);
+        BattleSkills.initAllSkills(fullSkills);
     }
     
     /**
@@ -367,9 +153,9 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     /**
      * @notice 获取指定NFT类型的技能
      * @param tokenType NFT类型编码
-     * @return FullSkill 技能详情
+     * @return BattleSkills.FullSkill 技能详情
      */
-    function getSkill(uint256 tokenType) public view returns (FullSkill memory) {
+    function getSkill(uint256 tokenType) public view returns (BattleSkills.FullSkill memory) {
         uint256 element = uint256(getElementFromTokenType(tokenType));
         uint256 zodiac = getZodiacIndex(tokenType);
         uint256 gender = getGender(tokenType);
@@ -385,18 +171,14 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     function battle(uint256[] calldata attackerTokens, uint256[] calldata defenderTokens) 
         external nonReentrant returns (bool, uint256, uint256) {
         
-        require(attackerTokens.length == TEAM_SIZE, "E01: Attacker must have 6 NFTs");
-        require(defenderTokens.length == TEAM_SIZE, "E02: Defender must have 6 NFTs");
-        
-        INFTMint nft = INFTMint(nftContract);
+        require(attackerTokens.length == TEAM_SIZE, "E01");
+        require(defenderTokens.length == TEAM_SIZE, "E02");
         
         NFTStatus[] memory attackerTeam = new NFTStatus[](TEAM_SIZE);
         NFTStatus[] memory defenderTeam = new NFTStatus[](TEAM_SIZE);
         
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
             (uint256 attackerType, uint8 attackerLevel, uint256 attackerGrowth) = _getTokenInfo(attackerTokens[i]);
-            (uint256 defenderType, uint8 defenderLevel, uint256 defenderGrowth) = _getTokenInfo(defenderTokens[i]);
-            
             attackerTeam[i] = NFTStatus({
                 currentHealth: calculateHealth(attackerLevel, attackerGrowth),
                 maxHealth: calculateHealth(attackerLevel, attackerGrowth),
@@ -410,7 +192,10 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
                 isAlive: true,
                 speed: calculateSpeed(zodiacSpeed[getZodiacIndex(attackerType)], attackerGrowth)
             });
-            
+        }
+        
+        for (uint256 i = 0; i < TEAM_SIZE; i++) {
+            (uint256 defenderType, uint8 defenderLevel, uint256 defenderGrowth) = _getTokenInfo(defenderTokens[i]);
             defenderTeam[i] = NFTStatus({
                 currentHealth: calculateHealth(defenderLevel, defenderGrowth),
                 maxHealth: calculateHealth(defenderLevel, defenderGrowth),
@@ -428,7 +213,7 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         
         uint256 attackerWins = 0;
         uint256 defenderWins = 0;
-        BattleRoundResult[] memory roundResults = new BattleRoundResult[](TEAM_SIZE);
+        BattleSkills.BattleRoundResult[] memory roundResults = new BattleSkills.BattleRoundResult[](TEAM_SIZE);
         
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
             if (!attackerTeam[i].isAlive) continue;
@@ -436,24 +221,14 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
             uint256 targetIndex = _findTarget(defenderTeam, attackerTeam[i].isFrontRow);
             if (targetIndex == type(uint256).max) continue;
             
-            bool attackerFirst = attackerTeam[i].speed >= defenderTeam[targetIndex].speed;
+            BattleSkills.BattleRoundResult memory roundResult = _executeSingleBattle(
+                attackerTeam[i], 
+                defenderTeam[targetIndex]
+            );
             
-            (bool attackerWon, uint256 atkDmg, uint256 defDmg, string memory atkSkill, string memory defSkill, bool atkDodged, bool defDodged) = 
-                _singleBattle(attackerTeam[i], defenderTeam[targetIndex], attackerFirst);
+            roundResults[i] = roundResult;
             
-            roundResults[i] = BattleRoundResult({
-                attackerTokenId: attackerTeam[i].tokenId,
-                defenderTokenId: defenderTeam[targetIndex].tokenId,
-                attackerWon: attackerWon,
-                attackerDamage: atkDmg,
-                defenderDamage: defDmg,
-                attackerSkill: atkSkill,
-                defenderSkill: defSkill,
-                attackerDodged: atkDodged,
-                defenderDodged: defDodged
-            });
-            
-            if (attackerWon) {
+            if (roundResult.attackerWon) {
                 attackerWins++;
                 defenderTeam[targetIndex].isAlive = false;
             } else {
@@ -470,7 +245,10 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         result.attackerWinCount = attackerWins;
         result.defenderWinCount = defenderWins;
         result.timestamp = block.timestamp;
-        result.roundResults = roundResults;
+        
+        for (uint256 i = 0; i < TEAM_SIZE; i++) {
+            result.roundResults.push(roundResults[i]);
+        }
         
         nextBattleId++;
         
@@ -503,6 +281,31 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     }
     
     /**
+     * @notice 执行单体战斗并返回完整结果（内部函数）
+     * @param attacker 攻击者状态
+     * @param defender 防守者状态
+     * @return BattleRoundResult 单轮战斗结果
+     */
+    function _executeSingleBattle(NFTStatus memory attacker, NFTStatus memory defender) 
+        internal view returns (BattleSkills.BattleRoundResult memory) {
+        
+        bool attackerFirst = attacker.speed >= defender.speed;
+        BattleSkills.SingleBattleResult memory battleResult = _singleBattle(attacker, defender, attackerFirst);
+        
+        return BattleSkills.BattleRoundResult({
+            attackerTokenId: attacker.tokenId,
+            defenderTokenId: defender.tokenId,
+            attackerWon: battleResult.attackerWon,
+            attackerDamage: battleResult.attackerDamage,
+            defenderDamage: battleResult.defenderDamage,
+            attackerSkill: battleResult.attackerSkill,
+            defenderSkill: battleResult.defenderSkill,
+            attackerDodged: battleResult.attackerDodged,
+            defenderDodged: battleResult.defenderDodged
+        });
+    }
+    
+    /**
      * @notice 执行单体战斗（内部函数）
      * @param attacker 攻击者状态
      * @param defender 防守者状态
@@ -510,63 +313,90 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @return 攻击者是否获胜、攻击者伤害、防守者伤害、攻击者技能名、防守者技能名、攻击者是否闪避、防守者是否闪避
      */
     function _singleBattle(NFTStatus memory attacker, NFTStatus memory defender, bool attackerFirst) 
-        internal pure returns (bool, uint256, uint256, string memory, string memory, bool, bool) {
-        
-        FullSkill memory attackerSkill = fullSkills[uint256(attacker.element)][attacker.zodiac][attacker.gender];
-        FullSkill memory defenderSkill = fullSkills[uint256(defender.element)][defender.zodiac][defender.gender];
-        
-        bool attackerDodged = false;
-        bool defenderDodged = false;
-        
-        // 基础伤害 = 等级 × 60，成长值影响成长加成
-        uint256 attackerGrowthBonus = 1000 + (attacker.growthValue * 5); // 1000倍精度，10→1050，100→1500
-        uint256 defenderGrowthBonus = 1000 + (defender.growthValue * 5);
-        
-        uint256 attackerBaseDamage = (attacker.level * 60 * attackerGrowthBonus) / 1000;
-        uint256 defenderBaseDamage = (defender.level * 60 * defenderGrowthBonus) / 1000;
-        
-        uint256 attackerTotalDamage = calculateDamage(attackerBaseDamage, attacker.element, defender.element);
-        uint256 defenderTotalDamage = calculateDamage(defenderBaseDamage, defender.element, attacker.element);
-        
-        attackerTotalDamage = _applySkillEffect(attackerSkill, attackerTotalDamage);
-        defenderTotalDamage = _applySkillEffect(defenderSkill, defenderTotalDamage);
-        
-        string memory attackerSkillName = attackerSkill.name;
-        string memory defenderSkillName = defenderSkill.name;
+        internal view returns (BattleSkills.SingleBattleResult memory) {
         
         if (attackerFirst) {
-            if (calculateDodgeChance(attacker.speed, defender.speed)) {
-                defenderDodged = true;
-                attackerTotalDamage = 0;
-            }
-            
-            if (!defenderDodged && attackerTotalDamage >= defender.currentHealth) {
-                return (true, attackerTotalDamage, 0, attackerSkillName, "", defenderDodged, false);
-            }
-            
-            if (calculateDodgeChance(defender.speed, attacker.speed)) {
-                attackerDodged = true;
-                defenderTotalDamage = 0;
-            }
+            return _battleAttackerFirst(attacker, defender);
         } else {
-            if (calculateDodgeChance(defender.speed, attacker.speed)) {
-                attackerDodged = true;
-                defenderTotalDamage = 0;
-            }
-            
-            if (!attackerDodged && defenderTotalDamage >= attacker.currentHealth) {
-                return (false, 0, defenderTotalDamage, "", defenderSkillName, false, attackerDodged);
-            }
-            
-            if (calculateDodgeChance(attacker.speed, defender.speed)) {
-                defenderDodged = true;
-                attackerTotalDamage = 0;
-            }
+            return _battleDefenderFirst(attacker, defender);
+        }
+    }
+    
+    function _battleAttackerFirst(NFTStatus memory attacker, NFTStatus memory defender) 
+        internal view returns (BattleSkills.SingleBattleResult memory) {
+        
+        BattleSkills.SingleBattleResult memory result;
+        
+        (result.attackerDamage, result.attackerSkill) = _calculateDamage(attacker, defender.element);
+        (result.defenderDamage, result.defenderSkill) = _calculateDamage(defender, attacker.element);
+        
+        if (calculateDodgeChance(attacker.speed, defender.speed)) {
+            result.defenderDodged = true;
+            result.attackerDamage = 0;
         }
         
-        bool attackerWon = attackerTotalDamage >= defender.currentHealth && defenderTotalDamage < attacker.currentHealth;
+        if (!result.defenderDodged && result.attackerDamage >= defender.currentHealth) {
+            result.attackerWon = true;
+            result.defenderDamage = 0;
+            result.defenderSkill = "";
+            return result;
+        }
         
-        return (attackerWon, attackerTotalDamage, defenderTotalDamage, attackerSkillName, attackerWon ? "" : defenderSkillName, attackerDodged, defenderDodged);
+        if (calculateDodgeChance(defender.speed, attacker.speed)) {
+            result.attackerDodged = true;
+            result.defenderDamage = 0;
+        }
+        
+        result.attackerWon = result.attackerDamage >= defender.currentHealth && result.defenderDamage < attacker.currentHealth;
+        if (result.attackerWon) {
+            result.defenderSkill = "";
+        }
+        
+        return result;
+    }
+    
+    function _battleDefenderFirst(NFTStatus memory attacker, NFTStatus memory defender) 
+        internal view returns (BattleSkills.SingleBattleResult memory) {
+        
+        BattleSkills.SingleBattleResult memory result;
+        
+        (result.attackerDamage, result.attackerSkill) = _calculateDamage(attacker, defender.element);
+        (result.defenderDamage, result.defenderSkill) = _calculateDamage(defender, attacker.element);
+        
+        if (calculateDodgeChance(defender.speed, attacker.speed)) {
+            result.attackerDodged = true;
+            result.defenderDamage = 0;
+        }
+        
+        if (!result.attackerDodged && result.defenderDamage >= attacker.currentHealth) {
+            result.attackerWon = false;
+            result.attackerDamage = 0;
+            result.attackerSkill = "";
+            return result;
+        }
+        
+        if (calculateDodgeChance(attacker.speed, defender.speed)) {
+            result.defenderDodged = true;
+            result.attackerDamage = 0;
+        }
+        
+        result.attackerWon = result.attackerDamage >= defender.currentHealth && result.defenderDamage < attacker.currentHealth;
+        if (result.attackerWon) {
+            result.defenderSkill = "";
+        }
+        
+        return result;
+    }
+    
+    function _calculateDamage(NFTStatus memory attacker, NFTDataTypes.ElementType defenderElement) internal view returns (uint256, string memory) {
+        BattleSkills.FullSkill memory skill = fullSkills[uint256(attacker.element)][attacker.zodiac][attacker.gender];
+        
+        uint256 growthBonus = 1000 + (attacker.growthValue * 5);
+        uint256 baseDamage = (attacker.level * 60 * growthBonus) / 1000;
+        uint256 totalDamage = calculateDamage(baseDamage, attacker.element, defenderElement);
+        totalDamage = _applySkillEffect(skill, totalDamage);
+        
+        return (totalDamage, skill.name);
     }
     
     /**
@@ -575,12 +405,17 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @param baseDamage 基础伤害
      * @return 应用技能后的伤害值
      */
-    function _applySkillEffect(FullSkill memory skill, uint256 baseDamage) internal pure returns (uint256) {
-        if (skill.skillType == SkillType.Attack || skill.skillType == SkillType.Special) {
+    function _applySkillEffect(BattleSkills.FullSkill memory skill, uint256 baseDamage) internal pure returns (uint256) {
+        uint8 ATTACK = 0;
+        uint8 SPECIAL = 3;
+        uint8 LIFESTEAL = 7;
+        uint8 COUNTER = 6;
+        
+        if (skill.skillType == ATTACK || skill.skillType == SPECIAL) {
             return (baseDamage * skill.value) / 100;
-        } else if (skill.skillType == SkillType.Lifesteal) {
+        } else if (skill.skillType == LIFESTEAL) {
             return (baseDamage * skill.value) / 100;
-        } else if (skill.skillType == SkillType.Counter) {
+        } else if (skill.skillType == COUNTER) {
             return (baseDamage * skill.value) / 100;
         }
         return baseDamage;
@@ -637,7 +472,7 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @param growthValue 成长值（10-100），成长值越高生命值越高
      * @return 生命值（基础400 + 每级+100）× 成长值系数
      */
-    function calculateHealth(uint256 level, uint256 growthValue) public pure returns (uint256) {
+    function calculateHealth(uint256 level, uint256 growthValue) public view returns (uint256) {
         // 成长值系数：10-100映射到0.9-1.5
         uint256 growthMultiplier = 900 + (growthValue * 6); // 1000倍精度
         return ((baseHealth + (level - 1) * 100) * growthMultiplier) / 1000;
@@ -702,79 +537,6 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
     }
 
     /**
-     * @notice 验证链下战斗结果
-     * @dev 允许用户提交链下计算的战斗结果进行验证，减少链上计算消耗
-     * @param attackerTokens 攻击方NFT ID数组（必须6个）
-     * @param defenderTokens 防守方NFT ID数组（必须6个）
-     * @param claimedResult 声称的攻击方获胜场次
-     * @param defenderWins 声称的防守方获胜场次
-     * @param seed 随机种子（用于验证结果一致性）
-     * @return bool 是否验证通过
-     */
-    function verifyBattleResult(
-        uint256[] calldata attackerTokens,
-        uint256[] calldata defenderTokens,
-        uint256 claimedAttackerWins,
-        uint256 claimedDefenderWins,
-        bytes32 seed
-    ) external view returns (bool) {
-        require(attackerTokens.length == TEAM_SIZE, "E01: Attacker must have 6 NFTs");
-        require(defenderTokens.length == TEAM_SIZE, "E02: Defender must have 6 NFTs");
-        require(claimedAttackerWins + claimedDefenderWins <= TEAM_SIZE, "E03: Invalid win counts");
-        
-        bytes32 expectedSeed = keccak256(abi.encodePacked(
-            block.timestamp,
-            block.number,
-            msg.sender,
-            attackerTokens,
-            defenderTokens
-        ));
-        
-        if (seed != expectedSeed) {
-            return false;
-        }
-        
-        (bool, uint256 actualAttackerWins, uint256 actualDefenderWins) = simulateBattle(attackerTokens, defenderTokens);
-        
-        return actualAttackerWins == claimedAttackerWins && actualDefenderWins == claimedDefenderWins;
-    }
-
-    /**
-     * @notice 提交链下计算的战斗结果（轻量版本）
-     * @dev 先验证结果再记录，减少链上计算压力
-     * @param attackerTokens 攻击方NFT ID数组（必须6个）
-     * @param defenderTokens 防守方NFT ID数组（必须6个）
-     * @param claimedAttackerWins 声称的攻击方获胜场次
-     * @param claimedDefenderWins 声称的防守方获胜场次
-     * @param seed 随机种子
-     * @return bool 攻击方是否获胜
-     */
-    function commitBattleResult(
-        uint256[] calldata attackerTokens,
-        uint256[] calldata defenderTokens,
-        uint256 claimedAttackerWins,
-        uint256 claimedDefenderWins,
-        bytes32 seed
-    ) external nonReentrant returns (bool) {
-        require(verifyBattleResult(attackerTokens, defenderTokens, claimedAttackerWins, claimedDefenderWins, seed), "E04: Invalid battle result");
-        
-        bool attackerWon = claimedAttackerWins > claimedDefenderWins;
-        
-        BattleResult storage result = battleHistory[nextBattleId];
-        result.attacker = msg.sender;
-        result.defender = tx.origin;
-        result.attackerWinCount = claimedAttackerWins;
-        result.defenderWinCount = claimedDefenderWins;
-        result.timestamp = block.timestamp;
-        
-        nextBattleId++;
-        
-        emit BattleCompleted(msg.sender, tx.origin, attackerWon, claimedAttackerWins, claimedDefenderWins);
-        
-        return attackerWon;
-    }
-
-    /**
      * @notice 模拟战斗（只读）
      * @dev 不消耗gas，用于预览战斗结果和验证链下计算
      * @param attackerTokens 攻击方NFT ID数组（必须6个）
@@ -782,20 +544,16 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @return 攻击方是否获胜、攻击方获胜场次、防守方获胜场次
      */
     function simulateBattle(uint256[] calldata attackerTokens, uint256[] calldata defenderTokens) 
-        external view returns (bool, uint256, uint256) {
+        public view returns (bool, uint256, uint256) {
         
-        require(attackerTokens.length == TEAM_SIZE, "E01: Attacker must have 6 NFTs");
-        require(defenderTokens.length == TEAM_SIZE, "E02: Defender must have 6 NFTs");
-        
-        INFTMint nft = INFTMint(nftContract);
+        require(attackerTokens.length == TEAM_SIZE, "E01");
+        require(defenderTokens.length == TEAM_SIZE, "E02");
         
         NFTStatus[] memory attackerTeam = new NFTStatus[](TEAM_SIZE);
         NFTStatus[] memory defenderTeam = new NFTStatus[](TEAM_SIZE);
         
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
             (uint256 attackerType, uint8 attackerLevel, uint256 attackerGrowth) = _getTokenInfo(attackerTokens[i]);
-            (uint256 defenderType, uint8 defenderLevel, uint256 defenderGrowth) = _getTokenInfo(defenderTokens[i]);
-            
             attackerTeam[i] = NFTStatus({
                 currentHealth: calculateHealth(attackerLevel, attackerGrowth),
                 maxHealth: calculateHealth(attackerLevel, attackerGrowth),
@@ -809,7 +567,10 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
                 isAlive: true,
                 speed: calculateSpeed(zodiacSpeed[getZodiacIndex(attackerType)], attackerGrowth)
             });
-            
+        }
+        
+        for (uint256 i = 0; i < TEAM_SIZE; i++) {
+            (uint256 defenderType, uint8 defenderLevel, uint256 defenderGrowth) = _getTokenInfo(defenderTokens[i]);
             defenderTeam[i] = NFTStatus({
                 currentHealth: calculateHealth(defenderLevel, defenderGrowth),
                 maxHealth: calculateHealth(defenderLevel, defenderGrowth),
@@ -835,9 +596,9 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
             if (targetIndex == type(uint256).max) continue;
             
             bool attackerFirst = attackerTeam[i].speed >= defenderTeam[targetIndex].speed;
-            (bool attackerWon, , , , , , ) = _singleBattle(attackerTeam[i], defenderTeam[targetIndex], attackerFirst);
+            BattleSkills.SingleBattleResult memory battleResult = _singleBattle(attackerTeam[i], defenderTeam[targetIndex], attackerFirst);
             
-            if (attackerWon) {
+            if (battleResult.attackerWon) {
                 attackerWins++;
                 defenderTeam[targetIndex].isAlive = false;
             } else {
@@ -847,6 +608,79 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         }
         
         return (attackerWins > defenderWins, attackerWins, defenderWins);
+    }
+
+    /**
+     * @notice 验证链下战斗结果
+     * @dev 允许用户提交链下计算的战斗结果进行验证，减少链上计算消耗
+     * @param attackerTokens 攻击方NFT ID数组（必须6个）
+     * @param defenderTokens 防守方NFT ID数组（必须6个）
+     * @param claimedAttackerWins 声称的攻击方获胜场次
+     * @param claimedDefenderWins 声称的防守方获胜场次
+     * @param seed 随机种子（用于验证结果一致性）
+     * @return bool 是否验证通过
+     */
+    function verifyBattleResult(
+        uint256[] calldata attackerTokens,
+        uint256[] calldata defenderTokens,
+        uint256 claimedAttackerWins,
+        uint256 claimedDefenderWins,
+        bytes32 seed
+    ) public view returns (bool) {
+        require(attackerTokens.length == TEAM_SIZE, "E01");
+        require(defenderTokens.length == TEAM_SIZE, "E02");
+        require(claimedAttackerWins + claimedDefenderWins <= TEAM_SIZE, "E03");
+        
+        bytes32 expectedSeed = keccak256(abi.encodePacked(
+            block.timestamp,
+            block.number,
+            msg.sender,
+            attackerTokens,
+            defenderTokens
+        ));
+        
+        if (seed != expectedSeed) {
+            return false;
+        }
+        
+        (bool success, uint256 actualAttackerWins, uint256 actualDefenderWins) = simulateBattle(attackerTokens, defenderTokens);
+        
+        return actualAttackerWins == claimedAttackerWins && actualDefenderWins == claimedDefenderWins;
+    }
+
+    /**
+     * @notice 提交链下计算的战斗结果（轻量版本）
+     * @dev 先验证结果再记录，减少链上计算压力
+     * @param attackerTokens 攻击方NFT ID数组（必须6个）
+     * @param defenderTokens 防守方NFT ID数组（必须6个）
+     * @param claimedAttackerWins 声称的攻击方获胜场次
+     * @param claimedDefenderWins 声称的防守方获胜场次
+     * @param seed 随机种子
+     * @return bool 攻击方是否获胜
+     */
+    function commitBattleResult(
+        uint256[] calldata attackerTokens,
+        uint256[] calldata defenderTokens,
+        uint256 claimedAttackerWins,
+        uint256 claimedDefenderWins,
+        bytes32 seed
+    ) external nonReentrant returns (bool) {
+        require(verifyBattleResult(attackerTokens, defenderTokens, claimedAttackerWins, claimedDefenderWins, seed), "E04");
+        
+        bool attackerWon = claimedAttackerWins > claimedDefenderWins;
+        
+        BattleResult storage result = battleHistory[nextBattleId];
+        result.attacker = msg.sender;
+        result.defender = tx.origin;
+        result.attackerWinCount = claimedAttackerWins;
+        result.defenderWinCount = claimedDefenderWins;
+        result.timestamp = block.timestamp;
+        
+        nextBattleId++;
+        
+        emit BattleCompleted(msg.sender, tx.origin, attackerWon, claimedAttackerWins, claimedDefenderWins);
+        
+        return attackerWon;
     }
     
     /**
@@ -877,15 +711,15 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @param gender 性别（0=雄，1=雌）
      * @param skill 技能详情
      */
-    function setSkill(uint256 elementIndex, uint256 zodiacIndex, uint256 gender, FullSkill calldata skill) external onlyOwner {
-        require(elementIndex < 5, "Invalid element");
-        require(zodiacIndex < 12, "Invalid zodiac");
-        require(gender < 2, "Invalid gender");
+    function setSkill(uint256 elementIndex, uint256 zodiacIndex, uint256 gender, BattleSkills.FullSkill calldata skill) external onlyOwner {
+        require(elementIndex < 5, "E05");
+        require(zodiacIndex < 12, "E06");
+        require(gender < 2, "E07");
         fullSkills[elementIndex][zodiacIndex][gender] = skill;
     }
 
     function setNFTContract(address _nftContract) external onlyOwner {
-        require(_nftContract != address(0), "Invalid NFT contract address");
+        require(_nftContract != address(0), "E08");
         nftContract = INFTMint(_nftContract);
     }
 
@@ -898,12 +732,12 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @param elementIndex 属性索引（0-4）
      * @param zodiacIndex 生肖索引（0-11）
      * @param gender 性别（0=雄，1=雌）
-     * @return FullSkill 技能详情
+     * @return BattleSkills.FullSkill 技能详情
      */
-    function getSkillByIndexes(uint256 elementIndex, uint256 zodiacIndex, uint256 gender) public view returns (FullSkill memory) {
-        require(elementIndex < 5, "Invalid element");
-        require(zodiacIndex < 12, "Invalid zodiac");
-        require(gender < 2, "Invalid gender");
+    function getSkillByIndexes(uint256 elementIndex, uint256 zodiacIndex, uint256 gender) public view returns (BattleSkills.FullSkill memory) {
+        require(elementIndex < 5, "E05");
+        require(zodiacIndex < 12, "E06");
+        require(gender < 2, "E07");
         return fullSkills[elementIndex][zodiacIndex][gender];
     }
 }
