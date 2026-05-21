@@ -184,12 +184,12 @@
         <div class="mb-6">
             <h3 class="text-lg font-bold text-gray-800 mb-3">筛选属性</h3>
             <div class="flex flex-wrap gap-2">
-                <button class="attribute-tab tab-water active" onclick="switchAttribute('water')">💧 水</button>
+                <button class="attribute-tab tab-water" onclick="switchAttribute('water')">💧 水</button>
                 <button class="attribute-tab tab-wind" onclick="switchAttribute('wind')">🌬️ 风</button>
                 <button class="attribute-tab tab-fire" onclick="switchAttribute('fire')">🔥 火</button>
                 <button class="attribute-tab tab-dark" onclick="switchAttribute('dark')">🌙 暗</button>
                 <button class="attribute-tab tab-light" onclick="switchAttribute('light')">☀️ 光</button>
-                <button class="attribute-tab active" style="background-color: #e5e7eb; color: #374151;" onclick="switchAttribute('all')">全部</button>
+                <button class="attribute-tab tab-all active" style="background-color: #e5e7eb; color: #374151;" onclick="switchAttribute('all')">全部</button>
             </div>
         </div>
 
@@ -455,11 +455,7 @@
         function switchAttribute(attr) {
             currentFilter = attr;
             document.querySelectorAll('.attribute-tab').forEach(tab => tab.classList.remove('active'));
-            if (attr === 'all') {
-                document.querySelector('.attribute-tab[style]').classList.add('active');
-            } else {
-                document.querySelector(`.tab-${attr}`).classList.add('active');
-            }
+            document.querySelector(`.tab-${attr}`).classList.add('active');
             renderTokens();
         }
 
