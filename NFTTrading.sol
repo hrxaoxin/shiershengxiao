@@ -979,6 +979,55 @@ contract NFTTrading is
     }
 
     /**
+     * @dev 分页获取上架记录
+     * @param offset 偏移量
+     * @param limit 每页数量
+     * @return tokenIds NFT ID列表
+     * @return sellers 卖家列表
+     * @return prices 价格列表
+     * @return actives 活跃状态列表
+     * @return total 总数量
+     */
+    function getPaginatedListings(uint256 offset, uint256 limit) external view returns (
+        uint256[] memory tokenIds,
+        address[] memory sellers,
+        uint256[] memory prices,
+        bool[] memory actives,
+        uint256 total
+    ) {
+        total = allListingIds.length;
+        
+        if (offset >= total) {
+            tokenIds = new uint256[](0);
+            sellers = new address[](0);
+            prices = new uint256[](0);
+            actives = new bool[](0);
+            return (tokenIds, sellers, prices, actives, total);
+        }
+        
+        uint256 actualLimit = limit;
+        if (offset + limit > total) {
+            actualLimit = total - offset;
+        }
+        
+        tokenIds = new uint256[](actualLimit);
+        sellers = new address[](actualLimit);
+        prices = new uint256[](actualLimit);
+        actives = new bool[](actualLimit);
+        
+        for (uint256 i = 0; i < actualLimit; i++) {
+            uint256 tokenId = allListingIds[offset + i];
+            NFTListing storage listing = listings[tokenId];
+            tokenIds[i] = tokenId;
+            sellers[i] = listing.seller;
+            prices[i] = listing.price;
+            actives[i] = listing.isActive;
+        }
+        
+        return (tokenIds, sellers, prices, actives, total);
+    }
+    
+    /**
      * @dev 获取所有活跃上架
      * @return ListedNFT[] 活跃上架列表
      */

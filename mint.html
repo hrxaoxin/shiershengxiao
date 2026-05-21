@@ -202,12 +202,12 @@
         </div>
     </main>
 
-    <div id="mintSuccessModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+    <div id="mintSuccessModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden overflow-y-auto">
+        <div class="bg-white rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[90vh]">
             <div class="text-center mb-4">
                 <div class="text-6xl mb-4">🎊</div>
                 <h3 class="text-2xl font-bold text-gray-800 mb-2">铸造成功！</h3>
-                <p class="text-gray-600 mb-6">恭喜您获得了一张生肖NFT</p>
+                <p class="text-gray-600 mb-6" id="mintCountText">恭喜您获得了一张生肖NFT</p>
             </div>
             <div id="mintedCardInfo" class="mb-6">
                 <div class="zodiac-preview" id="cardImage">
@@ -217,6 +217,8 @@
                     <h4 id="cardName" class="text-xl font-bold text-gray-800 mb-2">生肖名称</h4>
                     <p id="cardDescription" class="text-gray-600 text-sm">描述</p>
                 </div>
+            </div>
+            <div id="mintedCardsGrid" class="mb-6 grid grid-cols-5 gap-2 hidden">
             </div>
             <div class="flex space-x-4">
                 <button class="btn-secondary flex-1" id="cancelModal">取消</button>
@@ -530,12 +532,23 @@
                     gas: gas
                 });
 
-                const currentNextCardId = await nftMintContract.methods.nextCardId().call();
-                const actualCardId = (parseInt(currentNextCardId) - 1).toString();
-                const cardType = await nftMintContract.methods.tokenType(actualCardId).call();
+                if (methodName.includes('Ten')) {
+                    const mintedTokenIds = [];
+                    const currentNextCardId = parseInt(await nftMintContract.methods.nextCardId().call());
+                    for (let i = 0; i < 10; i++) {
+                        const tokenId = (currentNextCardId - 1 - i).toString();
+                        const cardType = await nftMintContract.methods.tokenType(tokenId).call();
+                        mintedTokenIds.push({ cardId: tokenId, cardType: cardType });
+                    }
+                    displayMultiCardInfo(mintedTokenIds);
+                } else {
+                    const currentNextCardId = await nftMintContract.methods.nextCardId().call();
+                    const actualCardId = (parseInt(currentNextCardId) - 1).toString();
+                    const cardType = await nftMintContract.methods.tokenType(actualCardId).call();
 
-                const cardInfo = { cardId: actualCardId, cardType: cardType };
-                displayCardInfo(cardInfo);
+                    const cardInfo = { cardId: actualCardId, cardType: cardType };
+                    displayCardInfo(cardInfo);
+                }
                 document.getElementById('mintSuccessModal').classList.remove('hidden');
 
                 await updateTokenBalance();
@@ -556,6 +569,10 @@
         }
 
         function displayCardInfo(cardInfo) {
+            document.getElementById('mintedCardInfo').classList.remove('hidden');
+            document.getElementById('mintedCardsGrid').classList.add('hidden');
+            document.getElementById('mintCountText').textContent = '恭喜您获得了一张生肖NFT';
+            
             const cardType = parseInt(cardInfo.cardType);
             const nftInfo = ZODIAC_UTILS.getNFTInfo(cardType);
             const desc = `${nftInfo.attrName}属性生肖·${nftInfo.zodiac}·${nftInfo.gender} · 持有可享受税收分红`;
@@ -563,6 +580,35 @@
             document.getElementById('cardImage').querySelector('img').src = nftInfo.imagePath;
             document.getElementById('cardName').textContent = nftInfo.name;
             document.getElementById('cardDescription').textContent = desc;
+        }
+
+        function displayMultiCardInfo(cardInfos) {
+            document.getElementById('mintedCardInfo').classList.add('hidden');
+            document.getElementById('mintedCardsGrid').classList.remove('hidden');
+            document.getElementById('mintCountText').textContent = `恭喜您获得了${cardInfos.length}张生肖NFT`;
+            
+            const grid = document.getElementById('mintedCardsGrid');
+            grid.innerHTML = '';
+            
+            cardInfos.forEach((cardInfo, index) => {
+                const cardType = parseInt(cardInfo.cardType);
+                const nftInfo = ZODIAC_UTILS.getNFTInfo(cardType);
+                
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'relative cursor-pointer group';
+                cardDiv.innerHTML = `
+                    <div class="zodiac-preview-small">
+                        <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" class="w-full h-full object-cover">
+                    </div>
+                    <div class="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        ${index + 1}
+                    </div>
+                    <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-60 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <span class="text-white text-xs text-center px-1">${nftInfo.name}</span>
+                    </div>
+                `;
+                grid.appendChild(cardDiv);
+            });
         }
 
         document.getElementById('cancelModal').addEventListener('click', function() { 

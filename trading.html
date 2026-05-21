@@ -283,6 +283,7 @@
         let currentPage = 1;
         let totalPages = 1;
         let allListings = [];
+        let supportsPaginatedAPI = null;
 
         document.addEventListener('DOMContentLoaded', function() {
             initWeb3();
@@ -331,19 +332,31 @@
                 loadMarketplace();
             });
 
-            document.getElementById('prevPageBtn').addEventListener('click', () => {
+            document.getElementById('prevPageBtn').addEventListener('click', async () => {
                 if (currentPage > 1) {
-                    currentPage--;
-                    updatePagination();
-                    displayMarketplaceListings(getCurrentPageListings());
+                    if (supportsPaginatedAPI) {
+                        currentPage--;
+                        marketplaceCache = null;
+                        await loadMarketplace();
+                    } else {
+                        currentPage--;
+                        updatePagination();
+                        displayMarketplaceListings(getCurrentPageListings());
+                    }
                 }
             });
 
-            document.getElementById('nextPageBtn').addEventListener('click', () => {
+            document.getElementById('nextPageBtn').addEventListener('click', async () => {
                 if (currentPage < totalPages) {
-                    currentPage++;
-                    updatePagination();
-                    displayMarketplaceListings(getCurrentPageListings());
+                    if (supportsPaginatedAPI) {
+                        currentPage++;
+                        marketplaceCache = null;
+                        await loadMarketplace();
+                    } else {
+                        currentPage++;
+                        updatePagination();
+                        displayMarketplaceListings(getCurrentPageListings());
+                    }
                 }
             });
 
@@ -484,6 +497,21 @@
         let cacheTimestamp = 0;
         const CACHE_DURATION = 30000;
 
+        async function checkPaginatedSupport() {
+            if (supportsPaginatedAPI !== null) {
+                return supportsPaginatedAPI;
+            }
+            try {
+                await nftTradingContract.methods.getPaginatedListings(0, 1).call();
+                supportsPaginatedAPI = true;
+                console.log('合约支持分页API');
+            } catch (e) {
+                supportsPaginatedAPI = false;
+                console.log('合约不支持分页API，使用 getAllListings');
+            }
+            return supportsPaginatedAPI;
+        }
+
         async function loadMarketplace() {
             const marketplaceGrid = document.getElementById('marketplaceGrid');
             marketplaceGrid.innerHTML = '<div class="col-span-full text-center py-12"><i class="fa fa-spinner fa-spin text-4xl text-blue-500 mb-4"></i><p class="text-gray-600">加载市场数据中...</p></div>';
@@ -497,11 +525,65 @@
                 
                 const now = Date.now();
                 if (marketplaceCache && (now - cacheTimestamp) < CACHE_DURATION) {
-                    displayMarketplaceListings(marketplaceCache);
+                    allListings = marketplaceCache;
+                    updatePagination();
+                    displayMarketplaceListings(getCurrentPageListings());
                     return;
                 }
                 
+                const hasPaginated = await checkPaginatedSupport();
                 const listings = [];
+                
+                if (hasPaginated) {
+                    console.log('使用分页API加载市场数据');
+                    try {
+                        const offset = (currentPage - 1) * PAGE_SIZE;
+                        const [tokenIdArray, sellerArray, priceArray, activeArray, total] = 
+                            await nftTradingContract.methods.getPaginatedListings(offset, PAGE_SIZE).call();
+                        
+                        totalPages = Math.ceil(parseInt(total) / PAGE_SIZE);
+                        const activeIndices = [];
+                        
+                        for (let i = 0; i < activeArray.length; i++) {
+                            if (activeArray[i]) {
+                                activeIndices.push(i);
+                            }
+                        }
+                        
+                        const typePromises = activeIndices.map(idx => 
+                            nftMintContract.methods.tokenType(tokenIdArray[idx]).call()
+                        );
+                        const levelPromises = activeIndices.map(idx => 
+                            nftMintContract.methods.tokenLevel(tokenIdArray[idx]).call()
+                        );
+                        const types = await Promise.all(typePromises);
+                        const levels = await Promise.all(levelPromises);
+                        
+                        for (let i = 0; i < activeIndices.length; i++) {
+                            const idx = activeIndices[i];
+                            listings.push({
+                                tokenId: parseInt(tokenIdArray[idx]),
+                                price: web3.utils.fromWei(priceArray[idx], 'ether'),
+                                priceWei: priceArray[idx],
+                                seller: sellerArray[idx],
+                                type: types[i],
+                                level: parseInt(levels[i])
+                            });
+                        }
+                        
+                        allListings = listings;
+                        updatePagination();
+                        marketplaceCache = listings;
+                        cacheTimestamp = Date.now();
+                        displayMarketplaceListings(listings);
+                        return;
+                    } catch (e) {
+                        console.log('分页API调用失败，回退到 getAllListings', e);
+                        supportsPaginatedAPI = false;
+                    }
+                }
+                
+                console.log('使用 getAllListings 加载市场数据');
                 try {
                     const [tokenIdArray, sellerArray, priceArray, activeArray] = await nftTradingContract.methods.getAllListings().call();
                     const activeIndices = [];

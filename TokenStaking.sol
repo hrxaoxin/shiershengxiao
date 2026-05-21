@@ -319,6 +319,14 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     /**
+     * @dev 获取最小质押时间
+     * @return uint256 最小质押时间（秒）
+     */
+    function minimumStakeDuration() external view returns (uint256) {
+        return REWARD_INTERVAL;
+    }
+
+    /**
      * @dev 计算当前释放比例（内部函数）
      * 根据当日存入量动态调整释放比例
      * @return uint256 当前释放比例

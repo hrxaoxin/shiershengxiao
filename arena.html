@@ -728,7 +728,8 @@
 
         async function init() {
             document.getElementById('connectWalletBtn').addEventListener('click', connectWallet);
-            document.getElementById('challengeBtn').addEventListener('click', openBattleModal);
+            document.getElementById('challengeBtn').addEventListener('click', executeRealChallenge);
+            document.getElementById('mobileChallengeBtn')?.addEventListener('click', executeRealChallenge);
             document.getElementById('closeBattleModal').addEventListener('click', () => {
                 calculateBattleResult();
                 document.getElementById('battleModal').classList.add('hidden');
@@ -1201,13 +1202,50 @@
                 if (leaderboardData.length > 0) {
                     for (let i = 0; i < leaderboardData.length; i++) {
                         const player = leaderboardData[i];
+                        let team = [];
+                        
+                        if (!player.isMock) {
+                            try {
+                                const teamTokens = await arenaContract.methods.getPlayerBattleTeam(player.playerAddress).call();
+                                for (const tokenId of teamTokens) {
+                                    if (tokenId !== '0') {
+                                        try {
+                                            const tokenInfo = await nftContract.methods.getNFTData(tokenId).call();
+                                            const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenInfo.tokenType);
+                                            const zodiac = ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiacIndex];
+                                            team.push({
+                                                tokenId: tokenId,
+                                                name: `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`,
+                                                level: tokenInfo.level,
+                                                element: tokenInfo.tokenType < 48 ? (tokenInfo.tokenType < 16 ? 'Water' : tokenInfo.tokenType < 32 ? 'Wind' : 'Fire') : (tokenInfo.tokenType < 80 ? 'Dark' : 'Light'),
+                                                imagePath: getNFTImagePath(tokenInfo.tokenType)
+                                            });
+                                        } catch (e) {
+                                            team.push({
+                                                tokenId: tokenId,
+                                                name: '未知',
+                                                level: 1,
+                                                element: 'Water',
+                                                imagePath: `${IPFS_BASE_1}shuishu_0.png`
+                                            });
+                                        }
+                                    }
+                                }
+                            } catch (e) {
+                                team = mockOpponents[i % mockOpponents.length].team;
+                            }
+                        } else {
+                            team = mockOpponents[i % mockOpponents.length].team;
+                        }
+                        
                         topPlayers.push({
                             address: player.playerAddress,
                             points: player.points,
                             wins: player.wins,
                             losses: player.losses,
                             rank: i + 1,
-                            isMock: player.isMock
+                            isMock: player.isMock,
+                            team: team
                         });
                     }
                 } else {
@@ -1225,6 +1263,9 @@
                         });
                     }
                 }
+                
+                // 保存排行榜数据供selectOpponent使用
+                document.getElementById('leaderboard').dataset.leaderboardData = JSON.stringify(topPlayers);
                 
                 // 获取每个排名的奖励
                 const rewards = [];
@@ -1329,7 +1370,20 @@
         ];
 
         function selectOpponent(index) {
-            selectedOpponent = mockOpponents[index % mockOpponents.length];
+            const leaderboardItems = document.querySelectorAll('#leaderboard .cursor-pointer');
+            if (leaderboardItems[index]) {
+                leaderboardItems[index].classList.add('ring-2', 'ring-yellow-400');
+            }
+            
+            const leaderboardData = document.getElementById('leaderboard').dataset.leaderboardData;
+            let opponents;
+            if (leaderboardData) {
+                opponents = JSON.parse(leaderboardData);
+            } else {
+                opponents = mockOpponents;
+            }
+            
+            selectedOpponent = opponents[index % opponents.length];
             updateChallengeBtn();
             showOpponentTeam(selectedOpponent);
         }
@@ -1442,6 +1496,60 @@
                     defenderHp.style.backgroundColor = '#22c55e';
                 }
                 if (defenderHpText) defenderHpText.textContent = '100%';
+            }
+        }
+
+        async function executeRealChallenge() {
+            if (!selectedOpponent || !selectedOpponent.address) {
+                ZODIAC_UI.showToast('请先选择对手', 'warning');
+                return;
+            }
+
+            const btn = document.getElementById('challengeBtn');
+            const mobileBtn = document.getElementById('mobileChallengeBtn');
+            
+            if (btn) btn.disabled = true;
+            if (mobileBtn) mobileBtn.disabled = true;
+
+            try {
+                ZODIAC_UI.showLoading('正在发起挑战...');
+                
+                const defenderAddress = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
+                
+                const gas = await arenaContract.methods.challenge(defenderAddress).estimateGas({ from: accounts[0] });
+                const tx = await arenaContract.methods.challenge(defenderAddress).send({ 
+                    from: accounts[0],
+                    gas: gas
+                });
+                
+                ZODIAC_UI.hideLoading();
+                
+                const result = tx.events?.ChallengeCompleted?.returnValues;
+                if (result) {
+                    const attackerWon = result[0] === true || result[0] === 'true';
+                    const attackerWins = parseInt(result[1]);
+                    const defenderWins = parseInt(result[2]);
+                    
+                    openBattleModal();
+                    
+                    setTimeout(() => {
+                        simulateBattleWithResult(attackerWon, attackerWins, defenderWins);
+                    }, 2000);
+                } else {
+                    ZODIAC_UI.showToast('战斗结果解析失败', 'error');
+                }
+                
+                await loadRemainingAttempts();
+                await loadLeaderboard();
+                await loadMyStats();
+                
+            } catch (error) {
+                ZODIAC_UI.hideLoading();
+                console.error('挑战失败:', error);
+                ZODIAC_UI.handleError(error, '发起挑战');
+            } finally {
+                if (btn) btn.disabled = false;
+                if (mobileBtn) mobileBtn.disabled = false;
             }
         }
 
@@ -1882,6 +1990,158 @@
                     addBattleLog('\n🤝 平局！双方同归于尽');
                     setTimeout(() => alert('🤝 战斗平局！'), 100);
                 }
+            }
+        }
+
+        async function simulateBattleWithResult(attackerWon, attackerWins, defenderWins) {
+            const attackerTeam = battleTeam.filter(n => n);
+            const defenderTeam = selectedOpponent.team;
+            
+            const MAX_HP = 1000;
+            const attackerHp = attackerTeam.map(() => MAX_HP);
+            const defenderHp = defenderTeam.map(() => MAX_HP);
+            const attackerAlive = attackerTeam.map(() => true);
+            const defenderAlive = defenderTeam.map(() => true);
+            
+            addBattleLog(`⚔️ 6v6战斗开始！`);
+            await delay(800);
+            
+            const totalRounds = Math.max(attackerWins, defenderWins, 1);
+            let currentRound = 0;
+            
+            while (currentRound < totalRounds && !isBattleSkipped) {
+                currentRound++;
+                document.getElementById('currentRound').textContent = `第 ${currentRound} 回合`;
+                
+                if (isBattleSkipped) break;
+                
+                const isAttackerRound = currentRound <= attackerWins;
+                
+                for (let i = 0; i < attackerTeam.length; i++) {
+                    if (!attackerAlive[i] || isBattleSkipped) continue;
+                    
+                    const attackerIndex = i;
+                    const defenderIndex = findAliveIndex(defenderAlive, attackerIndex < FRONT_ROW_SIZE);
+                    
+                    if (defenderIndex === -1) break;
+                    
+                    const attacker = attackerTeam[attackerIndex];
+                    const defender = defenderTeam[defenderIndex];
+                    
+                    addBattleLog(`\n🎯 ${attacker.name} → ${defender.name}`);
+                    await delay(300);
+                    
+                    if (isBattleSkipped) break;
+                    
+                    const attackerAdvantage = checkAdvantage(attacker.attr, defender.element);
+                    if (attackerAdvantage) {
+                        addBattleLog(`🔥 属性克制！`);
+                    }
+                    
+                    await delay(200);
+                    
+                    if (isBattleSkipped) break;
+                    
+                    let attackerDamage = isAttackerRound ? attacker.level * 60 : attacker.level * 30;
+                    
+                    if (attackerAdvantage) attackerDamage = Math.floor(attackerDamage * 1.5);
+                    
+                    addBattleLog(`✨ ${attacker.name} 发起攻击！`);
+                    addAttackEffect(true, attackerIndex);
+                    await delay(300);
+                    
+                    if (isBattleSkipped) break;
+                    
+                    addBattleLog(`💥 造成 ${attackerDamage} 点伤害！`);
+                    addDamageEffect(false, defenderIndex);
+                    defenderHp[defenderIndex] -= attackerDamage;
+                    const defenderHpPercent = Math.max(0, (defenderHp[defenderIndex] / MAX_HP) * 100);
+                    updateHpBar(false, defenderIndex, defenderHpPercent);
+                    await delay(400);
+                    
+                    if (isBattleSkipped) break;
+                    
+                    if (defenderHp[defenderIndex] <= 0) {
+                        defenderAlive[defenderIndex] = false;
+                        addBattleLog(`💀 ${defender.name} 被击败！`);
+                    }
+                    
+                    if (!defenderAlive.some(d => d)) break;
+                }
+                
+                if (isBattleSkipped) break;
+                if (!defenderAlive.some(d => d)) break;
+                
+                for (let i = 0; i < defenderTeam.length; i++) {
+                    if (!defenderAlive[i] || isBattleSkipped) continue;
+                    
+                    const defenderIndex = i;
+                    const attackerIndex = findAliveIndex(attackerAlive, defenderIndex < FRONT_ROW_SIZE);
+                    
+                    if (attackerIndex === -1) break;
+                    
+                    const defender = defenderTeam[defenderIndex];
+                    const attacker = attackerTeam[attackerIndex];
+                    
+                    addBattleLog(`\n🛡️ ${defender.name} → ${attacker.name}`);
+                    await delay(300);
+                    
+                    if (isBattleSkipped) break;
+                    
+                    const defenderAdvantage = checkAdvantage(defender.element, attacker.attr);
+                    if (defenderAdvantage) {
+                        addBattleLog(`🔥 属性克制！`);
+                    }
+                    
+                    await delay(200);
+                    
+                    if (isBattleSkipped) break;
+                    
+                    let defenderDamage = !isAttackerRound ? defender.level * 60 : defender.level * 30;
+                    
+                    if (defenderAdvantage) defenderDamage = Math.floor(defenderDamage * 1.5);
+                    
+                    addBattleLog(`✨ ${defender.name} 发起攻击！`);
+                    addAttackEffect(false, defenderIndex);
+                    await delay(300);
+                    
+                    if (isBattleSkipped) break;
+                    
+                    addBattleLog(`💥 造成 ${defenderDamage} 点伤害！`);
+                    addDamageEffect(true, attackerIndex);
+                    attackerHp[attackerIndex] -= defenderDamage;
+                    const attackerHpPercent = Math.max(0, (attackerHp[attackerIndex] / MAX_HP) * 100);
+                    updateHpBar(true, attackerIndex, attackerHpPercent);
+                    await delay(400);
+                    
+                    if (isBattleSkipped) break;
+                    
+                    if (attackerHp[attackerIndex] <= 0) {
+                        attackerAlive[attackerIndex] = false;
+                        addBattleLog(`💀 ${attacker.name} 被击败！`);
+                    }
+                    
+                    if (!attackerAlive.some(a => a)) break;
+                }
+                
+                if (isBattleSkipped) break;
+                
+                await delay(500);
+            }
+            
+            await delay(500);
+            
+            document.getElementById('attackerWinCount').textContent = attackerWins.toString();
+            document.getElementById('defenderWinCount').textContent = defenderWins.toString();
+            
+            if (attackerWon) {
+                document.getElementById('battleResult').textContent = '🎉';
+                document.getElementById('battleMessage').textContent = `胜利！${attackerWins}:${defenderWins}`;
+                addBattleLog(`\n\n🏆🏆🏆 战斗胜利！进攻方以 ${attackerWins}:${defenderWins} 赢得比赛！`);
+            } else {
+                document.getElementById('battleResult').textContent = '💀';
+                document.getElementById('battleMessage').textContent = `失败！${attackerWins}:${defenderWins}`;
+                addBattleLog(`\n\n💀💀💀 战斗失败！防守方以 ${defenderWins}:${attackerWins} 赢得比赛！`);
             }
         }
 
