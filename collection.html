@@ -454,6 +454,7 @@
 
         function switchAttribute(attr) {
             currentFilter = attr;
+            console.log('switchAttribute called with:', attr, 'currentFilter set to:', currentFilter);
             document.querySelectorAll('.attribute-tab').forEach(tab => tab.classList.remove('active'));
             document.querySelector(`.tab-${attr}`).classList.add('active');
             renderTokens();
@@ -475,12 +476,15 @@
 
         function renderCollectionView(grid) {
             const allTypes = getAllNftTypes();
+            console.log('renderCollectionView - allTypes count:', allTypes.length, 'currentFilter:', currentFilter);
             
             let filteredTypes = allTypes;
             if (currentFilter !== 'all') {
                 const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
                 const attrIndex = attrs.indexOf(currentFilter);
+                console.log('Filtering by attr:', currentFilter, 'attrIndex:', attrIndex);
                 filteredTypes = allTypes.filter(t => t.elementIndex === attrIndex);
+                console.log('Filtered count:', filteredTypes.length);
             }
             
             let html = '';
