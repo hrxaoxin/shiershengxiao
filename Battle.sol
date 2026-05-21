@@ -82,8 +82,15 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
         nextBattleId = 1;
         baseHealth = 400;
         
-        _initAllSkills();
         _initZodiacSpeed();
+    }
+    
+    /**
+     * @notice 初始化所有技能（外部调用）
+     * @dev 用于在部署后一次调用完成所有120个技能的初始化
+     */
+    function initAllSkills() external onlyOwner {
+        BattleSkills.initAllSkills(fullSkills);
     }
     
     /**
@@ -91,13 +98,6 @@ contract Battle is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgr
      * @param newImplementation 新实现合约地址
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-    
-    /**
-     * @notice 初始化所有技能（内部函数）
-     */
-    function _initAllSkills() internal {
-        BattleSkills.initAllSkills(fullSkills);
-    }
     
     /**
      * @notice 初始化生肖速度值（内部函数）
