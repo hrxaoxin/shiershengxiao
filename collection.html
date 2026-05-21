@@ -83,6 +83,8 @@
         .tab-dark.active { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; }
         .tab-light { background-color: #fef3c7; color: #d97706; }
         .tab-light.active { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .tab-all { background-color: #e5e7eb; color: #374151; }
+        .tab-all.active { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); color: white; }
         .empty-collection { text-align: center; padding: 60px 20px; }
         .empty-collection .icon { font-size: 64px; margin-bottom: 16px; }
         .mode-tab {
@@ -176,8 +178,8 @@
         <div class="mb-4">
             <h3 class="text-lg font-bold text-gray-800 mb-3">显示模式</h3>
             <div class="flex flex-wrap gap-2">
-                <button class="mode-tab active" onclick="switchViewMode('collection')">📚 图鉴模式</button>
-                <button class="mode-tab" onclick="switchViewMode('my')">🎒 我的收藏</button>
+                <button id="mode-collection" class="mode-tab active" onclick="switchViewMode('collection')">📚 图鉴模式</button>
+                <button id="mode-my" class="mode-tab" onclick="switchViewMode('my')">🎒 我的收藏</button>
             </div>
         </div>
 
@@ -380,7 +382,7 @@
         function switchViewMode(mode) {
             currentViewMode = mode;
             document.querySelectorAll('.mode-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelector(`.mode-tab[onclick="switchViewMode('${mode}')"]`).classList.add('active');
+            document.getElementById(`mode-${mode}`).classList.add('active');
             renderTokens();
         }
 
@@ -454,9 +456,11 @@
 
         function switchAttribute(attr) {
             currentFilter = attr;
-            console.log('switchAttribute called with:', attr, 'currentFilter set to:', currentFilter);
             document.querySelectorAll('.attribute-tab').forEach(tab => tab.classList.remove('active'));
-            document.querySelector(`.tab-${attr}`).classList.add('active');
+            const activeTab = document.querySelector(`.tab-${attr}`) || document.querySelector(`[onclick="switchAttribute('${attr}')"]`);
+            if (activeTab) {
+                activeTab.classList.add('active');
+            }
             renderTokens();
         }
 
@@ -476,15 +480,12 @@
 
         function renderCollectionView(grid) {
             const allTypes = getAllNftTypes();
-            console.log('renderCollectionView - allTypes count:', allTypes.length, 'currentFilter:', currentFilter);
-            
             let filteredTypes = allTypes;
+            
             if (currentFilter !== 'all') {
                 const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
                 const attrIndex = attrs.indexOf(currentFilter);
-                console.log('Filtering by attr:', currentFilter, 'attrIndex:', attrIndex);
                 filteredTypes = allTypes.filter(t => t.elementIndex === attrIndex);
-                console.log('Filtered count:', filteredTypes.length);
             }
             
             let html = '';
@@ -512,13 +513,13 @@
         }
 
         function renderMyCollectionView(grid, emptyState) {
-            const filteredTokens = currentFilter === 'all'
-                ? userTokens
-                : userTokens.filter(t => {
-                    const attrIndex = Math.floor(t.typeId / 24);
-                    const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
-                    return attrs[attrIndex] === currentFilter;
-                });
+            let filteredTokens = userTokens;
+            
+            if (currentFilter !== 'all') {
+                const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+                const attrIndex = attrs.indexOf(currentFilter);
+                filteredTokens = userTokens.filter(t => Math.floor(t.typeId / 24) === attrIndex);
+            }
 
             if (filteredTokens.length === 0) {
                 grid.innerHTML = '';
