@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/ERC721Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/utils/ERC721HolderUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
@@ -24,6 +24,17 @@ struct NFTListing {
     bool isActive; // 是否活跃
 }
 
+struct TradeParams {
+    address seller;
+    uint256 priceWEI;
+    uint256 priceBNB;
+    uint256 feeWEI;
+    uint256 feeBNB;
+    uint256 sellerAmountWEI;
+    address royaltyWallet;
+    uint256 overpaidWEI;
+}
+
 /**
  * @title NFTTrading
  * @dev 核心NFT交易合约，支持NFT上架、购买、下架等功能
@@ -31,7 +42,7 @@ struct NFTListing {
  */
 contract NFTTrading is 
     Initializable, 
-    OwnableUpgradeable, 
+    Ownable2StepUpgradeable, 
     UUPSUpgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
@@ -456,13 +467,13 @@ contract NFTTrading is
      * @param tokenId NFT ID
      */
     function buyNFT(uint256 tokenId) external payable nonReentrant whenNotPaused {
-        require(tokenId > 0, "NFTTrading: invalid token ID (must be > 0)");
-        require(msg.value > 0, "NFTTrading: payment must be greater than 0");
-        require(msg.value <= _maxListingPrice, "NFTTrading: payment exceeds maximum allowed price");
+        require(tokenId > 0, "NFTTrading: invalid token ID");
+        require(msg.value > 0, "NFTTrading: payment must be > 0");
+        require(msg.value <= _maxListingPrice, "NFTTrading: payment exceeds max allowed");
         require(msg.value <= type(uint128).max, "NFTTrading: payment amount too large");
 
         NFTListing storage listing = listings[tokenId];
-        require(listing.isActive, "NFTTrading: NFT not listed or already sold");
+        require(listing.isActive, "NFTTrading: NFT not listed");
         require(listing.price > 0, "NFTTrading: listing price is zero");
         require(msg.sender != listing.seller, "NFTTrading: cannot purchase your own NFT");
         
@@ -470,81 +481,68 @@ contract NFTTrading is
         require(nft.ownerOf(tokenId) == address(this), "NFTTrading: contract does not hold this NFT");
         
         uint256 maxAllowedPayment = (listing.price * MAX_OVERPAY_RATIO) / OVERPAY_DENOMINATOR;
-        require(msg.value >= listing.price, string(abi.encodePacked(
-            "NFTTrading: insufficient payment - required ", listing.price, " wei, sent ", msg.value, " wei"
-        )));
-        require(msg.value <= maxAllowedPayment, string(abi.encodePacked(
-            "NFTTrading: payment exceeds max allowed (", maxAllowedPayment, " wei) - sent ", msg.value, " wei"
-        )));
+        require(msg.value >= listing.price, "NFTTrading: insufficient payment");
+        require(msg.value <= maxAllowedPayment, "NFTTrading: payment exceeds max allowed");
 
-        address seller = listing.seller;
-        uint256 priceWEI = listing.price;
-        uint256 priceBNB = _weiToBnbWithDecimals(priceWEI);
+        TradeParams memory params;
+        params.seller = listing.seller;
+        params.priceWEI = listing.price;
+        params.priceBNB = _weiToBnbWithDecimals(params.priceWEI);
 
         uint256 minSellerAmountWEI = 1e14;
-        uint256 feeWEI = (priceWEI * FEE_PERCENTAGE) / FEE_DENOMINATOR;
-        uint256 sellerAmountWEI = priceWEI - feeWEI;
+        params.feeWEI = (params.priceWEI * FEE_PERCENTAGE) / FEE_DENOMINATOR;
+        params.sellerAmountWEI = params.priceWEI - params.feeWEI;
         
-        if (sellerAmountWEI < minSellerAmountWEI && sellerAmountWEI > 0) {
-            feeWEI = priceWEI - minSellerAmountWEI;
-            sellerAmountWEI = minSellerAmountWEI;
-        } else if (sellerAmountWEI == 0) {
-            sellerAmountWEI = priceWEI;
-            feeWEI = 0;
+        if (params.sellerAmountWEI < minSellerAmountWEI && params.sellerAmountWEI > 0) {
+            params.feeWEI = params.priceWEI - minSellerAmountWEI;
+            params.sellerAmountWEI = minSellerAmountWEI;
+        } else if (params.sellerAmountWEI == 0) {
+            params.sellerAmountWEI = params.priceWEI;
+            params.feeWEI = 0;
         }
         
-        uint256 feeBNB = _weiToBnbWithDecimals(feeWEI);
+        params.feeBNB = _weiToBnbWithDecimals(params.feeWEI);
+        params.royaltyWallet = _royaltyWallet == address(0) ? owner() : _royaltyWallet;
 
-        address royaltyWallet = _royaltyWallet;
-        if (royaltyWallet == address(0)) {
-            royaltyWallet = owner();
-        }
+        require(address(this).balance >= params.sellerAmountWEI, "NFTTrading: insufficient contract balance");
 
-        require(address(this).balance >= sellerAmountWEI, "NFTTrading: insufficient contract balance for seller payment");
-
-        _removeListing(tokenId, seller);
+        _removeListing(tokenId, params.seller);
         totalSales++;
-        totalFeesCollected += feeWEI;
+        totalFeesCollected += params.feeWEI;
 
-        bool nftTransferSuccess = false;
-        
         try nft.safeTransferFrom(address(this), msg.sender, tokenId) {
-            nftTransferSuccess = true;
+            if (params.sellerAmountWEI > 0) {
+                _safeTransferBNB(params.seller, params.sellerAmountWEI);
+            }
+            if (params.feeWEI > 0) {
+                _safeTransferBNB(params.royaltyWallet, params.feeWEI);
+            }
+            if (msg.value > params.priceWEI) {
+                params.overpaidWEI = msg.value - params.priceWEI;
+                totalOverpaid += params.overpaidWEI;
+                emit OverpaidReceived(msg.sender, params.overpaidWEI, block.timestamp, block.number);
+            }
         } catch {
             listings[tokenId] = NFTListing({
-                seller: seller,
-                price: priceWEI,
+                seller: params.seller,
+                price: params.priceWEI,
                 listedAt: block.timestamp - 1,
                 isActive: true
             });
-            _addListingToUserTokens(seller, tokenId);
+            _addListingToUserTokens(params.seller, tokenId);
             _addToActiveListings(tokenId);
             totalSales--;
-            totalFeesCollected -= feeWEI;
+            totalFeesCollected -= params.feeWEI;
             
             (bool refundSuccess, ) = msg.sender.call{value: msg.value}("");
-            require(refundSuccess, "NFTTrading: refund to buyer failed");
+            require(refundSuccess, "NFTTrading: refund failed");
             
-            emit NFTTransferFailed(tokenId, msg.sender, seller, priceWEI, block.timestamp, block.number);
+            emit NFTTransferFailed(tokenId, msg.sender, params.seller, params.priceWEI, block.timestamp, block.number);
             return;
         }
-        
-        if (nftTransferSuccess) {
-            if (sellerAmountWEI > 0) {
-                _safeTransferBNB(seller, sellerAmountWEI);
-            }
-            if (feeWEI > 0) {
-                _safeTransferBNB(royaltyWallet, feeWEI);
-            }
-            if (msg.value > priceWEI) {
-                uint256 overpaidWEI = msg.value - priceWEI;
-                totalOverpaid += overpaidWEI;
-                emit OverpaidReceived(msg.sender, overpaidWEI, block.timestamp, block.number);
-            }
-        }
 
-        emit NFTSold(tokenId, seller, msg.sender, priceBNB, priceWEI, feeBNB, feeWEI, block.timestamp, block.number);
-        emit FeeCollected(royaltyWallet, feeBNB, feeWEI, block.timestamp, block.number);
+        emit NFTSold(tokenId, params.seller, msg.sender, params.priceBNB, params.priceWEI, params.feeBNB, params.feeWEI, block.timestamp, block.number);
+        emit FeeCollected(params.royaltyWallet, params.feeBNB, params.feeWEI, block.timestamp, block.number);
     }
     
     /**
@@ -908,8 +906,16 @@ contract NFTTrading is
      * @dev 取消上架（与unlistNFT同义）
      * @param tokenId NFT ID
      */
-    function cancelListing(uint256 tokenId) external nonReentrant whenNotPaused {
-        unlistNFT(tokenId);
+    function cancelListing(uint256 tokenId) external nonReentrant whenNotPaused onlySeller(tokenId) {
+        NFTListing storage listing = listings[tokenId];
+        address seller = listing.seller;
+
+        _removeListing(tokenId, seller);
+
+        INFTMint(_nftContract).safeTransferFrom(address(this), seller, tokenId);
+
+        emit NFTUnlisted(tokenId, seller, block.timestamp, block.number);
+        emit NFTReturned(tokenId, seller, block.timestamp, block.number);
     }
 
     /**

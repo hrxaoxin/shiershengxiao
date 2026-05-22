@@ -125,6 +125,12 @@ interface IPriceOracle {
      * @return timestamp 时间戳
      */
     function getPriceTimestamp() external view returns (uint256);
+
+    /**
+     * @dev 获取并更新缓存的代币价格（含波动保护）
+     * @return price 价格（精度18位）
+     */
+    function getAndUpdatePrice() external returns (uint256);
 }
 
 /**
@@ -207,6 +213,21 @@ interface INFTMint {
     function tokenGrowthValue(uint256 tokenId) external view returns (uint256);
     
     /**
+     * @dev 获取NFT所有者（ERC721标准）
+     * @param tokenId NFT ID
+     * @return owner 所有者地址
+     */
+    function ownerOf(uint256 tokenId) external view returns (address);
+    
+    /**
+     * @dev 安全转账NFT（ERC721标准）
+     * @param from 转出地址
+     * @param to 转入地址
+     * @param tokenId NFT ID
+     */
+    function safeTransferFrom(address from, address to, uint256 tokenId) external;
+    
+    /**
      * @dev 普通铸造
      * @param to 接收地址
      * @return tokenId 新NFT ID
@@ -278,58 +299,6 @@ interface INFTMint {
      * @return newLevel 新等级
      */
     function upgradeWithUSDValue(uint256 tokenId) external returns (uint8);
-    
-    /**
-     * @dev 获取NFT所有者
-     * @param tokenId NFT ID
-     * @return owner 所有者地址
-     */
-    function ownerOf(uint256 tokenId) external view returns (address);
-    
-    /**
-     * @dev 安全转移NFT
-     * @param from 转出地址
-     * @param to 转入地址
-     * @param tokenId NFT ID
-     */
-    function safeTransferFrom(address from, address to, uint256 tokenId) external;
-    
-    /**
-     * @dev 检查是否已授权全部NFT
-     * @param owner 所有者地址
-     * @param operator 操作方地址
-     * @return approved 是否已授权
-     */
-    function isApprovedForAll(address owner, address operator) external view returns (bool);
-    
-    /**
-     * @dev 获取单个NFT的授权地址
-     * @param tokenId NFT ID
-     * @return approvedAddress 授权地址
-     */
-    function getApproved(uint256 tokenId) external view returns (address);
-    
-    /**
-     * @dev 授权单个NFT
-     * @param to 授权地址
-     * @param tokenId NFT ID
-     */
-    function approve(address to, uint256 tokenId) external;
-    
-    /**
-     * @dev 检查是否支持接口
-     * @param interfaceId 接口ID
-     * @return supported 是否支持
-     */
-    function supportsInterface(bytes4 interfaceId) external view returns (bool);
-    
-    /**
-     * @dev 转移NFT
-     * @param from 转出地址
-     * @param to 转入地址
-     * @param tokenId NFT ID
-     */
-    function transferFrom(address from, address to, uint256 tokenId) external;
     
     /**
      * @dev 设置合约地址
@@ -1045,6 +1014,53 @@ interface IERC20 {
      * @return balance 余额
      */
     function balanceOf(address account) external view returns (uint256);
+}
+
+interface IDividendManager {
+    function depositDividend() external payable;
+    function claimDividend() external;
+    function createSnapshot() external returns (uint256);
+    function finalizeSnapshot(uint256 snapshotId) external;
+    function claimDividendFromSnapshot(uint256 snapshotId) external;
+    function calcUserDividend(address user) external view returns (uint256, uint256);
+    function getUserWeightInSnapshot(uint256 snapshotId, address user) external view returns (uint256);
+    function getUserDividendInSnapshot(uint256 snapshotId, address user) external view returns (uint256);
+    function getSnapshotCount() external view returns (uint256);
+    function updateUserWeight(address user, uint256 oldWeight, uint256 newWeight) external;
+    function setOwnerWeight(uint256 weight) external;
+    function setMinOwnerWeight(uint256 minWeight) external;
+}
+
+interface IWeightManager {
+    function setNFTDataContract(address _nftDataContract) external;
+    function setMinOwnerWeight(uint256 _minWeight) external;
+    function setOwnerWeight(uint256 _w) external;
+    function getUserWeight(address user) external view returns (uint256);
+    function refreshUserWeightCache(address user) external;
+    function batchRefreshUserWeightCache(address[] calldata users) external;
+    function hasEligibility(address user) external view returns (bool);
+    function updateUserWeight(address user) external;
+    function addHolder(address user) external returns (bool);
+    function removeHolder(address user) external;
+}
+
+interface IPoolManager {
+    function setRewardManager(address _rewardManager) external;
+    function setRouterContract(address _router) external;
+    function setWbnbContract(address _wbnb) external;
+    function setTokenContract(address _token) external;
+    function setNftStakingContract(address _nftStaking) external;
+    function setTokenStakingContract(address _tokenStaking) external;
+    function setArenaContract(address _arena) external;
+    function setRatios(uint256 _ownerRatio, uint256 _nftStakingRatio, uint256 _arenaRatio, uint256 _tokenStakingRatio, uint256 _dividendRatio) external;
+    function deposit() external payable;
+    function withdrawOwnerDividend() external;
+    function withdrawNftStakingPool() external;
+    function withdrawArenaPool() external;
+    function withdrawTokenStakingPool() external;
+    function withdrawExtraFunds() external;
+    function getTotalPoolAmount() external view returns (uint256);
+    function getPoolDetails() external view returns (uint256, uint256, uint256, uint256);
 }
 
 /**

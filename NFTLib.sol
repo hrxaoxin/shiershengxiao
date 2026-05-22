@@ -11,7 +11,7 @@ library NFTLib {
      * @param n 要转换的整数
      * @return string memory 转换后的字符串
      */
-    function uint2str(uint256 n) internal pure returns (string memory) {
+    function uint2str(uint256 n) public pure returns (string memory) {
         if (n == 0) return "0";
         uint256 temp = n;
         uint256 len;
@@ -26,7 +26,7 @@ library NFTLib {
      * @param _addr 要转换的地址
      * @return string memory 转换后的十六进制字符串（以0x开头）
      */
-    function addressToString(address _addr) internal pure returns (string memory) {
+    function addressToString(address _addr) public pure returns (string memory) {
         bytes32 value = bytes32(uint256(uint160(_addr)));
         bytes memory alphabet = "0123456789abcdef";
         bytes memory str = new bytes(42);
@@ -43,7 +43,7 @@ library NFTLib {
      * @param data 要编码的原始字节数据
      * @return string memory Base64编码后的字符串
      */
-    function base64Encode(bytes memory data) internal pure returns (string memory) {
+    function base64Encode(bytes memory data) public pure returns (string memory) {
         bytes memory base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         bytes memory result = new bytes((data.length + 2) / 3 * 4);
         uint cursor = 0;
@@ -67,7 +67,7 @@ library NFTLib {
      * @param input 输入字符串
      * @return string memory 转义后的字符串
      */
-    function escapeString(string memory input) internal pure returns (string memory) {
+    function escapeString(string memory input) public pure returns (string memory) {
         bytes memory b = bytes(input);
         uint esc;
         for (uint i; i<b.length; i++) { if (b[i] == '"' || b[i] == '\\') esc++; }

@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import "./NFTDataType.sol";
 import "./NFTInterface.sol";
 import "./NFTLib.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
@@ -15,7 +15,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * 支持使用NFT、代币或USD价值升级NFT等级
  * 基于OpenZeppelin UUPS可升级合约实现
  */
-contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, INFTUpdate {
+contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, INFTUpdate {
     using NFTLib for uint256;
     using NFTLib for address;
 
@@ -71,7 +71,6 @@ contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reentr
 
     /**
      * @dev 升级授权函数
-     * @param newImplementation 新实现合约地址
      */
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -280,7 +279,7 @@ contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reentr
         
         uint8 newLv = lv + 1;
         m.setTokenLevel(tokenId, newLv);
-        NFTDataTypes.ElementType element = t.getElement();
+        NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         m.updateUserWeight(msg.sender, lv, false, element);
         m.updateUserWeight(msg.sender, newLv, true, element);
         emit CardUpgraded(tokenId, t, lv, newLv, msg.sender, uint64(block.timestamp));
@@ -384,7 +383,7 @@ contract NFTUpdate is Initializable, OwnableUpgradeable, UUPSUpgradeable, Reentr
         NFTDataTypes.ZodiacType t = m.tokenType(id);
         uint8 newLv = oldLv + 1;
         m.setTokenLevel(id, newLv);
-        NFTDataTypes.ElementType element = t.getElement();
+        NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         m.updateUserWeight(msg.sender, oldLv, false, element);
         m.updateUserWeight(msg.sender, newLv, true, element);
         emit CardUpgraded(id, t, oldLv, newLv, msg.sender, uint64(block.timestamp));

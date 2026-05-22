@@ -239,11 +239,20 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ERC
     }
 
     function _updateDailyDeposited(uint256 amount) internal {
+        _resetDailyIfNeeded();
+        dailyDeposited += amount;
+    }
+
+    function _updateDailyRewardDistributed(uint256 amount) internal {
+        _resetDailyIfNeeded();
+        dailyRewardDistributed += amount;
+    }
+
+    function _resetDailyIfNeeded() internal {
         if (block.timestamp >= lastDateReset + 1 days) {
-            dailyDeposited = amount;
+            dailyDeposited = 0;
+            dailyRewardDistributed = 0;
             lastDateReset = block.timestamp;
-        } else {
-            dailyDeposited += amount;
         }
     }
 

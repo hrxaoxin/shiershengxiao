@@ -4,33 +4,58 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "./Battle.sol";
+import "./BattleLib.sol";
 import "./NFTInterface.sol";
+import "./ArenaRankingLib.sol";
 
 contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, IArenaRanking {
-    Battle public battleContract;
+    using ArenaRankingLib for *;
+
+    error InvalidDuration();
+    error InvalidCost();
+    error InvalidRate();
+    error InvalidTierRange();
+    error TierNotSequential();
+    error InvalidTierPercentage();
+    error TotalPercentageExceeds100();
+    error InvalidMockRank();
+    error NoActiveSeason();
+    error BattleTeamSizeMismatch();
+    error NFTNotOwned();
+    error NFTAlreadyInTeam();
+    error NoBattleTeamToClear();
+    error DuplicateNFTInTeam();
+    error MaxAttemptsReached();
+    error TokenTransferFailed();
+    error SeasonNotActive();
+    error AttackerNoTeam();
+    error CannotChallengeSelf();
+    error NoAttemptsLeft();
+    error DefenderNoTeam();
+    error BattleCallFailed();
+    error RewardAlreadyClaimed();
+    error InsufficientRewardBalance();
+    error TransferFailed();
+    error InsufficientContractBalance();
+    error InsufficientBNBBalance();
+    error BNBTransferFailed();
+
+    address public battleContract;
     INFTMint public nftContract;
     address public tokenContract;
     address public authorizer;
 
     uint256 public constant TEAM_SIZE = 6;
-    uint256 public constant BASE_WIN_POINTS = 100;
-    uint256 public constant BASE_LOSS_POINTS = 50;
-    uint256 public constant MAX_RANK_BONUS = 500;
     uint256 public constant DAILY_ATTEMPTS = 5;
     uint256 public constant RECHARGE_AMOUNT = 5;
     uint256 public constant DEFAULT_RECHARGE_COST = 888000000000000000000;
     uint256 public constant TIER1_NFT_COUNT = 120;
-    uint256 public constant DEFAULT_SEASON_REWARD_RATE = 2; // 0.2% (2 basis points)
-    uint256 public constant BPS = 10000; // Basis points denominator
+    uint256 public constant DEFAULT_SEASON_REWARD_RATE = 2;
 
     uint256 public rechargeCost = DEFAULT_RECHARGE_COST;
-    uint256 public seasonRewardRate = DEFAULT_SEASON_REWARD_RATE; // Reward rate in basis points
+    uint256 public seasonRewardRate = DEFAULT_SEASON_REWARD_RATE;
 
-    enum ChallengeMode {
-        Points,
-        RankSwap
-    }
+    uint8 public currentMode;
 
     struct Player {
         uint256 points;
@@ -49,13 +74,12 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         uint256 endTime;
         bool isActive;
         uint256 totalReward;
-        uint256 totalRewardPool; // Total BNB pool for the season
+        uint256 totalRewardPool;
     }
 
     struct SeasonReward {
-        uint256 seasonNumber;
-        uint256 rank;
-        uint256 reward;
+        uint128 reward;
+        uint64 rank;
         bool claimed;
     }
 
@@ -66,7 +90,15 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         uint256 attackerWinCount;
         uint256 defenderWinCount;
         uint256 timestamp;
-        ChallengeMode mode;
+        uint8 mode;
+    }
+
+    struct BattleResult {
+        bool won;
+        uint256 aw;
+        uint256 dw;
+        uint256 ar;
+        uint256 dr;
     }
 
     struct LeaderboardEntry {
@@ -80,7 +112,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     struct RewardTier {
         uint256 startRank;
         uint256 endRank;
-        uint256 percentage; // in basis points
+        uint256 percentage;
     }
 
     mapping(address => Player) public players;
@@ -104,8 +136,6 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     RewardTier[] public rewardTiers;
 
-    ChallengeMode public currentMode;
-
     address[] public sortedPlayerAddresses;
     mapping(address => uint256) public playerSortedIndex;
 
@@ -118,7 +148,6 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         uint256 attackerRank,
         uint256 defenderRank
     );
-
     event SeasonStarted(uint256 seasonNumber, uint256 startTime, uint256 endTime, uint256 totalRewardPool);
     event SeasonEnded(uint256 seasonNumber, uint256 totalReward);
     event RewardClaimed(address indexed player, uint256 seasonNumber, uint256 reward);
@@ -136,7 +165,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        battleContract = Battle(_battleContract);
+        battleContract = _battleContract;
         nftContract = INFTMint(_nftContract);
         tokenContract = _tokenContract;
         currentSeason = 1;
@@ -158,20 +187,20 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     function _initializeDefaultRewardTiers() internal {
         delete rewardTiers;
-        rewardTiers.push(RewardTier({startRank: 1, endRank: 1, percentage: 1500})); // 15%
-        rewardTiers.push(RewardTier({startRank: 2, endRank: 2, percentage: 1000})); // 10%
-        rewardTiers.push(RewardTier({startRank: 3, endRank: 3, percentage: 800}));  // 8%
-        rewardTiers.push(RewardTier({startRank: 4, endRank: 5, percentage: 600}));  // 6% each
-        rewardTiers.push(RewardTier({startRank: 6, endRank: 10, percentage: 400})); // 4% each
-        rewardTiers.push(RewardTier({startRank: 11, endRank: 20, percentage: 250})); // 2.5% each
-        rewardTiers.push(RewardTier({startRank: 21, endRank: 50, percentage: 150})); // 1.5% each
-        rewardTiers.push(RewardTier({startRank: 51, endRank: 100, percentage: 80})); // 0.8% each
+        rewardTiers.push(RewardTier({startRank: 1, endRank: 1, percentage: 1500}));
+        rewardTiers.push(RewardTier({startRank: 2, endRank: 2, percentage: 1000}));
+        rewardTiers.push(RewardTier({startRank: 3, endRank: 3, percentage: 800}));
+        rewardTiers.push(RewardTier({startRank: 4, endRank: 5, percentage: 600}));
+        rewardTiers.push(RewardTier({startRank: 6, endRank: 10, percentage: 400}));
+        rewardTiers.push(RewardTier({startRank: 11, endRank: 20, percentage: 250}));
+        rewardTiers.push(RewardTier({startRank: 21, endRank: 50, percentage: 150}));
+        rewardTiers.push(RewardTier({startRank: 51, endRank: 100, percentage: 80}));
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     function setBattleContract(address _battleContract) external onlyOwner {
-        battleContract = Battle(_battleContract);
+        battleContract = _battleContract;
     }
 
     function setNFTContract(address _nftContract) external onlyOwner {
@@ -187,21 +216,21 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     }
 
     function setSeasonDuration(uint256 _duration) external onlyOwner {
-        require(_duration > 0, "Duration must be greater than 0");
+        if (_duration == 0) revert InvalidDuration();
         uint256 oldDuration = seasonDuration;
         seasonDuration = _duration;
         emit SeasonDurationUpdated(oldDuration, _duration);
     }
 
     function setRechargeCost(uint256 _cost) external onlyOwner {
-        require(_cost > 0, "Cost must be greater than 0");
+        if (_cost == 0) revert InvalidCost();
         uint256 oldCost = rechargeCost;
         rechargeCost = _cost;
         emit RechargeCostUpdated(oldCost, _cost);
     }
 
     function setSeasonRewardRate(uint256 _rate) external onlyOwner {
-        require(_rate > 0 && _rate <= BPS, "Rate must be between 1 and 10000 basis points");
+        if (_rate == 0 || _rate > ArenaRankingLib.BPS) revert InvalidRate();
         uint256 oldRate = seasonRewardRate;
         seasonRewardRate = _rate;
         emit SeasonRewardRateUpdated(oldRate, _rate);
@@ -213,23 +242,23 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         uint256 lastRank = 0;
 
         for (uint256 i = 0; i < _rewardTiers.length; i++) {
-            require(_rewardTiers[i].startRank > lastRank, "Tiers must be sequential");
-            require(_rewardTiers[i].endRank >= _rewardTiers[i].startRank, "Invalid tier range");
-            require(_rewardTiers[i].percentage > 0, "Percentage must be positive");
+            if (_rewardTiers[i].startRank <= lastRank) revert TierNotSequential();
+            if (_rewardTiers[i].endRank < _rewardTiers[i].startRank) revert InvalidTierRange();
+            if (_rewardTiers[i].percentage == 0) revert InvalidTierPercentage();
 
             rewardTiers.push(_rewardTiers[i]);
             totalPercentage += _rewardTiers[i].percentage * (_rewardTiers[i].endRank - _rewardTiers[i].startRank + 1);
             lastRank = _rewardTiers[i].endRank;
         }
 
-        require(totalPercentage <= BPS, "Total percentage cannot exceed 100%");
+        if (totalPercentage > ArenaRankingLib.BPS) revert TotalPercentageExceeds100();
         emit RewardTiersUpdated();
     }
 
-    event ChallengeModeUpdated(ChallengeMode oldMode, ChallengeMode newMode);
+    event ChallengeModeUpdated(uint8 oldMode, uint8 newMode);
 
-    function setChallengeMode(ChallengeMode _mode) external onlyOwner {
-        ChallengeMode oldMode = currentMode;
+    function setChallengeMode(uint8 _mode) external onlyOwner {
+        uint8 oldMode = currentMode;
         currentMode = _mode;
         emit ChallengeModeUpdated(oldMode, _mode);
     }
@@ -243,13 +272,11 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     function _generateMockTeam(uint256 seed) internal pure returns (uint256[6] memory) {
         uint256[6] memory team;
-
         for (uint256 i = 0; i < 6; i++) {
             uint256 randomIndex;
             bool isUnique;
-
             do {
-                randomIndex = uint256(keccak256(abi.encodePacked(seed, i, block.timestamp, block.number))) % TIER1_NFT_COUNT;
+                randomIndex = uint256(keccak256(abi.encodePacked(seed, i))) % TIER1_NFT_COUNT;
                 isUnique = true;
                 for (uint256 j = 0; j < i; j++) {
                     if (team[j] == randomIndex) {
@@ -258,25 +285,21 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
                     }
                 }
             } while (!isUnique);
-
             team[i] = randomIndex;
         }
-
         return team;
     }
 
     function replaceMockPlayerTeam(uint256 rank) internal {
-        require(rank <= mockPlayerCount && rank > 0, "Invalid mock player rank");
-        uint256 seed = uint256(keccak256(abi.encodePacked(block.timestamp, rank, msg.sender)));
-        uint256[6] memory newTeam = _generateMockTeam(seed);
+        if (rank == 0 || rank > mockPlayerCount) revert InvalidMockRank();
+        uint256 seed = uint256(keccak256(abi.encodePacked(block.timestamp, rank)));
+        _generateMockTeam(seed);
         emit MockPlayerBattleTeamReplaced(rank);
     }
 
     function startNewSeason() external onlyOwner {
-        require(seasons[currentSeason].isActive, "E01: No active season");
-
+        if (!seasons[currentSeason].isActive) revert NoActiveSeason();
         _finalizeCurrentSeason();
-
         currentSeason++;
         _startNewSeason();
     }
@@ -295,7 +318,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         current.isActive = false;
 
         uint256 contractBalance = address(this).balance;
-        uint256 seasonRewardPool = (contractBalance * seasonRewardRate) / BPS;
+        uint256 seasonRewardPool = (contractBalance * seasonRewardRate) / ArenaRankingLib.BPS;
         current.totalRewardPool = seasonRewardPool;
 
         emit SeasonEnded(currentSeason, seasonRewardPool);
@@ -304,7 +327,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     function _startNewSeason() internal {
         uint256 contractBalance = address(this).balance;
-        uint256 seasonRewardPool = (contractBalance * seasonRewardRate) / BPS;
+        uint256 seasonRewardPool = (contractBalance * seasonRewardRate) / ArenaRankingLib.BPS;
 
         seasons[currentSeason] = Season({
             seasonNumber: currentSeason,
@@ -331,19 +354,17 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     }
 
     function setBattleTeam(uint256[] calldata tokenIds) external nonReentrant {
-        require(tokenIds.length == TEAM_SIZE, "E03: Battle team must have 6 NFTs");
-
-        _validateUniqueTokens(tokenIds);
+        if (tokenIds.length != TEAM_SIZE) revert BattleTeamSizeMismatch();
+        ArenaRankingLib.validateUniqueTokens(tokenIds);
 
         Player storage player = players[msg.sender];
-
         if (player.hasTeam) {
             _clearBattleTeam(msg.sender);
         }
 
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
-            require(nftContract.ownerOf(tokenIds[i]) == msg.sender, "E17: NFT not owned by sender");
-            require(!isInBattleTeam[tokenIds[i]], "E18: NFT already in another battle team");
+            if (nftContract.ownerOf(tokenIds[i]) != msg.sender) revert NFTNotOwned();
+            if (isInBattleTeam[tokenIds[i]]) revert NFTAlreadyInTeam();
 
             nftContract.transferFrom(msg.sender, address(this), tokenIds[i]);
             nftToPlayer[tokenIds[i]] = msg.sender;
@@ -362,7 +383,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     function clearBattleTeam() external nonReentrant {
         Player storage player = players[msg.sender];
-        require(player.hasTeam, "E19: No battle team to clear");
+        if (!player.hasTeam) revert NoBattleTeamToClear();
 
         for (uint256 i = 0; i < player.battleTeam.length; i++) {
             uint256 tokenId = player.battleTeam[i];
@@ -375,16 +396,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
         delete player.battleTeam;
         player.hasTeam = false;
-
         emit BattleTeamCleared(msg.sender);
-    }
-
-    function _validateUniqueTokens(uint256[] calldata tokenIds) internal pure {
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            for (uint256 j = i + 1; j < tokenIds.length; j++) {
-                require(tokenIds[i] != tokenIds[j], "E16: Duplicate NFT in team");
-            }
-        }
     }
 
     function _registerPlayer(address player) internal {
@@ -425,14 +437,13 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     function rechargeChallengeAttempts() external nonReentrant {
         _resetDailyAttempts(msg.sender);
-
         Player storage player = players[msg.sender];
-        require(player.remainingAttempts < DAILY_ATTEMPTS, "E20: Already have max attempts");
+        if (player.remainingAttempts >= DAILY_ATTEMPTS) revert MaxAttemptsReached();
 
         (bool success, ) = tokenContract.call(
             abi.encodeWithSignature("transferFrom(address,address,uint256)", msg.sender, address(this), rechargeCost)
         );
-        require(success, "E21: Token transfer failed");
+        if (!success) revert TokenTransferFailed();
 
         player.remainingAttempts += RECHARGE_AMOUNT;
         if (player.remainingAttempts > DAILY_ATTEMPTS) {
@@ -443,15 +454,14 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     }
 
     function challenge(address defender) external nonReentrant returns (bool, uint256, uint256) {
-        require(seasons[currentSeason].isActive, "E02: Season not active");
+        if (!seasons[currentSeason].isActive) revert SeasonNotActive();
 
         Player storage attacker = players[msg.sender];
-
-        require(attacker.hasTeam && attacker.battleTeam.length == TEAM_SIZE, "E05: Attacker must set battle team");
-        require(msg.sender != defender, "E22: Cannot challenge yourself");
+        if (!attacker.hasTeam || attacker.battleTeam.length != TEAM_SIZE) revert AttackerNoTeam();
+        if (msg.sender == defender) revert CannotChallengeSelf();
 
         _resetDailyAttempts(msg.sender);
-        require(attacker.remainingAttempts > 0, "E23: No remaining challenge attempts");
+        if (attacker.remainingAttempts == 0) revert NoAttemptsLeft();
 
         if (!isPlayerRegistered[msg.sender]) {
             _registerPlayer(msg.sender);
@@ -460,44 +470,30 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         attacker.remainingAttempts--;
 
         uint256 attackerRank = getPlayerRank(msg.sender);
-        uint256 defenderRank;
+        uint256 defenderRank = defender == address(0) ? 1 : getPlayerRank(defender);
 
-        if (defender == address(0)) {
-            defenderRank = 1;
-        } else {
-            defenderRank = getPlayerRank(defender);
-        }
-
-        bool isMockDefender = _isMockPlayer(defender);
+        bool isMockDefender = ArenaRankingLib.isMockPlayer(defender);
         uint256[6] memory defenderTeam;
         bool defenderHasTeam;
 
         if (isMockDefender) {
-            uint256 mockRank = _getMockPlayerRank(defender);
+            uint256 mockRank = ArenaRankingLib.getMockPlayerRank(defender);
             defenderTeam = _getMockTeamByRank(mockRank);
             defenderHasTeam = true;
         } else {
             Player storage defenderPlayer = players[defender];
-            require(defenderPlayer.hasTeam && defenderPlayer.battleTeam.length == TEAM_SIZE, "E06: Defender must set battle team");
+            if (!defenderPlayer.hasTeam || defenderPlayer.battleTeam.length != TEAM_SIZE) revert DefenderNoTeam();
             defenderTeam = _convertToFixedArray(defenderPlayer.battleTeam);
             defenderHasTeam = defenderPlayer.hasTeam;
         }
 
-        require(defenderHasTeam, "E06: Defender must set battle team");
-
-        ChallengeMode mode = currentMode;
-
-        if (mode == ChallengeMode.RankSwap) {
-            if (isMockDefender) {
-                require(attackerRank < _getMockPlayerRank(defender), "E24: Can only challenge higher ranked players");
-            }
-        }
+        if (!defenderHasTeam) revert DefenderNoTeam();
 
         if (!isPlayerRegistered[defender]) {
             _registerPlayer(defender);
         }
 
-        if (mode == ChallengeMode.RankSwap) {
+        if (currentMode == 1) {
             return _challengeRankSwapWithMock(msg.sender, defender, attackerRank, defenderRank, defenderTeam, isMockDefender);
         } else {
             return _challengePointsWithMock(msg.sender, defender, attackerRank, defenderRank, defenderTeam, isMockDefender);
@@ -505,20 +501,14 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     }
 
     function _isMockPlayer(address player) internal view returns (bool) {
-        if (player == address(0)) {
-            return true;
-        }
+        if (player == address(0)) return true;
         uint256 mockRank = _getMockPlayerRank(player);
         return mockRank > 0 && mockRank <= mockPlayerCount && isMockPlayerActive[mockRank];
     }
 
     function _getMockPlayerRank(address player) internal pure returns (uint256) {
-        if (player == address(0)) {
-            return 1;
-        }
-        if (player >= address(1) && player <= address(20)) {
-            return uint256(uint160(player));
-        }
+        if (player == address(0)) return 1;
+        if (player >= address(1) && player <= address(20)) return uint256(uint160(player));
         return 0;
     }
 
@@ -535,207 +525,179 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     }
 
     function challengeWithMock(address attacker, uint256 defenderRank) external onlyOwner returns (bool, uint256, uint256) {
-        require(seasons[currentSeason].isActive, "E02: Season not active");
-        require(defenderRank > 0 && defenderRank <= mockPlayerCount, "Invalid mock rank");
+        if (!seasons[currentSeason].isActive) revert SeasonNotActive();
+        if (defenderRank == 0 || defenderRank > mockPlayerCount) revert InvalidMockRank();
 
         Player storage attackerPlayer = players[attacker];
-        require(attackerPlayer.hasTeam && attackerPlayer.battleTeam.length == TEAM_SIZE, "E05: Attacker must set battle team");
+        if (!attackerPlayer.hasTeam || attackerPlayer.battleTeam.length != TEAM_SIZE) revert AttackerNoTeam();
 
         uint256[6] memory defenderTeam = _getMockTeamByRank(defenderRank);
-
         uint256 attackerRank = getPlayerRank(attacker);
 
         return _challengePointsWithMock(attacker, address(uint160(defenderRank)), attackerRank, defenderRank, defenderTeam, true);
     }
 
+    function _executeBattle(uint256 attackerToken, uint256 defenderToken) internal view returns (bool) {
+        (bool success, bytes memory data) = battleContract.staticcall(
+            abi.encodeWithSignature("simulateBattle(uint256,uint256)", attackerToken, defenderToken)
+        );
+        if (!success) revert BattleCallFailed();
+        BattleLib.SingleBattleResult memory result = abi.decode(data, (BattleLib.SingleBattleResult));
+        return result.attackerWon;
+    }
+
+    function _executeTeamBattle(uint256[] memory attackerTeam, uint256[6] memory defenderTeam) internal view returns (uint256, uint256) {
+        uint256 attackerWins = 0;
+        uint256 defenderWins = 0;
+
+        for (uint256 i = 0; i < TEAM_SIZE; i++) {
+            if (attackerWins >= 4 || defenderWins >= 4) break;
+            
+            bool attackerWon = _executeBattle(attackerTeam[i], defenderTeam[i]);
+            if (attackerWon) {
+                attackerWins++;
+            } else {
+                defenderWins++;
+            }
+        }
+
+        return (attackerWins, defenderWins);
+    }
+
     function _challengePointsWithMock(address attacker, address defender, uint256 attackerRank, uint256 defenderRank, uint256[6] memory defenderTeam, bool isMockDefender) internal returns (bool, uint256, uint256) {
-        Player storage attackerPlayer = players[attacker];
+        return _executePointsBattle(attacker, defender, attackerRank, defenderRank, defenderTeam, isMockDefender);
+    }
 
-        uint256[] memory attackerTeamDynamic = attackerPlayer.battleTeam;
-        uint256[6] memory attackerTeamFixed = _convertToFixedArray(attackerTeamDynamic);
+    function _executePointsBattle(address a, address d, uint256 ar, uint256 dr, uint256[6] memory dt, bool md) private returns (bool, uint256, uint256) {
+        Player storage ap = players[a];
+        
+        BattleResult memory br;
+        br.ar = ar;
+        br.dr = dr;
 
-        (bool attackerWon, uint256 attackerWinCount, uint256 defenderWinCount) =
-            battleContract.battle(attackerTeamFixed, defenderTeam);
+        uint256[] memory at = ap.battleTeam;
+        (br.aw, br.dw) = _executeTeamBattle(at, dt);
+        br.won = br.aw > br.dw;
 
-        int256 attackerPointsChange;
-        int256 defenderPointsChange;
+        _updatePoints(a, d, ap, ar, dr, br.aw, br.dw, br.won, md);
+        
+        if (md && br.won) {
+            replaceMockPlayerTeam(dr);
+        }
 
-        if (attackerWon) {
-            attackerPointsChange = _calculateWinPoints(attackerRank, defenderRank, attackerWinCount);
-            attackerPlayer.points += uint256(attackerPointsChange);
-            attackerPlayer.wins++;
+        _finishBattle(a, d, ap, br, 0);
 
-            if (!isMockDefender) {
-                Player storage defenderPlayer = players[defender];
-                defenderPointsChange = -attackerPointsChange / 2;
-                if (defenderPlayer.points > uint256(-defenderPointsChange)) {
-                    defenderPlayer.points -= uint256(-defenderPointsChange);
-                } else {
-                    defenderPlayer.points = 0;
-                }
-                defenderPlayer.losses++;
+        return (br.won, br.aw, br.dw);
+    }
+
+    function _updatePoints(address attacker, address defender, Player storage ap, uint256 ar, uint256 dr, uint256 aw, uint256 dw, bool won, bool md) private {
+        if (won) {
+            uint256 wp = uint256(_calculateWinPoints(ar, dr, aw));
+            ap.points += wp;
+            ap.wins++;
+
+            if (!md) {
+                Player storage dp = players[defender];
+                uint256 lp = wp / 2;
+                dp.points = dp.points > lp ? dp.points - lp : 0;
+                dp.losses++;
                 _updatePlayerPosition(defender);
             }
         } else {
-            attackerPointsChange = -_calculateLossPoints(attackerRank, defenderRank);
-            if (attackerPlayer.points > uint256(-attackerPointsChange)) {
-                attackerPlayer.points -= uint256(-attackerPointsChange);
-            } else {
-                attackerPlayer.points = 0;
-            }
-            attackerPlayer.losses++;
+            uint256 lp = _calculateLossPoints(ar, dr);
+            ap.points = ap.points > lp ? ap.points - lp : 0;
+            ap.losses++;
 
-            if (!isMockDefender) {
-                Player storage defenderPlayer = players[defender];
-                defenderPointsChange = _calculateWinPoints(defenderRank, attackerRank, defenderWinCount);
-                defenderPlayer.points += uint256(defenderPointsChange);
-                defenderPlayer.wins++;
+            if (!md) {
+                Player storage dp = players[defender];
+                dp.points += uint256(_calculateWinPoints(dr, ar, dw));
+                dp.wins++;
                 _updatePlayerPosition(defender);
             }
         }
 
         _updatePlayerPosition(attacker);
-        attackerPlayer.lastBattleTime = block.timestamp;
-
-        battleHistory[nextBattleId] = BattleRecord({
-            attacker: attacker,
-            defender: defender,
-            attackerWon: attackerWon,
-            attackerWinCount: attackerWinCount,
-            defenderWinCount: defenderWinCount,
-            timestamp: block.timestamp,
-            mode: ChallengeMode.Points
-        });
-        nextBattleId++;
-
-        if (isMockDefender && attackerWon) {
-            replaceMockPlayerTeam(defenderRank);
-        }
-
-        emit ChallengeCompleted(attacker, defender, attackerWon, attackerPointsChange, defenderPointsChange, attackerRank, defenderRank);
-
-        return (attackerWon, attackerWinCount, defenderWinCount);
     }
+
+    
 
     function _challengeRankSwapWithMock(address attacker, address defender, uint256 attackerRank, uint256 defenderRank, uint256[6] memory defenderTeam, bool isMockDefender) internal returns (bool, uint256, uint256) {
-        Player storage attackerPlayer = players[attacker];
-
-        uint256[] memory attackerTeamDynamic = attackerPlayer.battleTeam;
-        uint256[6] memory attackerTeamFixed = _convertToFixedArray(attackerTeamDynamic);
-
-        uint256 attackerWins = 0;
-        uint256 defenderWins = 0;
-
-        for (uint256 i = 0; i < 3; i++) {
-            (bool roundWon, uint256 atkCount, uint256 defCount) =
-                battleContract.battle(attackerTeamFixed, defenderTeam);
-
-            if (roundWon) {
-                attackerWins++;
-            } else {
-                defenderWins++;
-            }
-
-            if (attackerWins >= 2 || defenderWins >= 2) {
-                break;
-            }
-        }
-
-        bool attackerWon = attackerWins >= 2;
-
-        if (attackerWon) {
-            if (isMockDefender) {
-                uint256 mockRank = _getMockPlayerRank(defender);
-                replaceMockPlayerTeam(mockRank);
-                attackerPlayer.points = (mockPlayerCount - attackerRank + 1) * 100;
-            } else {
-                Player storage defenderPlayer = players[defender];
-                uint256 tempPoints = attackerPlayer.points;
-                attackerPlayer.points = defenderPlayer.points;
-                defenderPlayer.points = tempPoints;
-                defenderPlayer.losses++;
-                _updatePlayerPosition(defender);
-            }
-            attackerPlayer.wins++;
-            _updatePlayerPosition(attacker);
-
-            emit RankSwapped(attacker, defender, attackerRank, defenderRank);
-        } else {
-            attackerPlayer.losses++;
-            _updatePlayerPosition(attacker);
-            if (!isMockDefender) {
-                Player storage defenderPlayer = players[defender];
-                defenderPlayer.wins++;
-            }
-        }
-
-        attackerPlayer.lastBattleTime = block.timestamp;
-
-        battleHistory[nextBattleId] = BattleRecord({
-            attacker: attacker,
-            defender: defender,
-            attackerWon: attackerWon,
-            attackerWinCount: attackerWins,
-            defenderWinCount: defenderWins,
-            timestamp: block.timestamp,
-            mode: ChallengeMode.RankSwap
-        });
-        nextBattleId++;
-
-        int256 attackerPointsChange = attackerWon ? int256(attackerPlayer.points) : 0;
-        int256 defenderPointsChange = attackerWon ? -attackerPointsChange : 0;
-
-        emit ChallengeCompleted(attacker, defender, attackerWon, attackerPointsChange, defenderPointsChange, attackerRank, defenderRank);
-
-        return (attackerWon, attackerWins, defenderWins);
+        return _executeRankSwap(attacker, defender, attackerRank, defenderRank, defenderTeam, isMockDefender);
     }
 
-    function _calculateWinPoints(uint256 attackerRank, uint256 defenderRank, uint256 winCount) internal pure returns (int256) {
-        uint256 rankDiff;
-        if (attackerRank > defenderRank) {
-            rankDiff = attackerRank - defenderRank;
-        } else {
-            rankDiff = defenderRank - attackerRank;
-        }
+    
 
-        uint256 bonus = (rankDiff * MAX_RANK_BONUS) / 100;
+    function _executeRankSwap(address a, address d, uint256 ar, uint256 dr, uint256[6] memory dt, bool md) private returns (bool, uint256, uint256) {
+        Player storage ap = players[a];
+        
+        BattleResult memory br;
+        br.ar = ar;
+        br.dr = dr;
 
-        uint256 battlePoints = winCount * BASE_WIN_POINTS;
-
-        if (attackerRank > defenderRank) {
-            return int256(battlePoints + bonus);
-        } else if (attackerRank < defenderRank) {
-            uint256 penalty = (battlePoints * bonus) / 1000;
-            if (battlePoints > penalty) {
-                return int256(battlePoints - penalty);
+        uint256[] memory at = ap.battleTeam;
+        for (uint256 i = 0; i < 3; i++) {
+            if (br.aw >= 2 || br.dw >= 2) break;
+            if (_executeBattle(at[i], dt[i])) {
+                br.aw++;
+            } else {
+                br.dw++;
             }
-            return int256(battlePoints / 2);
-        } else {
-            return int256(battlePoints);
         }
+
+        br.won = br.aw >= 2;
+        _updateRankSwap(a, d, ap, ar, br.won, md);
+        _finishBattle(a, d, ap, br, 1);
+
+        return (br.won, br.aw, br.dw);
+    }
+
+    function _finishBattle(address a, address d, Player storage ap, BattleResult memory br, uint8 m) private {
+        ap.lastBattleTime = block.timestamp;
+        battleHistory[nextBattleId++] = BattleRecord({
+            attacker: a, defender: d, attackerWon: br.won, attackerWinCount: br.aw, defenderWinCount: br.dw, timestamp: block.timestamp, mode: m
+        });
+
+        int256 apc = br.won ? int256(ap.points) : int256(0);
+        int256 dpc = br.won ? -apc : int256(0);
+        emit ChallengeCompleted(a, d, br.won, apc, dpc, br.ar, br.dr);
+    }
+
+    
+
+    function _updateRankSwap(address a, address d, Player storage ap, uint256 ar, bool won, bool md) private {
+        if (won) {
+            if (md) {
+                uint256 mr = _getMockPlayerRank(d);
+                replaceMockPlayerTeam(mr);
+                ap.points = (mockPlayerCount - ar + 1) * 100;
+            } else {
+                Player storage dp = players[d];
+                uint256 tp = ap.points;
+                ap.points = dp.points;
+                dp.points = tp;
+                dp.losses++;
+                _updatePlayerPosition(d);
+            }
+            ap.wins++;
+            _updatePlayerPosition(a);
+            emit RankSwapped(a, d, ar, _getMockPlayerRank(d));
+        } else {
+            ap.losses++;
+            _updatePlayerPosition(a);
+            if (!md) {
+                players[d].wins++;
+            }
+        }
+    }
+
+    
+
+    function _calculateWinPoints(uint256 attackerRank, uint256 defenderRank, uint256 winCount) internal pure returns (int256) {
+        return ArenaRankingLib.calculateWinPoints(attackerRank, defenderRank, winCount);
     }
 
     function _calculateLossPoints(uint256 attackerRank, uint256 defenderRank) internal pure returns (uint256) {
-        uint256 rankDiff;
-        if (attackerRank > defenderRank) {
-            rankDiff = attackerRank - defenderRank;
-        } else {
-            rankDiff = defenderRank - attackerRank;
-        }
-
-        uint256 bonus = (rankDiff * MAX_RANK_BONUS) / 100;
-
-        if (attackerRank > defenderRank) {
-            uint256 penalty = (BASE_LOSS_POINTS * bonus) / 1000;
-            if (penalty < BASE_LOSS_POINTS) {
-                return BASE_LOSS_POINTS - penalty;
-            }
-            return BASE_LOSS_POINTS / 2;
-        } else if (attackerRank < defenderRank) {
-            return BASE_LOSS_POINTS + bonus;
-        } else {
-            return BASE_LOSS_POINTS;
-        }
+        return ArenaRankingLib.calculateLossPoints(attackerRank, defenderRank);
     }
 
     function _insertIntoSortedArray(address player) internal {
@@ -834,7 +796,6 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
         }
 
         LeaderboardEntry[] memory entries = new LeaderboardEntry[](totalSlots);
-
         uint256 entryIndex = 0;
 
         for (uint256 i = 0; i < totalRealPlayers && entryIndex < totalSlots; i++) {
@@ -867,7 +828,7 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     }
 
     function getMockPlayerTeam(uint256 rank) external view returns (uint256[6] memory) {
-        require(rank > 0 && rank <= mockPlayerCount, "Invalid mock rank");
+        if (rank == 0 || rank > mockPlayerCount) revert InvalidMockRank();
         return _getMockTeamByRank(rank);
     }
 
@@ -886,12 +847,12 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     function getRewardForRank(uint256 rank) public view returns (uint256) {
         uint256 rewardPool = seasons[currentSeason].totalRewardPool;
         if (rewardPool == 0) {
-            rewardPool = (address(this).balance * seasonRewardRate) / BPS;
+            rewardPool = (address(this).balance * seasonRewardRate) / ArenaRankingLib.BPS;
         }
 
         for (uint256 i = 0; i < rewardTiers.length; i++) {
             if (rank >= rewardTiers[i].startRank && rank <= rewardTiers[i].endRank) {
-                return (rewardPool * rewardTiers[i].percentage) / BPS;
+                return (rewardPool * rewardTiers[i].percentage) / ArenaRankingLib.BPS;
             }
         }
 
@@ -912,21 +873,21 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
 
     function claimReward(uint256 seasonNumber) external nonReentrant {
         SeasonReward storage reward = playerRewards[msg.sender][seasonNumber];
-        require(!reward.claimed, "E08: Reward already claimed");
+        if (reward.claimed) revert RewardAlreadyClaimed();
 
         Season storage season = seasons[seasonNumber];
-        require(!season.isActive, "E09: Season still active");
+        if (season.isActive) revert NoActiveSeason();
 
         uint256 rewardAmount = calculateSeasonReward(msg.sender, seasonNumber);
-        require(rewardAmount > 0, "E10: No reward available");
-        require(rewardAmount <= season.totalRewardPool, "Reward exceeds pool");
+        if (rewardAmount == 0) revert InsufficientRewardBalance();
+        if (rewardAmount > season.totalRewardPool) revert InsufficientRewardBalance();
 
         reward.claimed = true;
-        reward.reward = rewardAmount;
-        reward.rank = getPlayerRank(msg.sender);
+        reward.reward = uint128(rewardAmount);
+        reward.rank = uint64(getPlayerRank(msg.sender));
 
         (bool success, ) = msg.sender.call{value: rewardAmount}("");
-        require(success, "E11: Transfer failed");
+        if (!success) revert TransferFailed();
 
         emit RewardClaimed(msg.sender, seasonNumber, rewardAmount);
     }
@@ -978,15 +939,15 @@ contract ArenaRanking is Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGua
     }
 
     function withdrawBNB(uint256 amount) external onlyOwner nonReentrant {
-        require(amount <= address(this).balance, "E12: Insufficient balance");
+        if (amount > address(this).balance) revert InsufficientContractBalance();
         (bool success, ) = owner().call{value: amount}("");
-        require(success, "E13: Transfer failed");
+        if (!success) revert TransferFailed();
     }
 
     function withdrawSpecificBNB(uint256 amount) external onlyOwner nonReentrant {
-        require(amount <= address(this).balance, "Insufficient BNB balance");
+        if (amount > address(this).balance) revert InsufficientBNBBalance();
         (bool success, ) = owner().call{value: amount}("");
-        require(success, "BNB transfer failed");
+        if (!success) revert BNBTransferFailed();
     }
 
     function withdrawNFTs(uint256[] calldata tokenIds) external onlyOwner nonReentrant {

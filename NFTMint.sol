@@ -6,33 +6,36 @@ pragma solidity ^0.8.20;
  * @dev 十二生肖NFT合约，支持铸造、升级、繁殖等功能
  * 实现120种生肖NFT类型（5属性x12生肖x2性别）
  * 基于OpenZeppelin UUPS可升级合约实现
+ *
+ * 模块拆分说明：
+ * - MintModule: 随机类型生成、成长值计算
+ * - UpgradeModule: 升级费用计算、燃烧候选查找
+ * - PriceOracle: PancakeSwap代币USD价格查询
  */
 import "./NFTData.sol";
 import "./NFTLib.sol";
 import "./NFTInterface.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC721/utils/ERC721HolderUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+import "./NFTQueryLib.sol";
+import "./NFTMintDelegator.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/ERC721Upgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/utils/ERC721HolderUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/OwnableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/utils/Counters.sol";
 
 /**
  * @title NFTMint
- * @dev 十二生肖NFT合约
+ * @dev 十二生肖NFT主合约（ERC721核心 + 模块协调）
  */
 contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, ERC721HolderUpgradeable, PausableUpgradeable, INFTMint {
     using Counters for Counters.Counter;
-    using NFTLib for uint256;
-    using NFTLib for address;
-    using NFTLib for bytes;
-    using NFTLib for string;
 
-    /** @dev 用于生成随机数的计数器 */
+    /** @dev 存储间隙计数器（保留用于存储兼容性） */
     Counters.Counter private _nonce;
-    /** @dev 黑洞地址，用于永久销毁NFT（使用标准0地址） */
+    /** @dev 黑洞地址，用于永久销毁NFT */
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
     /** @dev 下一个可铸造的NFT ID */
     uint256 public nextCardId;
@@ -46,39 +49,47 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     address public authorizer;
     /** @dev 代币合约地址 */
     address public tokenContract;
-    /** @dev PancakeSwap流动性池地址（代币/稳定币对） */
+    /** @dev @deprecated PancakeSwap流动性池地址（已迁移至PriceOracle） */
     address public pancakeSwapPair;
-    /** @dev WBNB合约地址 */
+    /** @dev @deprecated WBNB合约地址（已迁移至PriceOracle） */
     address public wbnbAddress;
-    /** @dev 稳定币合约地址（如USDT/USDC/BUSD） */
+    /** @dev @deprecated 稳定币合约地址（已迁移至PriceOracle） */
     address public stablecoinAddress;
     /** @dev 繁殖合约地址 */
     address public breedingContract;
-    /** @dev NFT升级合约地址 */
+    /** @dev NFT升级合约地址（旧版兼容） */
     address public nftUpdateContract;
-    /** @dev 价格过期时间（秒）- 默认1小时 */
-    uint256 public priceExpirySeconds = 3600;
-    /** @dev 价格波动保护阈值（百分比，精度4位）- 默认50% */
-    uint256 public priceDeviationThreshold = 5000;
-    /** @dev 上次价格 */
+    /** @dev @deprecated 价格过期时间（已迁移至PriceOracle） */
+    uint256 public priceExpirySeconds;
+    /** @dev @deprecated 价格波动保护阈值（已迁移至PriceOracle） */
+    uint256 public priceDeviationThreshold;
+    /** @dev @deprecated 上次价格（已迁移至PriceOracle） */
     uint256 public lastPrice;
-    /** @dev 上次价格更新时间 */
+    /** @dev @deprecated 上次价格更新时间（已迁移至PriceOracle） */
     uint256 public lastPriceUpdateTime;
-
-    /** @dev 升级费用（1->2, 2->3, 3->4, 4->5） */
-    uint256 public level1UpgradeCost = 10000;
-    uint256 public level2UpgradeCost = 40000;
-    uint256 public level3UpgradeCost = 120000;
-    uint256 public level4UpgradeCost = 480000;
-
+    /** @dev @deprecated 升级费用变量（已迁移至UpgradeModule） */
+    uint256 public level1UpgradeCost;
+    uint256 public level2UpgradeCost;
+    uint256 public level3UpgradeCost;
+    uint256 public level4UpgradeCost;
     /** @dev 授权铸造者映射 */
     mapping(address => bool) public authorizedMinter;
 
+    // ---- 新增：模块地址 ----
+    /** @dev 铸造模块合约地址 */
+    address public mintModule;
+    /** @dev 升级模块合约地址 */
+    address public upgradeModule;
+    /** @dev 价格预言机合约地址 */
+    address public priceOracle;
+
     /** @dev 存储间隙，用于合约升级兼容性 */
-    uint256[50] private __gap;
+    uint256[47] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
+
+    // ====================== Init ======================
 
     /**
      * @dev 初始化合约
@@ -102,532 +113,204 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
 
     /**
      * @dev 升级授权函数
-     * @param newImplementation 新实现合约地址
      */
     function _authorizeUpgrade(address) internal override onlyOwner {}
-
-    // ====================== 随机类型 ======================
-
-    /**
-     * @dev 安全随机数生成器
-     * 使用链上数据源生成不可预测的随机数
-     */
-    function _generateSecureRandom() internal returns (uint256) {
-        _nonce.increment();
-        bytes32 entropy = keccak256(
-            abi.encodePacked(
-                blockhash(block.number > 1 ? block.number - 1 : block.number),
-                msg.sender,
-                nextCardId,
-                block.timestamp,
-                _nonce.current(),
-                gasleft(),
-                tx.origin,
-                block.coinbase,
-                block.difficulty
-            )
-        );
-        return uint256(entropy);
-    }
-
-    /**
-     * @dev 普通铸造随机类型生成：五种属性随机
-     * 概率分布：水(32%)、火(32%)、风(32%)、光(2%)、暗(2%)
-     * @return NFTDataTypes.ZodiacType 随机生成的生肖类型
-     */
-    function _getRandomNormalType() internal returns (NFTDataTypes.ZodiacType) {
-        uint rand = _generateSecureRandom();
-        uint r = rand % 100;
-        if (r < 2) return NFTDataTypes.ZodiacType(72 + (rand % 24));      // 暗属性(2%)
-        else if (r < 4) return NFTDataTypes.ZodiacType(96 + (rand % 24));  // 光属性(2%)
-        else if (r < 36) return NFTDataTypes.ZodiacType(rand % 24);        // 水属性(32%)
-        else if (r < 68) return NFTDataTypes.ZodiacType(24 + (rand % 24)); // 风属性(32%)
-        else return NFTDataTypes.ZodiacType(48 + (rand % 24));              // 火属性(32%)
-    }
-
-    /**
-     * @dev 稀有铸造随机类型生成：仅光/暗属性随机
-     * 概率分布：光(50%)、暗(50%)
-     * @return NFTDataTypes.ZodiacType 随机生成的生肖类型
-     */
-    function _getRandomRareType() internal returns (NFTDataTypes.ZodiacType) {
-        uint rand = _generateSecureRandom();
-        // 50%概率光属性，50%概率暗属性
-        if (rand % 2 == 0) {
-            return NFTDataTypes.ZodiacType(96 + (rand % 24));  // 光属性(50%)
-        } else {
-            return NFTDataTypes.ZodiacType(72 + (rand % 24));  // 暗属性(50%)
-        }
-    }
 
     // ====================== URI ======================
 
     /**
      * @dev 获取NFT的元数据URI
-     * @param tokenId NFT ID
-     * @return string JSON格式的元数据URI
      */
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_ownerOf(tokenId) != address(0), "E0");
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
         string memory json = string(abi.encodePacked(
-            '{"name":"', m.getCardName(t), " #", tokenId.uint2str(), '",',
-            '"description":"', m.getCardDesc(t).escapeString(), '",',
-            '"image":"', m.getCardImage(t).escapeString(), '"}'
+            '{"name":"', m.getCardName(t), " #", NFTLib.uint2str(tokenId), '",',
+            '"description":"', NFTLib.escapeString(m.getCardDesc(t)), '",',
+            '"image":"', NFTLib.escapeString(m.getCardImage(t)), '"}'
         ));
-        return string(abi.encodePacked("data:application/json;base64,", bytes(json).base64Encode()));
+        return string(abi.encodePacked("data:application/json;base64,", NFTLib.base64Encode(bytes(json))));
     }
 
     /**
      * @dev 获取合约级别的元数据URI（用于OpenSea等平台）
-     * @return string JSON格式的合约元数据URI
      */
     function contractURI() public view returns (string memory) {
         require(metadataContract != address(0), "E1");
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         IRewardManager rm = IRewardManager(rewardManager);
         string memory json = string(abi.encodePacked(
-            '{"name":"', m.collName().escapeString(), '",',
-            '"description":"', m.collDesc().escapeString(), '",',
-            '"image":"', m.collImage().escapeString(), '",',
-            '"seller_fee_basis_points":', m.sellerFeeBasisPoints().uint2str(), ',',
-            '"fee_recipient":"', rm.royaltyWallet().addressToString(), '"}'
+            '{"name":"', NFTLib.escapeString(m.collName()), '",',
+            '"description":"', NFTLib.escapeString(m.collDesc()), '",',
+            '"image":"', NFTLib.escapeString(m.collImage()), '",',
+            '"seller_fee_basis_points":', NFTLib.uint2str(m.sellerFeeBasisPoints()), ',',
+            '"fee_recipient":"', NFTLib.addressToString(rm.royaltyWallet()), '"}'
         ));
-        return string(abi.encodePacked("data:application/json;base64,", bytes(json).base64Encode()));
+        return string(abi.encodePacked("data:application/json;base64,", NFTLib.base64Encode(bytes(json))));
+    }
+
+    // ====================== Mint (主逻辑 + 模块调用) ======================
+
+    /**
+     * @dev 内部统一铸造逻辑
+     */
+    function _mintRaw(address to, NFTDataTypes.ZodiacType t, uint256 growthValue) internal returns (uint256) {
+        (uint256 id, uint256 newId) = NFTMintDelegator.mintRaw(address(this), metadataContract, nextCardId, to, t, growthValue);
+        nextCardId = newId;
+        return id;
     }
 
     /**
      * @dev 普通铸造：销毁代币，随机铸造五种属性中的任意一个生肖
-     * 概率分布：水(32%)、火(32%)、风(32%)、光(2%)、暗(2%)
-     * @param to 接收NFT的地址
-     * @return uint256 新铸造的NFT ID
      */
     function mintNormal(address to) external nonReentrant returns (uint256) {
         require(tokenBurner != address(0) && rewardManager != address(0), "E2");
         require(ITokenBurner(tokenBurner).burnAndMint(to, false), "E6");
-        return _mintTo(to, _getRandomNormalType());
+        require(mintModule != address(0), "Module not set");
+        (NFTDataTypes.ZodiacType t, uint256 growth) = IMintModule(mintModule).generateNormalType();
+        return _mintRaw(to, t, growth);
     }
 
     /**
      * @dev 稀有铸造：销毁代币，随机铸造光或暗属性的生肖
-     * 概率分布：光(50%)、暗(50%)
-     * @param to 接收NFT的地址
-     * @return uint256 新铸造的NFT ID
      */
     function mintRare(address to) external nonReentrant returns (uint256) {
         require(tokenBurner != address(0) && rewardManager != address(0), "E2");
         require(ITokenBurner(tokenBurner).burnAndMint(to, true), "E6");
-        return _mintTo(to, _getRandomRareType());
+        require(mintModule != address(0), "Module not set");
+        (NFTDataTypes.ZodiacType t, uint256 growth) = IMintModule(mintModule).generateRareType();
+        return _mintRaw(to, t, growth);
     }
 
     /**
-     * @dev 指定类型铸造：直接铸造指定类型的生肖（无需销毁代币）
-     * 仅限合约拥有者调用，用于特殊活动或白名单铸造
-     * @param to 接收NFT的地址
-     * @param zodiacType 指定的生肖类型
-     * @return uint256 新铸造的NFT ID
+     * @dev 指定类型铸造（仅Owner）
      */
     function mintCustom(address to, NFTDataTypes.ZodiacType zodiacType) external nonReentrant onlyOwner returns (uint256) {
         require(to != address(0), "E11");
-        return _mintTo(to, zodiacType);
+        require(mintModule != address(0), "Module not set");
+        uint256 growth = IMintModule(mintModule).generateGrowth();
+        return _mintRaw(to, zodiacType, growth);
     }
 
     /**
      * @dev 铸造繁殖结果NFT（仅限繁殖合约调用）
-     * 繁殖完成后调用此函数铸造新的NFT
-     * @param to 接收NFT的地址
-     * @param t NFT的类型
-     * @return uint256 新铸造的NFT ID
      */
-    function mintBreedResult(address to, NFTDataTypes.ZodiacType t) external returns (uint256) {
+    function mintBreedResult(address to, NFTDataTypes.ZodiacType t) external nonReentrant returns (uint256) {
         require(msg.sender == breedingContract, "E12");
-        return _mintTo(to, t);
+        require(mintModule != address(0), "Module not set");
+        uint256 growth = IMintModule(mintModule).generateGrowth();
+        return _mintRaw(to, t, growth);
     }
 
     /**
-     * @dev 普通十连铸造：消耗普通铸造10倍的代币，随机铸造10张NFT，以普通铸造的概率
-     * 概率分布：水(32%)、火(32%)、风(32%)、光(2%)、暗(2%)
-     * @param to 接收NFT的地址
-     * @return uint256[] 新铸造的NFT ID数组
+     * @dev 批量铸造内部逻辑（十连铸造复用）
+     */
+    function _mintBatchRaw(
+        address to,
+        NFTDataTypes.ZodiacType[] memory types,
+        uint256[] memory growthValues,
+        bool isNormal
+    ) internal returns (uint256[] memory) {
+        (uint256[] memory tokenIds, uint256 newId) = NFTMintDelegator.mintBatchRaw(address(this), metadataContract, nextCardId, to, types, growthValues, isNormal);
+        nextCardId = newId;
+        return tokenIds;
+    }
+
+    /**
+     * @dev 普通十连铸造
      */
     function mintNormalTen(address to) external nonReentrant returns (uint256[] memory) {
         require(tokenBurner != address(0) && rewardManager != address(0), "E2");
         require(ITokenBurner(tokenBurner).burnAndMintTen(to, false), "E6");
-        return _mintTenTo(to, true);
+        require(mintModule != address(0), "Module not set");
+        (NFTDataTypes.ZodiacType[] memory types, uint256[] memory growthValues) = IMintModule(mintModule).generateTenNormalTypes();
+        return _mintBatchRaw(to, types, growthValues, true);
     }
 
     /**
-     * @dev 光暗十连铸造：消耗光暗铸造10倍的代币，随机铸造10张NFT，以光暗铸造的概率
-     * 概率分布：光(50%)、暗(50%)
-     * @param to 接收NFT的地址
-     * @return uint256[] 新铸造的NFT ID数组
+     * @dev 光暗十连铸造
      */
     function mintRareTen(address to) external nonReentrant returns (uint256[] memory) {
         require(tokenBurner != address(0) && rewardManager != address(0), "E2");
         require(ITokenBurner(tokenBurner).burnAndMintTen(to, true), "E6");
-        return _mintTenTo(to, false);
+        require(mintModule != address(0), "Module not set");
+        (NFTDataTypes.ZodiacType[] memory types, uint256[] memory growthValues) = IMintModule(mintModule).generateTenRareTypes();
+        return _mintBatchRaw(to, types, growthValues, false);
     }
 
     /**
-     * @dev 指定铸造：用户选择一个生肖，消耗6x普通铸造的代币+4x光暗铸造的代币
-     * 铸造该生肖所有的属性和性别的NFT（共10张：5属性x2性别）
-     * @param to 接收NFT的地址
-     * @param baseZodiac 基础生肖类型
-     * @return uint256[] 新铸造的NFT ID数组
+     * @dev 指定铸造：选择一个生肖，铸造该生肖所有属性和性别的NFT（共10张）
      */
     function mintTargeted(address to, NFTDataTypes.BaseZodiac baseZodiac) external nonReentrant returns (uint256[] memory) {
         require(tokenBurner != address(0) && rewardManager != address(0), "E2");
-        require(uint256(baseZodiac) < 12, "E28: Invalid zodiac");
         require(ITokenBurner(tokenBurner).burnAndMintTargeted(to), "E6");
-        return _mintTargetedTo(to, baseZodiac);
-    }
-
-    /**
-     * @dev 十连铸造统一逻辑（内部函数）- 批量优化版本
-     * 通过合并状态更新减少SLOAD/SSTORE次数，降低Gas消耗
-     * @param to 接收NFT的地址
-     * @param isNormal 是否普通铸造（true为普通概率，false为光暗概率）
-     * @return uint256[] 新铸造的NFT ID数组
-     */
-    function _mintTenTo(address to, bool isNormal) internal returns (uint256[] memory) {
-        uint256[] memory tokenIds = new uint256[](10);
-        NFTDataTypes.ZodiacType[] memory types = new NFTDataTypes.ZodiacType[](10);
-        uint256[] memory growthValues = new uint256[](10);
-        
-        INFTData m = INFTData(metadataContract);
-        
-        for (uint i = 0; i < 10; i++) {
-            if (isNormal) {
-                types[i] = _getRandomNormalType();
-            } else {
-                types[i] = _getRandomRareType();
-            }
-            growthValues[i] = _generateGrowthValue();
-            tokenIds[i] = nextCardId++;
-        }
-        
-        for (uint i = 0; i < 10; i++) {
-            uint256 id = tokenIds[i];
-            NFTDataTypes.ZodiacType t = types[i];
-            m.setTokenType(id, t);
-            m.setTokenLevel(id, 1);
-            m.setTokenGrowthValue(id, growthValues[i]);
-            m.addUserToken(to, t, id);
-            _safeMint(to, id);
-            _updateUserWeight(to, id, 1, true);
-        }
-        
-        emit TenCardsMinted(tokenIds, to, isNormal, uint64(block.timestamp));
+        (uint256[] memory tokenIds, uint256 newId) = NFTMintDelegator.mintTargetedLogic(address(this), metadataContract, mintModule, nextCardId, to, baseZodiac);
+        nextCardId = newId;
         return tokenIds;
     }
 
-    /**
-     * @dev 指定铸造统一逻辑（内部函数）
-     * 铸造指定生肖的所有属性和性别组合（5属性x2性别=10张）
-     * @param to 接收NFT的地址
-     * @param baseZodiac 基础生肖类型
-     * @return uint256[] 新铸造的NFT ID数组
-     */
-    function _mintTargetedTo(address to, NFTDataTypes.BaseZodiac baseZodiac) internal returns (uint256[] memory) {
-        uint256[] memory tokenIds = new uint256[](10);
-        uint256 zodiacIndex = uint256(baseZodiac) * 2;
-        
-        // 铸造5种属性的公母各一张（共10张）
-        // 属性顺序: 水(0)、风(1)、火(2)、暗(3)、光(4)
-        for (uint i = 0; i < 5; i++) {
-            uint256 baseIndex = i * 24 + zodiacIndex;
-            // 母 (gender=0)
-            tokenIds[i * 2] = _mintTo(to, NFTDataTypes.ZodiacType(baseIndex));
-            // 公 (gender=1)
-            tokenIds[i * 2 + 1] = _mintTo(to, NFTDataTypes.ZodiacType(baseIndex + 1));
-        }
-        emit TargetedMintCompleted(tokenIds, to, baseZodiac, uint64(block.timestamp));
-        return tokenIds;
-    }
-
-    /**
-     * @dev 统一铸造逻辑（内部函数）
-     * @param to 接收NFT的地址
-     * @param t NFT的类型
-     * @return uint256 新铸造的NFT ID
-     */
-    function _mintTo(address to, NFTDataTypes.ZodiacType t) internal returns (uint256) {
-        uint id = nextCardId++;
-        INFTData m = INFTData(metadataContract);
-        m.setTokenType(id, t);
-        m.setTokenLevel(id, 1);
-        // 随机生成成长值（10-100），成长值影响战斗属性
-        uint256 growthValue = _generateGrowthValue();
-        m.setTokenGrowthValue(id, growthValue);
-        m.addUserToken(to, t, id);
-        _safeMint(to, id);
-        // 更新权重缓存
-        _updateUserWeight(to, id, 1, true);
-        emit CardMinted(id, t, to, uint64(block.timestamp));
-        return id;
-    }
-    
-    /**
-     * @dev 生成随机成长值（10-100）
-     * 成长值影响NFT在竞技场中的属性（生命值、攻击力、速度等）
-     * @return uint256 成长值
-     */
-    function _generateGrowthValue() internal returns (uint256) {
-        uint256 rand = _generateSecureRandom();
-        // 生成10-100的成长值
-        return 10 + (rand % 91);
-    }
+    // ====================== Transfer Hook ======================
 
     /**
      * @dev 转账前的钩子函数
-     * 在转账时自动更新用户的NFT列表、奖励管理器和权重缓存
-     * @param from 转出地址
-     * @param to 转入地址
-     * @param tokenId NFT ID
-     * @param batchSize 批量转账数量
      */
     function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override {
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
         uint8 lv = m.tokenLevel(tokenId);
         if (from != address(0) && from != BLACK_HOLE) {
             m.removeUserToken(from, t, tokenId);
             _updateReward(from, t, false);
-            // 更新权重缓存：减少转出方权重
             _updateUserWeight(from, tokenId, lv, false);
         }
         if (to != address(0) && to != BLACK_HOLE) {
             m.addUserToken(to, t, tokenId);
             _updateReward(to, t, true);
-            // 更新权重缓存：增加转入方权重
             _updateUserWeight(to, tokenId, lv, true);
         }
     }
 
     /**
-     * @dev 更新奖励管理器中的用户卡牌计数（内部函数）
-     * @param u 用户地址
-     * @param t NFT类型
-     * @param add 是否增加计数（true增加，false减少）
+     * @dev 更新奖励管理器中的用户卡牌计数
      */
     function _updateReward(address u, NFTDataTypes.ZodiacType t, bool add) internal {
-        if (rewardManager == address(0)) return;
-        IRewardManager rm = IRewardManager(rewardManager);
-        uint cnt = rm.cardCount(u, t);
-        uint n = add ? cnt+1 : (cnt>0 ? cnt-1 : 0);
-        try rm.updateCardExternal(u, t, n) returns (bool success) {
-            if (!success) {
-                emit RewardUpdateFailed(u, t, n, add);
-            }
-        } catch {
-            emit RewardUpdateFailed(u, t, n, add);
-        }
+        NFTMintDelegator.updateReward(rewardManager, u, t, add);
     }
-    
-    event RewardUpdateFailed(address indexed user, NFTDataTypes.ZodiacType indexed zodiacType, uint256 count, bool add);
 
-    /**
-     * @dev 使用NFT升级（消耗同类型同等级的其他NFT）
-     * 升级需要消耗lv个同类型同等级的NFT
-     * @param tokenId 要升级的NFT ID
-     * @return uint8 新等级
-     */
+    // ====================== Upgrade (主逻辑 + 模块调用) ======================
+
     function upgradeWithNFT(uint256 tokenId) external nonReentrant returns (uint8) {
-        require(_ownerOf(tokenId) == msg.sender, "E15");
-        INFTData m = INFTData(metadataContract);
-        NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
-        uint8 lv = m.tokenLevel(tokenId);
-        require(lv < 5, "E16");
-        uint req = lv;
-        
-        uint256[] memory arr = m.userTokens(msg.sender, t);
-        uint256 count = 0;
-        uint256[] memory burnCandidates = new uint256[](arr.length);
-        uint256 candidateIdx = 0;
-        
-        for (uint i = 0; i < arr.length; i++) {
-            uint256 currentId = arr[i];
-            if (m.tokenLevel(currentId) == lv) {
-                count++;
-                if (currentId != tokenId && candidateIdx < req) {
-                    burnCandidates[candidateIdx++] = currentId;
-                }
-            }
-        }
-        require(count >= req+1, "E17");
-        
-        for (uint i = 0; i < req; i++) {
-            uint burnId = burnCandidates[i];
-            uint8 burnLv = m.tokenLevel(burnId);
-            _updateUserWeight(msg.sender, burnId, burnLv, false);
-            _safeTransfer(msg.sender, BLACK_HOLE, burnId);
-            emit CardBurned(burnId, t, msg.sender);
-        }
-        
-        uint8 newLv = lv + 1;
-        m.setTokenLevel(tokenId, newLv);
-        _updateUserWeight(msg.sender, tokenId, lv, false);
-        _updateUserWeight(msg.sender, tokenId, newLv, true);
-        emit CardUpgraded(tokenId, t, lv, newLv, msg.sender, uint64(block.timestamp));
-        return newLv;
+        return NFTMintDelegator.upgradeWithNFTLogic(address(this), metadataContract, upgradeModule, tokenId, msg.sender, BLACK_HOLE);
     }
 
-    /**
-     * @dev 使用代币升级
-     * 各级别所需代币数量：1->2需10000, 2->3需40000, 3->4需120000, 4->5需480000
-     * @param tokenId 要升级的NFT ID
-     * @return uint8 新等级
-     */
     function upgradeWithToken(uint256 tokenId) external nonReentrant returns (uint8) {
-        require(_ownerOf(tokenId) == msg.sender, "E15");
-        require(tokenContract != address(0), "E7");
-        INFTData m = INFTData(metadataContract);
-        uint8 lv = m.tokenLevel(tokenId);
-        require(lv < 5, "E16");
-        uint256 cost;
-        if (lv == 1) cost = level1UpgradeCost;
-        else if (lv == 2) cost = level2UpgradeCost;
-        else if (lv == 3) cost = level3UpgradeCost;
-        else if (lv == 4) cost = level4UpgradeCost;
-        else revert("E18");
-        IToken t = IToken(tokenContract);
-        require(t.balanceOf(msg.sender) >= cost, "E8");
-        require(t.transferFrom(msg.sender, BLACK_HOLE, cost), "E9");
-        return _upgradeLevel(tokenId, lv);
+        return NFTMintDelegator.upgradeWithTokenLogic(address(this), metadataContract, upgradeModule, tokenContract, tokenId, msg.sender, BLACK_HOLE);
     }
 
-    /**
-     * @dev 使用USD价值升级（通过价格预言机计算所需代币数量）
-     * 各级别所需USD价值：1->2需1USD, 2->3需4USD, 3->4需12USD, 4->5需48USD
-     * @param tokenId 要升级的NFT ID
-     * @return uint8 新等级
-     */
     function upgradeWithUSDValue(uint256 tokenId) external nonReentrant returns (uint8) {
-        require(_ownerOf(tokenId) == msg.sender, "E15");
-        require(tokenContract != address(0) && pancakeSwapPair != address(0), "E19");
-        INFTData m = INFTData(metadataContract);
-        uint8 lv = m.tokenLevel(tokenId);
-        require(lv < 5, "E16");
-        
-        uint256 usdValue;
-        if (lv == 1) usdValue = 1e18;      // 1 USD
-        else if (lv == 2) usdValue = 4e18; // 4 USD
-        else if (lv == 3) usdValue = 12e18; // 12 USD
-        else if (lv == 4) usdValue = 48e18; // 48 USD
-        else revert("E18");
-        
-        uint256 price = getTokenPriceFromPancakeSwap();
-        require(price > 0, "E20: Price oracle returned zero");
-        
-        if (lastPrice > 0) {
-            uint256 deviation;
-            if (price > lastPrice) {
-                deviation = ((price - lastPrice) * 10000) / lastPrice;
-            } else {
-                deviation = ((lastPrice - price) * 10000) / lastPrice;
-            }
-            require(deviation <= priceDeviationThreshold, "E23: Price deviation too high");
-        }
-        
-        lastPrice = price;
-        lastPriceUpdateTime = block.timestamp;
-        
-        uint256 cost = (usdValue * 1e18) / price;
-        require(cost > 0, "E21");
-        
-        IToken t = IToken(tokenContract);
-        require(t.balanceOf(msg.sender) >= cost, "E8");
-        require(t.transferFrom(msg.sender, BLACK_HOLE, cost), "E9");
-        return _upgradeLevel(tokenId, lv);
+        return NFTMintDelegator.upgradeWithUSDValueLogic(address(this), metadataContract, upgradeModule, tokenContract, priceOracle, tokenId, msg.sender, BLACK_HOLE);
     }
 
-    /**
-     * @dev 从PancakeSwap获取代币价格（USD）
-     * @return uint256 代币价格（精度18位，如1.5 USD = 1500000000000000000）
-     */
-    function getTokenPriceFromPancakeSwap() public view returns (uint256) {
-        require(pancakeSwapPair != address(0), "E24: PancakeSwap pair not set");
-        
-        IPancakeSwapPair pair = IPancakeSwapPair(pancakeSwapPair);
-        (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
-        require(reserve0 > 0 && reserve1 > 0, "E25: Insufficient liquidity");
-        
-        address token0 = pair.token0();
-        address token1 = pair.token1();
-        
-        uint8 decimals0 = 18;
-        uint8 decimals1 = 18;
-        
-        if (token0 == tokenContract) {
-            try IBEP20(token1).decimals() returns (uint8 d) {
-                decimals1 = d;
-            } catch {}
-            
-            uint256 price = (uint256(reserve1) * 10**18) / uint256(reserve0);
-            return adjustDecimals(price, 18, decimals1);
-        } else if (token1 == tokenContract) {
-            try IBEP20(token0).decimals() returns (uint8 d) {
-                decimals0 = d;
-            } catch {}
-            
-            uint256 price = (uint256(reserve0) * 10**18) / uint256(reserve1);
-            return adjustDecimals(price, decimals0, 18);
-        } else {
-            revert("E26: Token not found in pair");
-        }
-    }
-
-    /**
-     * @dev 调整小数位数
-     * @param value 原始值
-     * @param fromDecimals 原始小数位数
-     * @param toDecimals 目标小数位数
-     * @return uint256 调整后的值
-     */
-    function adjustDecimals(uint256 value, uint8 fromDecimals, uint8 toDecimals) internal pure returns (uint256) {
-        if (fromDecimals == toDecimals) {
-            return value;
-        } else if (fromDecimals < toDecimals) {
-            return value * 10**(toDecimals - fromDecimals);
-        } else {
-            return value / 10**(fromDecimals - toDecimals);
-        }
-    }
-
-    /**
-     * @dev 升级等级的内部函数
-     * @param id NFT ID
-     * @param oldLv 旧等级
-     * @return uint8 新等级
-     */
     function _upgradeLevel(uint id, uint8 oldLv) internal returns (uint8) {
-        INFTData m = INFTData(metadataContract);
-        NFTDataTypes.ZodiacType t = m.tokenType(id);
-        uint8 newLv = oldLv+1;
-        m.setTokenLevel(id, newLv);
-        // 更新权重缓存：先减少旧等级权重，再增加新等级权重
-        _updateUserWeight(msg.sender, id, oldLv, false);
-        _updateUserWeight(msg.sender, id, newLv, true);
-        emit CardUpgraded(id, t, oldLv, newLv, msg.sender, uint64(block.timestamp));
-        return newLv;
+        return NFTMintDelegator.upgradeLevel(address(this), metadataContract, id, oldLv, msg.sender);
     }
+
+    // ====================== Config Setters ======================
 
     /**
      * @dev 设置TokenBurner和RewardManager地址
-     * @param tb TokenBurner合约地址
-     * @param rm RewardManager合约地址
      */
     function setAddresses(address tb, address rm) external {
         require(msg.sender == owner() || msg.sender == authorizer, "E10");
-        tokenBurner = tb; rewardManager = rm;
+        tokenBurner = tb;
+        rewardManager = rm;
         IRewardManager(rm).setAuthorizedNFTContract(address(this), true);
     }
 
     /**
      * @dev 设置元数据合约地址
-     * @param a 元数据合约地址
      */
     function setMetadataContract(address a) external {
         require(msg.sender == owner() || msg.sender == authorizer, "E10");
@@ -636,7 +319,6 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
 
     /**
      * @dev 设置代币合约地址
-     * @param a 代币合约地址
      */
     function setTokenContract(address a) external {
         require(msg.sender == owner() || msg.sender == authorizer, "E10");
@@ -644,60 +326,14 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     }
 
     /**
-     * @dev 设置PancakeSwap流动性池地址
-     * @param pair PancakeSwap流动性池地址
-     */
-    function setPancakeSwapPair(address pair) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
-        require(pair != address(0), "E27: Zero address");
-        pancakeSwapPair = pair;
-    }
-
-    /**
-     * @dev 设置WBNB合约地址
-     * @param wbnb WBNB合约地址
-     */
-    function setWBNBAddress(address wbnb) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
-        wbnbAddress = wbnb;
-    }
-
-    /**
-     * @dev 设置稳定币合约地址
-     * @param stablecoin 稳定币合约地址
-     */
-    function setStablecoinAddress(address stablecoin) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
-        stablecoinAddress = stablecoin;
-    }
-
-    /**
-     * @dev 授权铸造者
-     * @param a 铸造者地址
-     */
-    function authorizeMinter(address a) external onlyOwner { authorizedMinter[a] = true; }
-
-    /**
-     * @dev 取消铸造者授权
-     * @param a 铸造者地址
-     */
-    function unauthorizedMinter(address a) external onlyOwner { authorizedMinter[a] = false; }
-
-    /**
-     * @dev 设置授权合约地址
-     * @param a 授权合约地址
-     */
-    function setAuthorizer(address a) external onlyOwner { authorizer = a; }
-
-    /**
      * @dev 设置繁殖合约地址
-     * @param a 繁殖合约地址
      */
-    function setBreedingContract(address a) external onlyOwner { breedingContract = a; }
+    function setBreedingContract(address a) external onlyOwner {
+        breedingContract = a;
+    }
 
     /**
-     * @dev 设置NFT升级合约地址
-     * @param a NFT升级合约地址
+     * @dev 设置NFT升级合约地址（旧版兼容）
      */
     function setNFTUpdateContract(address a) external {
         require(msg.sender == owner() || msg.sender == authorizer, "E10");
@@ -705,275 +341,140 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
     }
 
     /**
-     * @dev 设置价格过期时间（秒）
-     * @param seconds_ 过期时间
+     * @dev 授权/取消铸造者
      */
-    function setPriceExpirySeconds(uint256 seconds_) external onlyOwner {
-        require(seconds_ > 0, "NFTMint: expiry must be > 0");
-        priceExpirySeconds = seconds_;
+    function authorizeMinter(address a) external onlyOwner { authorizedMinter[a] = true; }
+    function unauthorizedMinter(address a) external onlyOwner { authorizedMinter[a] = false; }
+
+    /**
+     * @dev 设置授权合约地址
+     */
+    function setAuthorizer(address a) external onlyOwner { authorizer = a; }
+
+    // ---- 模块地址设置 ----
+
+    /**
+     * @dev 设置铸造模块合约地址
+     */
+    function setMintModule(address a) external onlyOwner {
+        require(a != address(0), "Zero address");
+        mintModule = a;
     }
 
     /**
-     * @dev 设置价格波动保护阈值（千分比，如5000表示50%）
-     * @param threshold 阈值
+     * @dev 设置升级模块合约地址
      */
-    function setPriceDeviationThreshold(uint256 threshold) external onlyOwner {
-        require(threshold <= 10000, "NFTMint: threshold <= 10000");
-        priceDeviationThreshold = threshold;
+    function setUpgradeModule(address a) external onlyOwner {
+        require(a != address(0), "Zero address");
+        upgradeModule = a;
     }
 
     /**
-     * @dev 重置价格缓存
+     * @dev 设置价格预言机合约地址
      */
-    function resetPriceCache() external onlyOwner {
-        lastPrice = 0;
-        lastPriceUpdateTime = 0;
+    function setPriceOracle(address a) external {
+        require(msg.sender == owner() || msg.sender == authorizer, "E10");
+        priceOracle = a;
     }
 
-    /**
-     * @dev 设置1级升级到2级的费用
-     * @param cost 升级费用（代币数量）
-     */
-    function setLevel1UpgradeCost(uint256 cost) external onlyOwner {
-        require(cost > 0, "NFTMint: cost must be > 0");
-        level1UpgradeCost = cost;
-    }
+    // ====================== Weight ======================
 
     /**
-     * @dev 设置2级升级到3级的费用
-     * @param cost 升级费用（代币数量）
+     * @dev 更新用户权重缓存
      */
-    function setLevel2UpgradeCost(uint256 cost) external onlyOwner {
-        require(cost > 0, "NFTMint: cost must be > 0");
-        level2UpgradeCost = cost;
-    }
-
-    /**
-     * @dev 设置3级升级到4级的费用
-     * @param cost 升级费用（代币数量）
-     */
-    function setLevel3UpgradeCost(uint256 cost) external onlyOwner {
-        require(cost > 0, "NFTMint: cost must be > 0");
-        level3UpgradeCost = cost;
-    }
-
-    /**
-     * @dev 设置4级升级到5级的费用
-     * @param cost 升级费用（代币数量）
-     */
-    function setLevel4UpgradeCost(uint256 cost) external onlyOwner {
-        require(cost > 0, "NFTMint: cost must be > 0");
-        level4UpgradeCost = cost;
-    }
-
-    /**
-     * @dev 获取用户拥有的指定类型NFT数量
-     * @param u 用户地址
-     * @param t NFT类型
-     * @return uint NFT数量
-     */
-    function getCardCount(address u, NFTDataTypes.ZodiacType t) external view returns (uint) {
-        return IRewardManager(rewardManager).cardCount(u, t);
+    function _updateUserWeight(address user, uint256 tokenId, uint8 level, bool add) internal {
+        NFTMintDelegator.updateUserWeight(metadataContract, user, tokenId, level, add);
     }
 
     /**
      * @dev 计算用户权重（用于分红计算）
-     * 权重规则：1阶=1, 2阶=2, 3阶=4, 4阶=12, 5阶=48
-     * 使用缓存机制减少Gas消耗
-     * @param user 用户地址
-     * @return uint256 用户权重
      */
     function calcUserWeight(address user) external view returns (uint256) {
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         return m.userWeightCache(user);
     }
 
-    function _getLevelWeight(uint8 level) internal pure returns (uint256) {
-        if (level == 1) return 1;
-        if (level == 2) return 2;
-        if (level == 3) return 4;
-        if (level == 4) return 12;
-        if (level == 5) return 48;
-        return 0;
+    // ====================== Query ======================
+
+    function tokenType(uint256 tokenId) external view override returns (NFTDataTypes.ZodiacType) {
+        INFTDataInterface m = INFTDataInterface(metadataContract);
+        return m.tokenType(tokenId);
     }
 
-    /**
-     * @dev 更新用户权重缓存（内部函数）
-     * @param user 用户地址
-     * @param tokenId NFT ID
-     * @param level NFT等级
-     * @param add 是否增加权重（true增加，false减少）
-     */
-    function _updateUserWeight(address user, uint256 tokenId, uint8 level, bool add) internal {
-        INFTData m = INFTData(metadataContract);
-        NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
-        NFTDataTypes.ElementType element = t.getElement();
-        m.updateUserWeight(user, level, add, element);
+    function tokenLevel(uint256 tokenId) external view override returns (uint8) {
+        INFTDataInterface m = INFTDataInterface(metadataContract);
+        return m.tokenLevel(tokenId);
     }
 
-    /**
-     * @dev 获取总供应量
-     * @return uint256 总NFT数量
-     */
+    function tokenGrowthValue(uint256 tokenId) external view returns (uint256) {
+        INFTDataInterface m = INFTDataInterface(metadataContract);
+        return m.tokenGrowthValue(tokenId);
+    }
+
+    function getCardCount(address u, NFTDataTypes.ZodiacType t) external view returns (uint) {
+        return IRewardManager(rewardManager).cardCount(u, t);
+    }
+
     function totalSupply() external view returns (uint256) {
         return nextCardId - 1;
     }
 
-    /**
-     * @dev 获取用户持有的NFT列表（按索引）
-     * @param owner 持有者地址
-     * @param index 索引
-     * @return uint256 NFT ID
-     */
     function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256) {
-        INFTData m = INFTData(metadataContract);
-        uint256[] memory arr = m.userAllTokens(owner);
-        require(index < arr.length, "NFTMint: index out of bounds");
-        return arr[index];
+        return NFTQueryLib.tokenOfOwnerByIndex(metadataContract, owner, index);
     }
 
-    /**
-     * @dev 获取用户持有的NFT总数
-     * @param owner 持有者地址
-     * @return uint256 NFT数量
-     */
     function balanceOf(address owner) public view override returns (uint256) {
-        INFTData m = INFTData(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataContract);
         return m.userAllTokens(owner).length;
     }
 
-    /**
-     * @dev 获取NFT成长值
-     * @param tokenId NFT ID
-     * @return uint256 成长值(10-100)
-     */
-    function tokenGrowthValue(uint256 tokenId) external view returns (uint256) {
-        INFTData m = INFTData(metadataContract);
-        return m.tokenGrowthValue(tokenId);
-    }
+    // ====================== Pagination (delegates to NFTQueryLib) ======================
 
-    /**
-     * @dev 分页获取用户持有的NFT列表
-     * @param owner 持有者地址
-     * @param page 页码（从0开始）
-     * @param pageSize 每页大小
-     * @return uint256[] NFT ID列表
-     * @return bool 是否还有更多
-     */
     function getTokensByPage(address owner, uint256 page, uint256 pageSize) external view returns (uint256[] memory, bool) {
-        INFTData m = INFTData(metadataContract);
-        uint256[] memory arr = m.userAllTokens(owner);
-        uint256 total = arr.length;
-        uint256 start = page * pageSize;
-        
-        if (start >= total) {
-            return (new uint256[](0), false);
-        }
-        
-        uint256 end = start + pageSize;
-        if (end > total) {
-            end = total;
-        }
-        
-        uint256 count = end - start;
-        uint256[] memory result = new uint256[](count);
-        
-        for (uint256 i = 0; i < count; i++) {
-            result[i] = arr[start + i];
-        }
-        
-        return (result, end < total);
+        return NFTQueryLib.getTokensByPage(metadataContract, owner, page, pageSize);
     }
 
-    /**
-     * @dev 分页获取用户持有的NFT详情列表
-     * @param owner 持有者地址
-     * @param page 页码（从0开始）
-     * @param pageSize 每页大小
-     * @return uint256[] NFT ID列表
-     * @return NFTDataTypes.ZodiacType[] NFT类型列表
-     * @return uint8[] NFT等级列表
-     * @return bool 是否还有更多
-     */
     function getTokenDetailsByPage(address owner, uint256 page, uint256 pageSize) external view returns (
-        uint256[] memory, 
-        NFTDataTypes.ZodiacType[] memory, 
+        uint256[] memory,
+        NFTDataTypes.ZodiacType[] memory,
         uint8[] memory,
         bool
     ) {
-        INFTData m = INFTData(metadataContract);
-        uint256[] memory arr = m.userAllTokens(owner);
-        uint256 total = arr.length;
-        uint256 start = page * pageSize;
-        
-        if (start >= total) {
-            return (new uint256[](0), new NFTDataTypes.ZodiacType[](0), new uint8[](0), false);
-        }
-        
-        uint256 end = start + pageSize;
-        if (end > total) {
-            end = total;
-        }
-        
-        uint256 count = end - start;
-        uint256[] memory tokenIds = new uint256[](count);
-        NFTDataTypes.ZodiacType[] memory types = new NFTDataTypes.ZodiacType[](count);
-        uint8[] memory levels = new uint8[](count);
-        
-        for (uint256 i = 0; i < count; i++) {
-            uint256 tokenId = arr[start + i];
-            tokenIds[i] = tokenId;
-            types[i] = m.tokenType(tokenId);
-            levels[i] = m.tokenLevel(tokenId);
-        }
-        
-        return (tokenIds, types, levels, end < total);
+        return NFTQueryLib.getTokenDetailsByPage(metadataContract, owner, page, pageSize);
+    }
+
+    // ====================== ERC721 Delegator Callback Wrappers ======================
+
+    /**
+     * @dev 供 NFTMintDelegator 库回调 _safeMint（ERC721Upgradeable internal）
+     */
+    function delegator_safeMint(address to, uint256 tokenId) external {
+        require(msg.sender == address(this), "!self");
+        _safeMint(to, tokenId);
     }
 
     /**
-     * @dev 铸造事件
-     * @param cardId NFT ID
-     * @param cardType NFT类型
-     * @param owner 持有者地址
-     * @param timestamp 时间戳
+     * @dev 供 NFTMintDelegator 库回调 _safeTransfer（ERC721Upgradeable internal）
      */
+    function delegator_safeTransfer(address from, address to, uint256 tokenId) external {
+        require(msg.sender == address(this), "!self");
+        _safeTransfer(from, to, tokenId, "");
+    }
+
+    /**
+     * @dev 供 NFTMintDelegator 库回调 _ownerOf（ERC721Upgradeable internal）
+     */
+    function delegator_ownerOf(uint256 tokenId) external view returns (address) {
+        require(msg.sender == address(this), "!self");
+        return _ownerOf(tokenId);
+    }
+
+    // ====================== Events ======================
+
     event CardMinted(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, address indexed owner, uint64 timestamp);
-
-    /**
-     * @dev 销毁事件
-     * @param cardId NFT ID
-     * @param cardType NFT类型
-     * @param owner 持有者地址
-     */
     event CardBurned(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, address indexed owner);
-
-
-    /**
-     * @dev 升级事件
-     * @param cardId NFT ID
-     * @param cardType NFT类型
-     * @param oldLevel 旧等级
-     * @param newLevel 新等级
-     * @param owner 持有者地址
-     * @param timestamp 时间戳
-     */
     event CardUpgraded(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, address indexed owner, uint64 timestamp);
-
-    /**
-     * @dev 十连铸造事件
-     * @param tokenIds 新铸造的NFT ID数组
-     * @param owner 接收地址
-     * @param isNormal 是否普通铸造
-     * @param timestamp 时间戳
-     */
     event TenCardsMinted(uint256[] indexed tokenIds, address indexed owner, bool isNormal, uint64 timestamp);
-
-    /**
-     * @dev 指定铸造完成事件
-     * @param tokenIds 新铸造的NFT ID数组
-     * @param owner 接收地址
-     * @param baseZodiac 基础生肖类型
-     * @param timestamp 时间戳
-     */
     event TargetedMintCompleted(uint256[] indexed tokenIds, address indexed owner, NFTDataTypes.BaseZodiac indexed baseZodiac, uint64 timestamp);
+    event RewardUpdateFailed(address indexed user, NFTDataTypes.ZodiacType indexed zodiacType, uint256 count, bool add);
 }

@@ -68,7 +68,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      * @param isRare 是否稀有铸造
      * @return bool 是否成功
      */
-    function burnAndMint(address user, bool isRare) external returns (bool) {
+    function burnAndMint(address user, bool isRare) public returns (bool) {
         require(tokenContract != address(0), "TokenBurner: tokenContract not set");
         require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
         require(msg.sender == authorizedNFTContract || msg.sender == authorizer, "TokenBurner: Unauthorized caller");
@@ -216,20 +216,12 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
         authorizer = _authorizer;
     }
 
-    /**
-     * @dev 销毁代币用于普通铸造（已废弃，请使用 burnAndMint）
-     * @return bool 是否成功
-     * @deprecated 使用 burnAndMint(user, false) 替代
-     */
+    /// @notice 已废弃：销毁代币用于普通铸造，请使用 burnAndMint(user, false) 替代
     function burnTokenForMint() external returns (bool) {
         return burnAndMint(msg.sender, false);
     }
 
-    /**
-     * @dev 销毁代币用于稀有铸造（已废弃，请使用 burnAndMint）
-     * @return bool 是否成功
-     * @deprecated 使用 burnAndMint(user, true) 替代
-     */
+    /// @notice 已废弃：销毁代币用于稀有铸造，请使用 burnAndMint(user, true) 替代
     function burnTokenForRareMint() external returns (bool) {
         return burnAndMint(msg.sender, true);
     }

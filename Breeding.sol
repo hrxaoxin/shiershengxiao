@@ -33,6 +33,8 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
     address public nftContract;
     /** @dev 授权合约地址 */
     address public authorizer;
+    /** @dev 竞技场排名合约地址 */
+    address public arenaRankingContract;
 
     /**
      * @dev 繁殖订单结构体
@@ -63,7 +65,12 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
     }
 
     /** @dev 繁殖订单映射：orderId -> BreedingOrder */
-    mapping(uint256 => BreedingOrder) public breedingOrders;
+    mapping(uint256 => BreedingOrder) internal _breedingOrders;
+    
+    function breedingOrders(uint256 orderId) external view returns (address, address, uint256, uint256, uint256, bool, bool) {
+        BreedingOrder storage order = _breedingOrders[orderId];
+        return (order.owner1, order.owner2, order.tokenId1, order.tokenId2, order.startTime, order.completed, order.cancelled);
+    }
     /** @dev NFT到订单的映射：tokenId -> orderId（用于检查NFT是否正在繁殖）*/
     mapping(uint256 => uint256) public tokenToOrderId;
     /** @dev 用户繁殖订单列表：user -> orderId数组 */
@@ -143,7 +150,6 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
 
     /**
      * @dev 升级授权函数
-     * @param newImplementation 新实现合约地址
      */
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
@@ -182,7 +188,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         nft.safeTransferFrom(msg.sender, address(this), tokenId2);
 
         uint256 orderId = nextOrderId++;
-        breedingOrders[orderId] = BreedingOrder({
+        _breedingOrders[orderId] = BreedingOrder({
             owner1: msg.sender,
             owner2: msg.sender,
             tokenId1: tokenId1,
@@ -221,7 +227,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         nft.safeTransferFrom(msg.sender, address(this), tokenId);
 
         uint256 orderId = nextOrderId++;
-        breedingOrders[orderId] = BreedingOrder({
+        _breedingOrders[orderId] = BreedingOrder({
             owner1: msg.sender,
             owner2: address(0),
             tokenId1: tokenId,
@@ -247,7 +253,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
      * @param tokenId 用户提供的NFT ID
      */
     function joinBreeding(uint256 orderId, uint256 tokenId) external nonReentrant whenNotPaused {
-        BreedingOrder storage order = breedingOrders[orderId];
+        BreedingOrder storage order = _breedingOrders[orderId];
         require(order.owner1 != address(0), "Breeding: Order not found");
         require(order.owner2 == address(0), "Breeding: Order already has two participants");
         require(order.completed == false, "Breeding: Order already completed");
@@ -288,7 +294,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
      * @param orderId 订单ID
      */
     function completeSelfBreeding(uint256 orderId) external nonReentrant whenNotPaused {
-        BreedingOrder storage order = breedingOrders[orderId];
+        BreedingOrder storage order = _breedingOrders[orderId];
         require(order.owner1 == msg.sender, "Breeding: Not the owner");
         require(order.completed == false, "Breeding: Already completed");
         require(order.cancelled == false, "Breeding: Order cancelled");
@@ -327,7 +333,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
      * @param orderId 订单ID
      */
     function completeMarketBreeding(uint256 orderId) external nonReentrant whenNotPaused {
-        BreedingOrder storage order = breedingOrders[orderId];
+        BreedingOrder storage order = _breedingOrders[orderId];
         require(order.completed == false, "Breeding: Already completed");
         require(order.cancelled == false, "Breeding: Order cancelled");
         require(order.owner2 != address(0), "Breeding: Waiting for second participant");
@@ -385,7 +391,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
      * @param orderId 订单ID
      */
     function _cleanupBreedingOrder(uint256 orderId) internal {
-        BreedingOrder storage order = breedingOrders[orderId];
+        BreedingOrder storage order = _breedingOrders[orderId];
         
         // 清理 tokenToOrderId（如果还有残留）
         if (order.tokenId1 != 0 && tokenToOrderId[order.tokenId1] == orderId) {
@@ -402,7 +408,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         }
         
         // 重置订单数据
-        delete breedingOrders[orderId];
+        delete _breedingOrders[orderId];
     }
     
     /**
@@ -430,7 +436,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
      * @param orderId 订单ID
      */
     function cancelBreedingListing(uint256 orderId) external nonReentrant whenNotPaused {
-        BreedingOrder storage order = breedingOrders[orderId];
+        BreedingOrder storage order = _breedingOrders[orderId];
         require(order.owner1 == msg.sender, "Breeding: Not the owner");
         require(order.owner2 == address(0), "Breeding: Cannot cancel after joined");
         require(order.completed == false, "Breeding: Already completed");
@@ -452,7 +458,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
     function getMarketBreedingOrders() external view returns (uint256[] memory) {
         uint256 count = 0;
         for (uint256 i = 1; i < nextOrderId; i++) {
-            BreedingOrder storage order = breedingOrders[i];
+            BreedingOrder storage order = _breedingOrders[i];
             if (order.owner1 != address(0) && order.owner2 == address(0) && !order.completed && !order.cancelled) {
                 count++;
             }
@@ -461,7 +467,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         uint256[] memory result = new uint256[](count);
         uint256 index = 0;
         for (uint256 i = 1; i < nextOrderId; i++) {
-            BreedingOrder storage order = breedingOrders[i];
+            BreedingOrder storage order = _breedingOrders[i];
             if (order.owner1 != address(0) && order.owner2 == address(0) && !order.completed && !order.cancelled) {
                 result[index++] = i;
             }
@@ -530,7 +536,10 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
      * @dev 设置竞技场排名合约地址
      * @param _arenaRankingContract 竞技场排名合约地址
      */
-    
+    function setArenaRankingContract(address _arenaRankingContract) external onlyOwner {
+        require(_arenaRankingContract != address(0), "Breeding: Zero address");
+        arenaRankingContract = _arenaRankingContract;
+    }
 
     /**
      * @dev 设置授权合约地址

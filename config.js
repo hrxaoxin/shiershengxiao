@@ -94,6 +94,9 @@ window.ZODIAC_CONFIG = (function() {
     const CONTRACT_ADDRESSES = {
         tokenContract: getEnvContractAddress('token', '0x1234567890abcdef1234567890abcdef12345678'),
         rewardManager: getEnvContractAddress('rewardManager', '0xabcdef1234567890abcdef1234567890abcdef12'),
+        dividendManager: getEnvContractAddress('dividendManager', '0xabcdef1234567890abcdef1234567890abcdef22'),
+        weightManager: getEnvContractAddress('weightManager', '0xabcdef1234567890abcdef1234567890abcdef23'),
+        poolManager: getEnvContractAddress('poolManager', '0xabcdef1234567890abcdef1234567890abcdef24'),
         tokenBurner: getEnvContractAddress('tokenBurner', '0xabcdef1234567890abcdef1234567890abcdef13'),
         nftMint: getEnvContractAddress('nftMint', '0xabcdef1234567890abcdef1234567890abcdef14'),
         nftUpdate: getEnvContractAddress('nftUpdate', '0xabcdef1234567890abcdef1234567890abcdef15'),
