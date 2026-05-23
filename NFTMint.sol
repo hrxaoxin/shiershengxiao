@@ -443,6 +443,28 @@ contract NFTMint is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         return NFTQueryLib.getTokenDetailsByPage(metadataContract, owner, page, pageSize);
     }
 
+    // ====================== ERC721 Overrides ======================
+
+    function ownerOf(uint256 tokenId) public view override(ERC721Upgradeable, INFTMint) returns (address) {
+        return super.ownerOf(tokenId);
+    }
+
+    function safeTransferFrom(address from, address to, uint256 tokenId) public override(ERC721Upgradeable, INFTMint) {
+        super.safeTransferFrom(from, to, tokenId);
+    }
+
+    function transferFrom(address from, address to, uint256 tokenId) public override(ERC721Upgradeable, INFTMint) {
+        super.transferFrom(from, to, tokenId);
+    }
+
+    function isApprovedForAll(address owner, address operator) public view override(ERC721Upgradeable, INFTMint) returns (bool) {
+        return super.isApprovedForAll(owner, operator);
+    }
+
+    function getApproved(uint256 tokenId) public view override(ERC721Upgradeable, INFTMint) returns (address) {
+        return super.getApproved(tokenId);
+    }
+
     // ====================== ERC721 Delegator Callback Wrappers ======================
 
     /**

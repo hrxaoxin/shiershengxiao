@@ -226,6 +226,29 @@ interface INFTMint {
      * @param tokenId NFT ID
      */
     function safeTransferFrom(address from, address to, uint256 tokenId) external;
+
+    /**
+     * @dev 转账NFT（ERC721标准）
+     * @param from 转出地址
+     * @param to 转入地址
+     * @param tokenId NFT ID
+     */
+    function transferFrom(address from, address to, uint256 tokenId) external;
+
+    /**
+     * @dev 查询批量授权状态（ERC721标准）
+     * @param owner 所有者地址
+     * @param operator 操作者地址
+     * @return approved 是否授权
+     */
+    function isApprovedForAll(address owner, address operator) external view returns (bool);
+
+    /**
+     * @dev 查询NFT授权地址（ERC721标准）
+     * @param tokenId NFT ID
+     * @return operator 被授权的地址
+     */
+    function getApproved(uint256 tokenId) external view returns (address);
     
     /**
      * @dev 普通铸造
