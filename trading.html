@@ -502,12 +502,12 @@
                 return supportsPaginatedAPI;
             }
             try {
-                await nftTradingContract.methods.getPaginatedListings(0, 1).call();
+                await nftTradingContract.methods.getListedNFTs().call();
                 supportsPaginatedAPI = true;
-                console.log('合约支持分页API');
+                console.log('合约支持 getListedNFTs API');
             } catch (e) {
                 supportsPaginatedAPI = false;
-                console.log('合约不支持分页API，使用 getAllListings');
+                console.log('合约不支持 getListedNFTs API');
             }
             return supportsPaginatedAPI;
         }
@@ -535,41 +535,34 @@
                 const listings = [];
                 
                 if (hasPaginated) {
-                    console.log('使用分页API加载市场数据');
+                    console.log('使用 getListedNFTs 加载市场数据');
                     try {
-                        const offset = (currentPage - 1) * PAGE_SIZE;
-                        const [tokenIdArray, sellerArray, priceArray, activeArray, total] = 
-                            await nftTradingContract.methods.getPaginatedListings(offset, PAGE_SIZE).call();
+                        const listedTokenIds = await nftTradingContract.methods.getListedNFTs().call();
                         
-                        totalPages = Math.ceil(parseInt(total) / PAGE_SIZE);
-                        const activeIndices = [];
+                        const batchSize = 20;
+                        const startIdx = (currentPage - 1) * PAGE_SIZE;
+                        const endIdx = Math.min(startIdx + PAGE_SIZE, listedTokenIds.length);
                         
-                        for (let i = 0; i < activeArray.length; i++) {
-                            if (activeArray[i]) {
-                                activeIndices.push(i);
+                        for (let i = startIdx; i < endIdx; i++) {
+                            const tokenId = parseInt(listedTokenIds[i]);
+                            try {
+                                const [seller, priceWei, listTime] = await nftTradingContract.methods.getListingInfo(tokenId).call();
+                                const type = await nftMintContract.methods.tokenType(tokenId).call();
+                                const level = await nftMintContract.methods.tokenLevel(tokenId).call();
+                                listings.push({
+                                    tokenId: tokenId,
+                                    price: web3.utils.fromWei(priceWei, 'ether'),
+                                    priceWei: priceWei,
+                                    seller: seller,
+                                    type: type,
+                                    level: parseInt(level)
+                                });
+                            } catch (e) {
+                                console.warn(`获取NFT ${tokenId} 详情失败:`, e);
                             }
                         }
                         
-                        const typePromises = activeIndices.map(idx => 
-                            nftMintContract.methods.tokenType(tokenIdArray[idx]).call()
-                        );
-                        const levelPromises = activeIndices.map(idx => 
-                            nftMintContract.methods.tokenLevel(tokenIdArray[idx]).call()
-                        );
-                        const types = await Promise.all(typePromises);
-                        const levels = await Promise.all(levelPromises);
-                        
-                        for (let i = 0; i < activeIndices.length; i++) {
-                            const idx = activeIndices[i];
-                            listings.push({
-                                tokenId: parseInt(tokenIdArray[idx]),
-                                price: web3.utils.fromWei(priceArray[idx], 'ether'),
-                                priceWei: priceArray[idx],
-                                seller: sellerArray[idx],
-                                type: types[i],
-                                level: parseInt(levels[i])
-                            });
-                        }
+                        totalPages = Math.ceil(listedTokenIds.length / PAGE_SIZE);
                         
                         allListings = listings;
                         updatePagination();
@@ -583,38 +576,31 @@
                     }
                 }
                 
-                console.log('使用 getAllListings 加载市场数据');
+                console.log('使用 getListedNFTs 加载市场数据');
                 try {
-                    const [tokenIdArray, sellerArray, priceArray, activeArray] = await nftTradingContract.methods.getAllListings().call();
-                    const activeIndices = [];
-                    for (let i = 0; i < activeArray.length; i++) {
-                        if (activeArray[i]) {
-                            activeIndices.push(i);
+                    const listedTokenIds = await nftTradingContract.methods.getListedNFTs().call();
+                    
+                    for (let i = 0; i < listedTokenIds.length; i++) {
+                        const tokenId = parseInt(listedTokenIds[i]);
+                        try {
+                            const listingInfo = await nftTradingContract.methods.getListingInfo(tokenId).call();
+                            const [seller, priceWei, listTime] = listingInfo;
+                            const type = await nftMintContract.methods.tokenType(tokenId).call();
+                            const level = await nftMintContract.methods.tokenLevel(tokenId).call();
+                            listings.push({
+                                tokenId: tokenId,
+                                price: web3.utils.fromWei(priceWei, 'ether'),
+                                priceWei: priceWei,
+                                seller: seller,
+                                type: type,
+                                level: parseInt(level)
+                            });
+                        } catch (e) {
+                            console.warn(`获取NFT ${tokenId} 详情失败:`, e);
                         }
                     }
-                    
-                    const typePromises = activeIndices.map(idx => 
-                        nftMintContract.methods.tokenType(tokenIdArray[idx]).call()
-                    );
-                    const levelPromises = activeIndices.map(idx => 
-                        nftMintContract.methods.tokenLevel(tokenIdArray[idx]).call()
-                    );
-                    const types = await Promise.all(typePromises);
-                    const levels = await Promise.all(levelPromises);
-                    
-                    for (let i = 0; i < activeIndices.length; i++) {
-                        const idx = activeIndices[i];
-                        listings.push({
-                            tokenId: parseInt(tokenIdArray[idx]),
-                            price: web3.utils.fromWei(priceArray[idx], 'ether'),
-                            priceWei: priceArray[idx],
-                            seller: sellerArray[idx],
-                            type: types[i],
-                            level: parseInt(levels[i])
-                        });
-                    }
                 } catch (contractError) {
-                    console.log('使用备用方案加载市场数据');
+                    console.log('getListedNFTs 调用失败，尝试备用方案', contractError);
                     let totalSupply = 100;
                     try {
                         totalSupply = await nftMintContract.methods.totalSupply().call();
@@ -632,7 +618,7 @@
                         for (let tokenId = startId; tokenId <= endId; tokenId++) {
                             promises.push((async (id) => {
                                 try {
-                                    const [seller, price, active] = await nftTradingContract.methods.getListing(id).call();
+                                    const [seller, price, active] = await nftTradingContract.methods.getListingInfo(id).call();
                                     if (active) {
                                         const type = await nftMintContract.methods.tokenType(id).call();
                                         const level = await nftMintContract.methods.tokenLevel(id).call();
@@ -857,7 +843,8 @@
                     return false;
                 }
                 
-                const [seller, price, active] = await nftTradingContract.methods.getListing(tokenId).call();
+                const [seller, priceWei, listTime] = await nftTradingContract.methods.getListingInfo(tokenId).call();
+                const active = seller !== '0x0000000000000000000000000000000000000000';
                 if (active) {
                     ZODIAC_UI.showToast('此NFT已上架', 'warning');
                     return false;
@@ -966,16 +953,16 @@
                 }
                 
                 const listings = [];
-                const listedTokenIds = await nftTradingContract.methods.getSellerListings(account).call();
+                const allListedTokenIds = await nftTradingContract.methods.getListedNFTs().call();
                 
-                for (const tokenId of listedTokenIds) {
-                    const [seller, price, active] = await nftTradingContract.methods.getListing(tokenId).call();
-                    if (active) {
+                for (const tokenId of allListedTokenIds) {
+                    const [seller, priceWei, listTime] = await nftTradingContract.methods.getListingInfo(tokenId).call();
+                    if (seller.toLowerCase() === account.toLowerCase()) {
                         const type = await nftMintContract.methods.tokenType(tokenId).call();
                         const level = await nftMintContract.methods.tokenLevel(tokenId).call();
                         listings.push({
                             tokenId: parseInt(tokenId),
-                            price: web3.utils.fromWei(price, 'ether'),
+                            price: web3.utils.fromWei(priceWei, 'ether'),
                             type: type,
                             level: parseInt(level)
                         });
@@ -1022,8 +1009,8 @@
             if (!confirm) return;
 
             try {
-                const gas = await ZODIAC_WEB3.estimateGas(nftTradingContract, 'cancelListing', [tokenId], account);
-                await nftTradingContract.methods.cancelListing(tokenId).send({
+                const gas = await ZODIAC_WEB3.estimateGas(nftTradingContract, 'delistNFT', [tokenId], account);
+                await nftTradingContract.methods.delistNFT(tokenId).send({
                     from: account,
                     gas: gas
                 });
@@ -1056,43 +1043,30 @@
             try {
                 const nfts = [];
                 const pageSize = 20;
-                let hasMore = true;
-                let page = 0;
-
-                while (hasMore) {
+                
+                const balance = parseInt(await nftMintContract.methods.balanceOf(account).call());
+                const startIdx = 0;
+                const endIdx = Math.min(balance, pageSize);
+                
+                for (let i = startIdx; i < endIdx; i++) {
                     try {
-                        const [tokenIds, hasMoreTokens] = await nftMintContract.methods.getTokenDetailsByPage(account, page, pageSize).call();
-
-                        if (tokenIds.length === 0) {
-                            hasMore = false;
-                            break;
+                        const tokenId = parseInt(await nftMintContract.methods.tokenOfOwnerByIndex(account, i).call());
+                        
+                        const [seller, priceWei, listTime] = await nftTradingContract.methods.getListingInfo(tokenId).call();
+                        const isActive = seller !== '0x0000000000000000000000000000000000000000';
+                        if (!isActive) {
+                            const nftType = await nftMintContract.methods.tokenType(tokenId).call();
+                            const nftLevel = await nftMintContract.methods.tokenLevel(tokenId).call();
+                            nfts.push({
+                                tokenId: tokenId,
+                                type: parseInt(nftType),
+                                level: parseInt(nftLevel)
+                            });
                         }
-
-                        const listingPromises = tokenIds.map(async (tokenId, idx) => {
-                            try {
-                                const [seller, price, active] = await nftTradingContract.methods.getListing(tokenId).call();
-                                if (!active) {
-                                    // 获取 NFT 类型和等级
-                                    const nftType = await nftMintContract.methods.tokenType(tokenId).call();
-                                    const nftLevel = await nftMintContract.methods.tokenLevel(tokenId).call();
-                                    return {
-                                        tokenId: parseInt(tokenId),
-                                        type: parseInt(nftType),
-                                        level: parseInt(nftLevel)
-                                    };
-                                }
-                            } catch (e) {}
-                            return null;
-                        });
-
-                        const batchResults = await Promise.all(listingPromises);
-                        nfts.push(...batchResults.filter(Boolean));
-
-                        hasMore = hasMoreTokens;
-                        page++;
-                    } catch (error) {
-                        console.error('加载NFT失败:', error);
-                        break;
+                    } catch (e) {
+                        console.warn(`获取NFT详情失败:`, e);
+                    }
+                }
                     }
                 }
 

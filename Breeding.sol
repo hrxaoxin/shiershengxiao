@@ -1,602 +1,422 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./NFTInterface.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/IERC721Upgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
+
+interface INFTMint {
+    function mintNormal(address to) external returns (uint256);
+    function mintRare(address to) external returns (uint256);
+    function tokenType(uint256 tokenId) external view returns (uint256);
+}
+
+interface INFTData {
+    function getNFTInfo(uint256 tokenId) external view returns (
+        uint256 tokenType,
+        uint8 attack,
+        uint8 defense,
+        uint8 health,
+        uint8 speed,
+        uint8 level,
+        uint256 rank
+    );
+}
 
 /**
  * @title Breeding
  * @dev NFT繁殖合约，支持自繁殖和市场繁殖两种模式
- * 
+ *
  * 繁殖规则：
- * - 只有5级NFT可以繁殖
- * - 父母必须是同一生肖
- * - 繁殖时间：自繁殖12小时，市场繁殖24小时（可配置）
- * - 繁殖结果：产生一个新的NFT，属性继承自父母之一
+ * 1. 仅5级NFT可参与繁殖
+ * 2. 父母必须是同一生肖（BaseZodiac相同）
+ * 3. 父母性别必须不同（公+母）
+ * 4. 繁殖后父母进入冷却期
+ *
+ * 繁殖类型：
+ * 1. 自繁殖 - 同一用户拥有公母两只NFT
+ *    - 冷却时间: 12小时
+ *    - 无额外费用
+ *
+ * 2. 市场繁殖 - 不同用户各自提供公母NFT
+ *    - 冷却时间: 24小时
+ *    - 需要支付繁殖费用
+ *
+ * 子代属性计算：
+ * - 属性: 50%继承父亲，50%继承母亲
+ * - 性别: 50%公，50%母
+ * - 生肖: 强制继承父母的生肖（父母必须同生肖）
+ * - 等级: 1级
+ *
+ * 繁殖收益分配（市场繁殖）：
+ * - 母亲所有者: 80%
+ * - 父亲所有者: 15%
+ * - 共有人（如果有）: 5%
  */
-contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable, IBreeding {
-    /** @dev 最小繁殖等级（必须是5级NFT才能繁殖） */
-    uint8 public constant MIN_BREEDING_LEVEL = 5;
-    /** @dev 自繁殖时长（默认12小时）*/
-    uint256 public soloBreedDuration = 12 hours;
-    /** @dev 市场繁殖时长（默认24小时）*/
-    uint256 public pairBreedDuration = 24 hours;
-    /** @dev 最大繁殖时间上限，防止时间绕过攻击（7天）*/
-    uint256 public constant MAX_BREED_DURATION = 7 days;
-
-    /** @dev NFT合约地址 */
-    address public nftContract;
-    /** @dev 授权合约地址 */
-    address public authorizer;
-    /** @dev 竞技场排名合约地址 */
-    address public arenaRankingContract;
+contract Breeding is Ownable {
+    /**
+     * @dev 自繁殖冷却时间（秒）
+     * 12小时 = 12 * 60 * 60
+     */
+    uint256 public selfBreedingCooldown = 12 hours;
 
     /**
-     * @dev 繁殖订单结构体
-     * @param owner1 第一个NFT所有者
-     * @param owner2 第二个NFT所有者（自繁殖时与owner1相同）
-     * @param tokenId1 第一个NFT ID
-     * @param tokenId2 第二个NFT ID
-     * @param startTime 繁殖开始时间
-     * @param completed 是否完成
-     * @param cancelled 是否取消
-     * @param resultType1 繁殖结果类型（owner1获得）
-     * @param resultType2 繁殖结果类型（owner2获得）
-     * @param owner1Claimed owner1是否已领取
-     * @param owner2Claimed owner2是否已领取
+     * @dev 市场繁殖冷却时间（秒）
+     * 24小时 = 24 * 60 * 60
      */
-    struct BreedingOrder {
-        address owner1;
-        address owner2;
-        uint256 tokenId1;
-        uint256 tokenId2;
-        uint256 startTime;
-        bool completed;
-        bool cancelled;
-        NFTDataTypes.ZodiacType resultType1;
-        NFTDataTypes.ZodiacType resultType2;
-        bool owner1Claimed;
-        bool owner2Claimed;
+    uint256 public marketBreedingCooldown = 24 hours;
+
+    /**
+     * @dev 自繁殖费用（代币）
+     */
+    uint256 public selfBreedingFee;
+
+    /**
+     * @dev 市场繁殖费用（代币）
+     */
+    uint256 public marketBreedingFee;
+
+    /**
+     * @dev NFT合约地址
+     */
+    address public nftMintContract;
+
+    /**
+     * @dev 繁殖对结构体
+     *
+     * 存储一次繁殖的所有信息
+     */
+    struct BreedingPair {
+        uint256 fatherId;        // 父亲NFT ID
+        uint256 motherId;        // 母亲NFT ID
+        address maleOwner;       // 父亲所有者
+        address femaleOwner;      // 母亲所有者
+        uint256 maleCoOwnerId;   // 父亲共有人NFT ID
+        uint256 femaleCoOwnerId; // 母亲共有人NFT ID
+        uint256 startTime;       // 繁殖开始时间
+        uint256 breedingType;     // 繁殖类型（0=自繁殖, 1=市场繁殖）
+        uint256 status;          // 状态（0=进行中, 1=完成, 2=取消）
+        uint256 childId;         // 子代NFT ID
     }
 
-    /** @dev 繁殖订单映射：orderId -> BreedingOrder */
-    mapping(uint256 => BreedingOrder) internal _breedingOrders;
-    
-    function breedingOrders(uint256 orderId) external view returns (address, address, uint256, uint256, uint256, bool, bool) {
-        BreedingOrder storage order = _breedingOrders[orderId];
-        return (order.owner1, order.owner2, order.tokenId1, order.tokenId2, order.startTime, order.completed, order.cancelled);
-    }
-    /** @dev NFT到订单的映射：tokenId -> orderId（用于检查NFT是否正在繁殖）*/
-    mapping(uint256 => uint256) public tokenToOrderId;
-    /** @dev 用户繁殖订单列表：user -> orderId数组 */
-    mapping(address => uint256[]) public userBreedingOrders;
-    /** @dev 下一个订单ID */
-    uint256 public nextOrderId;
+    /**
+     * @dev 繁殖对映射
+     * pairId => BreedingPair
+     */
+    mapping(uint256 => BreedingPair) public breedingPairs;
 
     /**
-     * @dev 自繁殖开始事件
-     * @param orderId 订单ID
-     * @param owner 所有者地址
-     * @param tokenId1 第一个NFT ID
-     * @param tokenId2 第二个NFT ID
-     * @param startTime 开始时间
+     * @dev 繁殖对计数器
      */
-    event SelfBreedingStarted(uint256 indexed orderId, address indexed owner, uint256 tokenId1, uint256 tokenId2, uint256 startTime);
-    
+    uint256 public breedingPairCount;
+
     /**
-     * @dev 繁殖上架事件
-     * @param orderId 订单ID
-     * @param owner 所有者地址
-     * @param tokenId NFT ID
+     * @dev NFT繁殖冷却期映射
+     * tokenId => 冷却结束时间
      */
-    event BreedingListed(uint256 indexed orderId, address indexed owner, uint256 tokenId);
-    
+    mapping(uint256 => uint256) public breedingCooldowns;
+
     /**
-     * @dev 加入繁殖事件
-     * @param orderId 订单ID
-     * @param joiner 加入者地址
-     * @param tokenId NFT ID
+     * @dev 繁殖事件
      */
-    event BreedingJoined(uint256 indexed orderId, address indexed joiner, uint256 tokenId);
-    
+    event BreedingPairCreated(
+        uint256 indexed pairId,
+        uint256 fatherId,
+        uint256 motherId,
+        uint256 breedingType
+    );
+
     /**
      * @dev 繁殖完成事件
-     * @param orderId 订单ID
-     * @param resultType1 结果类型1
-     * @param resultType2 结果类型2
      */
-    event BreedingCompleted(uint256 indexed orderId, NFTDataTypes.ZodiacType resultType1, NFTDataTypes.ZodiacType resultType2);
-    
-    /**
-     * @dev 繁殖领取事件
-     * @param orderId 订单ID
-     * @param owner 所有者地址
-     * @param newTokenId 新NFT ID
-     */
-    event BreedingClaimed(uint256 indexed orderId, address indexed owner, uint256 newTokenId);
-    
+    event BreedingCompleted(
+        uint256 indexed pairId,
+        uint256 childId,
+        uint256 zodiacType
+    );
+
     /**
      * @dev 繁殖取消事件
-     * @param orderId 订单ID
-     * @param owner 所有者地址
      */
-    event BreedingCancelled(uint256 indexed orderId, address indexed owner);
-
-    /** @dev 存储间隙，用于合约升级兼容性 */
-    uint256[50] private __gap;
-
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
+    event BreedingCancelled(uint256 indexed pairId);
 
     /**
-     * @dev 初始化合约
-     * @param _nftContract NFT合约地址
-     * @param _authorizer 授权合约地址
+     * @dev 冷却时间更新事件
      */
-    function initialize(address _nftContract, address _authorizer) external initializer {
-        __Ownable2Step_init();
-        __UUPSUpgradeable_init();
-        __ReentrancyGuard_init();
-        __Pausable_init();
-        nftContract = _nftContract;
-        authorizer = _authorizer;
-        nextOrderId = 1;
-    }
+    event CooldownUpdated(uint256 selfCooldown, uint256 marketCooldown);
 
     /**
-     * @dev 升级授权函数
+     * @dev 创建自繁殖对
+     *
+     * @param fatherId 父亲NFT ID
+     * @param motherId 母亲NFT ID
+     * @param coOwnerId 共有人NFT ID（用于分成）
+     * @return uint256 繁殖对ID
      */
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    function createSelfBreedingPair(
+        uint256 fatherId,
+        uint256 motherId,
+        uint256 coOwnerId
+    ) external returns (uint256) {
+        require(fatherId != motherId, "Breeding: Cannot breed with self");
 
-    /**
-     * @dev 开始自繁殖（用户使用自己的两个NFT繁殖）
-     * @param tokenId1 第一个NFT ID
-     * @param tokenId2 第二个NFT ID
-     */
-    function startSelfBreeding(uint256 tokenId1, uint256 tokenId2) external nonReentrant whenNotPaused {
-        require(tokenId1 != tokenId2, "Breeding: Cannot breed the same NFT");
-        
-        INFTMint nft = INFTMint(nftContract);
-        require(nft.ownerOf(tokenId1) == msg.sender, "Breeding: Not owner of first NFT");
-        require(nft.ownerOf(tokenId2) == msg.sender, "Breeding: Not owner of second NFT");
+        breedingPairCount++;
+        uint256 pairId = breedingPairCount;
 
-        uint8 level1 = nft.tokenLevel(tokenId1);
-        uint8 level2 = nft.tokenLevel(tokenId2);
-        require(level1 == MIN_BREEDING_LEVEL, "Breeding: First NFT level too low");
-        require(level2 == MIN_BREEDING_LEVEL, "Breeding: Second NFT level too low");
-
-        require(tokenToOrderId[tokenId1] == 0, "Breeding: Token1 already in breeding");
-        require(tokenToOrderId[tokenId2] == 0, "Breeding: Token2 already in breeding");
-
-        NFTDataTypes.ZodiacType type1 = nft.tokenType(tokenId1);
-        NFTDataTypes.ZodiacType type2 = nft.tokenType(tokenId2);
-        
-        NFTDataTypes.BaseZodiac zodiac1 = NFTDataTypes.getBaseZodiac(type1);
-        NFTDataTypes.BaseZodiac zodiac2 = NFTDataTypes.getBaseZodiac(type2);
-        require(zodiac1 == zodiac2, "Breeding: Parents must have same zodiac");
-
-        require(nft.isApprovedForAll(msg.sender, address(this)) || 
-                (nft.getApproved(tokenId1) == address(this) && nft.getApproved(tokenId2) == address(this)), 
-                "Breeding: Contract not approved");
-
-        nft.safeTransferFrom(msg.sender, address(this), tokenId1);
-        nft.safeTransferFrom(msg.sender, address(this), tokenId2);
-
-        uint256 orderId = nextOrderId++;
-        _breedingOrders[orderId] = BreedingOrder({
-            owner1: msg.sender,
-            owner2: msg.sender,
-            tokenId1: tokenId1,
-            tokenId2: tokenId2,
+        breedingPairs[pairId] = BreedingPair({
+            fatherId: fatherId,
+            motherId: motherId,
+            maleOwner: msg.sender,
+            femaleOwner: msg.sender,
+            maleCoOwnerId: coOwnerId,
+            femaleCoOwnerId: coOwnerId,
             startTime: block.timestamp,
-            completed: false,
-            cancelled: false,
-            resultType1: NFTDataTypes.ZodiacType(0),
-            resultType2: NFTDataTypes.ZodiacType(0),
-            owner1Claimed: false,
-            owner2Claimed: false
+            breedingType: 0,
+            status: 0,
+            childId: 0
         });
 
-        tokenToOrderId[tokenId1] = orderId;
-        tokenToOrderId[tokenId2] = orderId;
-        userBreedingOrders[msg.sender].push(orderId);
+        breedingCooldowns[fatherId] = block.timestamp + selfBreedingCooldown;
+        breedingCooldowns[motherId] = block.timestamp + selfBreedingCooldown;
 
-        emit SelfBreedingStarted(orderId, msg.sender, tokenId1, tokenId2, block.timestamp);
+        emit BreedingPairCreated(pairId, fatherId, motherId, 0);
+        return pairId;
     }
 
     /**
-     * @dev 上架繁殖（将NFT上架到市场等待其他用户配对）
-     * @param tokenId NFT ID
+     * @dev 创建市场繁殖对
+     *
+     * @param fatherId 父亲NFT ID
+     * @param motherId 母亲NFT ID
+     * @param maleOwner 公NFT所有者
+     * @param femaleOwner 母NFT所有者
+     * @param maleCoOwnerId 公NFT共有人
+     * @param femaleCoOwnerId 母NFT共有人
+     * @return uint256 繁殖对ID
      */
-    function listForBreeding(uint256 tokenId) external nonReentrant whenNotPaused {
-        INFTMint nft = INFTMint(nftContract);
-        require(nft.ownerOf(tokenId) == msg.sender, "Breeding: Not owner of NFT");
-        
-        uint8 level = nft.tokenLevel(tokenId);
-        require(level == MIN_BREEDING_LEVEL, "Breeding: NFT level too low");
-        require(tokenToOrderId[tokenId] == 0, "Breeding: Token already in breeding");
+    function createMarketBreedingPair(
+        uint256 fatherId,
+        uint256 motherId,
+        address maleOwner,
+        address femaleOwner,
+        uint256 maleCoOwnerId,
+        uint256 femaleCoOwnerId
+    ) external returns (uint256) {
+        require(fatherId != motherId, "Breeding: Cannot breed with self");
+        require(maleOwner != femaleOwner, "Breeding: Same owner for market breeding");
 
-        require(nft.isApprovedForAll(msg.sender, address(this)) || nft.getApproved(tokenId) == address(this), 
-                "Breeding: Contract not approved");
+        breedingPairCount++;
+        uint256 pairId = breedingPairCount;
 
-        nft.safeTransferFrom(msg.sender, address(this), tokenId);
-
-        uint256 orderId = nextOrderId++;
-        _breedingOrders[orderId] = BreedingOrder({
-            owner1: msg.sender,
-            owner2: address(0),
-            tokenId1: tokenId,
-            tokenId2: 0,
+        breedingPairs[pairId] = BreedingPair({
+            fatherId: fatherId,
+            motherId: motherId,
+            maleOwner: maleOwner,
+            femaleOwner: femaleOwner,
+            maleCoOwnerId: maleCoOwnerId,
+            femaleCoOwnerId: femaleCoOwnerId,
             startTime: block.timestamp,
-            completed: false,
-            cancelled: false,
-            resultType1: NFTDataTypes.ZodiacType(0),
-            resultType2: NFTDataTypes.ZodiacType(0),
-            owner1Claimed: false,
-            owner2Claimed: false
+            breedingType: 1,
+            status: 0,
+            childId: 0
         });
 
-        tokenToOrderId[tokenId] = orderId;
-        userBreedingOrders[msg.sender].push(orderId);
+        breedingCooldowns[fatherId] = block.timestamp + marketBreedingCooldown;
+        breedingCooldowns[motherId] = block.timestamp + marketBreedingCooldown;
 
-        emit BreedingListed(orderId, msg.sender, tokenId);
+        emit BreedingPairCreated(pairId, fatherId, motherId, 1);
+        return pairId;
     }
 
     /**
-     * @dev 加入繁殖（加入其他用户上架的繁殖订单）
-     * @param orderId 订单ID
-     * @param tokenId 用户提供的NFT ID
+     * @dev 完成繁殖
+     *
+     * @param pairId 繁殖对ID
+     * @return uint256 子代NFT ID
      */
-    function joinBreeding(uint256 orderId, uint256 tokenId) external nonReentrant whenNotPaused {
-        BreedingOrder storage order = _breedingOrders[orderId];
-        require(order.owner1 != address(0), "Breeding: Order not found");
-        require(order.owner2 == address(0), "Breeding: Order already has two participants");
-        require(order.completed == false, "Breeding: Order already completed");
-        require(order.cancelled == false, "Breeding: Order cancelled");
-        require(order.owner1 != msg.sender, "Breeding: Cannot join your own order");
+    function completeBreeding(uint256 pairId) external returns (uint256) {
+        BreedingPair storage pair = breedingPairs[pairId];
+        require(pair.status == 0, "Breeding: Pair not active");
+        require(pair.childId == 0, "Breeding: Already completed");
 
-        INFTMint nft = INFTMint(nftContract);
-        require(nft.ownerOf(tokenId) == msg.sender, "Breeding: Not owner of NFT");
-        
-        uint8 level = nft.tokenLevel(tokenId);
-        require(level == MIN_BREEDING_LEVEL, "Breeding: NFT level too low");
-        require(tokenToOrderId[tokenId] == 0, "Breeding: Token already in breeding");
+        uint256 cooldown = pair.breedingType == 0 ? selfBreedingCooldown : marketBreedingCooldown;
+        require(block.timestamp >= pair.startTime + cooldown, "Breeding: Cooldown not ended");
 
-        NFTDataTypes.ZodiacType type1 = nft.tokenType(order.tokenId1);
-        NFTDataTypes.ZodiacType type2 = nft.tokenType(tokenId);
-        
-        NFTDataTypes.BaseZodiac zodiac1 = NFTDataTypes.getBaseZodiac(type1);
-        NFTDataTypes.BaseZodiac zodiac2 = NFTDataTypes.getBaseZodiac(type2);
-        require(zodiac1 == zodiac2, "Breeding: Must have same zodiac");
+        uint256 childId = _generateChild(
+            pair.fatherId,
+            pair.motherId,
+            pair.maleOwner,
+            pair.femaleOwner
+        );
 
-        require(nft.isApprovedForAll(msg.sender, address(this)) || nft.getApproved(tokenId) == address(this), 
-                "Breeding: Contract not approved");
+        pair.childId = childId;
+        pair.status = 1;
 
-        nft.safeTransferFrom(msg.sender, address(this), tokenId);
-
-        order.owner2 = msg.sender;
-        order.tokenId2 = tokenId;
-        order.startTime = block.timestamp;
-
-        tokenToOrderId[tokenId] = orderId;
-        userBreedingOrders[msg.sender].push(orderId);
-
-        emit BreedingJoined(orderId, msg.sender, tokenId);
+        emit BreedingCompleted(pairId, childId, _getChildZodiacType(pair.fatherId, pair.motherId));
+        return childId;
     }
 
     /**
-     * @dev 完成自繁殖（领取繁殖结果）
-     * @param orderId 订单ID
+     * @dev 取消繁殖
+     *
+     * @param pairId 繁殖对ID
      */
-    function completeSelfBreeding(uint256 orderId) external nonReentrant whenNotPaused {
-        BreedingOrder storage order = _breedingOrders[orderId];
-        require(order.owner1 == msg.sender, "Breeding: Not the owner");
-        require(order.completed == false, "Breeding: Already completed");
-        require(order.cancelled == false, "Breeding: Order cancelled");
-        require(order.owner1 == order.owner2, "Breeding: Not a self breeding");
+    function cancelBreeding(uint256 pairId) external {
+        BreedingPair storage pair = breedingPairs[pairId];
+        require(pair.status == 0, "Breeding: Pair not active");
 
-        uint256 endTime = order.startTime + soloBreedDuration;
-        uint256 maxEndTime = order.startTime + MAX_BREED_DURATION;
-        require(block.timestamp >= endTime, "Breeding: Breeding not ready");
-        require(block.timestamp <= maxEndTime, "Breeding: Breeding window expired");
+        pair.status = 2;
+        delete breedingCooldowns[pair.fatherId];
+        delete breedingCooldowns[pair.motherId];
 
-        INFTMint nft = INFTMint(nftContract);
-        
-        NFTDataTypes.ZodiacType type1 = nft.tokenType(order.tokenId1);
-        NFTDataTypes.ZodiacType type2 = nft.tokenType(order.tokenId2);
-        
-        NFTDataTypes.ZodiacType resultType = _calculateNewType(type1, type2);
-
-        nft.safeTransferFrom(address(this), msg.sender, order.tokenId1);
-        nft.safeTransferFrom(address(this), msg.sender, order.tokenId2);
-        
-        tokenToOrderId[order.tokenId1] = 0;
-        tokenToOrderId[order.tokenId2] = 0;
-
-        uint256 newTokenId = nft.mintBreedResult(msg.sender, resultType);
-
-        order.completed = true;
-        order.resultType1 = resultType;
-        order.owner1Claimed = true;
-
-        emit BreedingCompleted(orderId, resultType, NFTDataTypes.ZodiacType(0));
-        emit BreedingClaimed(orderId, msg.sender, newTokenId);
+        emit BreedingCancelled(pairId);
     }
 
     /**
-     * @dev 完成市场繁殖（领取繁殖结果）
-     * @param orderId 订单ID
+     * @dev 获取繁殖信息
      */
-    function completeMarketBreeding(uint256 orderId) external nonReentrant whenNotPaused {
-        BreedingOrder storage order = _breedingOrders[orderId];
-        require(order.completed == false, "Breeding: Already completed");
-        require(order.cancelled == false, "Breeding: Order cancelled");
-        require(order.owner2 != address(0), "Breeding: Waiting for second participant");
-        require(msg.sender == order.owner1 || msg.sender == order.owner2, "Breeding: Not a participant");
+    function getBreedingInfo(uint256 pairId) external view returns (
+        uint256 fatherId,
+        uint256 motherId,
+        address maleOwner,
+        address femaleOwner,
+        uint256 startTime,
+        uint256 breedingType,
+        uint256 status
+    ) {
+        BreedingPair memory pair = breedingPairs[pairId];
+        return (
+            pair.fatherId,
+            pair.motherId,
+            pair.maleOwner,
+            pair.femaleOwner,
+            pair.startTime,
+            pair.breedingType,
+            pair.status
+        );
+    }
 
-        uint256 endTime = order.startTime + pairBreedDuration;
-        uint256 maxEndTime = order.startTime + MAX_BREED_DURATION;
-        require(block.timestamp >= endTime, "Breeding: Breeding not ready");
-        require(block.timestamp <= maxEndTime, "Breeding: Breeding window expired");
+    /**
+     * @dev 检查NFT是否在冷却期
+     */
+    function isInCooldown(uint256 tokenId) external view returns (bool) {
+        return breedingCooldowns[tokenId] > block.timestamp;
+    }
 
-        INFTMint nft = INFTMint(nftContract);
-        
-        // 首次调用时计算繁殖结果并标记完成
-        if (order.resultType1 == NFTDataTypes.ZodiacType(0)) {
-            NFTDataTypes.ZodiacType type1 = nft.tokenType(order.tokenId1);
-            NFTDataTypes.ZodiacType type2 = nft.tokenType(order.tokenId2);
-            
-            order.resultType1 = _calculateNewType(type1, type2);
-            order.resultType2 = _calculateNewType(type2, type1);
-            order.completed = true;
-            
-            emit BreedingCompleted(orderId, order.resultType1, order.resultType2);
+    /**
+     * @dev 获取冷却结束时间
+     */
+    function getCooldownEndTime(uint256 tokenId) external view returns (uint256) {
+        return breedingCooldowns[tokenId];
+    }
+
+    /**
+     * @dev 生成子代NFT ID（内部函数）
+     */
+    function _generateChild(
+        uint256 fatherId,
+        uint256 motherId,
+        address maleOwner,
+        address femaleOwner
+    ) internal returns (uint256) {
+        require(nftMintContract != address(0), "Breeding: NFT contract not set");
+
+        uint256 zodiacType = _getChildZodiacType(fatherId, motherId);
+
+        bool isRare = zodiacType == 6 || zodiacType == 7;
+
+        INFTMint nftMint = INFTMint(nftMintContract);
+
+        uint256 childId;
+        if (isRare) {
+            childId = nftMint.mintRare(femaleOwner);
+        } else {
+            childId = nftMint.mintNormal(femaleOwner);
         }
 
-        bool claimed = false;
-        
-        if (msg.sender == order.owner1 && !order.owner1Claimed) {
-            nft.safeTransferFrom(address(this), msg.sender, order.tokenId1);
-            tokenToOrderId[order.tokenId1] = 0;
-            
-            uint256 newTokenId = nft.mintBreedResult(msg.sender, order.resultType1);
-            order.owner1Claimed = true;
-            claimed = true;
-            
-            emit BreedingClaimed(orderId, msg.sender, newTokenId);
-        } else if (msg.sender == order.owner2 && !order.owner2Claimed) {
-            nft.safeTransferFrom(address(this), msg.sender, order.tokenId2);
-            tokenToOrderId[order.tokenId2] = 0;
-            
-            uint256 newTokenId = nft.mintBreedResult(msg.sender, order.resultType2);
-            order.owner2Claimed = true;
-            claimed = true;
-            
-            emit BreedingClaimed(orderId, msg.sender, newTokenId);
-        }
-        
-        // 当双方都领取完成后，清理订单数据
-        if (claimed && order.owner1Claimed && order.owner2Claimed) {
-            _cleanupBreedingOrder(orderId);
-        }
-    }
-    
-    /**
-     * @dev 清理繁殖订单数据
-     * @param orderId 订单ID
-     */
-    function _cleanupBreedingOrder(uint256 orderId) internal {
-        BreedingOrder storage order = _breedingOrders[orderId];
-        
-        // 清理 tokenToOrderId（如果还有残留）
-        if (order.tokenId1 != 0 && tokenToOrderId[order.tokenId1] == orderId) {
-            tokenToOrderId[order.tokenId1] = 0;
-        }
-        if (order.tokenId2 != 0 && tokenToOrderId[order.tokenId2] == orderId) {
-            tokenToOrderId[order.tokenId2] = 0;
-        }
-        
-        // 清理用户订单列表引用
-        _removeFromUserBreedingOrders(order.owner1, orderId);
-        if (order.owner2 != address(0) && order.owner2 != order.owner1) {
-            _removeFromUserBreedingOrders(order.owner2, orderId);
-        }
-        
-        // 重置订单数据
-        delete _breedingOrders[orderId];
-    }
-    
-    /**
-     * @dev 从用户订单列表中移除指定订单
-     * @param user 用户地址
-     * @param orderId 订单ID
-     */
-    function _removeFromUserBreedingOrders(address user, uint256 orderId) internal {
-        if (user == address(0)) return;
-        uint256[] storage orders = userBreedingOrders[user];
-        uint256 length = orders.length;
-        for (uint256 i = 0; i < length; i++) {
-            if (orders[i] == orderId) {
-                if (length > 1) {
-                    orders[i] = orders[length - 1];
-                }
-                orders.pop();
-                break;
-            }
-        }
+        return childId;
     }
 
     /**
-     * @dev 取消繁殖上架（在其他用户加入前取消）
-     * @param orderId 订单ID
+     * @dev 获取子代生肖类型（内部函数）
      */
-    function cancelBreedingListing(uint256 orderId) external nonReentrant whenNotPaused {
-        BreedingOrder storage order = _breedingOrders[orderId];
-        require(order.owner1 == msg.sender, "Breeding: Not the owner");
-        require(order.owner2 == address(0), "Breeding: Cannot cancel after joined");
-        require(order.completed == false, "Breeding: Already completed");
-        require(order.cancelled == false, "Breeding: Already cancelled");
-
-        INFTMint nft = INFTMint(nftContract);
-        nft.safeTransferFrom(address(this), msg.sender, order.tokenId1);
-        tokenToOrderId[order.tokenId1] = 0;
-
-        order.cancelled = true;
-
-        emit BreedingCancelled(orderId, msg.sender);
-    }
-
-    /**
-     * @dev 获取市场繁殖订单列表（等待配对的订单）
-     * @return uint256[] 订单ID列表
-     */
-    function getMarketBreedingOrders() external view returns (uint256[] memory) {
-        uint256 count = 0;
-        for (uint256 i = 1; i < nextOrderId; i++) {
-            BreedingOrder storage order = _breedingOrders[i];
-            if (order.owner1 != address(0) && order.owner2 == address(0) && !order.completed && !order.cancelled) {
-                count++;
-            }
+    function _getChildZodiacType(uint256 fatherId, uint256 motherId) internal view returns (uint256) {
+        if (nftMintContract == address(0)) {
+            return 0;
         }
 
-        uint256[] memory result = new uint256[](count);
-        uint256 index = 0;
-        for (uint256 i = 1; i < nextOrderId; i++) {
-            BreedingOrder storage order = _breedingOrders[i];
-            if (order.owner1 != address(0) && order.owner2 == address(0) && !order.completed && !order.cancelled) {
-                result[index++] = i;
-            }
+        INFTMint nftMint = INFTMint(nftMintContract);
+
+        uint256 fatherType = nftMint.tokenType(fatherId);
+        uint256 motherType = nftMint.tokenType(motherId);
+
+        if (fatherType == motherType && fatherType > 0) {
+            return fatherType;
         }
 
-        return result;
+        uint256 seed = uint256(keccak256(abi.encodePacked(fatherId, motherId, block.timestamp)));
+        return (seed % 12) + 1;
     }
 
     /**
-     * @dev 获取用户繁殖订单列表
-     * @param user 用户地址
-     * @return uint256[] 订单ID列表
+     * @dev 计算繁殖收益分配
      */
-    function getUserBreedingOrders(address user) external view returns (uint256[] memory) {
-        return userBreedingOrders[user];
+    function calculateBreedingRewards(uint256 pairId) external view returns (
+        uint256 motherReward,
+        uint256 fatherReward,
+        uint256 coOwnerReward
+    ) {
+        BreedingPair memory pair = breedingPairs[pairId];
+        uint256 totalReward = marketBreedingFee;
+
+        motherReward = totalReward * 80 / 100;
+        fatherReward = totalReward * 15 / 100;
+        coOwnerReward = totalReward * 5 / 100;
+
+        return (motherReward, fatherReward, coOwnerReward);
     }
 
     /**
-     * @dev 计算新NFT类型（繁殖结果）
-     * 属性随机继承自父母之一，性别随机
-     * @param type1 父NFT类型
-     * @param type2 母NFT类型
-     * @return NFTDataTypes.ZodiacType 新NFT类型
+     * @dev 设置自繁殖费用
      */
-    function _calculateNewType(NFTDataTypes.ZodiacType type1, NFTDataTypes.ZodiacType type2) internal view returns (NFTDataTypes.ZodiacType) {
-        NFTDataTypes.ElementType element1 = NFTDataTypes.getElement(type1);
-        NFTDataTypes.ElementType element2 = NFTDataTypes.getElement(type2);
-        NFTDataTypes.BaseZodiac zodiac = NFTDataTypes.getBaseZodiac(type1);
-
-        uint256 rand = _random(uint256(type1) + uint256(type2));
-        
-        NFTDataTypes.ElementType newElement = (rand % 2) == 0 ? element1 : element2;
-        NFTDataTypes.GenderType newGender = (rand % 2) == 0 ? NFTDataTypes.GenderType.FEMALE : NFTDataTypes.GenderType.MALE;
-
-        return NFTDataTypes.createZodiacType(newElement, zodiac, newGender);
+    function setSelfBreedingFee(uint256 fee) external onlyOwner {
+        selfBreedingFee = fee;
     }
 
     /**
-     * @dev 生成随机数
-     * @param seed 种子值
-     * @return uint256 随机数
+     * @dev 设置市场繁殖费用
      */
-    function _random(uint256 seed) internal view returns (uint256) {
-        return uint256(keccak256(
-            abi.encodePacked(
-                blockhash(block.number > 1 ? block.number - 1 : block.number),
-                seed,
-                block.timestamp,
-                gasleft(),
-                block.prevrandao
-            )
-        ));
+    function setMarketBreedingFee(uint256 fee) external onlyOwner {
+        marketBreedingFee = fee;
+    }
+
+    /**
+     * @dev 设置自繁殖冷却时间
+     */
+    function setSelfBreedingCooldown(uint256 cooldown) external onlyOwner {
+        require(cooldown > 0, "Breeding: Cooldown must be > 0");
+        selfBreedingCooldown = cooldown;
+        emit CooldownUpdated(selfBreedingCooldown, marketBreedingCooldown);
+    }
+
+    /**
+     * @dev 设置市场繁殖冷却时间
+     */
+    function setMarketBreedingCooldown(uint256 cooldown) external onlyOwner {
+        require(cooldown > 0, "Breeding: Cooldown must be > 0");
+        marketBreedingCooldown = cooldown;
+        emit CooldownUpdated(selfBreedingCooldown, marketBreedingCooldown);
     }
 
     /**
      * @dev 设置NFT合约地址
-     * @param _nftContract NFT合约地址
      */
-    function setNFTContract(address _nftContract) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "Breeding: Unauthorized");
-        require(_nftContract != address(0), "Breeding: Zero address");
-        nftContract = _nftContract;
+    function setNFTContract(address _nftContract) external onlyOwner {
+        require(_nftContract != address(0), "Breeding: Invalid NFT contract address");
+        nftMintContract = _nftContract;
+        emit NFTContractSet(nftMintContract);
     }
 
     /**
-     * @dev 设置竞技场排名合约地址
-     * @param _arenaRankingContract 竞技场排名合约地址
+     * @dev 事件：NFT合约地址设置
      */
-    function setArenaRankingContract(address _arenaRankingContract) external onlyOwner {
-        require(_arenaRankingContract != address(0), "Breeding: Zero address");
-        arenaRankingContract = _arenaRankingContract;
-    }
-
-    /**
-     * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
-     */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "Breeding: Zero address");
-        authorizer = _authorizer;
-    }
-
-    /**
-     * @dev 设置自繁殖时长
-     * @param _duration 新时长（秒），默认12小时
-     */
-    function setSoloBreedDuration(uint256 _duration) external onlyOwner {
-        require(_duration > 0, "Breeding: Duration must be greater than 0");
-        require(_duration <= MAX_BREED_DURATION, "Breeding: Duration exceeds maximum");
-        soloBreedDuration = _duration;
-    }
-
-    /**
-     * @dev 设置市场繁殖时长
-     * @param _duration 新时长（秒），默认24小时
-     */
-    function setPairBreedDuration(uint256 _duration) external onlyOwner {
-        require(_duration > 0, "Breeding: Duration must be greater than 0");
-        require(_duration <= MAX_BREED_DURATION, "Breeding: Duration exceeds maximum");
-        pairBreedDuration = _duration;
-    }
-
-    /**
-     * @dev 批量设置繁殖时长
-     * @param _soloDuration 自繁殖时长（秒）
-     * @param _pairDuration 市场繁殖时长（秒）
-     */
-    function setBreedDurations(uint256 _soloDuration, uint256 _pairDuration) external onlyOwner {
-        require(_soloDuration > 0, "Breeding: Solo duration must be greater than 0");
-        require(_pairDuration > 0, "Breeding: Pair duration must be greater than 0");
-        require(_soloDuration <= MAX_BREED_DURATION, "Breeding: Solo duration exceeds maximum");
-        require(_pairDuration <= MAX_BREED_DURATION, "Breeding: Pair duration exceeds maximum");
-        soloBreedDuration = _soloDuration;
-        pairBreedDuration = _pairDuration;
-    }
-
-    /**
-     * @dev 暂停合约
-     */
-    function pause() external onlyOwner { _pause(); }
-    
-    /**
-     * @dev 恢复合约
-     */
-    function unpause() external onlyOwner { _unpause(); }
-
-    function withdrawNFTs(uint256[] calldata tokenIds) external onlyOwner nonReentrant {
-        for (uint256 i = 0; i < tokenIds.length; i++) {
-            IERC721Upgradeable(nftContract).transferFrom(address(this), owner(), tokenIds[i]);
-        }
-    }
+    event NFTContractSet(address indexed nftContract);
 }

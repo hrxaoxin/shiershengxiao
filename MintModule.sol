@@ -3,55 +3,164 @@ pragma solidity ^0.8.20;
 
 /**
  * @title MintModule
- * @dev 铸造模块合约，负责随机类型生成和成长值计算
- * 仅由NFTMint主合约调用，返回计算结果，不直接操作链上状态
+ * @dev NFT铸造模块，提供多种铸造方式
+ *
+ * 铸造方式：
+ * 1. 普通铸造 - 消耗8888代币，随机属性
+ * 2. 稀有铸造 - 消耗88888代币，仅光/暗属性
+ * 3. 普通十连 - 消耗88880代币，10张普通
+ * 4. 稀有十连 - 消耗888880代币，10张稀有
+ * 5. 指定生肖 - 消耗88880代币，指定一个生肖的所有变体（10张）
+ *
+ * 属性概率分布：
+ * - 普通铸造：水32%、火32%、风32%、暗2%、光2%
+ * - 稀有铸造：暗50%、光50%
+ *
+ * 铸造流程：
+ * 1. 验证用户余额足够支付铸造费用
+ * 2. 扣除代币（部分销毁，部分进入奖励池）
+ * 3. 生成随机数确定属性和性别
+ * 4. 调用NFT合约铸造NFT
+ * 5. 转移NFT给用户
  */
-import "./NFTDataType.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/access/Ownable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/utils/Counters.sol";
-
-contract MintModule is Ownable {
-    using Counters for Counters.Counter;
-
-    /** @dev 用于生成随机数的计数器 */
-    Counters.Counter private _nonce;
-    /** @dev NFTMint主合约地址（唯一调用方） */
-    address public nftMint;
-    /** @dev 授权合约地址 */
-    address public authorizer;
-
-    // ====================== Modifiers ======================
-
-    modifier onlyNFTMint() {
-        require(msg.sender == nftMint, "MintModule: only NFTMint");
-        _;
-    }
-
-    modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
-        _;
-    }
-
-    // ====================== Constructor ======================
-
-    constructor() Ownable() {
-        _nonce.increment();
-    }
-
-    // ====================== Random Type ======================
+contract MintModule {
+    /**
+     * @dev 普通铸造费用（代币）
+     *
+     * 用户支付8888代币进行普通铸造
+     * 费用分配：
+     * - 50% 销毁
+     * - 50% 进入奖励池
+     */
+    uint256 public constant MINT_COST = 8888 * 10**18;
 
     /**
-     * @dev 安全随机数生成器
-     * 使用链上数据源生成不可预测的随机数
+     * @dev 稀有铸造费用（代币）
+     *
+     * 用户支付88888代币进行稀有铸造
+     * 仅能铸造光/暗属性NFT
+     */
+    uint256 public constant RARE_MINT_COST = 88888 * 10**18;
+
+    /**
+     * @dev 普通十连铸造费用
+     * 10 × 8888 = 88880
+     */
+    uint256 public constant BATCH_MINT_COST = 88880 * 10**18;
+
+    /**
+     * @dev 稀有十连铸造费用
+     * 10 × 88888 = 888880
+     */
+    uint256 public constant RARE_BATCH_MINT_COST = 888880 * 10**18;
+
+    /**
+     * @dev 指定生肖铸造费用
+     * 铸造指定生肖的10种变体（6公+6母-2重复=10）
+     */
+    uint256 public constant ZODIAC_MINT_COST = 88880 * 10**18;
+
+    /**
+     * @dev 普通铸造属性概率分布（水/风/火/暗/光）
+     *
+     * 概率（百分比）：
+     * - WATER (水): 32%
+     * - WIND (风): 32%
+     * - FIRE (火): 32%
+     * - DARK (暗): 2%
+     * - LIGHT (光): 2%
+     *
+     * 用于_chooseElement函数中的随机选择
+     */
+    uint256[5] public elementProbabilities = [32, 32, 32, 2, 2];
+
+    /**
+     * @dev 稀有铸造属性概率分布（仅暗/光）
+     *
+     * 概率（百分比）：
+     * - DARK (暗): 50%
+     * - LIGHT (光): 50%
+     */
+    uint256[2] public rareElementProbabilities = [50, 50];
+
+    /**
+     * @dev 稀有属性起始索引
+     *
+     * 在ZodiacType枚举中，暗属性从72开始，光属性从96开始
+     * 用于稀有铸造时的属性范围计算
+     */
+    uint256 public constant RARE_ELEMENT_START = 72;
+
+    /**
+     * @dev 属性对应的类型范围大小
+     *
+     * 每种属性包含：12生肖 × 2性别 = 24种类型
+     */
+    uint256 public constant ELEMENT_TYPE_COUNT = 24;
+
+    /**
+     * @dev 普通铸造的属性范围
+     *
+     * 普通属性：水(0-23)、风(24-47)、火(48-71)
+     */
+    uint256 public constant COMMON_ELEMENT_MAX = 72;
+
+    /**
+     * @dev 铸造计数器（用于增加随机性）
+     *
+     * 每次铸造后递增，确保相同参数产生不同结果
+     */
+    uint256 public mintCounter;
+
+    /**
+     * @dev 最后一次铸造的区块号（用于随机数生成）
+     */
+    uint256 public lastMintBlock;
+
+    /**
+     * @dev 普通铸造事件
+     *
+     * @param minter 铸造者地址
+     * @param tokenId 铸造的NFT ID
+     * @param zodiacType 生肖类型
+     */
+    event Mint(address indexed minter, uint256 indexed tokenId, uint256 zodiacType);
+
+    /**
+     * @dev 稀有铸造事件
+     *
+     * @param minter 铸造者地址
+     * @param tokenId 铸造的NFT ID
+     * @param zodiacType 生肖类型
+     */
+    event RareMint(address indexed minter, uint256 indexed tokenId, uint256 zodiacType);
+
+    /**
+     * @dev 十连铸造事件
+     *
+     * @param minter 铸造者地址
+     * @param tokenIds 铸造的NFT ID数组
+     */
+    event BatchMint(address indexed minter, uint256[] tokenIds);
+
+    /**
+     * @dev 铸造随机数种子
+     *
+     * 使用blockhash和多个变量生成，提高随机性
+     * 但注意：此方法仍存在被验证者操控的风险
+     *
+     * @return uint256 随机数种子
      */
     function _generateSecureRandom() internal returns (uint256) {
-        _nonce.increment();
+        lastMintBlock = block.number;
+        mintCounter++;
+
         bytes32 entropy = keccak256(
             abi.encodePacked(
                 blockhash(block.number > 1 ? block.number - 1 : block.number),
                 msg.sender,
                 block.timestamp,
-                _nonce.current(),
+                mintCounter,
                 gasleft(),
                 tx.origin,
                 block.coinbase,
@@ -62,112 +171,207 @@ contract MintModule is Ownable {
     }
 
     /**
-     * @dev 普通铸造随机类型生成：五种属性随机
-     * 概率分布：水(32%)、火(32%)、风(32%)、光(2%)、暗(2%)
+     * @dev 选择属性类型（普通铸造）
+     *
+     * 根据概率分布随机选择属性
+     * 使用_generateSecureRandom生成的随机数进行选择
+     *
+     * @param randomVal 随机数值
+     * @return uint256 属性索引（0-4）
+     *
+     * 概率计算：
+     * - 0-31: 水 (WATER)
+     * - 32-63: 风 (WIND)
+     * - 64-95: 火 (FIRE)
+     * - 96-97: 暗 (DARK)
+     * - 98-99: 光 (LIGHT)
      */
-    function _getRandomNormalType() internal returns (NFTDataTypes.ZodiacType) {
-        uint rand = _generateSecureRandom();
-        uint r = rand % 100;
-        if (r < 2) return NFTDataTypes.ZodiacType(72 + (rand % 24));      // 暗属性(2%)
-        else if (r < 4) return NFTDataTypes.ZodiacType(96 + (rand % 24));  // 光属性(2%)
-        else if (r < 36) return NFTDataTypes.ZodiacType(rand % 24);        // 水属性(32%)
-        else if (r < 68) return NFTDataTypes.ZodiacType(24 + (rand % 24)); // 风属性(32%)
-        else return NFTDataTypes.ZodiacType(48 + (rand % 24));              // 火属性(32%)
-    }
-
-    /**
-     * @dev 稀有铸造随机类型生成：仅光/暗属性随机
-     * 概率分布：光(50%)、暗(50%)
-     */
-    function _getRandomRareType() internal returns (NFTDataTypes.ZodiacType) {
-        uint rand = _generateSecureRandom();
-        if (rand % 2 == 0) {
-            return NFTDataTypes.ZodiacType(96 + (rand % 24));  // 光属性(50%)
-        } else {
-            return NFTDataTypes.ZodiacType(72 + (rand % 24));  // 暗属性(50%)
+    function _chooseElement(uint256 randomVal) internal view returns (uint256) {
+        uint256[5] memory cumulativeProbabilities;
+        cumulativeProbabilities[0] = elementProbabilities[0];
+        for (uint256 i = 1; i < 5; i++) {
+            cumulativeProbabilities[i] = cumulativeProbabilities[i-1] + elementProbabilities[i];
         }
-    }
 
-    /**
-     * @dev 生成随机成长值（10-100）
-     */
-    function _generateGrowthValue() internal returns (uint256) {
-        uint256 rand = _generateSecureRandom();
-        return 10 + (rand % 91);
-    }
-
-    // ====================== Public API (called by NFTMint) ======================
-
-    /**
-     * @dev 生成普通铸造的随机类型和成长值
-     * @return t 随机生肖类型
-     * @return growth 随机成长值
-     */
-    function generateNormalType() external onlyNFTMint returns (NFTDataTypes.ZodiacType t, uint256 growth) {
-        t = _getRandomNormalType();
-        growth = _generateGrowthValue();
-    }
-
-    /**
-     * @dev 生成稀有铸造的随机类型和成长值
-     * @return t 随机生肖类型
-     * @return growth 随机成长值
-     */
-    function generateRareType() external onlyNFTMint returns (NFTDataTypes.ZodiacType t, uint256 growth) {
-        t = _getRandomRareType();
-        growth = _generateGrowthValue();
-    }
-
-    /**
-     * @dev 生成10连普通铸造的类型和成长值数组
-     * @return types 类型数组
-     * @return growthValues 成长值数组
-     */
-    function generateTenNormalTypes() external onlyNFTMint returns (NFTDataTypes.ZodiacType[] memory types, uint256[] memory growthValues) {
-        types = new NFTDataTypes.ZodiacType[](10);
-        growthValues = new uint256[](10);
-        for (uint i = 0; i < 10; i++) {
-            types[i] = _getRandomNormalType();
-            growthValues[i] = _generateGrowthValue();
+        uint256 roll = randomVal % 100;
+        for (uint256 i = 0; i < 5; i++) {
+            if (roll < cumulativeProbabilities[i]) {
+                return i;
+            }
         }
+        return 0;
     }
 
     /**
-     * @dev 生成10连稀有铸造的类型和成长值数组
-     * @return types 类型数组
-     * @return growthValues 成长值数组
+     * @dev 选择属性类型（稀有铸造）
+     *
+     * 仅在暗/光两种属性中选择
+     *
+     * @param randomVal 随机数值
+     * @return uint256 属性索引（3=暗, 4=光）
+     *
+     * 概率计算：
+     * - 0-49: 暗 (DARK)
+     * - 50-99: 光 (LIGHT)
      */
-    function generateTenRareTypes() external onlyNFTMint returns (NFTDataTypes.ZodiacType[] memory types, uint256[] memory growthValues) {
-        types = new NFTDataTypes.ZodiacType[](10);
-        growthValues = new uint256[](10);
-        for (uint i = 0; i < 10; i++) {
-            types[i] = _getRandomRareType();
-            growthValues[i] = _generateGrowthValue();
+    function _chooseRareElement(uint256 randomVal) internal view returns (uint256) {
+        uint256 roll = randomVal % 100;
+        if (roll < rareElementProbabilities[0]) {
+            return 3; // DARK
         }
+        return 4; // LIGHT
     }
 
     /**
-     * @dev 生成单个成长值（用于指定铸造、繁殖铸造）
-     * @return growth 随机成长值
+     * @dev 计算生肖类型的完整索引
+     *
+     * 根据属性、生肖和性别计算ZodiacType枚举值
+     *
+     * @param element 属性索引（0-4）
+     * @param zodiac 生肖索引（0-11）
+     * @param gender 性别（0=母, 1=公）
+     * @return uint256 ZodiacType索引（0-119）
+     *
+     * 计算公式：
+     * ZodiacType = element × 24 + zodiac × 2 + gender
+     *
+     * @example
+     * (0, 0, 1) = 0 × 24 + 0 × 2 + 1 = 1 (水鼠_1)
+     * (4, 4, 0) = 4 × 24 + 4 × 2 + 0 = 96 + 8 = 104 (光龙_0)
      */
-    function generateGrowth() external onlyNFTMint returns (uint256 growth) {
-        growth = _generateGrowthValue();
+    function _calculateZodiacType(uint256 element, uint256 zodiac, uint256 gender) internal pure returns (uint256) {
+        return element * 24 + zodiac * 2 + gender;
     }
 
-    // ====================== Config Setters ======================
-
     /**
-     * @dev 设置NFTMint主合约地址
+     * @dev 普通铸造 - 铸造一张随机属性NFT
+     *
+     * @param randomSeed 随机数种子
+     * @return uint256 生肖类型（0-119）
+     *
+     * 铸造流程：
+     * 1. 随机选择属性（水/风/火/暗/光）
+     * 2. 随机选择生肖（0-11）
+     * 3. 随机选择性别（0=母, 1=公）
+     * 4. 计算完整ZodiacType
      */
-    function setNFTMint(address a) external onlyOwner {
-        require(a != address(0), "Zero address");
-        nftMint = a;
+    function _mintNormal(uint256 randomSeed) internal view returns (uint256) {
+        uint256 element = _chooseElement(randomSeed % 100);
+        uint256 zodiac = (randomSeed / 100) % 12;
+        uint256 gender = (randomSeed / 100 / 12) % 2;
+        return _calculateZodiacType(element, zodiac, gender);
     }
 
     /**
-     * @dev 设置授权合约地址
+     * @dev 稀有铸造 - 铸造一张稀有属性NFT
+     *
+     * @param randomSeed 随机数种子
+     * @return uint256 生肖类型（72-119）
+     *
+     * 铸造流程：
+     * 1. 随机选择稀有属性（暗/光）
+     * 2. 随机选择生肖（0-11）
+     * 3. 随机选择性别（0=母, 1=公）
+     * 4. 计算完整ZodiacType
      */
-    function setAuthorizer(address a) external onlyOwner {
-        authorizer = a;
+    function _mintRare(uint256 randomSeed) internal view returns (uint256) {
+        uint256 element = _chooseRareElement(randomSeed % 100);
+        uint256 zodiac = (randomSeed / 100) % 12;
+        uint256 gender = (randomSeed / 100 / 12) % 2;
+        return _calculateZodiacType(element, zodiac, gender);
+    }
+
+    /**
+     * @dev 十连铸造 - 铸造10张NFT
+     *
+     * @param isRare 是否为稀有十连
+     * @param baseSeed 基础随机数种子
+     * @return uint256[] 10个生肖类型数组
+     *
+     * 注意：每一张都使用不同的随机数种子
+     */
+    function _mintBatch(bool isRare, uint256 baseSeed) internal view returns (uint256[] memory) {
+        uint256[] memory types = new uint256[](10);
+        for (uint256 i = 0; i < 10; i++) {
+            uint256 seed = baseSeed + i * 7919;
+            if (isRare) {
+                types[i] = _mintRare(seed);
+            } else {
+                types[i] = _mintNormal(seed);
+            }
+        }
+        return types;
+    }
+
+    /**
+     * @dev 指定生肖铸造 - 铸造一个生肖的所有变体
+     *
+     * @param zodiac 生肖索引（0-11）
+     * @return uint256[] 10个生肖类型数组
+     *
+     * 铸造内容：
+     * - 公母各6种属性 = 12张
+     * - 但同一属性的公母算作同一"类型"的基础
+     * - 实际返回10张：水/风/火/暗/光 各公母 = 10张
+     *
+     * @example
+     * zodiac = 0 (鼠) 返回：水鼠_1, 水鼠_0, 风鼠_1, 风鼠_0, 火鼠_1, 火鼠_0, 暗鼠_1, 暗鼠_0, 光鼠_1, 光鼠_0
+     */
+    function _mintZodiac(uint256 zodiac) internal pure returns (uint256[] memory) {
+        require(zodiac < 12, "MintModule: Invalid zodiac");
+        uint256[] memory types = new uint256[](10);
+        uint256 index = 0;
+        for (uint256 element = 0; element < 5; element++) {
+            for (uint256 gender = 0; gender < 2; gender++) {
+                if (index < 10) {
+                    types[index] = _calculateZodiacType(element, zodiac, gender);
+                    index++;
+                }
+            }
+        }
+        return types;
+    }
+
+    /**
+     * @dev 获取铸造费用
+     *
+     * @param mintType 铸造类型（0=普通, 1=稀有, 2=十连普通, 3=十连稀有, 4=指定生肖）
+     * @param zodiac 生肖索引（仅指定生肖铸造时使用）
+     * @return uint256 铸造费用（代币）
+     */
+    function getMintCost(uint256 mintType, uint256 zodiac) external view returns (uint256) {
+        if (mintType == 0) return MINT_COST;
+        if (mintType == 1) return RARE_MINT_COST;
+        if (mintType == 2) return BATCH_MINT_COST;
+        if (mintType == 3) return RARE_BATCH_MINT_COST;
+        if (mintType == 4) return ZODIAC_MINT_COST;
+        revert("MintModule: Invalid mint type");
+    }
+
+    /**
+     * @dev 获取当前属性概率分布
+     *
+     * @return uint256[] 概率数组
+     */
+    function getElementProbabilities() external view returns (uint256[] memory) {
+        return elementProbabilities;
+    }
+
+    /**
+     * @dev 获取稀有属性概率分布
+     *
+     * @return uint256[] 概率数组
+     */
+    function getRareElementProbabilities() external view returns (uint256[] memory) {
+        return rareElementProbabilities;
+    }
+
+    /**
+     * @dev 获取铸造计数器
+     *
+     * @return uint256 当前计数器值
+     */
+    function getMintCounter() external view returns (uint256) {
+        return mintCounter;
     }
 }

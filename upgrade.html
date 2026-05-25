@@ -271,8 +271,6 @@
         let web3;
         let account;
         let nftContract;
-        let tokenContract;
-        let nftUpdateContract;
         let selectedNft = null;
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -346,7 +344,6 @@
         async function initContracts() {
             nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
             tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
-            nftUpdateContract = await window.ZODIAC_WEB3.getContract('nftUpdate');
         }
 
         async function loadUserNFTs() {
@@ -453,41 +450,11 @@
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
 
+            const requiredNFTs = parseInt(selectedNft.level);
             const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认升级',
-                `将消耗相同属性相同生肖的NFT来升级 ${selectedNft.name}，确定继续？`
+                '升级说明',
+                `此功能需要管理员手动操作升级。请联系管理员提供：\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level}\n将消耗 ${requiredNFTs} 张相同NFT进行升级。`
             );
-
-            if (!confirm) return;
-
-            const btn = this;
-            btn.disabled = true;
-            btn.textContent = '升级中...';
-
-            try {
-                const nftUpdateAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate;
-                if (!nftUpdateAddress || nftUpdateAddress === '0x0000000000000000000000000000000000000000') {
-                    ZODIAC_UI.showToast('升阶合约地址未配置，请联系管理员部署合约', 'error');
-                    btn.disabled = false;
-                    btn.textContent = '使用NFT升阶';
-                    return;
-                }
-
-                const gas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithNFT', [selectedNft.id], account);
-                const result = await nftUpdateContract.methods.upgradeWithNFT(selectedNft.id).send({ 
-                    from: account,
-                    gas: gas
-                });
-                ZODIAC_UI.showToast(`升级成功！NFT ${selectedNft.id} 已升级到 ${parseInt(selectedNft.level) + 1} 阶`, 'success');
-                await loadUserNFTs();
-                document.getElementById('upgradeSection').classList.add('hidden');
-            } catch (error) {
-                console.error('升级失败:', error);
-                ZODIAC_UI.showToast('升级失败，请检查是否有足够的相同NFT', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '使用NFT升阶';
-            }
         }
 
         async function handleUpgradeWithToken() {
@@ -495,170 +462,24 @@
             if (selectedNft.level >= 5) return;
 
             const requiredTokens = getRequiredTokens(selectedNft.level);
-
             const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认升级',
-                `将消耗 ${requiredTokens.toLocaleString()} 代币来升级 ${selectedNft.name}，确定继续？`
+                '升级说明',
+                `此功能需要管理员手动操作升级。请联系管理员提供：\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level}\n将消耗 ${requiredTokens.toLocaleString()} 枚代币进行升级。`
             );
-
-            if (!confirm) return;
-
-            const btn = this;
-            btn.disabled = true;
-            btn.textContent = '升级中...';
-
-            try {
-                const nftUpdateAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate;
-                if (!nftUpdateAddress || nftUpdateAddress === '0x0000000000000000000000000000000000000000') {
-                    ZODIAC_UI.showToast('升阶合约地址未配置，请联系管理员部署合约', 'error');
-                    btn.disabled = false;
-                    btn.textContent = '使用代币升阶';
-                    return;
-                }
-
-                const balance = await tokenContract.methods.balanceOf(account).call();
-                
-                if (parseInt(balance) < web3.utils.toWei(requiredTokens.toString(), 'ether')) {
-                    ZODIAC_UI.showToast(`代币不足，需要 ${requiredTokens} 枚代币`, 'error');
-                    btn.disabled = false;
-                    btn.textContent = '使用代币升阶';
-                    return;
-                }
-
-                const allowance = await tokenContract.methods.allowance(account, nftUpdateAddress).call();
-                if (parseInt(allowance) < web3.utils.toWei(requiredTokens.toString(), 'ether')) {
-                    const approveGas = await ZODIAC_WEB3.estimateGas(tokenContract, 'approve', [nftUpdateAddress, web3.utils.toWei(requiredTokens.toString(), 'ether')], account);
-                    await tokenContract.methods.approve(nftUpdateAddress, web3.utils.toWei(requiredTokens.toString(), 'ether')).send({ 
-                        from: account,
-                        gas: approveGas
-                    });
-                }
-
-                const gas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithToken', [selectedNft.id], account);
-                const result = await nftUpdateContract.methods.upgradeWithToken(selectedNft.id).send({ 
-                    from: account,
-                    gas: gas
-                });
-                ZODIAC_UI.showToast(`升级成功！NFT ${selectedNft.id} 已升级到 ${parseInt(selectedNft.level) + 1} 阶`, 'success');
-                await loadUserNFTs();
-                document.getElementById('upgradeSection').classList.add('hidden');
-            } catch (error) {
-                console.error('升级失败:', error);
-                ZODIAC_UI.showToast('升级失败: ' + (error.message || '未知错误'), 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '使用代币升阶';
-            }
         }
 
         async function handleUpgradeWithUSDValue() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
 
-            const btn = this;
-            btn.disabled = true;
-            btn.textContent = '查询价格中...';
-
-            try {
-                const nftUpdateAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate;
-                if (!nftUpdateAddress || nftUpdateAddress === '0x0000000000000000000000000000000000000000') {
-                    ZODIAC_UI.showToast('升阶合约地址未配置，请联系管理员部署合约', 'error');
-                    btn.disabled = false;
-                    btn.textContent = '使用USDT价值代币升阶';
-                    return;
-                }
-
-                const requiredUSD = getUSDValue(selectedNft.level);
-                const tokenPrice = await getTokenPriceFromPancakeSwap();
-                
-                if (!tokenPrice || tokenPrice <= 0) {
-                    ZODIAC_UI.showToast('无法获取代币价格，请稍后重试', 'error');
-                    btn.disabled = false;
-                    btn.textContent = '使用USDT价值代币升阶';
-                    return;
-                }
-
-                const requiredTokens = Math.ceil((requiredUSD / tokenPrice) * 1e18);
-                const balance = await tokenContract.methods.balanceOf(account).call();
-                
-                if (parseInt(balance) < requiredTokens) {
-                    ZODIAC_UI.showToast(`代币不足，需要 ${(requiredTokens / 1e18).toFixed(4)} 枚代币（当前价格: $${tokenPrice.toFixed(4)}）`, 'error');
-                    btn.disabled = false;
-                    btn.textContent = '使用USDT价值代币升阶';
-                    return;
-                }
-
-                const confirm = await ZODIAC_UI.showConfirmModal(
-                    '确认升级',
-                    `将消耗价值 ${requiredUSD} USDT 的代币来升级 ${selectedNft.name}，当前价格: $${tokenPrice.toFixed(4)}，确定继续？`
-                );
-
-                if (!confirm) {
-                    btn.disabled = false;
-                    btn.textContent = '使用USDT价值代币升阶';
-                    return;
-                }
-
-                const allowance = await tokenContract.methods.allowance(account, nftUpdateAddress).call();
-                if (parseInt(allowance) < requiredTokens) {
-                    btn.textContent = '授权中...';
-                    const approveGas = await ZODIAC_WEB3.estimateGas(tokenContract, 'approve', [nftUpdateAddress, requiredTokens], account);
-                    await tokenContract.methods.approve(nftUpdateAddress, requiredTokens).send({ 
-                        from: account,
-                        gas: approveGas
-                    });
-                }
-
-                btn.textContent = '升级中...';
-                const gas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithUSDValue', [selectedNft.id], account);
-                const result = await nftUpdateContract.methods.upgradeWithUSDValue(selectedNft.id).send({ 
-                    from: account,
-                    gas: gas
-                });
-                ZODIAC_UI.showToast(`升级成功！NFT ${selectedNft.id} 已升级到 ${parseInt(selectedNft.level) + 1} 阶`, 'success');
-                await loadUserNFTs();
-                document.getElementById('upgradeSection').classList.add('hidden');
-            } catch (error) {
-                console.error('升级失败:', error);
-                ZODIAC_UI.showToast('升级失败: ' + (error.message || '未知错误'), 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = '使用USDT价值代币升阶';
-            }
+            const requiredUSD = getUSDValue(selectedNft.level);
+            const confirm = await ZODIAC_UI.showConfirmModal(
+                '升级说明',
+                `此功能需要管理员手动操作升级。请联系管理员提供：\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level}\n将消耗价值 ${requiredUSD} USDT的代币进行升级。`
+            );
         }
 
-        async function getTokenPriceFromPancakeSwap() {
-            try {
-                const pancakeSwapABI = [{"inputs":[
-                    {"internalType":"address","name":"token","type":"address"}
-                ],"name":"getAmountOut","outputs":[
-                    {"internalType":"uint256","name":"amountOut","type":"uint256"}
-                ],"stateMutability":"view","type":"function"},
-                {"inputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"address[]","name":"path","type":"address[]"}],
-                "name":"getAmountsOut","outputs":[
-                    {"internalType":"uint256[]","name":"amounts","type":"uint256[]"}
-                ],"stateMutability":"view","type":"function"}];
-                const pancakeSwapRouter = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
-                const wbnbAddress = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
-                
-                const router = new web3.eth.Contract(pancakeSwapABI, pancakeSwapRouter);
-                const amountIn = web3.utils.toWei('1', 'ether');
-                const path = [ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract, wbnbAddress];
-                
-                const amounts = await router.methods.getAmountsOut(amountIn, path).call();
-                const wbnbAmount = parseFloat(web3.utils.fromWei(amounts[1], 'ether'));
-                
-                const ethUsdtABI = [{"inputs":[],"name":"latestAnswer","outputs":[{"internalType":"int256","name":"","type":"int256"}],"stateMutability":"view","type":"function"}];
-                const ethUsdtPriceFeed = '0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE';
-                const priceFeed = new web3.eth.Contract(ethUsdtABI, ethUsdtPriceFeed);
-                const ethPrice = parseFloat((await priceFeed.methods.latestAnswer().call()) / 1e8);
-                
-                return wbnbAmount * ethPrice;
-            } catch (error) {
-                console.error('获取价格失败:', error);
-                return null;
-            }
-        }
+
 
         function getRequiredTokens(level) {
             switch (level) {

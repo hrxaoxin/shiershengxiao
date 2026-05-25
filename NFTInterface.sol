@@ -1,1240 +1,784 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./NFTDataType.sol";
-
 /**
- * @title ITokenBurner
- * @dev 代币销毁合约接口
+ * @title NFTInterface
+ * @dev NFT主合约接口定义，定义与其他合约交互的标准接口
+ *
+ * 本接口遵循ERC165标准，用于合约间的互操作性
+ * 其他合约（如战斗、繁殖、交易等模块）通过此接口与NFT合约交互
+ *
+ * 主要功能：
+ * - 查询NFT信息（类型、等级、属性等）
+ * - 管理NFT所有权
+ * - 铸造新NFT
+ * - 升级NFT
+ * - 处理NFT繁殖
  */
-interface ITokenBurner {
+interface INFT {
     /**
-     * @dev 销毁普通铸造费用的代币
-     * @return success 是否成功
+     * @dev 铸造新NFT
+     * @param to 接收NFT的地址
+     * @param zodiacType NFT类型（0-119）
+     * @return uint256 新铸造的NFT ID
      */
-    function burnTokenForMint() external returns (bool);
-    
-    /**
-     * @dev 销毁稀有铸造费用的代币
-     * @return success 是否成功
-     */
-    function burnTokenForRareMint() external returns (bool);
-    
-    /**
-     * @dev 销毁代币并铸造
-     * @param user 用户地址
-     * @param isRare 是否稀有铸造
-     * @return success 是否成功
-     */
-    function burnAndMint(address user, bool isRare) external returns (bool);
-    
-    /**
-     * @dev 销毁代币并十连铸造
-     * @param user 用户地址
-     * @param isRare 是否稀有铸造
-     * @return success 是否成功
-     */
-    function burnAndMintTen(address user, bool isRare) external returns (bool);
-    
-    /**
-     * @dev 销毁代币并指定铸造
-     * @param user 用户地址
-     * @return success 是否成功
-     */
-    function burnAndMintTargeted(address user) external returns (bool);
-    
-    /**
-     * @dev 获取普通铸造费用
-     * @return cost 费用（代币数量）
-     */
-    function normalMintCost() external view returns (uint256);
-    
-    /**
-     * @dev 获取稀有铸造费用
-     * @return cost 费用（代币数量）
-     */
-    function rareMintCost() external view returns (uint256);
-    
-    /**
-     * @dev 获取普通十连铸造费用
-     * @return cost 费用（代币数量）
-     */
-    function normalMintTenCost() external view returns (uint256);
-    
-    /**
-     * @dev 获取稀有十连铸造费用
-     * @return cost 费用（代币数量）
-     */
-    function rareMintTenCost() external view returns (uint256);
-    
-    /**
-     * @dev 获取指定铸造费用
-     * @return normalPart 普通铸造部分费用
-     * @return rarePart 光暗铸造部分费用
-     */
-    function targetedMintCost() external view returns (uint256, uint256);
-    
-    /**
-     * @dev 设置授权的NFT合约地址
-     * @param nftContract NFT合约地址
-     */
-    function setAuthorizedNFTContract(address nftContract) external;
-    
-    /**
-     * @dev 设置代币合约地址
-     * @param tokenContract 代币合约地址
-     */
-    function setTokenContract(address tokenContract) external;
-}
-
-/**
- * @title IToken
- * @dev ERC20代币接口
- */
-interface IToken {
-    /**
-     * @dev 转账
-     * @param from 转出地址
-     * @param to 转入地址
-     * @param amount 数量
-     * @return success 是否成功
-     */
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    
-    /**
-     * @dev 获取余额
-     * @param account 账户地址
-     * @return balance 余额
-     */
-    function balanceOf(address account) external view returns (uint256);
-}
-
-/**
- * @title IPriceOracle
- * @dev 价格预言机接口
- */
-interface IPriceOracle {
-    /**
-     * @dev 获取代币价格（USD）
-     * @return price 价格（精度18位）
-     */
-    function getTokenPriceInUSD() external view returns (uint256);
-    
-    /**
-     * @dev 获取价格更新时间戳
-     * @return timestamp 时间戳
-     */
-    function getPriceTimestamp() external view returns (uint256);
+    function mint(address to, uint256 zodiacType) external returns (uint256);
 
     /**
-     * @dev 获取并更新缓存的代币价格（含波动保护）
-     * @return price 价格（精度18位）
+     * @dev 批量铸造NFT
+     * @param to 接收NFT的地址
+     * @param zodiacTypes NFT类型数组
+     * @return uint256[] 新铸造的NFT ID数组
      */
-    function getAndUpdatePrice() external returns (uint256);
-}
+    function mintBatch(address to, uint256[] calldata zodiacTypes) external returns (uint256[] memory);
 
-/**
- * @title IPancakeSwapPair
- * @dev PancakeSwap流动性池接口
- */
-interface IPancakeSwapPair {
-    /**
-     * @dev 获取储备量
-     * @return reserve0 token0储备量
-     * @return reserve1 token1储备量
-     * @return blockTimestampLast 最后更新时间戳
-     */
-    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-    
-    /**
-     * @dev 获取token0地址
-     * @return token0Address token0地址
-     */
-    function token0() external view returns (address);
-    
-    /**
-     * @dev 获取token1地址
-     * @return token1Address token1地址
-     */
-    function token1() external view returns (address);
-}
-
-/**
- * @title IBEP20
- * @dev BEP20代币接口（获取小数位数）
- */
-interface IBEP20 {
-    /**
-     * @dev 获取小数位数
-     * @return decimals 小数位数
-     */
-    function decimals() external view returns (uint8);
-}
-
-/**
- * @title IERC2981
- * @dev ERC2981版税标准接口
- */
-interface IERC2981 {
-    /**
-     * @dev 获取版税信息
-     * @param tokenId NFT ID
-     * @param salePrice 销售价格
-     * @return receiver 版税接收地址
-     * @return royaltyAmount 版税金额
-     */
-    function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address receiver, uint256 royaltyAmount);
-}
-
-/**
- * @title INFTMint
- * @dev NFT铸造合约接口
- */
-interface INFTMint {
     /**
      * @dev 获取NFT类型
      * @param tokenId NFT ID
-     * @return zodiacType 生肖类型
+     * @return uint256 NFT类型（0-119）
      */
-    function tokenType(uint256 tokenId) external view returns (NFTDataTypes.ZodiacType);
-    
+    function getNFTType(uint256 tokenId) external view returns (uint256);
+
     /**
-     * @dev 获取NFT等级
+     * @dev 获取NFT信息
      * @param tokenId NFT ID
-     * @return level 等级（1-5）
+     * @return tuple (类型, 等级, 铸造时间)
      */
-    function tokenLevel(uint256 tokenId) external view returns (uint8);
-    
+    function getNFTInfo(uint256 tokenId) external view returns (uint256, uint8, uint256);
+
     /**
-     * @dev 获取NFT成长值
+     * @dev 检查NFT是否为稀有属性
      * @param tokenId NFT ID
-     * @return growthValue 成长值(10-100)
+     * @return bool 是否为稀有（暗/光属性）
      */
-    function tokenGrowthValue(uint256 tokenId) external view returns (uint256);
-    
+    function isRare(uint256 tokenId) external view returns (bool);
+
     /**
-     * @dev 获取NFT所有者（ERC721标准）
+     * @dev 检查NFT是否为5级
      * @param tokenId NFT ID
-     * @return owner 所有者地址
+     * @return bool 是否为5级
+     */
+    function isMaxLevel(uint256 tokenId) external view returns (bool);
+
+    /**
+     * @dev 获取NFT当前等级
+     * @param tokenId NFT ID
+     * @return uint8 等级（1-5）
+     */
+    function getNFTLevel(uint256 tokenId) external view returns (uint8);
+
+    /**
+     * @dev 设置NFT等级（内部使用，由升级模块调用）
+     * @param tokenId NFT ID
+     * @param newLevel 新等级
+     */
+    function setNFTLevel(uint256 tokenId, uint256 newLevel) external;
+
+    /**
+     * @dev 获取NFT所有者
+     * @param tokenId NFT ID
+     * @return address 所有者地址
      */
     function ownerOf(uint256 tokenId) external view returns (address);
-    
+
     /**
-     * @dev 安全转账NFT（ERC721标准）
-     * @param from 转出地址
-     * @param to 转入地址
+     * @dev 安全转移NFT（带回调）
+     * @param from 发送方地址
+     * @param to 接收方地址
      * @param tokenId NFT ID
      */
     function safeTransferFrom(address from, address to, uint256 tokenId) external;
 
     /**
-     * @dev 转账NFT（ERC721标准）
-     * @param from 转出地址
-     * @param to 转入地址
+     * @dev 转移NFT
+     * @param from 发送方地址
+     * @param to 接收方地址
      * @param tokenId NFT ID
      */
     function transferFrom(address from, address to, uint256 tokenId) external;
 
     /**
-     * @dev 查询批量授权状态（ERC721标准）
-     * @param owner 所有者地址
-     * @param operator 操作者地址
-     * @return approved 是否授权
+     * @dev 批量查询NFT信息
+     * @param tokenIds NFT ID数组
+     * @return tuple[] NFT信息数组
      */
-    function isApprovedForAll(address owner, address operator) external view returns (bool);
+    function getNFTInfoBatch(uint256[] calldata tokenIds) external view returns (uint256[] memory);
 
     /**
-     * @dev 查询NFT授权地址（ERC721标准）
-     * @param tokenId NFT ID
-     * @return operator 被授权的地址
+     * @dev 获取合约名称
+     * @return string 合约名称
      */
-    function getApproved(uint256 tokenId) external view returns (address);
-    
-    /**
-     * @dev 普通铸造
-     * @param to 接收地址
-     * @return tokenId 新NFT ID
-     */
-    function mintNormal(address to) external returns (uint256);
-    
-    /**
-     * @dev 稀有铸造
-     * @param to 接收地址
-     * @return tokenId 新NFT ID
-     */
-    function mintRare(address to) external returns (uint256);
-    
-    /**
-     * @dev 指定类型铸造
-     * @param to 接收地址
-     * @param zodiacType 指定的生肖类型
-     * @return tokenId 新NFT ID
-     */
-    function mintCustom(address to, NFTDataTypes.ZodiacType zodiacType) external returns (uint256);
-    
-    /**
-     * @dev 铸造繁殖结果
-     * @param to 接收地址
-     * @param zodiacType 生肖类型
-     * @return tokenId 新NFT ID
-     */
-    function mintBreedResult(address to, NFTDataTypes.ZodiacType zodiacType) external returns (uint256);
-    
-    /**
-     * @dev 普通十连铸造
-     * @param to 接收地址
-     * @return tokenIds 新NFT ID数组
-     */
-    function mintNormalTen(address to) external returns (uint256[] memory);
-    
-    /**
-     * @dev 光暗十连铸造
-     * @param to 接收地址
-     * @return tokenIds 新NFT ID数组
-     */
-    function mintRareTen(address to) external returns (uint256[] memory);
-    
-    /**
-     * @dev 指定铸造
-     * @param to 接收地址
-     * @param baseZodiac 基础生肖类型
-     * @return tokenIds 新NFT ID数组
-     */
-    function mintTargeted(address to, NFTDataTypes.BaseZodiac baseZodiac) external returns (uint256[] memory);
-    
-    /**
-     * @dev 使用NFT升级
-     * @param tokenId 要升级的NFT ID
-     * @return newLevel 新等级
-     */
-    function upgradeWithNFT(uint256 tokenId) external returns (uint8);
-    
-    /**
-     * @dev 使用代币升级
-     * @param tokenId 要升级的NFT ID
-     * @return newLevel 新等级
-     */
-    function upgradeWithToken(uint256 tokenId) external returns (uint8);
-    
-    /**
-     * @dev 使用USD价值升级
-     * @param tokenId 要升级的NFT ID
-     * @return newLevel 新等级
-     */
-    function upgradeWithUSDValue(uint256 tokenId) external returns (uint8);
-    
-    /**
-     * @dev 设置合约地址
-     * @param tb TokenBurner地址
-     * @param rm RewardManager地址
-     */
-    function setAddresses(address tb, address rm) external;
-    
-    /**
-     * @dev 设置元数据合约地址
-     * @param a 元数据合约地址
-     */
-    function setMetadataContract(address a) external;
-    
-    /**
-     * @dev 设置代币合约地址
-     * @param a 代币合约地址
-     */
-    function setTokenContract(address a) external;
-    
-    /**
-     * @dev 设置繁殖合约地址
-     * @param a 繁殖合约地址
-     */
-    function setBreedingContract(address a) external;
-    
-    /**
-     * @dev 设置NFT升级合约地址
-     * @param a NFT升级合约地址
-     */
-    function setNFTUpdateContract(address a) external;
-    
-    /**
-     * @dev 获取用户权重缓存
-     * @param user 用户地址
-     * @return userWeight 用户权重缓存值
-     */
-    function calcUserWeight(address user) external view returns (uint256);
-}
+    function name() external view returns (string memory);
 
-/**
- * @title IRewardManagerExt
- * @dev 奖励管理合约扩展接口（用于Authorizer授权配置）
- */
-interface IRewardManagerExt {
-    function setAuthorizedNFTContract(address nft, bool ok) external;
-    function setNFTContract(address _newNFTContract) external;
-    function setNFTDataContract(address _nftDataContract) external;
-    function setAuthorizer(address _authorizer) external;
-    function setStakingContract(address _stakingContract) external;
-    function setTokenStakingContract(address _tokenStakingContract) external;
-    function setArenaContract(address _arenaContract) external;
-}
-
-/**
- * @title IRewardManager
- * @dev 奖励管理合约接口
- */
-interface IRewardManager {
     /**
-     * @dev 获取版税钱包地址
-     * @return wallet 版税钱包地址
+     * @dev 获取合约符号
+     * @return string 合约符号
      */
-    function royaltyWallet() external view returns (address);
-    
-    /**
-     * @dev 获取版税信息
-     * @param tokenId NFT ID
-     * @param salePrice 销售价格
-     * @return receiver 版税接收地址
-     * @return amount 版税金额
-     */
-    function royaltyInfo(uint256 tokenId, uint256 salePrice) external view returns (address, uint256);
-    
-    /**
-     * @dev 领取分红
-     */
-    function claimDividend() external;
-    
-    /**
-     * @dev 获取用户持有指定类型卡牌数量
-     * @param user 用户地址
-     * @param zodiacType 生肖类型
-     * @return count 卡牌数量
-     */
-    function cardCount(address user, NFTDataTypes.ZodiacType zodiacType) external view returns (uint256);
-    
-    /**
-     * @dev 外部更新用户卡牌信息
-     * @param user 用户地址
-     * @param zodiacType 生肖类型
-     * @param count 卡牌数量
-     * @return success 是否成功
-     */
-    function updateCardExternal(address user, NFTDataTypes.ZodiacType zodiacType, uint256 count) external returns (bool);
-    
-    /**
-     * @dev 原子性增加卡牌计数（解决时序问题）
-     * @param user 用户地址
-     * @param zodiacType 生肖类型
-     * @return success 是否成功
-     */
-    function addCardCount(address user, NFTDataTypes.ZodiacType zodiacType) external returns (bool);
-    
-    /**
-     * @dev 原子性减少卡牌计数（解决时序问题）
-     * @param user 用户地址
-     * @param zodiacType 生肖类型
-     * @return success 是否成功
-     */
-    function subCardCount(address user, NFTDataTypes.ZodiacType zodiacType) external returns (bool);
-    
-    /**
-     * @dev 设置授权的NFT合约
-     * @param nft NFT合约地址
-     * @param ok 是否授权
-     */
-    function setAuthorizedNFTContract(address nft, bool ok) external;
-    
-    /**
-     * @dev 设置NFT合约地址
-     * @param _newNFTContract 新NFT合约地址
-     */
-    function setNFTContract(address _newNFTContract) external;
-    
-    /**
-     * @dev 设置NFT数据合约地址
-     * @param _nftDataContract NFT数据合约地址
-     */
-    function setNFTDataContract(address _nftDataContract) external;
-    
-    /**
-     * @dev 设置NFT质押合约地址
-     * @param _stakingContract 质押合约地址
-     */
-    function setStakingContract(address _stakingContract) external;
-    
-    /**
-     * @dev 设置代币质押合约地址
-     * @param _tokenStakingContract 代币质押合约地址
-     */
-    function setTokenStakingContract(address _tokenStakingContract) external;
-    
-    /**
-     * @dev 设置竞技场排名合约地址
-     * @param _arenaContract 竞技场合约地址
-     */
-    function setArenaContract(address _arenaContract) external;
-    
-    /**
-     * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
-     */
-    function setAuthorizer(address _authorizer) external;
-}
-
-/**
- * @title INFTDataInterface
- * @dev NFT数据合约接口
- */
-interface INFTDataInterface {
-    /**
-     * @dev 获取NFT信息
-     * @param tokenId NFT ID
-     * @return nftInfo NFT信息结构体
-     */
-    function getNFTInfo(uint256 tokenId) external view returns (NFTDataTypes.NFTInfo memory);
-    
-    /**
-     * @dev 设置NFT信息
-     * @param tokenId NFT ID
-     * @param info NFT信息结构体
-     */
-    function setNFTInfo(uint256 tokenId, NFTDataTypes.NFTInfo memory info) external;
-    
-    /**
-     * @dev 清除NFT信息
-     * @param tokenId NFT ID
-     */
-    function clearNFTInfo(uint256 tokenId) external;
-    
-    /**
-     * @dev 获取属性名称
-     * @param element 属性类型
-     * @return name 属性名称
-     */
-    function getElementName(NFTDataTypes.ElementType element) external view returns (string memory);
-    
-    /**
-     * @dev 获取生肖名称
-     * @param zodiac 生肖类型
-     * @return name 生肖名称
-     */
-    function getZodiacName(NFTDataTypes.BaseZodiac zodiac) external view returns (string memory);
-    
-    /**
-     * @dev 获取性别名称
-     * @param gender 性别类型
-     * @return name 性别名称
-     */
-    function getGenderName(NFTDataTypes.GenderType gender) external view returns (string memory);
-    
-    /**
-     * @dev 获取完整类型名称
-     * @param zodiacType 生肖类型
-     * @return name 完整名称
-     */
-    function getFullTypeName(NFTDataTypes.ZodiacType zodiacType) external view returns (string memory);
-    
-    /**
-     * @dev 获取集合名称
-     * @return name 集合名称
-     */
-    function collName() external pure returns (string memory);
-    
-    /**
-     * @dev 获取集合描述
-     * @return description 集合描述
-     */
-    function collDesc() external pure returns (string memory);
-    
-    /**
-     * @dev 获取集合图片
-     * @return url 图片URL
-     */
-    function collImage() external pure returns (string memory);
-    
-    /**
-     * @dev 获取卖家费用比例
-     * @return feeBasisPoints 费用比例（千分比）
-     */
-    function sellerFeeBasisPoints() external pure returns (uint256);
-    
-    /**
-     * @dev 获取卡牌名称
-     * @param zodiacType 生肖类型
-     * @return name 卡牌名称
-     */
-    function getCardName(NFTDataTypes.ZodiacType zodiacType) external view returns (string memory);
-    
-    /**
-     * @dev 获取卡牌描述
-     * @param zodiacType 生肖类型
-     * @return description 卡牌描述
-     */
-    function getCardDesc(NFTDataTypes.ZodiacType zodiacType) external view returns (string memory);
-    
-    /**
-     * @dev 获取卡牌图片
-     * @param zodiacType 生肖类型
-     * @return url 图片URL
-     */
-    function getCardImage(NFTDataTypes.ZodiacType zodiacType) external view returns (string memory);
-    
-    /**
-     * @dev 获取NFT类型
-     * @param tokenId NFT ID
-     * @return zodiacType 生肖类型
-     */
-    function tokenType(uint256 tokenId) external view returns (NFTDataTypes.ZodiacType);
-    
-    /**
-     * @dev 获取NFT等级
-     * @param tokenId NFT ID
-     * @return level 等级
-     */
-    function tokenLevel(uint256 tokenId) external view returns (uint8);
-    
-    /**
-     * @dev 获取NFT成长值
-     * @param tokenId NFT ID
-     * @return growthValue 成长值(10-100)
-     */
-    function tokenGrowthValue(uint256 tokenId) external view returns (uint256);
-    
-    /**
-     * @dev 获取用户持有的指定类型NFT列表
-     * @param user 用户地址
-     * @param type_ 生肖类型
-     * @return tokenIds NFT ID列表
-     */
-    function userTokens(address user, NFTDataTypes.ZodiacType type_) external view returns (uint256[] memory);
-    
-    /**
-     * @dev 获取用户持有的所有NFT列表
-     * @param user 用户地址
-     * @return tokenIds NFT ID列表
-     */
-    function userAllTokens(address user) external view returns (uint256[] memory);
-    
-    /**
-     * @dev 获取用户权重缓存
-     * @param user 用户地址
-     * @return weight 权重值
-     */
-    function userWeightCache(address user) external view returns (uint256);
-    
-    /**
-     * @dev 设置NFT类型
-     * @param tokenId NFT ID
-     * @param type_ 生肖类型
-     */
-    function setTokenType(uint256 tokenId, NFTDataTypes.ZodiacType type_) external;
-    
-    /**
-     * @dev 设置NFT等级
-     * @param tokenId NFT ID
-     * @param level 等级
-     */
-    function setTokenLevel(uint256 tokenId, uint8 level) external;
-    
-    /**
-     * @dev 设置NFT成长值
-     * @param tokenId NFT ID
-     * @param growth 成长值（10-100）
-     */
-    function setTokenGrowthValue(uint256 tokenId, uint256 growth) external;
-    
-    /**
-     * @dev 添加用户NFT
-     * @param user 用户地址
-     * @param type_ 生肖类型
-     * @param tokenId NFT ID
-     */
-    function addUserToken(address user, NFTDataTypes.ZodiacType type_, uint256 tokenId) external;
-    
-    /**
-     * @dev 移除用户NFT
-     * @param user 用户地址
-     * @param type_ 生肖类型
-     * @param tokenId NFT ID
-     */
-    function removeUserToken(address user, NFTDataTypes.ZodiacType type_, uint256 tokenId) external;
-    
-    /**
-     * @dev 更新用户权重缓存
-     * @param user 用户地址
-     * @param weight 权重值
-     */
-    function updateUserWeightCache(address user, uint256 weight) external;
-    
-    /**
-     * @dev 统一的权重更新函数（计算并更新用户权重）
-     * @param user 用户地址
-     * @param level NFT等级
-     * @param add 是否增加（true增加，false减少）
-     * @param element 属性类型
-     */
-    function updateUserWeight(address user, uint8 level, bool add, NFTDataTypes.ElementType element) external;
-    
-    /**
-     * @dev 直接计算用户权重（遍历所有NFT）
-     * @param user 用户地址
-     * @return userWeight 用户权重
-     */
-    function calcUserWeight(address user) external view returns (uint256);
-    
-    /**
-     * @dev 获取用户持有的指定类型NFT数量
-     * @param user 用户地址
-     * @param type_ 生肖类型
-     * @return count 数量
-     */
-    function getUserTokenCount(address user, NFTDataTypes.ZodiacType type_) external view returns (uint256);
-    
-    /**
-     * @dev 获取用户持有的NFT总数
-     * @param user 用户地址
-     * @return totalCount 总数
-     */
-    function getUserTotalTokenCount(address user) external view returns (uint256);
-    
-    /**
-     * @dev 初始化合约
-     * @param initialOwner 初始所有者
-     */
-    function initialize(address initialOwner) external;
-    
-    /**
-     * @dev 设置授权的NFT合约
-     * @param nftContract NFT合约地址
-     */
-    function setAuthorizedNFTContract(address nftContract) external;
-    
-    /**
-     * @dev 检查用户是否有资格（持有NFT）
-     * @param user 用户地址
-     * @return eligible 是否有资格
-     */
-    function hasEligibility(address user) external view returns (bool);
-    
-    /**
-     * @dev 获取用户持有的NFT类型列表
-     * @param user 用户地址
-     * @return types 类型列表
-     */
-    function getUserTokenTypes(address user) external view returns (NFTDataTypes.ZodiacType[] memory);
-}
-
-/**
- * @title INFTTrading
- * @dev NFT交易合约接口
- */
-interface INFTTrading {
-    /**
-     * @dev 设置NFT合约地址
-     * @param newNFTContract NFT合约地址
-     */
-    function setNFTContract(address newNFTContract) external;
-    
-    /**
-     * @dev 设置奖励管理器地址
-     * @param newRewardManager 奖励管理器地址
-     */
-    function setRewardManager(address newRewardManager) external;
+    function symbol() external view returns (string memory);
 }
 
 /**
  * @title IBreeding
  * @dev 繁殖合约接口
+ *
+ * 定义繁殖相关的功能：
+ * - 创建繁殖对（自繁殖/市场繁殖）
+ * - 完成繁殖获取子代
+ * - 查询繁殖信息
  */
 interface IBreeding {
     /**
-     * @dev 设置NFT合约地址
-     * @param nftContract NFT合约地址
+     * @dev 创建自繁殖对
+     * @param fatherId 父亲NFT ID
+     * @param motherId 母亲NFT ID
+     * @param coOwnerId 共有人NFT ID（用于分成）
+     * @return uint256 繁殖对ID
      */
-    function setNFTContract(address nftContract) external;
-    
-    /**
-     * @dev 开始自繁殖
-     * @param tokenId1 第一个NFT ID
-     * @param tokenId2 第二个NFT ID
-     */
-    function startSelfBreeding(uint256 tokenId1, uint256 tokenId2) external;
-    
-    /**
-     * @dev 上架繁殖
-     * @param tokenId NFT ID
-     */
-    function listForBreeding(uint256 tokenId) external;
-    
-    /**
-     * @dev 加入繁殖
-     * @param orderId 订单ID
-     * @param tokenId NFT ID
-     */
-    function joinBreeding(uint256 orderId, uint256 tokenId) external;
-    
-    /**
-     * @dev 完成自繁殖
-     * @param orderId 订单ID
-     */
-    function completeSelfBreeding(uint256 orderId) external;
-    
-    /**
-     * @dev 完成市场繁殖
-     * @param orderId 订单ID
-     */
-    function completeMarketBreeding(uint256 orderId) external;
-    
-    /**
-     * @dev 取消繁殖上架
-     * @param orderId 订单ID
-     */
-    function cancelBreedingListing(uint256 orderId) external;
-    
-    /**
-     * @dev 获取市场繁殖订单列表
-     * @return orderIds 订单ID列表
-     */
-    function getMarketBreedingOrders() external view returns (uint256[] memory);
-    
-    /**
-     * @dev 获取用户繁殖订单列表
-     * @param user 用户地址
-     * @return orderIds 订单ID列表
-     */
-    function getUserBreedingOrders(address user) external view returns (uint256[] memory);
-    
-    /**
-     * @dev 获取繁殖订单详情
-     * @param orderId 订单ID
-     * @return address owner1
-     * @return address owner2
-     * @return uint256 tokenId1
-     * @return uint256 tokenId2
-     * @return uint256 startTime
-     * @return bool completed
-     * @return bool cancelled
-     */
-    function breedingOrders(uint256 orderId) external view returns (address, address, uint256, uint256, uint256, bool, bool);
-    
-    /**
-     * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
-     */
-    function setAuthorizer(address _authorizer) external;
-    
-    /**
-     * @dev 设置竞技场排名合约地址
-     * @param _arenaRankingContract 竞技场排名合约地址
-     */
-    function setArenaRankingContract(address _arenaRankingContract) external;
-}
+    function createSelfBreedingPair(uint256 fatherId, uint256 motherId, uint256 coOwnerId) external returns (uint256);
 
-/**
- * @title IStaking
- * @dev NFT质押合约接口
- */
-interface IStaking {
     /**
-     * @dev 设置NFT合约地址
-     * @param nftContract NFT合约地址
+     * @dev 创建市场繁殖对
+     * @param fatherId 父亲NFT ID
+     * @param motherId 母亲NFT ID
+     * @param maleOwner 公NFT所有者
+     * @param femaleOwner 母NFT所有者
+     * @param maleCoOwnerId 公NFT共有人
+     * @param femaleCoOwnerId 母NFT共有人
+     * @return uint256 繁殖对ID
      */
-    function setNFTContract(address nftContract) external;
-    
-    /**
-     * @dev 设置代币合约地址
-     * @param tokenContract 代币合约地址
-     */
-    function setTokenContract(address tokenContract) external;
-    
-    /**
-     * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
-     */
-    function setAuthorizer(address _authorizer) external;
-    
-    /**
-     * @dev 设置竞技场排名合约地址
-     * @param _arenaRankingContract 竞技场排名合约地址
-     */
-    function setArenaRankingContract(address _arenaRankingContract) external;
-}
+    function createMarketBreedingPair(
+        uint256 fatherId,
+        uint256 motherId,
+        address maleOwner,
+        address femaleOwner,
+        uint256 maleCoOwnerId,
+        uint256 femaleCoOwnerId
+    ) external returns (uint256);
 
+    /**
+     * @dev 完成繁殖获取子代
+     * @param pairId 繁殖对ID
+     * @return uint256 子代NFT ID
+     */
+    function completeBreeding(uint256 pairId) external returns (uint256);
 
+    /**
+     * @dev 取消繁殖
+     * @param pairId 繁殖对ID
+     */
+    function cancelBreeding(uint256 pairId) external;
 
-/**
- * @title INFTUpdate
- * @dev NFT升级合约接口
- */
-interface INFTUpdate {
     /**
-     * @dev 使用NFT升级
-     * @param tokenId NFT ID
-     * @return newLevel 新等级
+     * @dev 获取繁殖信息
+     * @param pairId 繁殖对ID
+     * @return tuple 繁殖详情
      */
-    function upgradeWithNFT(uint256 tokenId) external returns (uint8);
-    
-    /**
-     * @dev 使用代币升级
-     * @param tokenId NFT ID
-     * @return newLevel 新等级
-     */
-    function upgradeWithToken(uint256 tokenId) external returns (uint8);
-    
-    /**
-     * @dev 使用USD价值升级
-     * @param tokenId NFT ID
-     * @return newLevel 新等级
-     */
-    function upgradeWithUSDValue(uint256 tokenId) external returns (uint8);
-    
-    /**
-     * @dev 从PancakeSwap获取代币价格
-     * @return price 价格（精度18位）
-     */
-    function getTokenPriceFromPancakeSwap() external view returns (uint256);
-    
-    /**
-     * @dev 设置NFT合约地址
-     * @param a NFT合约地址
-     */
-    function setNFTContract(address a) external;
-    
-    /**
-     * @dev 设置元数据合约地址
-     * @param a 元数据合约地址
-     */
-    function setMetadataContract(address a) external;
-    
-    /**
-     * @dev 设置代币合约地址
-     * @param a 代币合约地址
-     */
-    function setTokenContract(address a) external;
-    
-    /**
-     * @dev 设置PancakeSwap流动性池地址
-     * @param pair 流动性池地址
-     */
-    function setPancakeSwapPair(address pair) external;
-    
-    /**
-     * @dev 设置授权合约地址
-     * @param a 授权合约地址
-     */
-    function setAuthorizer(address a) external;
-    
-    /**
-     * @dev 设置价格过期时间
-     * @param seconds_ 过期时间（秒）
-     */
-    function setPriceExpirySeconds(uint256 seconds_) external;
-    
-    /**
-     * @dev 设置价格偏差阈值
-     * @param threshold 阈值（千分比）
-     */
-    function setPriceDeviationThreshold(uint256 threshold) external;
-    
-    /**
-     * @dev 重置价格缓存
-     */
-    function resetPriceCache() external;
-    
-    /**
-     * @dev 设置1级升级费用
-     * @param cost 费用（代币数量）
-     */
-    function setLevel1UpgradeCost(uint256 cost) external;
-    
-    /**
-     * @dev 设置2级升级费用
-     * @param cost 费用（代币数量）
-     */
-    function setLevel2UpgradeCost(uint256 cost) external;
-    
-    /**
-     * @dev 设置3级升级费用
-     * @param cost 费用（代币数量）
-     */
-    function setLevel3UpgradeCost(uint256 cost) external;
-    
-    /**
-     * @dev 设置4级升级费用
-     * @param cost 费用（代币数量）
-     */
-    function setLevel4UpgradeCost(uint256 cost) external;
-}
-
-/**
- * @title ISwapRouter
- * @dev PancakeSwap交换路由器接口
- */
-interface ISwapRouter {
-    /**
-     * @dev 使用ETH交换代币
-     * @param amountOutMin 最小输出数量
-     * @param path 交换路径
-     * @param to 接收地址
-     * @param deadline 截止时间
-     * @return amounts 输出数量数组
-     */
-    function swapExactETHForTokens(
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external payable returns (uint256[] memory amounts);
-}
-
-/**
- * @title IPancakeFactory
- * @dev PancakeSwap工厂合约接口
- */
-interface IPancakeFactory {
-    /**
-     * @dev 获取流动性池地址
-     * @param tokenA 代币A地址
-     * @param tokenB 代币B地址
-     * @return pairAddress 流动性池地址
-     */
-    function getPair(address tokenA, address tokenB) external view returns (address);
-}
-
-/**
- * @title IStakingContract
- * @dev 质押合约接口
- */
-interface IStakingContract {
-    /**
-     * @dev 存入代币
-     * @param amount 数量
-     */
-    function depositToken(uint256 amount) external;
-}
-
-/**
- * @title IERC20
- * @dev ERC20代币接口
- */
-interface IERC20 {
-    /**
-     * @dev 转账
-     * @param to 转入地址
-     * @param amount 数量
-     * @return success 是否成功
-     */
-    function transfer(address to, uint256 amount) external returns (bool);
-    
-    /**
-     * @dev 授权
-     * @param spender 授权地址
-     * @param amount 授权数量
-     * @return success 是否成功
-     */
-    function approve(address spender, uint256 amount) external returns (bool);
-    
-    /**
-     * @dev 获取余额
-     * @param account 账户地址
-     * @return balance 余额
-     */
-    function balanceOf(address account) external view returns (uint256);
-}
-
-interface IDividendManager {
-    function depositDividend() external payable;
-    function claimDividend() external;
-    function createSnapshot() external returns (uint256);
-    function finalizeSnapshot(uint256 snapshotId) external;
-    function claimDividendFromSnapshot(uint256 snapshotId) external;
-    function calcUserDividend(address user) external view returns (uint256, uint256);
-    function getUserWeightInSnapshot(uint256 snapshotId, address user) external view returns (uint256);
-    function getUserDividendInSnapshot(uint256 snapshotId, address user) external view returns (uint256);
-    function getSnapshotCount() external view returns (uint256);
-    function updateUserWeight(address user, uint256 oldWeight, uint256 newWeight) external;
-    function setOwnerWeight(uint256 weight) external;
-    function setMinOwnerWeight(uint256 minWeight) external;
-}
-
-interface IWeightManager {
-    function setNFTDataContract(address _nftDataContract) external;
-    function setMinOwnerWeight(uint256 _minWeight) external;
-    function setOwnerWeight(uint256 _w) external;
-    function getUserWeight(address user) external view returns (uint256);
-    function refreshUserWeightCache(address user) external;
-    function batchRefreshUserWeightCache(address[] calldata users) external;
-    function hasEligibility(address user) external view returns (bool);
-    function updateUserWeight(address user) external;
-    function addHolder(address user) external returns (bool);
-    function removeHolder(address user) external;
-}
-
-interface IPoolManager {
-    function setRewardManager(address _rewardManager) external;
-    function setRouterContract(address _router) external;
-    function setWbnbContract(address _wbnb) external;
-    function setTokenContract(address _token) external;
-    function setNftStakingContract(address _nftStaking) external;
-    function setTokenStakingContract(address _tokenStaking) external;
-    function setArenaContract(address _arena) external;
-    function setRatios(uint256 _ownerRatio, uint256 _nftStakingRatio, uint256 _arenaRatio, uint256 _tokenStakingRatio, uint256 _dividendRatio) external;
-    function deposit() external payable;
-    function withdrawOwnerDividend() external;
-    function withdrawNftStakingPool() external;
-    function withdrawArenaPool() external;
-    function withdrawTokenStakingPool() external;
-    function withdrawExtraFunds() external;
-    function getTotalPoolAmount() external view returns (uint256);
-    function getPoolDetails() external view returns (uint256, uint256, uint256, uint256);
-}
-
-/**
- * @title ITokenStaking
- * @dev 代币质押合约接口
- */
-interface ITokenStaking {
-    /**
-     * @dev 质押代币
-     * @param amount 数量
-     */
-    function stakeTokens(uint256 amount) external;
-    
-    /**
-     * @dev 解除质押
-     * @param amount 数量
-     */
-    function unstakeTokens(uint256 amount) external;
-    
-    /**
-     * @dev 领取奖励
-     */
-    function claimRewards() external;
-    
-    /**
-     * @dev 提取BNB
-     * @param amount 数量
-     */
-    function withdrawBNB(uint256 amount) external;
-    
-    /**
-     * @dev 获取合约BNB余额
-     * @return balance BNB余额
-     */
-    function getContractBNBBalance() external view returns (uint256);
-    
-    /**
-     * @dev 获取合约代币余额
-     * @return balance 代币余额
-     */
-    function getContractTokenBalance() external view returns (uint256);
-    
-    /**
-     * @dev 获取用户质押信息
-     * @param user 用户地址
-     * @return stakeInfo 质押信息
-     */
-    function getUserStake(address user) external view returns (NFTDataTypes.NFTInfo memory);
-    
-    /**
-     * @dev 获取总质押量
-     * @return totalStaked 总质押量
-     */
-    function getTotalStaked() external view returns (uint256);
-    
-    /**
-     * @dev 设置代币合约地址
-     * @param tokenContract 代币合约地址
-     */
-    function setTokenContract(address tokenContract) external;
+    function getBreedingInfo(uint256 pairId) external view returns (
+        uint256 fatherId,
+        uint256 motherId,
+        address maleOwner,
+        address femaleOwner,
+        uint256 startTime,
+        uint256 breedingType,
+        uint256 status
+    );
 }
 
 /**
  * @title IBattle
  * @dev 战斗合约接口
+ *
+ * 定义战斗相关的功能：
+ * - 创建战斗房间
+ * - 执行战斗
+ * - 获取战斗结果
  */
 interface IBattle {
     /**
-     * @dev 设置NFT合约地址
-     * @param _nftContract NFT合约地址
+     * @dev 挑战对手
+     * @param challengerId 挑战者NFT ID
+     * @param challengedId 被挑战者NFT ID
+     * @param challengerTeam 挑战者队伍（6个NFT ID）
+     * @param challengedTeam 被挑战者队伍（6个NFT ID）
+     * @return tuple 战斗结果
      */
-    function setNFTContract(address _nftContract) external;
-    
+    function challenge(
+        uint256 challengerId,
+        uint256 challengedId,
+        uint256[6] calldata challengerTeam,
+        uint256[6] calldata challengedTeam
+    ) external returns (bool, uint256, uint256[] memory);
+
     /**
-     * @dev 设置授权合约地址
-     * @param a 授权合约地址
+     * @dev 模拟战斗（不改变状态）
+     * @param team1 队伍1
+     * @param team2 队伍2
+     * @return uint8 获胜队伍
      */
-    function setAuthorizer(address a) external;
+    function simulateBattle(uint256[6] calldata team1, uint256[6] calldata team2) external view returns (uint8);
+
+    /**
+     * @dev 获取战斗记录数量
+     * @return uint256 战斗记录数
+     */
+    function getBattleLogCount() external view returns (uint256);
+
+    /**
+     * @dev 获取战斗记录
+     * @param index 记录索引
+     * @return tuple 战斗详情
+     */
+    function getBattleLog(uint256 index) external view returns (
+        uint256 battleId,
+        uint256 challengerId,
+        uint256 challengedId,
+        uint8 winner,
+        uint256 timestamp
+    );
 }
 
 /**
  * @title IArenaRanking
  * @dev 竞技场排名合约接口
+ *
+ * 定义竞技场排名功能：
+ * - 每日挑战
+     * - 排名更新
+     * - 奖励领取
  */
 interface IArenaRanking {
     /**
-     * @dev 设置战斗队伍
-     * @param tokenIds NFT ID数组（必须为6个）
+     * @dev 挑战虚拟玩家
+     * @param playerTeam 玩家队伍（6个NFT ID）
+     * @param mockIndex 虚拟玩家索引
+     * @return bool 是否获胜
      */
-    function setBattleTeam(uint256[] calldata tokenIds) external;
-    
+    function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external returns (bool);
+
     /**
-     * @dev 清除战斗队伍
+     * @dev 挑战真实玩家
+     * @param playerTeam 玩家队伍
+     * @param challengedPlayer 被挑战玩家地址
+     * @return bool 是否获胜
      */
-    function clearBattleTeam() external;
-    
+    function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external returns (bool);
+
     /**
-     * @dev 挑战玩家
-     * @param defender 防守方地址
-     * @return success 挑战是否成功
-     * @return attackerWins 攻击方胜利场数
-     * @return defenderWins 防守方胜利场数
-     */
-    function challenge(address defender) external returns (bool, uint256, uint256);
-    
-    /**
-     * @dev 充值挑战次数
-     */
-    function rechargeChallengeAttempts() external;
-    
-    /**
-     * @dev 获取剩余挑战次数
+     * @dev 获取玩家排名
      * @param player 玩家地址
-     * @return remainingAttempts 剩余次数
+     * @return uint256 排名（1-based）
      */
-    function getRemainingAttempts(address player) external view returns (uint256);
-    
+    function getPlayerRank(address player) external view returns (uint256);
+
     /**
-     * @dev 设置挑战模式（仅所有者可调用）
-     * @param mode 模式（0=积分模式，1=排名交换模式）
+     * @dev 获取排名信息
+     * @param startIndex 起始索引
+     * @param endIndex 结束索引
+     * @return tuple[] 排名信息数组
      */
-    function setChallengeMode(uint8 mode) external;
-    
+    function getRankings(uint256 startIndex, uint256 endIndex) external view returns (
+        address[] memory players,
+        uint256[] memory scores,
+        uint256[] memory tiers
+    );
+
     /**
-     * @dev 获取当前挑战模式
-     * @return mode 当前模式
+     * @dev 领取每日奖励
      */
-    function currentMode() external view returns (uint8);
-    
+    function claimDailyReward() external;
+
     /**
-     * @dev 检查NFT是否在竞技场中
+     * @dev 获取当前赛季信息
+     * @return tuple 赛季信息
+     */
+    function getSeasonInfo() external view returns (uint256, uint256, uint256);
+}
+
+/**
+ * @title IStaking
+ * @dev NFT质押合约接口
+ *
+ * 定义NFT质押功能：
+ * - 质押NFT
+ * - 解除质押
+ * - 领取奖励
+ */
+interface IStaking {
+    /**
+     * @dev 质押NFT
+     * @param tokenIds NFT ID数组
+     */
+    function stake(uint256[] calldata tokenIds) external;
+
+    /**
+     * @dev 解除质押
+     * @param tokenIds NFT ID数组
+     */
+    function unstake(uint256[] calldata tokenIds) external;
+
+    /**
+     * @dev 领取质押奖励
+     */
+    function claimReward() external;
+
+    /**
+     * @dev 获取质押信息
      * @param tokenId NFT ID
-     * @return inArena 是否在竞技场中
+     * @return tuple 质押详情
      */
-    function isNFTInArena(uint256 tokenId) external view returns (bool);
-    
+    function getStakingInfo(uint256 tokenId) external view returns (
+        address owner,
+        uint256 stakeTime,
+        uint256 lastClaimTime,
+        uint256 accumulatedReward
+    );
+
     /**
-     * @dev 设置战斗合约地址
-     * @param _battleContract 战斗合约地址
+     * @dev 获取用户质押的NFT列表
+     * @param user 用户地址
+     * @return uint256[] 质押的NFT ID数组
      */
-    function setBattleContract(address _battleContract) external;
-    
+    function getUserStakedNFTs(address user) external view returns (uint256[] memory);
+
     /**
-     * @dev 设置NFT合约地址
-     * @param _nftContract NFT合约地址
+     * @dev 获取待领取奖励
+     * @param user 用户地址
+     * @return uint256 奖励数量
      */
-    function setNFTContract(address _nftContract) external;
-    
+    function getPendingReward(address user) external view returns (uint256);
+}
+
+/**
+ * @title ITokenStaking
+ * @dev 代币质押合约接口
+ *
+ * 定义代币质押功能：
+ * - 质押代币
+ * - 解除质押
+ * - 领取奖励
+ */
+interface ITokenStaking {
     /**
-     * @dev 设置授权合约地址
-     * @param a 授权合约地址
+     * @dev 质押代币
+     * @param amount 质押数量
      */
-    function setAuthorizer(address a) external;
+    function stake(uint256 amount) external;
+
+    /**
+     * @dev 解除质押
+     * @param amount 解除数量
+     */
+    function unstake(uint256 amount) external;
+
+    /**
+     * @dev 领取奖励
+     */
+    function claimReward() external;
+
+    /**
+     * @dev 获取质押信息
+     * @param user 用户地址
+     * @return tuple 质押详情
+     */
+    function getStakingInfo(address user) external view returns (
+        uint256 stakedAmount,
+        uint256 lastClaimTime,
+        uint256 accumulatedReward
+    );
+
+    /**
+     * @dev 获取待领取奖励
+     * @param user 用户地址
+     * @return uint256 奖励数量
+     */
+    function getPendingReward(address user) external view returns (uint256);
+}
+
+/**
+ * @title IRewardManager
+ * @dev 奖励管理合约接口
+ *
+ * 定义奖励分发功能：
+ * - 分发战斗奖励
+ * - 分发质押奖励
+ * - 分发交易分红
+ */
+interface IRewardManager {
+    /**
+     * @dev 分发战斗奖励
+     * @param winner 获胜者地址
+     * @param loser 失败者地址
+     * @param battleType 战斗类型
+     */
+    function distributeBattleReward(address winner, address loser, uint256 battleType) external;
+
+    /**
+     * @dev 添加质押池奖励
+     * @param amount 奖励数量
+     * @param poolType 池子类型（NFT质押/代币质押/竞技场）
+     */
+    function addStakingReward(uint256 amount, uint256 poolType) external;
+
+    /**
+     * @dev 领取分红
+     * @param user 用户地址
+     * @return uint256 分红数量
+     */
+    function claimDividend(address user) external returns (uint256);
+
+    /**
+     * @dev 获取用户可领取分红
+     * @param user 用户地址
+     * @return uint256 分红数量
+     */
+    function getDividend(address user) external view returns (uint256);
+}
+
+/**
+ * @title IDividendManager
+ * @dev 分红管理合约接口
+ *
+ * 定义交易分红功能：
+ * - 添加分红池
+ * - 领取分红
+ * - 计算用户份额
+ */
+interface IDividendManager {
+    /**
+     * @dev 添加到分红池
+     * @param amount 数量
+     */
+    function addDividendPool(uint256 amount) external;
+
+    /**
+     * @dev 领取分红
+     * @return uint256 领取数量
+     */
+    function claim() external returns (uint256);
+
+    /**
+     * @dev 获取可领取分红
+     * @param user 用户地址
+     * @return uint256 分红数量
+     */
+    function getClaimableDividend(address user) external view returns (uint256);
+
+    /**
+     * @dev 获取用户权重
+     * @param user 用户地址
+     * @return uint256 用户权重
+     */
+    function getUserWeight(address user) external view returns (uint256);
+
+    /**
+     * @dev 获取总权重
+     * @return uint256 总权重
+     */
+    function getTotalWeight() external view returns (uint256);
+}
+
+/**
+ * @title IPoolManager
+ * @dev 资金池管理合约接口
+ *
+ * 定义资金池功能：
+ * - 添加到池子
+ * - 从池子提取
+ * - 查询池子余额
+ */
+interface IPoolManager {
+    /**
+     * @dev 添加到NFT质押池
+     * @param amount 数量
+     */
+    function addToNFTStakingPool(uint256 amount) external;
+
+    /**
+     * @dev 添加到代币质押池
+     * @param amount 数量
+     */
+    function addToTokenStakingPool(uint256 amount) external;
+
+    /**
+     * @dev 添加到竞技场奖励池
+     * @param amount 数量
+     */
+    function addToArenaRewardPool(uint256 amount) external;
+
+    /**
+     * @dev 从NFT质押池提取
+     * @param amount 数量
+     */
+    function withdrawFromNFTStakingPool(uint256 amount) external;
+
+    /**
+     * @dev 从代币质押池提取
+     * @param amount 数量
+     */
+    function withdrawFromTokenStakingPool(uint256 amount) external;
+
+    /**
+     * @dev 获取池子余额
+     * @param poolType 池子类型
+     * @return uint256 余额
+     */
+    function getPoolBalance(uint256 poolType) external view returns (uint256);
+
+    /**
+     * @dev 紧急提取（仅管理员）
+     * @param token 代币地址
+     * @param to 接收地址
+     * @param amount 数量
+     */
+    function emergencyWithdraw(address token, address to, uint256 amount) external;
+}
+
+/**
+ * @title INFTTrading
+ * @dev NFT交易合约接口
+ *
+ * 定义NFT交易市场功能：
+ * - 上架NFT
+ * - 下架NFT
+ * - 购买NFT
+ * - 设置价格
+ */
+interface INFTTrading {
+    /**
+     * @dev 上架NFT
+     * @param tokenId NFT ID
+     * @param priceWei 价格（以Wei为单位）
+     */
+    function listNFT(uint256 tokenId, uint256 priceWei) external;
+
+    /**
+     * @dev 下架NFT
+     * @param tokenId NFT ID
+     */
+    function delistNFT(uint256 tokenId) external;
+
+    /**
+     * @dev 购买NFT
+     * @param tokenId NFT ID
+     */
+    function buyNFT(uint256 tokenId) external payable;
+
+    /**
+     * @dev 更新NFT价格
+     * @param tokenId NFT ID
+     * @param newPriceWei 新价格
+     */
+    function updatePrice(uint256 tokenId, uint256 newPriceWei) external;
+
+    /**
+     * @dev 获取挂牌信息
+     * @param tokenId NFT ID
+     * @return tuple 挂牌详情
+     */
+    function getListingInfo(uint256 tokenId) external view returns (
+        address seller,
+        uint256 priceWei,
+        uint256 listTime
+    );
+
+    /**
+     * @dev 获取在售NFT列表
+     * @return uint256[] 在售NFT ID数组
+     */
+    function getListedNFTs() external view returns (uint256[] memory);
+}
+
+/**
+ * @title IUpgradeModule
+ * @dev 升级模块接口
+ *
+ * 定义NFT升级功能：
+ * - 使用NFT升级
+ * - 使用代币升级
+ * - 使用USDT升级
+ */
+interface IUpgradeModule {
+    /**
+     * @dev 使用NFT升级
+     * @param tokenId 主NFT ID
+     */
+    function upgradeWithNFT(uint256 tokenId) external;
+
+    /**
+     * @dev 使用代币升级
+     * @param tokenId NFT ID
+     */
+    function upgradeWithToken(uint256 tokenId) external;
+
+    /**
+     * @dev 使用USDT升级
+     * @param tokenId NFT ID
+     */
+    function upgradeWithUSDValue(uint256 tokenId) external;
+
+    /**
+     * @dev 获取升级费用（代币）
+     * @param currentLevel 当前等级
+     * @return uint256 升级费用
+     */
+    function getUpgradeCost(uint256 currentLevel) external view returns (uint256);
+
+    /**
+     * @dev 获取升级所需NFT数量
+     * @param currentLevel 当前等级
+     * @return uint256 所需NFT数量
+     */
+    function getUpgradeMaterialCount(uint256 currentLevel) external view returns (uint256);
+
+    /**
+     * @dev 检查是否可以升级
+     * @param tokenId NFT ID
+     * @return bool 是否可以升级
+     */
+    function canUpgrade(uint256 tokenId) external view returns (bool);
+
+    /**
+     * @dev 获取NFT当前等级
+     * @param tokenId NFT ID
+     * @return uint256 当前等级
+     */
+    function getNFTLevel(uint256 tokenId) external view returns (uint256);
+}
+
+/**
+ * @title IMintModule
+ * @dev 铸造模块接口
+ *
+ * 定义NFT铸造功能：
+ * - 普通铸造
+ * - 稀有铸造
+ * - 十连铸造
+ * - 指定生肖铸造
+ */
+interface IMintModule {
+    /**
+     * @dev 普通铸造
+     * @param to 接收地址
+     * @return uint256 铸造的NFT ID
+     */
+    function mint(address to) external returns (uint256);
+
+    /**
+     * @dev 稀有铸造
+     * @param to 接收地址
+     * @return uint256 铸造的NFT ID
+     */
+    function mintRare(address to) external returns (uint256);
+
+    /**
+     * @dev 普通十连铸造
+     * @param to 接收地址
+     * @return uint256[] 铸造的NFT ID数组
+     */
+    function mintBatch(address to) external returns (uint256[] memory);
+
+    /**
+     * @dev 稀有十连铸造
+     * @param to 接收地址
+     * @return uint256[] 铸造的NFT ID数组
+     */
+    function mintRareBatch(address to) external returns (uint256[] memory);
+
+    /**
+     * @dev 指定生肖铸造
+     * @param to 接收地址
+     * @param zodiac 生肖索引（0-11）
+     * @return uint256[] 铸造的NFT ID数组（10个）
+     */
+    function mintZodiac(address to, uint256 zodiac) external returns (uint256[] memory);
+
+    /**
+     * @dev 获取铸造费用
+     * @param mintType 铸造类型（0普通, 1稀有, 2十连普通, 3十连稀有, 4指定生肖）
+     * @param zodiac 生肖索引（指定生肖铸造时使用）
+     * @return uint256 铸造费用（代币）
+     */
+    function getMintCost(uint256 mintType, uint256 zodiac) external view returns (uint256);
+}
+
+/**
+ * @title IPriceOracle
+ * @dev 价格预言机接口
+ *
+ * 定义代币价格查询功能：
+ * - 获取代币/USD价格
+ * - 获取ETH/USD价格
+ * - 获取铸造费用（USD计价）
+ */
+interface IPriceOracle {
+    /**
+     * @dev 获取代币价格（USD）
+     * @return uint256 价格（精度18位）
+     */
+    function getTokenPrice() external view returns (uint256);
+
+    /**
+     * @dev 获取ETH价格（USD）
+     * @return uint256 价格（精度18位）
+     */
+    function getETHPrice() external view returns (uint256);
+
+    /**
+     * @dev 计算USDT换算（用于升级费用计算）
+     * @param tokenAmount 代币数量
+     * @return uint256 等值USDT
+     */
+    function calculateUSDTEquivalent(uint256 tokenAmount) external view returns (uint256);
+
+    /**
+     * @dev 计算代币换算（用于显示）
+     * @param usdtAmount USDT数量
+     * @return uint256 等值代币
+     */
+    function calculateTokenEquivalent(uint256 usdtAmount) external view returns (uint256);
+}
+
+/**
+ * @title IAuthorizer
+ * @dev 权限管理接口
+ *
+ * 定义基于权重的权限系统：
+ * - 设置权限
+ * - 检查权限
+ * - 获取权重
+ */
+interface IAuthorizer {
+    /**
+     * @dev 授予权限
+     * @param user 用户地址
+     * @param weight 权重值
+     */
+    function grantPermission(address user, uint256 weight) external;
+
+    /**
+     * @dev 撤销权限
+     * @param user 用户地址
+     */
+    function revokePermission(address user) external;
+
+    /**
+     * @dev 检查是否有权限
+     * @param user 用户地址
+     * @param weightRequired 所需权重
+     * @return bool 是否有权限
+     */
+    function hasPermission(address user, uint256 weightRequired) external view returns (bool);
+
+    /**
+     * @dev 获取用户权重
+     * @param user 用户地址
+     * @return uint256 权重值
+     */
+    function getWeight(address user) external view returns (uint256);
+
+    /**
+     * @dev 获取总权重
+     * @return uint256 总权重
+     */
+    function getTotalWeight() external view returns (uint256);
 }

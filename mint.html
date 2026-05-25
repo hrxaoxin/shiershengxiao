@@ -508,7 +508,10 @@
 
         async function handleMint(methodName, cost, displayName, btn, extraArgs = []) {
             const account = ZODIAC_WEB3.getAccount();
-            if (!account || !nftMintContract) return;
+            if (!tokenBurnerContract || !nftMintContract) {
+                ZODIAC_UI.showToast('合约未初始化', 'error');
+                return;
+            }
 
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 铸造中...';
             btn.disabled = true;
@@ -525,12 +528,29 @@
                     return;
                 }
 
-                const args = [account, ...extraArgs];
-                const gas = await ZODIAC_WEB3.estimateGas(nftMintContract, methodName, args, account);
-                const tx = await nftMintContract.methods[methodName](...args).send({
-                    from: account,
-                    gas: gas
-                });
+                let tx;
+                if (methodName === 'mintTargeted') {
+                    const zodiac = extraArgs[0];
+                    const gas = await ZODIAC_WEB3.estimateGas(tokenBurnerContract, 'burnAndMintTargeted', [account, zodiac], account);
+                    tx = await tokenBurnerContract.methods.burnAndMintTargeted(account, zodiac).send({
+                        from: account,
+                        gas: gas
+                    });
+                } else if (methodName === 'mintNormalTen' || methodName === 'mintRareTen') {
+                    const isRare = methodName === 'mintRareTen';
+                    const gas = await ZODIAC_WEB3.estimateGas(tokenBurnerContract, 'burnAndMintTen', [account, isRare], account);
+                    tx = await tokenBurnerContract.methods.burnAndMintTen(account, isRare).send({
+                        from: account,
+                        gas: gas
+                    });
+                } else {
+                    const isRare = methodName === 'mintRare';
+                    const gas = await ZODIAC_WEB3.estimateGas(tokenBurnerContract, 'burnAndMint', [account, isRare], account);
+                    tx = await tokenBurnerContract.methods.burnAndMint(account, isRare).send({
+                        from: account,
+                        gas: gas
+                    });
+                }
 
                 if (methodName.includes('Ten')) {
                     const mintedTokenIds = [];

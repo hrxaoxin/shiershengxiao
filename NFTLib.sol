@@ -3,187 +3,463 @@ pragma solidity ^0.8.20;
 
 /**
  * @title NFTLib
- * @dev NFT工具库，提供字符串处理、数学运算等辅助函数
+ * @dev NFT工具库，提供生肖NFT相关的数学计算和属性判断函数
+ *
+ * 本库包含以下功能模块：
+ * 1. 战斗属性计算 - 攻击、防御、速度、生命值
+ * 2. 属性克制判断 - 五行相克逻辑
+ * 3. 伤害计算 - 技能伤害和暴击
+ * 4. 权重系统 - 分红和质押的权重计算
+ *
+ * 战斗属性计算公式：
+ * - 基础属性由生肖类型决定
+ * - 最终属性 = 基础属性 × (1 + 等级加成)
+ * - 等级加成 = (level - 1) × 0.1
+ *
+ * 属性克制关系：
+ * - 火克风：火属性攻击风属性时伤害×1.5
+ * - 风克水：风属性攻击水属性时伤害×1.5
+ * - 水克火：水属性攻击火属性时伤害×1.5
+ * - 光克暗：光属性攻击暗属性时伤害×1.5
+ * - 暗克光：暗属性攻击光属性时伤害×1.5
  */
 library NFTLib {
     /**
-     * @dev 将无符号整数转换为字符串
-     * @param n 要转换的整数
-     * @return string memory 转换后的字符串
+     * @dev 战斗属性结构体
+     *
+     * 存储NFT在战斗中的各项属性数值
+     * 这些值由NFT的等级和基础属性决定
      */
-    function uint2str(uint256 n) public pure returns (string memory) {
-        if (n == 0) return "0";
-        uint256 temp = n;
-        uint256 len;
-        while (temp != 0) { len++; temp /= 10; }
-        bytes memory buf = new bytes(len);
-        while (n != 0) { len--; buf[len] = bytes1(uint8(48 + n % 10)); n /= 10; }
-        return string(buf);
+    struct BattleAttributes {
+        uint256 hp;         // 生命值
+        uint256 attack;     // 攻击力
+        uint256 defense;    // 防御力
+        uint256 speed;      // 速度（决定先手顺序）
+        uint256 critical;   // 暴击率（0-10000，表示0%-100%）
+        uint256 dodge;      // 闪避率（0-10000，表示0%-100%）
     }
 
     /**
-     * @dev 将以太坊地址转换为十六进制字符串
-     * @param _addr 要转换的地址
-     * @return string memory 转换后的十六进制字符串（以0x开头）
+     * @dev 攻击结果结构体
+     *
+     * 存储一次攻击的所有相关信息
+     * 包括是否暴击、是否闪避、最终伤害等
      */
-    function addressToString(address _addr) public pure returns (string memory) {
-        bytes32 value = bytes32(uint256(uint160(_addr)));
-        bytes memory alphabet = "0123456789abcdef";
-        bytes memory str = new bytes(42);
-        str[0] = '0'; str[1] = 'x';
-        for (uint i = 0; i < 20; i++) {
-            str[2+i*2] = alphabet[uint8(value[i+12] >> 4)];
-            str[3+i*2] = alphabet[uint8(value[i+12] & 0x0f)];
+    struct AttackResult {
+        uint256 damage;        // 最终伤害
+        bool isCritical;        // 是否暴击
+        bool isDodged;          // 是否被闪避
+        uint256 elementalBonus; // 属性克制加成（100=无加成，150=克制）
+    }
+
+    /**
+     * @dev 根据生肖类型获取基础速度
+     *
+     * 速度影响战斗中的出手顺序，速度越高越先攻击
+     * 速度还会影响闪避率的计算（速度越快越容易闪避）
+     *
+     * @param zodiacType 生肖类型（0-11对应十二生肖）
+     * @return uint256 基础速度值
+     *
+     * 速度排名（从高到低）：
+     * - 猴(MONKEY): 110 - 最快
+     * - 马(HORSE): 100
+     * - 鼠(RAT): 95
+     * - 兔(RABBIT): 90
+     * - 蛇(SNAKE): 85
+     * - 龙(DRAGON): 80
+     * - 虎(TIGER): 70
+     * - 狗(DOG): 60
+     * - 鸡(ROOSTER): 55
+     * - 牛(OX): 40
+     * - 羊(GOAT): 35
+     * - 猪(PIG): 30 - 最慢
+     */
+    function getBaseSpeed(uint256 zodiacType) internal pure returns (uint256) {
+        uint256[12] memory baseSpeeds = [
+            95,   // RAT (0) - 鼠
+            40,   // OX (1) - 牛
+            70,   // TIGER (2) - 虎
+            90,   // RABBIT (3) - 兔
+            80,   // DRAGON (4) - 龙
+            85,   // SNAKE (5) - 蛇
+            100,  // HORSE (6) - 马
+            35,   // GOAT (7) - 羊
+            110,  // MONKEY (8) - 猴
+            55,   // ROOSTER (9) - 鸡
+            60,   // DOG (10) - 狗
+            30    // PIG (11) - 猪
+        ];
+        require(zodiacType < 12, "NFTLib: Invalid zodiac type");
+        return baseSpeeds[zodiacType];
+    }
+
+    /**
+     * @dev 根据等级计算属性加成
+     *
+     * 等级加成公式: multiplier = 1 + (level - 1) × 0.1
+     *
+     * 示例：
+     * - 1级: multiplier = 1.0 (无加成)
+     * - 2级: multiplier = 1.1 (+10%)
+     * - 3级: multiplier = 1.2 (+20%)
+     * - 4级: multiplier = 1.3 (+30%)
+     * - 5级: multiplier = 1.4 (+40%)
+     *
+     * @param level NFT等级（1-5）
+     * @return uint256 加成倍数（精度2位小数，100=1.0）
+     */
+    function getLevelMultiplier(uint256 level) internal pure returns (uint256) {
+        require(level >= 1 && level <= 5, "NFTLib: Invalid level");
+        return 100 + (level - 1) * 10;
+    }
+
+    /**
+     * @dev 计算战斗属性
+     *
+     * 根据NFT的基础属性和等级计算战斗时的完整属性
+     *
+     * @param zodiacType 生肖类型（0-11）
+     * @param level NFT等级（1-5）
+     * @return BattleAttributes 战斗属性结构体
+     *
+     * 属性计算：
+     * - hp: 基础HP(500-2000) × 等级加成
+     * - attack: 基础攻击(50-200) × 等级加成
+     * - defense: 基础防御(30-150) × 等级加成
+     * - speed: 基础速度 × 等级加成
+     * - critical: 基础暴击 + 等级加成(每级+2%)
+     * - dodge: 基础闪避 + 等级加成(每级+1%)
+     */
+    function calculateBattleAttributes(uint256 zodiacType, uint256 level) internal pure returns (BattleAttributes memory) {
+        uint256[12] memory baseHP = [1200, 2000, 1600, 1000, 1800, 1400, 1500, 900, 1100, 800, 1300, 700];
+        uint256[12] memory baseAttack = [120, 80, 150, 90, 180, 140, 130, 60, 160, 70, 100, 50];
+        uint256[12] memory baseDefense = [80, 120, 100, 70, 130, 110, 90, 60, 100, 50, 110, 40];
+        uint256[12] memory baseCritical = [800, 500, 900, 600, 850, 750, 700, 400, 950, 550, 650, 350];
+
+        require(zodiacType < 12, "NFTLib: Invalid zodiac type");
+        require(level >= 1 && level <= 5, "NFTLib: Invalid level");
+
+        uint256 multiplier = getLevelMultiplier(level);
+
+        BattleAttributes memory attrs;
+        attrs.hp = baseHP[zodiacType] * multiplier / 100;
+        attrs.attack = baseAttack[zodiacType] * multiplier / 100;
+        attrs.defense = baseDefense[zodiacType] * multiplier / 100;
+        attrs.speed = getBaseSpeed(zodiacType) * multiplier / 100;
+        attrs.critical = baseCritical[zodiacType] + level * 200;
+        attrs.dodge = 500 + level * 100;
+
+        if (attrs.critical > 3500) attrs.critical = 3500;
+        if (attrs.dodge > 1500) attrs.dodge = 1500;
+
+        return attrs;
+    }
+
+    /**
+     * @dev 判断属性克制关系
+     *
+     * 计算攻击方属性对被攻击方属性的克制加成
+     *
+     * 属性编号：
+     * - 0: 水 (WATER)
+     * - 1: 风 (WIND)
+     * - 2: 火 (FIRE)
+     * - 3: 暗 (DARK)
+     * - 4: 光 (LIGHT)
+     *
+     * 克制关系：
+     * - 火(2) → 风(1): 伤害×1.5
+     * - 风(1) → 水(0): 伤害×1.5
+     * - 水(0) → 火(2): 伤害×1.5
+     * - 光(4) → 暗(3): 伤害×1.5
+     * - 暗(3) → 光(4): 伤害×1.5
+     * - 同属性或无克制关系: 伤害×1.0
+     *
+     * @param attackerElement 攻击方属性（0-4）
+     * @param defenderElement 防守方属性（0-4）
+     * @return uint256 克制加成（100=无加成，150=克制）
+     */
+    function getElementalBonus(uint256 attackerElement, uint256 defenderElement) internal pure returns (uint256) {
+        if (attackerElement == 2 && defenderElement == 1) return 150; // 火克风
+        if (attackerElement == 1 && defenderElement == 0) return 150; // 风克水
+        if (attackerElement == 0 && defenderElement == 2) return 150; // 水克火
+        if (attackerElement == 4 && defenderElement == 3) return 150; // 光克暗
+        if (attackerElement == 3 && defenderElement == 4) return 150; // 暗克光
+        return 100; // 无克制
+    }
+
+    /**
+     * @dev 计算伤害
+     *
+     * 伤害公式：
+     * baseDamage = attacker.attack × elementalBonus / 100
+     * finalDamage = baseDamage × (defender.defense / 1000 + 1)
+     *              × randomFactor / 100
+     *
+     * @param attacker 攻击方属性
+     * @param defender 防守方属性
+     * @param attackerElement 攻击方属性类型（0-4）
+     * @param defenderElement 防守方属性类型（0-4）
+     * @param randomValue 随机值（0-100）
+     * @return AttackResult 攻击结果
+     *
+     * 暴击：randomValue < attacker.critical 时触发暴击，伤害×1.5
+     * 闪避：randomValue < defender.dodge 时闪避成功，返回0伤害
+     */
+    function calculateDamage(
+        BattleAttributes memory attacker,
+        BattleAttributes memory defender,
+        uint256 attackerElement,
+        uint256 defenderElement,
+        uint256 randomValue
+    ) internal pure returns (AttackResult memory) {
+        AttackResult memory result;
+
+        if (randomValue < defender.dodge) {
+            result.isDodged = true;
+            result.damage = 0;
+            return result;
         }
-        return string(str);
-    }
 
-    /**
-     * @dev Base64编码函数
-     * @param data 要编码的原始字节数据
-     * @return string memory Base64编码后的字符串
-     */
-    function base64Encode(bytes memory data) public pure returns (string memory) {
-        bytes memory base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        bytes memory result = new bytes((data.length + 2) / 3 * 4);
-        uint cursor = 0;
-        for (uint i = 0; i < data.length; i += 3) {
-            uint b0 = uint8(data[i]);
-            uint b1 = i+1 < data.length ? uint8(data[i+1]) : 0;
-            uint b2 = i+2 < data.length ? uint8(data[i+2]) : 0;
-            uint chunk = (b0 << 16) | (b1 << 8) | b2;
-            result[cursor++] = base64[(chunk >> 18) & 0x3F];
-            result[cursor++] = base64[(chunk >> 12) & 0x3F];
-            result[cursor++] = base64[(chunk >> 6) & 0x3F];
-            result[cursor++] = base64[chunk & 0x3F];
+        result.elementalBonus = getElementalBonus(attackerElement, defenderElement);
+        uint256 baseDamage = attacker.attack * result.elementalBonus / 100;
+        uint256 defenseReduction = 1000 + defender.defense;
+        uint256 finalDamage = baseDamage * 1000 / defenseReduction;
+
+        result.isCritical = randomValue < attacker.critical;
+        if (result.isCritical) {
+            finalDamage = finalDamage * 3 / 2;
         }
-        if (data.length % 3 == 1) { result[cursor-2] = '='; result[cursor-1] = '='; }
-        else if (data.length % 3 == 2) { result[cursor-1] = '='; }
-        return string(result);
+
+        result.damage = finalDamage;
+        return result;
     }
 
     /**
-     * @dev 转义字符串中的特殊字符（双引号和反斜杠）
-     * @param input 输入字符串
-     * @return string memory 转义后的字符串
+     * @dev 计算攻击力（简化版）
+     *
+     * 用于不需要完整战斗属性的场合
+     *
+     * @param zodiacType 生肖类型（0-11）
+     * @param level 等级（1-5）
+     * @return uint256 攻击力
      */
-    function escapeString(string memory input) public pure returns (string memory) {
-        bytes memory b = bytes(input);
-        uint esc;
-        for (uint i; i<b.length; i++) { if (b[i] == '"' || b[i] == '\\') esc++; }
-        if (esc == 0) return input;
-        bytes memory o = new bytes(b.length + esc);
-        uint j;
-        for (uint i; i<b.length; i++) {
-            if (b[i] == '"' || b[i] == '\\') o[j++] = '\\';
-            o[j++] = b[i];
-        }
-        return string(o);
+    function calculateAttack(uint256 zodiacType, uint256 level) internal pure returns (uint256) {
+        uint256[12] memory baseAttack = [120, 80, 150, 90, 180, 140, 130, 60, 160, 70, 100, 50];
+        require(zodiacType < 12, "NFTLib: Invalid zodiac type");
+        require(level >= 1 && level <= 5, "NFTLib: Invalid level");
+        uint256 multiplier = getLevelMultiplier(level);
+        return baseAttack[zodiacType] * multiplier / 100;
     }
 
     /**
-     * @dev 连接两个字符串
-     * @param a 第一个字符串
-     * @param b 第二个字符串
-     * @return string memory 连接后的字符串
+     * @dev 计算防御力（简化版）
+     *
+     * @param zodiacType 生肖类型（0-11）
+     * @param level 等级（1-5）
+     * @return uint256 防御力
      */
-    function concat(string memory a, string memory b) internal pure returns (string memory) {
-        return string(abi.encodePacked(a, b));
+    function calculateDefense(uint256 zodiacType, uint256 level) internal pure returns (uint256) {
+        uint256[12] memory baseDefense = [80, 120, 100, 70, 130, 110, 90, 60, 100, 50, 110, 40];
+        require(zodiacType < 12, "NFTLib: Invalid zodiac type");
+        require(level >= 1 && level <= 5, "NFTLib: Invalid level");
+        uint256 multiplier = getLevelMultiplier(level);
+        return baseDefense[zodiacType] * multiplier / 100;
     }
 
     /**
-     * @dev 连接三个字符串
-     * @param a 第一个字符串
-     * @param b 第二个字符串
-     * @param c 第三个字符串
-     * @return string memory 连接后的字符串
+     * @dev 计算生命值（简化版）
+     *
+     * @param zodiacType 生肖类型（0-11）
+     * @param level 等级（1-5）
+     * @return uint256 生命值
      */
-    function concat3(string memory a, string memory b, string memory c) internal pure returns (string memory) {
-        return string(abi.encodePacked(a, b, c));
+    function calculateHP(uint256 zodiacType, uint256 level) internal pure returns (uint256) {
+        uint256[12] memory baseHP = [1200, 2000, 1600, 1000, 1800, 1400, 1500, 900, 1100, 800, 1300, 700];
+        require(zodiacType < 12, "NFTLib: Invalid zodiac type");
+        require(level >= 1 && level <= 5, "NFTLib: Invalid level");
+        uint256 multiplier = getLevelMultiplier(level);
+        return baseHP[zodiacType] * multiplier / 100;
     }
 
     /**
-     * @dev 安全减法，防止下溢
-     * @param a 被减数
-     * @param b 减数
-     * @return uint256 差
+     * @dev 计算速度（简化版）
+     *
+     * @param zodiacType 生肖类型（0-11）
+     * @param level 等级（1-5）
+     * @return uint256 速度值
      */
-    function safeSub(uint256 a, uint256 b) internal pure returns (uint256) {
-        require(a >= b, "NFTLib: Underflow in subtraction");
-        return a - b;
+    function calculateSpeed(uint256 zodiacType, uint256 level) internal pure returns (uint256) {
+        require(zodiacType < 12, "NFTLib: Invalid zodiac type");
+        require(level >= 1 && level <= 5, "NFTLib: Invalid level");
+        uint256 multiplier = getLevelMultiplier(level);
+        return getBaseSpeed(zodiacType) * multiplier / 100;
     }
 
     /**
-     * @dev 安全加法，防止溢出
-     * @param a 被加数
+     * @dev 获取普通NFT的升级权重
+     *
+     * 权重用于分红和质押奖励的计算
+     * 等级越高，权重越大
+     *
+     * @param level 等级（1-5）
+     * @return uint256 权重值
+     *
+     * 权重表（普通NFT）：
+     * - 1级: 1
+     * - 2级: 2
+     * - 3级: 6
+     * - 4级: 18
+     * - 5级: 66
+     */
+    function getCommonUpgradeWeight(uint256 level) internal pure returns (uint256) {
+        uint256[6] memory weights = [0, 1, 2, 6, 18, 66];
+        require(level <= 5, "NFTLib: Invalid level");
+        return weights[level];
+    }
+
+    /**
+     * @dev 获取稀有NFT的升级权重
+     *
+     * 稀有NFT（暗/光属性）的权重更高
+     *
+     * @param level 等级（1-5）
+     * @return uint256 权重值
+     *
+     * 权重表（稀有NFT）：
+     * - 1级: 10
+     * - 2级: 12
+     * - 3级: 16
+     * - 4级: 28
+     * - 5级: 76
+     */
+    function getRareUpgradeWeight(uint256 level) internal pure returns (uint256) {
+        uint256[6] memory weights = [0, 10, 12, 16, 28, 76];
+        require(level <= 5, "NFTLib: Invalid level");
+        return weights[level];
+    }
+
+    /**
+     * @dev 验证属性值是否有效
+     *
+     * @param element 属性类型值（0-4）
+     * @return bool 是否有效
+     */
+    function isValidElement(uint256 element) internal pure returns (bool) {
+        return element < 5;
+    }
+
+    /**
+     * @dev 验证生肖类型值是否有效
+     *
+     * @param zodiacType 生肖类型值（0-11）
+     * @return bool 是否有效
+     */
+    function isValidZodiac(uint256 zodiacType) internal pure returns (bool) {
+        return zodiacType < 12;
+    }
+
+    /**
+     * @dev 验证等级值是否有效
+     *
+     * @param level 等级值（1-5）
+     * @return bool 是否有效
+     */
+    function isValidLevel(uint256 level) internal pure returns (bool) {
+        return level >= 1 && level <= 5;
+    }
+
+    /**
+     * @dev 判断是否为稀有属性
+     *
+     * 稀有属性包括：暗(3)、光(4)
+     * 稀有属性NFT在战斗中有额外加成，权重也更高
+     *
+     * @param element 属性类型值（0-4）
+     * @return bool 是否为稀有属性
+     */
+    function isRareElement(uint256 element) internal pure returns (bool) {
+        return element == 3 || element == 4; // DARK or LIGHT
+    }
+
+    /**
+     * @dev 获取属性名称
+     *
+     * @param element 属性类型值（0-4）
+     * @return string 属性名称
+     */
+    function getElementName(uint256 element) internal pure returns (string memory) {
+        if (element == 0) return "Water";
+        if (element == 1) return "Wind";
+        if (element == 2) return "Fire";
+        if (element == 3) return "Dark";
+        if (element == 4) return "Light";
+        revert("NFTLib: Invalid element");
+    }
+
+    /**
+     * @dev 获取生肖名称
+     *
+     * @param zodiac 生肖类型值（0-11）
+     * @return string 生肖名称
+     */
+    function getZodiacName(uint256 zodiac) internal pure returns (string memory) {
+        if (zodiac == 0) return "Rat";
+        if (zodiac == 1) return "Ox";
+        if (zodiac == 2) return "Tiger";
+        if (zodiac == 3) return "Rabbit";
+        if (zodiac == 4) return "Dragon";
+        if (zodiac == 5) return "Snake";
+        if (zodiac == 6) return "Horse";
+        if (zodiac == 7) return "Goat";
+        if (zodiac == 8) return "Monkey";
+        if (zodiac == 9) return "Rooster";
+        if (zodiac == 10) return "Dog";
+        if (zodiac == 11) return "Pig";
+        revert("NFTLib: Invalid zodiac");
+    }
+
+    /**
+     * @dev 安全执行除法
+     *
+     * 防止除以零错误
+     *
+     * @param a 被除数
+     * @param b 除数
+     * @return uint256 结果
+     */
+    function safeDiv(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b > 0, "NFTLib: Division by zero");
+        return a / b;
+    }
+
+    /**
+     * @dev 安全执行加法
+     *
+     * 防止溢出
+     *
+     * @param a 加数
      * @param b 加数
-     * @return uint256 和
+     * @return uint256 结果
      */
     function safeAdd(uint256 a, uint256 b) internal pure returns (uint256) {
-        require(a <= type(uint256).max - b, "NFTLib: Overflow in addition");
-        return a + b;
+        uint256 c = a + b;
+        require(c >= a, "NFTLib: Addition overflow");
+        return c;
     }
 
     /**
-     * @dev 安全乘法，防止溢出
-     * @param a 被乘数
-     * @param b 乘数
-     * @return uint256 积
+     * @dev 安全执行减法
+     *
+     * 防止下溢
+     *
+     * @param a 被减数
+     * @param b 减数
+     * @return uint256 结果
      */
-    function safeMul(uint256 a, uint256 b) internal pure returns (uint256) {
-        if (a == 0 || b == 0) return 0;
-        require(a <= type(uint256).max / b, "NFTLib: Overflow in multiplication");
-        return a * b;
-    }
-
-    /**
-     * @dev 返回两个数中的较小值
-     * @param a 第一个数
-     * @param b 第二个数
-     * @return uint256 较小值
-     */
-    function min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
-    }
-
-    /**
-     * @dev 返回两个数中的较大值
-     * @param a 第一个数
-     * @param b 第二个数
-     * @return uint256 较大值
-     */
-    function max(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a > b ? a : b;
-    }
-
-    /**
-     * @dev 计算NFT等级对应的权重增量
-     * 权重规则：1阶=1, 2阶=2, 3阶=4, 4阶=12, 5阶=48
-     * @param level NFT等级（1-5）
-     * @return uint256 权重增量
-     */
-    function calculateWeightDelta(uint8 level) internal pure returns (uint256) {
-        if (level == 1) return 1;
-        if (level == 2) return 2;
-        if (level == 3) return 4;
-        if (level == 4) return 12;
-        if (level == 5) return 48;
-        return 0;
-    }
-
-    /**
-     * @dev 更新用户权重值
-     * @param currentWeight 当前权重
-     * @param level NFT等级
-     * @param add 是否增加权重（true增加，false减少）
-     * @return uint256 更新后的权重
-     */
-    function updateUserWeightValue(uint256 currentWeight, uint8 level, bool add) internal pure returns (uint256) {
-        uint256 weightDelta = calculateWeightDelta(level);
-        if (add) {
-            return currentWeight + weightDelta;
-        } else {
-            return currentWeight >= weightDelta ? currentWeight - weightDelta : 0;
-        }
+    function safeSub(uint256 a, uint256 b) internal pure returns (uint256) {
+        require(b <= a, "NFTLib: Subtraction underflow");
+        return a - b;
     }
 }

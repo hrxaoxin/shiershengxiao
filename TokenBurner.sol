@@ -1,228 +1,163 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/**
- * @title TokenBurner
- * @dev 代币销毁合约，统一管理NFT铸造所需的代币销毁
- * 支持修改销毁费用，仅限合约拥有者操作
- * 基于OpenZeppelin可升级合约实现
- */
-import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 
-/**
- * @title TokenBurner
- * @dev 代币销毁合约
- */
+interface INFTMint {
+    function mintNormal(address to) external returns (uint256);
+    function mintRare(address to) external returns (uint256);
+    function mintNormalTen(address to) external returns (uint256[] memory);
+    function mintRareTen(address to) external returns (uint256[] memory);
+    function mintTargeted(address to, uint8 baseZodiac) external returns (uint256[] memory);
+}
+
 contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
-    /** @dev 黑洞地址，用于销毁代币 */
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
-    
-    /** @dev 普通铸造费用（默认8888代币） */
-    uint256 public normalMintCost = 8888;
-    /** @dev 稀有铸造费用（默认88888代币） */
-    uint256 public rareMintCost = 88888;
 
-    /** @dev 代币合约地址 */
+    uint256 public normalMintCost = 8888 * 10**18;
+    uint256 public rareMintCost = 88888 * 10**18;
+
     address public tokenContract;
-    /** @dev 授权合约地址 */
-    address public authorizer;
-    /** @dev 授权的NFT合约地址 */
     address public authorizedNFTContract;
+    address public nftMintContract;
 
-    /** @dev 代币销毁事件 */
     event TokenBurned(address indexed user, uint256 amount, uint256 timestamp);
-    /** @dev 费用更新事件 */
     event MintCostUpdated(uint256 oldNormalCost, uint256 newNormalCost, uint256 oldRareCost, uint256 newRareCost, uint256 timestamp);
+    event NFTMinted(address indexed user, uint256 tokenId, uint256 zodiacType, bool isRare);
+
+    modifier onlyAuthorized() {
+        require(msg.sender == authorizedNFTContract || msg.sender == owner() || msg.sender == nftMintContract, "TokenBurner: Unauthorized");
+        _;
+    }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    /**
-     * @dev 初始化合约
-     * @param _tokenContract 代币合约地址
-     * @param _authorizer 授权合约地址
-     */
-    function initialize(address _tokenContract, address _authorizer) external initializer {
+    function initialize(address _tokenContract, address _nftMint) external initializer {
         __UUPSUpgradeable_init();
         __Ownable2Step_init();
-
         tokenContract = _tokenContract;
-        authorizer = _authorizer;
+        nftMintContract = _nftMint;
     }
 
-    /**
-     * @dev 升级授权函数
-     * @param newImplementation 新实现合约地址
-     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    /**
-     * @dev 销毁代币用于铸造（仅限授权的NFT合约或管理员调用）
-     * @param user 用户地址
-     * @param isRare 是否稀有铸造
-     * @return bool 是否成功
-     */
-    function burnAndMint(address user, bool isRare) public returns (bool) {
-        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
-        require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
-        require(msg.sender == authorizedNFTContract || msg.sender == authorizer, "TokenBurner: Unauthorized caller");
-        require(user != address(0), "TokenBurner: Zero user address");
-        
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        uint256 cost = isRare ? rareMintCost : normalMintCost;
-        require(cost > 0, "TokenBurner: Invalid cost");
-        require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
-        require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
-        
-        bool success = token.transferFrom(user, BLACK_HOLE, cost);
-        require(success, "TokenBurner: Token transfer failed");
-        
-        emit TokenBurned(user, cost, block.timestamp);
-        return true;
-    }
-    
-    /**
-     * @dev 销毁代币用于十连铸造（仅限授权的NFT合约或管理员调用）
-     * @param user 用户地址
-     * @param isRare 是否光暗十连（true为光暗，false为普通）
-     * @return bool 是否成功
-     */
-    function burnAndMintTen(address user, bool isRare) external returns (bool) {
-        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
-        require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
-        require(msg.sender == authorizedNFTContract || msg.sender == authorizer, "TokenBurner: Unauthorized caller");
-        require(user != address(0), "TokenBurner: Zero user address");
-        
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        uint256 cost = isRare ? rareMintCost * 10 : normalMintCost * 10;
-        require(cost > 0, "TokenBurner: Invalid cost");
-        require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
-        require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
-        
-        bool success = token.transferFrom(user, BLACK_HOLE, cost);
-        require(success, "TokenBurner: Token transfer failed");
-        
-        emit TokenBurned(user, cost, block.timestamp);
-        return true;
-    }
-    
-    /**
-     * @dev 销毁代币用于指定铸造（仅限授权的NFT合约或管理员调用）
-     * 消耗6x普通铸造代币 + 4x光暗铸造代币
-     * @param user 用户地址
-     * @return bool 是否成功
-     */
-    function burnAndMintTargeted(address user) external returns (bool) {
-        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
-        require(authorizedNFTContract != address(0), "TokenBurner: authorizedNFTContract not set");
-        require(msg.sender == authorizedNFTContract || msg.sender == authorizer, "TokenBurner: Unauthorized caller");
-        require(user != address(0), "TokenBurner: Zero user address");
-        
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        uint256 normalPart = normalMintCost * 6;  // 6倍普通铸造
-        uint256 rarePart = rareMintCost * 4;      // 4倍光暗铸造
-        uint256 totalCost = normalPart + rarePart;
-        
-        require(totalCost > 0, "TokenBurner: Invalid cost");
-        require(token.balanceOf(user) >= totalCost, "TokenBurner: Insufficient balance");
-        require(token.allowance(user, address(this)) >= totalCost, "TokenBurner: Insufficient allowance");
-        
-        bool success = token.transferFrom(user, BLACK_HOLE, totalCost);
-        require(success, "TokenBurner: Token transfer failed");
-        
-        emit TokenBurned(user, totalCost, block.timestamp);
-        return true;
-    }
-    
-    /**
-     * @dev 获取普通十连铸造费用
-     * @return uint256 费用（代币数量）
-     */
-    function normalMintTenCost() external view returns (uint256) {
-        return normalMintCost * 10;
-    }
-    
-    /**
-     * @dev 获取光暗十连铸造费用
-     * @return uint256 费用（代币数量）
-     */
-    function rareMintTenCost() external view returns (uint256) {
-        return rareMintCost * 10;
-    }
-    
-    /**
-     * @dev 获取指定铸造费用
-     * @return uint256 normalPart 普通铸造部分费用（6倍）
-     * @return uint256 rarePart 光暗铸造部分费用（4倍）
-     */
-    function targetedMintCost() external view returns (uint256, uint256) {
-        return (normalMintCost * 6, rareMintCost * 4);
-    }
-    
-    /**
-     * @dev 设置授权的NFT合约地址
-     * @param nftContract NFT合约地址
-     */
-    function setAuthorizedNFTContract(address nftContract) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "TokenBurner: Unauthorized");
-        require(nftContract != address(0), "TokenBurner: Zero address");
-        authorizedNFTContract = nftContract;
+    function setNFTContract(address _nftMint) external onlyOwner {
+        require(_nftMint != address(0), "TokenBurner: Zero address");
+        nftMintContract = _nftMint;
     }
 
-    /**
-     * @dev 设置普通铸造费用（仅限合约拥有者）
-     * @param cost 新的铸造费用（代币数量）
-     */
+    function setAuthorizedNFTContract(address _authorized) external onlyOwner {
+        require(_authorized != address(0), "TokenBurner: Zero address");
+        authorizedNFTContract = _authorized;
+    }
+
     function setNormalMintCost(uint256 cost) external onlyOwner {
         require(cost > 0, "TokenBurner: cost must be > 0");
         uint256 oldNormal = normalMintCost;
-        uint256 oldRare = rareMintCost;
         normalMintCost = cost;
-        emit MintCostUpdated(oldNormal, cost, oldRare, rareMintCost, block.timestamp);
+        emit MintCostUpdated(oldNormal, cost, rareMintCost, rareMintCost, block.timestamp);
     }
 
-    /**
-     * @dev 设置稀有铸造费用（仅限合约拥有者）
-     * @param cost 新的铸造费用（代币数量）
-     */
     function setRareMintCost(uint256 cost) external onlyOwner {
         require(cost > 0, "TokenBurner: cost must be > 0");
-        uint256 oldNormal = normalMintCost;
         uint256 oldRare = rareMintCost;
         rareMintCost = cost;
-        emit MintCostUpdated(oldNormal, normalMintCost, oldRare, cost, block.timestamp);
+        emit MintCostUpdated(normalMintCost, normalMintCost, oldRare, cost, block.timestamp);
     }
 
-    /**
-     * @dev 设置代币合约地址
-     * @param _tokenContract 代币合约地址
-     */
-    function setTokenContract(address _tokenContract) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "TokenBurner: Unauthorized");
+    function setTokenContract(address _tokenContract) external onlyOwner {
+        require(_tokenContract != address(0), "TokenBurner: Zero address");
         tokenContract = _tokenContract;
     }
 
-    /**
-     * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
-     */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        authorizer = _authorizer;
+    function normalMintTenCost() external view returns (uint256) {
+        return normalMintCost * 10;
     }
 
-    /// @notice 已废弃：销毁代币用于普通铸造，请使用 burnAndMint(user, false) 替代
-    function burnTokenForMint() external returns (bool) {
-        return burnAndMint(msg.sender, false);
+    function rareMintTenCost() external view returns (uint256) {
+        return rareMintCost * 10;
     }
 
-    /// @notice 已废弃：销毁代币用于稀有铸造，请使用 burnAndMint(user, true) 替代
-    function burnTokenForRareMint() external returns (bool) {
-        return burnAndMint(msg.sender, true);
+    function targetedMintCost() external view returns (uint256 normalPart, uint256 rarePart) {
+        normalPart = normalMintCost * 6;
+        rarePart = rareMintCost * 4;
+    }
+
+    function burnAndMint(address user, bool isRare) external returns (bool) {
+        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
+        require(nftMintContract != address(0), "TokenBurner: nftMintContract not set");
+        require(user != address(0), "TokenBurner: Zero user address");
+        require(msg.sender == user || msg.sender == owner(), "TokenBurner: Caller must be user or owner");
+
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        uint256 cost = isRare ? rareMintCost : normalMintCost;
+        require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
+        require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
+        require(token.transferFrom(user, BLACK_HOLE, cost), "TokenBurner: Token transfer failed");
+
+        emit TokenBurned(user, cost, block.timestamp);
+
+        INFTMint nftMint = INFTMint(nftMintContract);
+        if (isRare) {
+            uint256 tokenId = nftMint.mintRare(user);
+            emit NFTMinted(user, tokenId, 0, true);
+        } else {
+            uint256 tokenId = nftMint.mintNormal(user);
+            emit NFTMinted(user, tokenId, 0, false);
+        }
+
+        return true;
+    }
+
+    function burnAndMintTen(address user, bool isRare) external returns (bool) {
+        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
+        require(nftMintContract != address(0), "TokenBurner: nftMintContract not set");
+        require(user != address(0), "TokenBurner: Zero user address");
+        require(msg.sender == user || msg.sender == owner(), "TokenBurner: Caller must be user or owner");
+
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        uint256 cost = isRare ? rareMintCost * 10 : normalMintCost * 10;
+        require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
+        require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
+        require(token.transferFrom(user, BLACK_HOLE, cost), "TokenBurner: Token transfer failed");
+
+        emit TokenBurned(user, cost, block.timestamp);
+
+        INFTMint nftMint = INFTMint(nftMintContract);
+        if (isRare) {
+            nftMint.mintRareTen(user);
+        } else {
+            nftMint.mintNormalTen(user);
+        }
+
+        return true;
+    }
+
+    function burnAndMintTargeted(address user, uint8 zodiac) external returns (bool) {
+        require(tokenContract != address(0), "TokenBurner: tokenContract not set");
+        require(nftMintContract != address(0), "TokenBurner: nftMintContract not set");
+        require(user != address(0), "TokenBurner: Zero user address");
+        require(msg.sender == user || msg.sender == owner(), "TokenBurner: Caller must be user or owner");
+
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        uint256 normalPart = normalMintCost * 6;
+        uint256 rarePart = rareMintCost * 4;
+        uint256 totalCost = normalPart + rarePart;
+        require(token.balanceOf(user) >= totalCost, "TokenBurner: Insufficient balance");
+        require(token.allowance(user, address(this)) >= totalCost, "TokenBurner: Insufficient allowance");
+        require(token.transferFrom(user, BLACK_HOLE, totalCost), "TokenBurner: Token transfer failed");
+
+        emit TokenBurned(user, totalCost, block.timestamp);
+
+        INFTMint nftMint = INFTMint(nftMintContract);
+        nftMint.mintTargeted(user, zodiac);
+
+        return true;
     }
 }

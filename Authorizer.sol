@@ -1,147 +1,118 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
-import "./NFTInterface.sol";
+/**
+ * @title Authorizer
+ * @dev 权限管理合约，基于权重系统控制访问权限
+ *
+ * 权限系统：
+ * 1. 每个用户有权重值
+ * 2. 操作需要满足最小权重要求
+ * 3. 支持批量更新权重
+ *
+ * 权重用途：
+ * - 高级操作权限
+ * - 分红权重计算
+ * - 投票权重
+ */
+contract Authorizer {
+    /**
+     * @dev 用户权重映射
+     */
+    mapping(address => uint256) public weights;
 
-contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
-    enum PermissionLevel { NONE, OPERATOR, ADMIN, SUPER_ADMIN }
+    /**
+     * @dev 总权重
+     */
+    uint256 public totalWeight;
 
-    mapping(address => PermissionLevel) public permissions;
+    /**
+     * @dev 管理员地址
+     */
+    address public admin;
 
-    event AddressAuthorized(address indexed addr, PermissionLevel level, uint256 timestamp);
-    event AddressUnauthorized(address indexed addr, uint256 timestamp);
-    event PermissionUpdated(address indexed addr, PermissionLevel oldLevel, PermissionLevel newLevel, uint256 timestamp);
+    /**
+     * @dev 权重事件
+     */
+    event WeightGranted(address indexed user, uint256 weight);
+    event WeightRevoked(address indexed user);
+    event WeightsUpdated(address[] users, uint256[] weights);
 
-    constructor() { _disableInitializers(); }
+    /**
+     * @dev 授予权限
+     */
+    function grantPermission(address user, uint256 weight) external {
+        require(msg.sender == admin, "Authorizer: Not admin");
 
-    function initialize(address initialOwner) external initializer {
-        __UUPSUpgradeable_init();
-        __Ownable2Step_init();
-        transferOwnership(initialOwner);
-        permissions[initialOwner] = PermissionLevel.SUPER_ADMIN;
-        emit AddressAuthorized(initialOwner, PermissionLevel.SUPER_ADMIN, block.timestamp);
-    }
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    function _authorize(address addr, PermissionLevel level) internal {
-        require(addr != address(0), "Zero address");
-        PermissionLevel oldLevel = permissions[addr];
-        permissions[addr] = level;
-        if (oldLevel == PermissionLevel.NONE) {
-            emit AddressAuthorized(addr, level, block.timestamp);
+        if (weights[user] == 0) {
+            totalWeight += weight;
         } else {
-            emit PermissionUpdated(addr, oldLevel, level, block.timestamp);
+            totalWeight = totalWeight - weights[user] + weight;
         }
+
+        weights[user] = weight;
+        emit WeightGranted(user, weight);
     }
 
-    function authorize(address addr, PermissionLevel level) external onlyOwner { _authorize(addr, level); }
+    /**
+     * @dev 撤销权限
+     */
+    function revokePermission(address user) external {
+        require(msg.sender == admin, "Authorizer: Not admin");
 
-    function batchAuthorize(address[] calldata addrs, PermissionLevel[] calldata levels) external onlyOwner {
-        require(addrs.length == levels.length, "Length mismatch");
-        for (uint256 i = 0; i < addrs.length; i++) { _authorize(addrs[i], levels[i]); }
+        totalWeight -= weights[user];
+        weights[user] = 0;
+        emit WeightRevoked(user);
     }
 
-    function _unauthorize(address addr) internal {
-        require(permissions[addr] != PermissionLevel.NONE, "Not authorized");
-        permissions[addr] = PermissionLevel.NONE;
-        emit AddressUnauthorized(addr, block.timestamp);
+    /**
+     * @dev 检查是否有权限
+     */
+    function hasPermission(address user, uint256 weightRequired) external view returns (bool) {
+        return weights[user] >= weightRequired;
     }
 
-    function unauthorize(address addr) external onlyOwner { _unauthorize(addr); }
-
-    function batchUnauthorize(address[] calldata addrs) external onlyOwner {
-        for (uint256 i = 0; i < addrs.length; i++) { _unauthorize(addrs[i]); }
+    /**
+     * @dev 获取用户权重
+     */
+    function getWeight(address user) external view returns (uint256) {
+        return weights[user];
     }
 
-    function isAuthorized(address addr) external view returns (bool) { return permissions[addr] != PermissionLevel.NONE; }
-
-    function hasPermission(address addr, PermissionLevel requiredLevel) external view returns (bool) {
-        return uint256(permissions[addr]) >= uint256(requiredLevel);
+    /**
+     * @dev 获取总权重
+     */
+    function getTotalWeight() external view returns (uint256) {
+        return totalWeight;
     }
 
-    function getPermissionLevel(address addr) external view returns (PermissionLevel) { return permissions[addr]; }
+    /**
+     * @dev 批量更新权重
+     */
+    function updateWeightsBatch(
+        address[] calldata users,
+        uint256[] calldata newWeights
+    ) external {
+        require(msg.sender == admin, "Authorizer: Not admin");
+        require(users.length == newWeights.length, "Authorizer: Length mismatch");
 
-    function getPermissionLevelName(PermissionLevel level) external pure returns (string memory) {
-        if (level == PermissionLevel.NONE) return "NONE";
-        if (level == PermissionLevel.OPERATOR) return "OPERATOR";
-        if (level == PermissionLevel.ADMIN) return "ADMIN";
-        if (level == PermissionLevel.SUPER_ADMIN) return "SUPER_ADMIN";
-        return "UNKNOWN";
-    }
-
-    function authCore(address burner, address reward, address nftData, address mint, address token) external onlyOwner {
-        require(burner != address(0) && reward != address(0) && nftData != address(0) && mint != address(0) && token != address(0), "Zero addr");
-        
-        ITokenBurner(burner).setAuthorizedNFTContract(mint);
-        ITokenBurner(burner).setTokenContract(token);
-        
-        IRewardManagerExt(reward).setAuthorizedNFTContract(mint, true);
-        IRewardManagerExt(reward).setNFTContract(mint);
-        IRewardManagerExt(reward).setNFTDataContract(nftData);
-        IRewardManagerExt(reward).setAuthorizer(address(this));
-        
-        INFTDataInterface(nftData).setAuthorizedNFTContract(mint);
-        
-        INFTMint(mint).setAddresses(burner, reward);
-        INFTMint(mint).setMetadataContract(nftData);
-        INFTMint(mint).setTokenContract(token);
-    }
-
-    function authRewardSub(address reward, address staking, address tokenStaking, address arena) external onlyOwner {
-        if (staking != address(0)) IRewardManagerExt(reward).setStakingContract(staking);
-        if (tokenStaking != address(0)) IRewardManagerExt(reward).setTokenStakingContract(tokenStaking);
-        if (arena != address(0)) IRewardManagerExt(reward).setArenaContract(arena);
-    }
-
-    function authTrading(address trading, address mint, address reward) external onlyOwner {
-        if (trading != address(0)) {
-            INFTTrading(trading).setNFTContract(mint);
-            INFTTrading(trading).setRewardManager(reward);
+        for (uint256 i = 0; i < users.length; i++) {
+            if (weights[users[i]] > 0) {
+                totalWeight = totalWeight - weights[users[i]] + newWeights[i];
+            } else {
+                totalWeight += newWeights[i];
+            }
+            weights[users[i]] = newWeights[i];
         }
+
+        emit WeightsUpdated(users, newWeights);
     }
 
-    function authBreeding(address breeding, address mint, address arena) external onlyOwner {
-        if (breeding != address(0)) {
-            IBreeding(breeding).setNFTContract(mint);
-            INFTMint(mint).setBreedingContract(breeding);
-            IBreeding(breeding).setAuthorizer(address(this));
-            if (arena != address(0)) IBreeding(breeding).setArenaRankingContract(arena);
-        }
-    }
-
-    function authStaking(address staking, address mint, address token, address arena) external onlyOwner {
-        if (staking != address(0)) {
-            IStaking(staking).setNFTContract(mint);
-            IStaking(staking).setTokenContract(token);
-            IStaking(staking).setAuthorizer(address(this));
-            if (arena != address(0)) IStaking(staking).setArenaRankingContract(arena);
-        }
-    }
-
-    function authUpdate(address update, address mint, address nftData, address token, address pair) external onlyOwner {
-        if (update != address(0)) {
-            INFTMint(mint).setNFTUpdateContract(update);
-            INFTUpdate(update).setNFTContract(mint);
-            INFTUpdate(update).setMetadataContract(nftData);
-            INFTUpdate(update).setTokenContract(token);
-            INFTUpdate(update).setAuthorizer(address(this));
-            if (pair != address(0)) INFTUpdate(update).setPancakeSwapPair(pair);
-        }
-    }
-
-    function authTokenStaking(address tokenStaking, address token) external onlyOwner {
-        if (tokenStaking != address(0)) ITokenStaking(tokenStaking).setTokenContract(token);
-    }
-
-    function authBattle(address battle, address mint) external onlyOwner {
-        if (battle != address(0)) IBattle(battle).setNFTContract(mint);
-    }
-
-    function authArena(address arena, address battle) external onlyOwner {
-        if (arena != address(0) && battle != address(0)) IArenaRanking(arena).setBattleContract(battle);
+    /**
+     * @dev 设置管理员
+     */
+    function setAdmin(address _admin) external {
+        require(msg.sender == admin, "Authorizer: Not admin");
+        admin = _admin;
     }
 }

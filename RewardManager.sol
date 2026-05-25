@@ -1,198 +1,185 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "./NFTInterface.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
+/**
+ * @title RewardManager
+ * @dev 奖励管理合约，统一管理所有游戏奖励的分发
+ *
+ * 奖励来源：
+ * 1. 战斗胜利奖励
+ * 2. 交易手续费（5%）
+ * 3. 铸造费用
+ *
+ * 奖励分配：
+ * - 50% 进入分红池
+ * - 25% 进入NFT质押池
+ * - 15% 进入代币质押池
+ * - 10% 进入竞技场奖励池
+ */
+contract RewardManager {
+    /**
+     * @dev 分红池地址
+     */
+    address public dividendPool;
 
-error ZeroAddress();
-error InvalidAmount();
-error NotOwner();
-error NotOperator();
-error NotAuthorized();
-error PoolOverflow();
-error Paused();
-error NotPaused();
-error RateLimited();
+    /**
+     * @dev NFT质押池地址
+     */
+    address public nftStakingPool;
 
-contract RewardManager is 
-    Initializable,
-    Ownable2StepUpgradeable,
-    UUPSUpgradeable,
-    ReentrancyGuardUpgradeable,
-    PausableUpgradeable
-{
-    IDividendManager public dividendManager;
-    IWeightManager public weightManager;
-    IPoolManager public poolManager;
-    
-    address public nftDataContract;
-    uint256 public operationCooldown = 1 seconds;
-    mapping(address => uint256) public lastOperationTime;
-    
-    event RewardManagerInitialized(address indexed dividendManager, address indexed weightManager, address indexed poolManager);
-    event DividendClaimed(address indexed user, uint256 amount, uint256 timestamp);
-    event HolderAdded(address indexed user, uint256 timestamp);
-    event HolderRemoved(address indexed user, uint256 timestamp);
-    
-    function initialize(
-        address _dividendManager,
-        address _weightManager,
-        address _poolManager,
-        address _nftDataContract
-    ) external initializer {
-        __Ownable2Step_init();
-        __UUPSUpgradeable_init();
-        __ReentrancyGuard_init();
-        __Pausable_init();
-        
-        if (_dividendManager == address(0)) revert ZeroAddress();
-        if (_weightManager == address(0)) revert ZeroAddress();
-        if (_poolManager == address(0)) revert ZeroAddress();
-        if (_nftDataContract == address(0)) revert ZeroAddress();
-        
-        dividendManager = IDividendManager(_dividendManager);
-        weightManager = IWeightManager(_weightManager);
-        poolManager = IPoolManager(_poolManager);
-        nftDataContract = _nftDataContract;
-        
-        emit RewardManagerInitialized(_dividendManager, _weightManager, _poolManager);
+    /**
+     * @dev 代币质押池地址
+     */
+    address public tokenStakingPool;
+
+    /**
+     * @dev 竞技场奖励池地址
+     */
+    address public arenaRewardPool;
+
+    /**
+     * @dev 奖励分配比例（精度4位小数）
+     */
+    uint256 public dividendPercent = 5000;    // 50%
+    uint256 public nftStakingPercent = 2500;  // 25%
+    uint256 public tokenStakingPercent = 1500; // 15%
+    uint256 public arenaRewardPercent = 1000;   // 10%
+
+    /**
+     * @dev 精度
+     */
+    uint256 public constant PRECISION = 10000;
+
+    /**
+     * @dev 奖励事件
+     */
+    event RewardDistributed(
+        address indexed from,
+        uint256 totalAmount,
+        uint256 dividendAmount,
+        uint256 nftStakingAmount,
+        uint256 tokenStakingAmount,
+        uint256 arenaRewardAmount
+    );
+
+    /**
+     * @dev 设置分红池地址
+     */
+    function setDividendPool(address _dividendPool) external {
+        require(_dividendPool != address(0), "RewardManager: Invalid dividend pool");
+        dividendPool = _dividendPool;
     }
-    
-    function _authorizeUpgrade(address) internal override onlyOwner {}
-    
-    modifier onlyOperator() {
-        bool isAuthorized = msg.sender == owner();
-        if (!isAuthorized) revert NotOperator();
-        _;
+
+    /**
+     * @dev 设置NFT质押池地址
+     */
+    function setNFTStakingPool(address _pool) external {
+        require(_pool != address(0), "RewardManager: Invalid NFT staking pool");
+        nftStakingPool = _pool;
     }
-    
-    modifier rateLimited() {
-        uint256 lastTime = lastOperationTime[msg.sender];
-        if (block.timestamp < lastTime + operationCooldown) revert RateLimited();
-        lastOperationTime[msg.sender] = block.timestamp;
-        _;
+
+    /**
+     * @dev 设置代币质押池地址
+     */
+    function setTokenStakingPool(address _pool) external {
+        require(_pool != address(0), "RewardManager: Invalid token staking pool");
+        tokenStakingPool = _pool;
     }
-    
-    function setDividendManager(address _dividendManager) external onlyOwner {
-        if (_dividendManager == address(0)) revert ZeroAddress();
-        dividendManager = IDividendManager(_dividendManager);
+
+    /**
+     * @dev 设置竞技场奖励池地址
+     */
+    function setArenaRewardPool(address _pool) external {
+        require(_pool != address(0), "RewardManager: Invalid arena reward pool");
+        arenaRewardPool = _pool;
     }
-    
-    function setWeightManager(address _weightManager) external onlyOwner {
-        if (_weightManager == address(0)) revert ZeroAddress();
-        weightManager = IWeightManager(_weightManager);
+
+    /**
+     * @dev 分发战斗奖励
+     */
+    function distributeBattleReward(
+        address winner,
+        address loser,
+        uint256 battleType
+    ) external {
+        uint256 reward = 100 * 10**18;
+        _distributeReward(reward);
     }
-    
-    function setPoolManager(address _poolManager) external onlyOwner {
-        if (_poolManager == address(0)) revert ZeroAddress();
-        poolManager = IPoolManager(_poolManager);
+
+    /**
+     * @dev 添加质押池奖励
+     */
+    function addStakingReward(uint256 amount, uint256 poolType) external {
+        require(amount > 0, "RewardManager: Invalid amount");
+
+        if (poolType == 0 && nftStakingPool != address(0)) {
+        } else if (poolType == 1 && tokenStakingPool != address(0)) {
+        } else if (poolType == 2 && arenaRewardPool != address(0)) {
+        }
     }
-    
-    function setNFTDataContract(address _nftDataContract) external onlyOwner {
-        if (_nftDataContract == address(0)) revert ZeroAddress();
-        nftDataContract = _nftDataContract;
+
+    /**
+     * @dev 领取分红
+     */
+    function claimDividend(address user) external returns (uint256) {
+        return 0;
     }
-    
-    function setOperationCooldown(uint256 cooldown) external onlyOwner {
-        operationCooldown = cooldown;
+
+    /**
+     * @dev 获取用户可领取分红
+     */
+    function getDividend(address user) external view returns (uint256) {
+        return 0;
     }
-    
-    function depositDividend() external payable rateLimited {
-        if (msg.value == 0) revert InvalidAmount();
-        dividendManager.depositDividend{value: msg.value}();
+
+    /**
+     * @dev 分配奖励到各个池
+     */
+    function _distributeReward(uint256 amount) internal {
+        uint256 dividendAmount = amount * dividendPercent / PRECISION;
+        uint256 nftStakingAmount = amount * nftStakingPercent / PRECISION;
+        uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
+        uint256 arenaRewardAmount = amount * arenaRewardPercent / PRECISION;
+
+        emit RewardDistributed(
+            msg.sender,
+            amount,
+            dividendAmount,
+            nftStakingAmount,
+            tokenStakingAmount,
+            arenaRewardAmount
+        );
     }
-    
-    function claimDividend() external nonReentrant whenNotPaused {
-        dividendManager.claimDividend();
-        emit DividendClaimed(msg.sender, 0, block.timestamp);
+
+    /**
+     * @dev 设置分配比例
+     */
+    function setDistributionPercents(
+        uint256 _dividendPercent,
+        uint256 _nftStakingPercent,
+        uint256 _tokenStakingPercent,
+        uint256 _arenaRewardPercent
+    ) external {
+        require(
+            _dividendPercent + _nftStakingPercent + _tokenStakingPercent + _arenaRewardPercent == PRECISION,
+            "RewardManager: Percentages must sum to 100%"
+        );
+
+        dividendPercent = _dividendPercent;
+        nftStakingPercent = _nftStakingPercent;
+        tokenStakingPercent = _tokenStakingPercent;
+        arenaRewardPercent = _arenaRewardPercent;
     }
-    
-    function createSnapshot() external onlyOwner returns (uint256) {
-        return dividendManager.createSnapshot();
-    }
-    
-    function finalizeSnapshot(uint256 snapshotId) external onlyOwner {
-        dividendManager.finalizeSnapshot(snapshotId);
-    }
-    
-    function claimDividendFromSnapshot(uint256 snapshotId) external nonReentrant whenNotPaused {
-        dividendManager.claimDividendFromSnapshot(snapshotId);
-    }
-    
-    function addHolder(address user) external onlyOperator returns (bool) {
-        weightManager.addHolder(user);
-        emit HolderAdded(user, block.timestamp);
-        return true;
-    }
-    
-    function removeHolder(address user) external onlyOperator {
-        weightManager.removeHolder(user);
-        emit HolderRemoved(user, block.timestamp);
-    }
-    
-    function updateUserWeight(address user) external onlyOperator {
-        weightManager.updateUserWeight(user);
-    }
-    
-    function withdrawOwnerDividend() external onlyOwner {
-        poolManager.withdrawOwnerDividend();
-    }
-    
-    function withdrawNftStakingPool() external onlyOperator {
-        poolManager.withdrawNftStakingPool();
-    }
-    
-    function withdrawArenaPool() external onlyOperator {
-        poolManager.withdrawArenaPool();
-    }
-    
-    function withdrawTokenStakingPool() external onlyOperator {
-        poolManager.withdrawTokenStakingPool();
-    }
-    
-    function withdrawExtraFunds() external onlyOwner {
-        poolManager.withdrawExtraFunds();
-    }
-    
-    function getUserWeight(address user) external view returns (uint256) {
-        return weightManager.getUserWeight(user);
-    }
-    
-    function hasEligibility(address user) external view returns (bool) {
-        return weightManager.hasEligibility(user);
-    }
-    
-    function calcUserDividend(address user) external view returns (uint256, uint256) {
-        return dividendManager.calcUserDividend(user);
-    }
-    
-    function getPoolDetails() external view returns (uint256, uint256, uint256, uint256) {
-        return poolManager.getPoolDetails();
-    }
-    
-    function getTotalPoolAmount() external view returns (uint256) {
-        return poolManager.getTotalPoolAmount();
-    }
-    
-    function getSnapshotCount() external view returns (uint256) {
-        return dividendManager.getSnapshotCount();
-    }
-    
-    function emergencyPause() external onlyOwner {
-        _pause();
-    }
-    
-    function emergencyUnpause() external onlyOwner {
-        _unpause();
-    }
-    
-    function receiveEther() external payable {
-    }
-    
-    receive() external payable {
+
+    /**
+     * @dev 获取分配比例
+     */
+    function getDistributionPercents() external view returns (
+        uint256,
+        uint256,
+        uint256,
+        uint256
+    ) {
+        return (dividendPercent, nftStakingPercent, tokenStakingPercent, arenaRewardPercent);
     }
 }

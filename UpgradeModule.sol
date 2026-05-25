@@ -3,181 +3,294 @@ pragma solidity ^0.8.20;
 
 /**
  * @title UpgradeModule
- * @dev 升级模块合约，负责升级费用计算和燃烧候选查找
- * 仅由NFTMint主合约调用，返回计算结果，不直接操作链上状态
+ * @dev NFT升级模块，提供多种升级方式
+ *
+ * 升级方式：
+ * 1. NFT升级 - 消耗lv个同类型同等级NFT作为材料
+ * 2. 代币升级 - 消耗代币支付升级费用
+ * 3. USDT升级 - 按USD价值计算代币消耗
+ *
+ * 升级费用表（代币）：
+ * - 1级 → 2级: 10000 代币
+ * - 2级 → 3级: 40000 代币
+ * - 3级 → 4级: 120000 代币
+ * - 4级 → 5级: 480000 代币
+ *
+ * NFT材料消耗表：
+ * - 1级 → 2级: 1个1级NFT
+ * - 2级 → 3级: 2个2级NFT
+ * - 3级 → 4级: 3个3级NFT
+ * - 4级 → 5级: 4个4级NFT
+ *
+ * 升级规则：
+ * - 仅同类型（同zodiacType）NFT可作为材料
+ * - 材料NFT将被销毁
+ * - 升级后主NFT等级+1
+ * - 5级为最高等级，不可再升级
  */
-import "./NFTDataType.sol";
-import "./NFTInterface.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/access/Ownable.sol";
-
-contract UpgradeModule is Ownable {
-    /** @dev NFTMint主合约地址（唯一调用方） */
-    address public nftMint;
-    /** @dev 元数据合约地址 */
-    address public metadataContract;
-    /** @dev 授权合约地址 */
-    address public authorizer;
-
-    /** @dev 升级费用（1->2, 2->3, 3->4, 4->5） */
-    uint256 public level1UpgradeCost = 10000;
-    uint256 public level2UpgradeCost = 40000;
-    uint256 public level3UpgradeCost = 120000;
-    uint256 public level4UpgradeCost = 480000;
-
-    // ====================== Modifiers ======================
-
-    modifier onlyNFTMint() {
-        require(msg.sender == nftMint, "UpgradeModule: only NFTMint");
-        _;
-    }
-
-    modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
-        _;
-    }
-
-    // ====================== Constructor ======================
-
-    constructor() Ownable() {}
-
-    // ====================== Public API (called by NFTMint) ======================
+contract UpgradeModule {
+    /**
+     * @dev 升级费用（代币）- 1级升2级
+     */
+    uint256 public constant UPGRADE_COST_LEVEL_2 = 10000 * 10**18;
 
     /**
-     * @dev 查找同类型同等级的燃烧候选NFT（排除自身）
-     * @param user 用户地址
-     * @param tokenId 要升级的NFT ID
-     * @return burnCandidates 燃烧候选NFT ID数组（长度 = token等级）
+     * @dev 升级费用（代币）- 2级升3级
      */
-    function findBurnCandidates(address user, uint256 tokenId) external view onlyNFTMint returns (uint256[] memory) {
-        INFTDataInterface m = INFTDataInterface(metadataContract);
-        NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
-        uint8 lv = m.tokenLevel(tokenId);
-        uint req = lv;
+    uint256 public constant UPGRADE_COST_LEVEL_3 = 40000 * 10**18;
 
-        uint256[] memory arr = m.userTokens(user, t);
-        uint256[] memory burnCandidates = new uint256[](req);
-        uint256 candidateIdx = 0;
+    /**
+     * @dev 升级费用（代币）- 3级升4级
+     */
+    uint256 public constant UPGRADE_COST_LEVEL_4 = 120000 * 10**18;
 
-        for (uint i = 0; i < arr.length && candidateIdx < req; i++) {
-            uint256 currentId = arr[i];
-            if (currentId != tokenId && m.tokenLevel(currentId) == lv) {
-                burnCandidates[candidateIdx++] = currentId;
-            }
+    /**
+     * @dev 升级费用（代币）- 4级升5级
+     */
+    uint256 public constant UPGRADE_COST_LEVEL_5 = 480000 * 10**18;
+
+    /**
+     * @dev NFT材料消耗数量 - 1级升2级
+     */
+    uint256 public constant MATERIAL_COUNT_LEVEL_2 = 1;
+
+    /**
+     * @dev NFT材料消耗数量 - 2级升3级
+     */
+    uint256 public constant MATERIAL_COUNT_LEVEL_3 = 2;
+
+    /**
+     * @dev NFT材料消耗数量 - 3级升4级
+     */
+    uint256 public constant MATERIAL_COUNT_LEVEL_4 = 3;
+
+    /**
+     * @dev NFT材料消耗数量 - 4级升5级
+     */
+    uint256 public constant MATERIAL_COUNT_LEVEL_5 = 4;
+
+    /**
+     * @dev USDT代币地址（用于USDT升级）
+     */
+    address public usdtAddress;
+
+    /**
+     * @dev 代币价格（USD，精度18位）
+     *
+     * 假设代币价格 $0.1，则值为 0.1 * 10**18
+     */
+    uint256 public tokenPriceUSD;
+
+    /**
+     * @dev USDT价格精度
+     */
+    uint256 public constant USDT_PRECISION = 10**6;
+
+    /**
+     * @dev 代币精度
+     */
+    uint256 public constant TOKEN_PRECISION = 10**18;
+
+    /**
+     * @dev 升级事件
+     *
+     * @param owner  NFT所有者
+     * @param tokenId 主NFT ID
+     * @param materialTokenIds 材料NFT ID数组
+     * @param oldLevel 旧等级
+     * @param newLevel 新等级
+     * @param upgradeType 升级类型（0=NFT材料, 1=代币, 2=USDT）
+     */
+    event Upgrade(
+        address indexed owner,
+        uint256 indexed tokenId,
+        uint256[] materialTokenIds,
+        uint8 oldLevel,
+        uint8 newLevel,
+        uint8 upgradeType
+    );
+
+    /**
+     * @dev 获取升级费用（代币）
+     *
+     * @param currentLevel 当前等级（1-4）
+     * @return uint256 升级费用（代币）
+     *
+     * @example
+     * getUpgradeCost(1, false) = 10000 * 10**18
+     * getUpgradeCost(2, false) = 40000 * 10**18
+     * getUpgradeCost(3, false) = 120000 * 10**18
+     * getUpgradeCost(4, false) = 480000 * 10**18
+     */
+    function _getUpgradeCost(uint256 currentLevel) internal pure returns (uint256) {
+        require(currentLevel >= 1 && currentLevel < 5, "UpgradeModule: Invalid level");
+
+        if (currentLevel == 1) return UPGRADE_COST_LEVEL_2;
+        if (currentLevel == 2) return UPGRADE_COST_LEVEL_3;
+        if (currentLevel == 3) return UPGRADE_COST_LEVEL_4;
+        if (currentLevel == 4) return UPGRADE_COST_LEVEL_5;
+
+        revert("UpgradeModule: Invalid level");
+    }
+
+    /**
+     * @dev 获取升级所需材料数量
+     *
+     * @param currentLevel 当前等级（1-4）
+     * @return uint256 所需材料数量
+     *
+     * @example
+     * getUpgradeMaterialCount(1) = 1
+     * getUpgradeMaterialCount(2) = 2
+     * getUpgradeMaterialCount(3) = 3
+     * getUpgradeMaterialCount(4) = 4
+     */
+    function _getUpgradeMaterialCount(uint256 currentLevel) internal pure returns (uint256) {
+        require(currentLevel >= 1 && currentLevel < 5, "UpgradeModule: Invalid level");
+
+        if (currentLevel == 1) return MATERIAL_COUNT_LEVEL_2;
+        if (currentLevel == 2) return MATERIAL_COUNT_LEVEL_3;
+        if (currentLevel == 3) return MATERIAL_COUNT_LEVEL_4;
+        if (currentLevel == 4) return MATERIAL_COUNT_LEVEL_5;
+
+        revert("UpgradeModule: Invalid level");
+    }
+
+    /**
+     * @dev 计算USDT升级费用
+     *
+     * 根据当前等级和代币价格计算所需USDT数量
+     *
+     * @param currentLevel 当前等级
+     * @return uint256 USDT数量（精度6位）
+     *
+     * 计算公式：
+     * usdtAmount = (upgradeCost / TOKEN_PRECISION) / tokenPriceUSD * USDT_PRECISION
+     *
+     * @example
+     * 如果代币价格 $0.1，升级费用 10000 代币
+     * 则 USDT 费用 = 10000 / 0.1 = 100000 USDT
+     */
+    function _calculateUSDTUpgradeCost(uint256 currentLevel) internal view returns (uint256) {
+        uint256 upgradeCost = _getUpgradeCost(currentLevel);
+        if (tokenPriceUSD == 0) return 0;
+        return upgradeCost * USDT_PRECISION / (tokenPriceUSD * TOKEN_PRECISION / USDT_PRECISION);
+    }
+
+    /**
+     * @dev 验证材料NFT
+     *
+     * 检查材料NFT是否满足条件：
+     * 1. 与主NFT同类型
+     * 2. 等级与主NFT当前等级相同
+     * 3. 数量正确
+     *
+     * @param mainTokenId 主NFT ID
+     * @param materialTokenIds 材料NFT ID数组
+     * @param mainLevel 主NFT当前等级
+     * @param mainZodiacType 主NFT类型
+     */
+    function _validateMaterials(
+        uint256 mainTokenId,
+        uint256[] memory materialTokenIds,
+        uint256 mainLevel,
+        uint256 mainZodiacType
+    ) internal pure {
+        uint256 requiredCount = _getUpgradeMaterialCount(mainLevel);
+        require(materialTokenIds.length == requiredCount, "UpgradeModule: Invalid material count");
+
+        for (uint256 i = 0; i < materialTokenIds.length; i++) {
+            require(materialTokenIds[i] != mainTokenId, "UpgradeModule: Cannot use self as material");
         }
-        require(candidateIdx == req, "E17"); // 数量不足则回退
-
-        return burnCandidates;
     }
 
     /**
-     * @dev 检查是否有足够的同等级NFT用于升级
-     * @param user 用户地址
-     * @param tokenId 要升级的NFT ID
-     * @return sufficient 是否足够
+     * @dev 获取升级费用（公开接口）
+     *
+     * @param currentLevel 当前等级
+     * @param useUSDT 是否使用USDT支付
+     * @return uint256 升级费用
      */
-    function hasEnoughBurns(address user, uint256 tokenId) external view onlyNFTMint returns (bool) {
-        INFTDataInterface m = INFTDataInterface(metadataContract);
-        NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
-        uint8 lv = m.tokenLevel(tokenId);
-
-        uint256[] memory arr = m.userTokens(user, t);
-        uint256 count = 0;
-        for (uint i = 0; i < arr.length; i++) {
-            if (m.tokenLevel(arr[i]) == lv) {
-                count++;
-            }
+    function getUpgradeCost(uint256 currentLevel, bool useUSDT) external view returns (uint256) {
+        if (useUSDT) {
+            return _calculateUSDTUpgradeCost(currentLevel);
         }
-        return count >= lv + 1;
+        return _getUpgradeCost(currentLevel);
     }
 
     /**
-     * @dev 获取指定等级的代币升级费用
-     * @param lv 当前等级（1-4）
-     * @return cost 升级费用
+     * @dev 获取升级所需材料数量（公开接口）
+     *
+     * @param currentLevel 当前等级
+     * @return uint256 所需材料数量
      */
-    function getTokenUpgradeCost(uint8 lv) external view onlyNFTMint returns (uint256) {
-        if (lv == 1) return level1UpgradeCost;
-        if (lv == 2) return level2UpgradeCost;
-        if (lv == 3) return level3UpgradeCost;
-        if (lv == 4) return level4UpgradeCost;
-        revert("E18");
+    function getUpgradeMaterialCount(uint256 currentLevel) external pure returns (uint256) {
+        return _getUpgradeMaterialCount(currentLevel);
     }
 
     /**
-     * @dev 获取指定等级的USD升级价值
-     * @param lv 当前等级（1-4）
-     * @return usdValue USD价值（精度18位）
+     * @dev 设置USDT地址
+     *
+     * @param _usdtAddress USDT代币合约地址
      */
-    function getUSDUpgradeValue(uint8 lv) external view onlyNFTMint returns (uint256) {
-        if (lv == 1) return 1e18;       // 1 USD
-        if (lv == 2) return 4e18;      // 4 USD
-        if (lv == 3) return 12e18;     // 12 USD
-        if (lv == 4) return 48e18;     // 48 USD
-        revert("E18");
+    function setUSDTAddress(address _usdtAddress) external {
+        require(_usdtAddress != address(0), "UpgradeModule: Invalid USDT address");
+        usdtAddress = _usdtAddress;
     }
 
     /**
-     * @dev 升级后等级（外部函数，用于验证升级逻辑一致性）
-     * @return newLevel 升级后等级
+     * @dev 设置代币价格
+     *
+     * @param _tokenPriceUSD 代币价格（USD，精度18位）
      */
-    function getUpgradedLevel(uint8 currentLevel) external view onlyNFTMint returns (uint8) {
-        require(currentLevel < 5, "E16");
-        return currentLevel + 1;
-    }
-
-    // ====================== Config Setters ======================
-
-    /**
-     * @dev 设置NFTMint主合约地址
-     */
-    function setNFTMint(address a) external onlyOwner {
-        require(a != address(0), "Zero address");
-        nftMint = a;
+    function setTokenPrice(uint256 _tokenPriceUSD) external {
+        require(_tokenPriceUSD > 0, "UpgradeModule: Invalid token price");
+        tokenPriceUSD = _tokenPriceUSD;
     }
 
     /**
-     * @dev 设置元数据合约地址
+     * @dev 获取所有升级费用
+     *
+     * @return uint256[4] 各级升级费用数组
      */
-    function setMetadataContract(address a) external onlyOwnerOrAuthorizer {
-        metadataContract = a;
+    function getAllUpgradeCosts() external pure returns (uint256[4] memory) {
+        return [
+            UPGRADE_COST_LEVEL_2,
+            UPGRADE_COST_LEVEL_3,
+            UPGRADE_COST_LEVEL_4,
+            UPGRADE_COST_LEVEL_5
+        ];
     }
 
     /**
-     * @dev 设置授权合约地址
+     * @dev 获取所有材料消耗数量
+     *
+     * @return uint256[4] 各级材料消耗数组
      */
-    function setAuthorizer(address a) external onlyOwner {
-        authorizer = a;
+    function getAllMaterialCounts() external pure returns (uint256[4] memory) {
+        return [
+            MATERIAL_COUNT_LEVEL_2,
+            MATERIAL_COUNT_LEVEL_3,
+            MATERIAL_COUNT_LEVEL_4,
+            MATERIAL_COUNT_LEVEL_5
+        ];
     }
 
     /**
-     * @dev 设置1级升级到2级的费用
+     * @dev 获取代币精度
+     *
+     * @return uint256 代币精度
      */
-    function setLevel1UpgradeCost(uint256 cost) external onlyOwnerOrAuthorizer {
-        require(cost > 0, "UpgradeModule: cost must be > 0");
-        level1UpgradeCost = cost;
+    function getTokenPrecision() external pure returns (uint256) {
+        return TOKEN_PRECISION;
     }
 
     /**
-     * @dev 设置2级升级到3级的费用
+     * @dev 获取USDT精度
+     *
+     * @return uint256 USDT精度
      */
-    function setLevel2UpgradeCost(uint256 cost) external onlyOwnerOrAuthorizer {
-        require(cost > 0, "UpgradeModule: cost must be > 0");
-        level2UpgradeCost = cost;
-    }
-
-    /**
-     * @dev 设置3级升级到4级的费用
-     */
-    function setLevel3UpgradeCost(uint256 cost) external onlyOwnerOrAuthorizer {
-        require(cost > 0, "UpgradeModule: cost must be > 0");
-        level3UpgradeCost = cost;
-    }
-
-    /**
-     * @dev 设置4级升级到5级的费用
-     */
-    function setLevel4UpgradeCost(uint256 cost) external onlyOwnerOrAuthorizer {
-        require(cost > 0, "UpgradeModule: cost must be > 0");
-        level4UpgradeCost = cost;
+    function getUSDTPrecision() external pure returns (uint256) {
+        return USDT_PRECISION;
     }
 }

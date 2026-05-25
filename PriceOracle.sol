@@ -3,191 +3,210 @@ pragma solidity ^0.8.20;
 
 /**
  * @title PriceOracle
- * @dev 价格预言机合约，从PancakeSwap获取代币的USD价格
- * 提供价格缓存、波动保护等安全机制
+ * @dev 价格预言机合约，提供代币和ETH的USD价格查询
+ *
+ * 功能：
+ * 1. 获取代币的USD价格
+ * 2. 获取ETH的USD价格
+ * 3. 计算代币与USDT的兑换比例
+ *
+ * 价格精度：
+ * - 所有价格使用18位精度
+ * - USDT使用6位精度
+ * - 代币使用18位精度
+ *
+ * 用途：
+ * - 升级费用计算（代币 → USDT）
+ * - 铸造费用验证
+ * - NFT定价参考
  */
-import "./NFTInterface.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.9/contracts/access/Ownable.sol";
-
-contract PriceOracle is Ownable {
-    /** @dev 代币合约地址 */
-    address public tokenContract;
-    /** @dev PancakeSwap流动性池地址（代币/稳定币对） */
-    address public pancakeSwapPair;
-    /** @dev WBNB合约地址 */
-    address public wbnbAddress;
-    /** @dev 稳定币合约地址（如USDT/USDC/BUSD） */
-    address public stablecoinAddress;
-    /** @dev 价格过期时间（秒）- 默认1小时 */
-    uint256 public priceExpirySeconds = 3600;
-    /** @dev 价格波动保护阈值（千分比，精度4位）- 默认50% */
-    uint256 public priceDeviationThreshold = 5000;
-    /** @dev 上次查询价格 */
-    uint256 public lastPrice;
-    /** @dev 上次价格更新时间戳 */
-    uint256 public lastPriceUpdateTime;
-
-    /** @dev 授权调用者映射（如UpgradeModule） */
-    mapping(address => bool) public authorizedCaller;
-
-    // ====================== Events ======================
-
-    event PriceUpdated(uint256 price, uint256 timestamp);
-    event TokenContractSet(address indexed tokenContract);
-    event PancakeSwapPairSet(address indexed pair);
-    event PriceParamsUpdated(uint256 expirySeconds, uint256 deviationThreshold);
-
-    // ====================== Constructor ======================
-
-    constructor() Ownable() {}
-
-    // ====================== Price Query ======================
+contract PriceOracle {
+    /**
+     * @dev 代币地址
+     */
+    address public tokenAddress;
 
     /**
-     * @dev 从PancakeSwap获取代币价格（USD）
-     * @return uint256 代币价格（精度18位，如1.5 USD = 1500000000000000000）
+     * @dev USDT代币地址
      */
-    function getTokenPriceFromPancakeSwap() public view returns (uint256) {
-        require(pancakeSwapPair != address(0), "E24: PancakeSwap pair not set");
+    address public usdtAddress;
 
-        IPancakeSwapPair pair = IPancakeSwapPair(pancakeSwapPair);
-        (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
-        require(reserve0 > 0 && reserve1 > 0, "E25: Insufficient liquidity");
+    /**
+     * @dev 代币的USD价格（精度18位）
+     *
+     * 例如：$0.1 = 0.1 * 10^18
+     */
+    uint256 public tokenPriceUSD;
 
-        address token0 = pair.token0();
-        address token1 = pair.token1();
+    /**
+     * @dev ETH的USD价格（精度18位）
+     *
+     * 例如：$2000 = 2000 * 10^18
+     */
+    uint256 public ethPriceUSD;
 
-        uint8 decimals0 = 18;
-        uint8 decimals1 = 18;
+    /**
+     * @dev 代币精度
+     */
+    uint256 public constant TOKEN_PRECISION = 10**18;
 
-        if (token0 == tokenContract) {
-            try IBEP20(token1).decimals() returns (uint8 d) {
-                decimals1 = d;
-            } catch {}
+    /**
+     * @dev USDT精度
+     */
+    uint256 public constant USDT_PRECISION = 10**6;
 
-            uint256 price = (uint256(reserve1) * 10**18) / uint256(reserve0);
-            return adjustDecimals(price, 18, decimals1);
-        } else if (token1 == tokenContract) {
-            try IBEP20(token0).decimals() returns (uint8 d) {
-                decimals0 = d;
-            } catch {}
+    /**
+     * @dev 价格更新事件
+     *
+     * @param tokenPrice 新的代币价格
+     * @param ethPrice 新的ETH价格
+     * @param updater 更新者地址
+     */
+    event PriceUpdated(uint256 tokenPrice, uint256 ethPrice, address updater);
 
-            uint256 price = (uint256(reserve0) * 10**18) / uint256(reserve1);
-            return adjustDecimals(price, decimals0, 18);
-        } else {
-            revert("E26: Token not found in pair");
-        }
+    /**
+     * @dev 设置代币地址
+     *
+     * @param _tokenAddress 代币合约地址
+     */
+    function setTokenAddress(address _tokenAddress) external {
+        require(_tokenAddress != address(0), "PriceOracle: Invalid token address");
+        tokenAddress = _tokenAddress;
     }
 
     /**
-     * @dev 获取代币价格并更新缓存（包含波动保护检查）
-     * 仅供授权合约调用（如UpgradeModule）
-     * @return uint256 代币价格（精度18位）
+     * @dev 设置USDT地址
+     *
+     * @param _usdtAddress USDT代币合约地址
      */
-    function getAndUpdatePrice() external returns (uint256) {
-        require(authorizedCaller[msg.sender] || msg.sender == owner(), "PriceOracle: Unauthorized");
-
-        uint256 price = getTokenPriceFromPancakeSwap();
-        require(price > 0, "E20: Price oracle returned zero");
-
-        // 价格波动保护
-        if (lastPrice > 0) {
-            uint256 deviation;
-            if (price > lastPrice) {
-                deviation = ((price - lastPrice) * 10000) / lastPrice;
-            } else {
-                deviation = ((lastPrice - price) * 10000) / lastPrice;
-            }
-            require(deviation <= priceDeviationThreshold, "E23: Price deviation too high");
-        }
-
-        lastPrice = price;
-        lastPriceUpdateTime = block.timestamp;
-        emit PriceUpdated(price, block.timestamp);
-        return price;
+    function setUSDTAddress(address _usdtAddress) external {
+        require(_usdtAddress != address(0), "PriceOracle: Invalid USDT address");
+        usdtAddress = _usdtAddress;
     }
 
     /**
-     * @dev 调整小数位数
-     * @param value 原始值
-     * @param fromDecimals 原始小数位数
-     * @param toDecimals 目标小数位数
-     * @return uint256 调整后的值
+     * @dev 更新代币价格
+     *
+     * @param _tokenPriceUSD 新的代币价格（USD，精度18位）
      */
-    function adjustDecimals(uint256 value, uint8 fromDecimals, uint8 toDecimals) internal pure returns (uint256) {
-        if (fromDecimals == toDecimals) {
-            return value;
-        } else if (fromDecimals < toDecimals) {
-            return value * 10**(toDecimals - fromDecimals);
-        } else {
-            return value / 10**(fromDecimals - toDecimals);
-        }
-    }
-
-    // ====================== Config Setters ======================
-
-    /**
-     * @dev 设置代币合约地址
-     */
-    function setTokenContract(address a) external onlyOwner {
-        require(a != address(0), "PriceOracle: Zero address");
-        tokenContract = a;
-        emit TokenContractSet(a);
+    function updateTokenPrice(uint256 _tokenPriceUSD) external {
+        require(_tokenPriceUSD > 0, "PriceOracle: Invalid token price");
+        tokenPriceUSD = _tokenPriceUSD;
+        emit PriceUpdated(_tokenPriceUSD, ethPriceUSD, msg.sender);
     }
 
     /**
-     * @dev 设置PancakeSwap流动性池地址
+     * @dev 更新ETH价格
+     *
+     * @param _ethPriceUSD 新的ETH价格（USD，精度18位）
      */
-    function setPancakeSwapPair(address pair) external onlyOwner {
-        require(pair != address(0), "E27: Zero address");
-        pancakeSwapPair = pair;
-        emit PancakeSwapPairSet(pair);
+    function updateETHPrice(uint256 _ethPriceUSD) external {
+        require(_ethPriceUSD > 0, "PriceOracle: Invalid ETH price");
+        ethPriceUSD = _ethPriceUSD;
+        emit PriceUpdated(tokenPriceUSD, _ethPriceUSD, msg.sender);
     }
 
     /**
-     * @dev 设置WBNB合约地址
+     * @dev 批量更新价格
+     *
+     * @param _tokenPriceUSD 代币价格
+     * @param _ethPriceUSD ETH价格
      */
-    function setWBNBAddress(address wbnb) external onlyOwner {
-        wbnbAddress = wbnb;
+    function updatePrices(uint256 _tokenPriceUSD, uint256 _ethPriceUSD) external {
+        require(_tokenPriceUSD > 0, "PriceOracle: Invalid token price");
+        require(_ethPriceUSD > 0, "PriceOracle: Invalid ETH price");
+        tokenPriceUSD = _tokenPriceUSD;
+        ethPriceUSD = _ethPriceUSD;
+        emit PriceUpdated(_tokenPriceUSD, _ethPriceUSD, msg.sender);
     }
 
     /**
-     * @dev 设置稳定币合约地址
+     * @dev 获取代币价格
+     *
+     * @return uint256 代币价格（USD，精度18位）
      */
-    function setStablecoinAddress(address stablecoin) external onlyOwner {
-        stablecoinAddress = stablecoin;
+    function getTokenPrice() external view returns (uint256) {
+        return tokenPriceUSD;
     }
 
     /**
-     * @dev 设置价格过期时间（秒）
+     * @dev 获取ETH价格
+     *
+     * @return uint256 ETH价格（USD，精度18位）
      */
-    function setPriceExpirySeconds(uint256 seconds_) external onlyOwner {
-        require(seconds_ > 0, "PriceOracle: expiry must be > 0");
-        priceExpirySeconds = seconds_;
-        emit PriceParamsUpdated(seconds_, priceDeviationThreshold);
+    function getETHPrice() external view returns (uint256) {
+        return ethPriceUSD;
     }
 
     /**
-     * @dev 设置价格波动保护阈值（千分比，如5000表示50%）
+     * @dev 计算代币的USDT等值
+     *
+     * 将代币数量转换为USDT数量
+     *
+     * @param tokenAmount 代币数量（精度18位）
+     * @return uint256 USDT数量（精度6位）
+     *
+     * 计算公式：
+     * usdtAmount = tokenAmount * tokenPriceUSD / (1 USD) / TOKEN_PRECISION * USDT_PRECISION
+     *
+     * @example
+     * tokenAmount = 10000 * 10^18 (10000代币)
+     * tokenPriceUSD = 0.1 * 10^18 ($0.1)
+     * usdtAmount = 10000 * 0.1 = 1000 USDT
      */
-    function setPriceDeviationThreshold(uint256 threshold) external onlyOwner {
-        require(threshold <= 10000, "PriceOracle: threshold <= 10000");
-        priceDeviationThreshold = threshold;
-        emit PriceParamsUpdated(priceExpirySeconds, threshold);
+    function calculateUSDTEquivalent(uint256 tokenAmount) external view returns (uint256) {
+        if (tokenPriceUSD == 0 || tokenAmount == 0) return 0;
+        return tokenAmount * tokenPriceUSD / TOKEN_PRECISION * USDT_PRECISION / (1 * TOKEN_PRECISION);
     }
 
     /**
-     * @dev 重置价格缓存
+     * @dev 计算USDT的代币等值
+     *
+     * 将USDT数量转换为代币数量
+     *
+     * @param usdtAmount USDT数量（精度6位）
+     * @return uint256 代币数量（精度18位）
+     *
+     * 计算公式：
+     * tokenAmount = usdtAmount * (1 USD) / tokenPriceUSD / USDT_PRECISION * TOKEN_PRECISION
+     *
+     * @example
+     * usdtAmount = 1000 * 10^6 (1000 USDT)
+     * tokenPriceUSD = 0.1 * 10^18 ($0.1)
+     * tokenAmount = 1000 / 0.1 = 10000 代币
      */
-    function resetPriceCache() external onlyOwner {
-        lastPrice = 0;
-        lastPriceUpdateTime = 0;
+    function calculateTokenEquivalent(uint256 usdtAmount) external view returns (uint256) {
+        if (tokenPriceUSD == 0 || usdtAmount == 0) return 0;
+        return usdtAmount * (1 * TOKEN_PRECISION) / tokenPriceUSD / USDT_PRECISION * TOKEN_PRECISION;
     }
 
     /**
-     * @dev 授权调用者（如UpgradeModule合约）
+     * @dev 计算ETH的USDT等值
+     *
+     * @param ethAmount ETH数量（精度18位）
+     * @return uint256 USDT数量（精度6位）
      */
-    function setAuthorizedCaller(address caller, bool ok) external onlyOwner {
-        authorizedCaller[caller] = ok;
+    function calculateETHUSDTEquivalent(uint256 ethAmount) external view returns (uint256) {
+        if (ethPriceUSD == 0 || ethAmount == 0) return 0;
+        return ethAmount * ethPriceUSD / TOKEN_PRECISION * USDT_PRECISION / (1 * TOKEN_PRECISION);
+    }
+
+    /**
+     * @dev 获取精度信息
+     *
+     * @return uint256 代币精度
+     * @return uint256 USDT精度
+     */
+    function getPrecisionInfo() external pure returns (uint256, uint256) {
+        return (TOKEN_PRECISION, USDT_PRECISION);
+    }
+
+    /**
+     * @dev 验证价格是否有效
+     *
+     * @return bool 价格是否有效（非零）
+     */
+    function isPriceValid() external view returns (bool) {
+        return tokenPriceUSD > 0 && ethPriceUSD > 0;
     }
 }

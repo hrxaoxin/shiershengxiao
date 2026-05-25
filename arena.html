@@ -354,7 +354,7 @@
                 <div class="space-y-6">
                     <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
                         <h3 class="text-white font-semibold mb-4 flex items-center">
-                            <span class="mr-2">�</span> 赛季奖励池
+                            <span class="mr-2">🏆</span> 赛季奖励池
                         </h3>
                         <div id="rewardPoolDisplay" class="text-center mb-4 p-4 bg-yellow-500/10 rounded-lg">
                             <div class="text-yellow-400 text-2xl font-bold" id="rewardPoolAmount">--</div>
@@ -365,7 +365,7 @@
 
                     <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
                         <h3 class="text-white font-semibold mb-4 flex items-center">
-                            <span class="mr-2">�</span> 排行榜
+                            <span class="mr-2">📊</span> 排行榜
                         </h3>
                         <div id="leaderboard" class="space-y-3 max-h-80 overflow-y-auto">
                             <div class="text-center text-gray-400 py-4">加载中...</div>
@@ -861,11 +861,11 @@
                         tokenId: tokenId,
                         tokenType: tokenType,
                         level: level,
-                        attr: attr,
-                        attrName: attr === 'Water' ? '水' : attr === 'Wind' ? '风' : attr === 'Fire' ? '火' : attr === 'Dark' ? '暗' : '光',
-                        zodiacIndex: zodiacIndex,
+                        attr: nftInfo.element || nftInfo.attrName,
+                        attrName: nftInfo.attrName,
+                        zodiacIndex: nftInfo.zodiacIndex,
                         zodiac: zodiac,
-                        gender: gender,
+                        gender: nftInfo.gender,
                         name: name,
                         imagePath: imagePath,
                         skill: skill,
@@ -1259,6 +1259,7 @@
                             losses: 12 + i * 2,
                             rank: i + 1,
                             isMock: true,
+                            mockIndex: i % mockOpponents.length,
                             team: opponent.team
                         });
                     }
@@ -1374,7 +1375,7 @@
             if (leaderboardItems[index]) {
                 leaderboardItems[index].classList.add('ring-2', 'ring-yellow-400');
             }
-            
+
             const leaderboardData = document.getElementById('leaderboard').dataset.leaderboardData;
             let opponents;
             if (leaderboardData) {
@@ -1382,8 +1383,11 @@
             } else {
                 opponents = mockOpponents;
             }
-            
+
             selectedOpponent = opponents[index % opponents.length];
+            if (selectedOpponent.isMock && selectedOpponent.mockIndex === undefined) {
+                selectedOpponent.mockIndex = index % mockOpponents.length;
+            }
             updateChallengeBtn();
             showOpponentTeam(selectedOpponent);
         }
@@ -1507,42 +1511,54 @@
 
             const btn = document.getElementById('challengeBtn');
             const mobileBtn = document.getElementById('mobileChallengeBtn');
-            
+
             if (btn) btn.disabled = true;
             if (mobileBtn) mobileBtn.disabled = true;
 
             try {
                 ZODIAC_UI.showLoading('正在发起挑战...');
-                
-                const defenderAddress = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
-                
-                const gas = await arenaContract.methods.challenge(defenderAddress).estimateGas({ from: accounts[0] });
-                const tx = await arenaContract.methods.challenge(defenderAddress).send({ 
-                    from: accounts[0],
-                    gas: gas
-                });
-                
+
+                const playerTeam = battleTeam.filter(n => n).map(nft => nft.tokenId);
+                if (playerTeam.length !== 6) {
+                    ZODIAC_UI.showToast('请先设置完整的战队', 'warning');
+                    ZODIAC_UI.hideLoading();
+                    return;
+                }
+
+                let victory;
+                if (selectedOpponent.isMock) {
+                    const mockIndex = selectedOpponent.mockIndex !== undefined ? selectedOpponent.mockIndex : 0;
+                    const gas = await arenaContract.methods.challengeMockPlayer(playerTeam, mockIndex).estimateGas({ from: accounts[0] });
+                    const tx = await arenaContract.methods.challengeMockPlayer(playerTeam, mockIndex).send({
+                        from: accounts[0],
+                        gas: gas
+                    });
+                    victory = tx.events?.ChallengeResult?.returnValues?.[1];
+                } else {
+                    const defenderAddress = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
+                    const gas = await arenaContract.methods.challengeRealPlayer(defenderAddress, playerTeam).estimateGas({ from: accounts[0] });
+                    const tx = await arenaContract.methods.challengeRealPlayer(defenderAddress, playerTeam).send({
+                        from: accounts[0],
+                        gas: gas
+                    });
+                    victory = tx.events?.ChallengeResult?.returnValues?.[1];
+                }
+
                 ZODIAC_UI.hideLoading();
-                
-                const result = tx.events?.ChallengeCompleted?.returnValues;
-                if (result) {
-                    const attackerWon = result[0] === true || result[0] === 'true';
-                    const attackerWins = parseInt(result[1]);
-                    const defenderWins = parseInt(result[2]);
-                    
+
+                if (victory !== undefined) {
                     openBattleModal();
-                    
                     setTimeout(() => {
-                        simulateBattleWithResult(attackerWon, attackerWins, defenderWins);
+                        simulateBattleWithResult(victory, victory ? 1 : 0, victory ? 0 : 1);
                     }, 2000);
                 } else {
                     ZODIAC_UI.showToast('战斗结果解析失败', 'error');
                 }
-                
+
                 await loadRemainingAttempts();
                 await loadLeaderboard();
                 await loadMyStats();
-                
+
             } catch (error) {
                 ZODIAC_UI.hideLoading();
                 console.error('挑战失败:', error);
