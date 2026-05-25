@@ -829,7 +829,6 @@
                 const bnbBalance = '0';
                 document.getElementById('tokenStakingBNBBalance').textContent = bnbBalance;
 
-                const totalStaked = await tokenStakingContract.methods.getTotalStaked().call();
                 document.getElementById('totalStakedTokens').textContent = web3.utils.fromWei(totalStaked, 'ether').substring(0, 10);
 
                 const releaseRatio = '0';
