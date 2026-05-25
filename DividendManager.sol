@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+
 /**
  * @title DividendManager
  * @dev 分红管理合约，管理NFT持有者的分红分发
@@ -28,12 +32,48 @@ pragma solidity ^0.8.20;
  * - 4级: 28
  * - 5级: 76
  */
-contract DividendManager {
+contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+    /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+
     /**
      * @dev 用户权重映射
      * user => weight
      */
     mapping(address => uint256) public userWeights;
+
+    /**
+     * @dev 初始化函数
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _authorizer) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        authorizer = _authorizer;
+    }
+
+    /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "DividendManager: Not authorized");
+        _;
+    }
 
     /**
      * @dev 用户待领取分红映射
@@ -73,7 +113,7 @@ contract DividendManager {
     /**
      * @dev 添加到分红池
      */
-    function addDividendPool(uint256 amount) external {
+    function addDividendPool(uint256 amount) external onlyOwner {
         require(amount > 0, "DividendManager: Invalid amount");
         dividendPoolBalance += amount;
 
@@ -125,7 +165,7 @@ contract DividendManager {
     /**
      * @dev 更新用户权重
      */
-    function updateUserWeight(address user, uint256 weight) external {
+    function updateUserWeight(address user, uint256 weight) external onlyOwner {
         totalWeight = totalWeight - userWeights[user] + weight;
         userWeights[user] = weight;
     }
@@ -136,7 +176,7 @@ contract DividendManager {
     function updateUserWeightsBatch(
         address[] calldata users,
         uint256[] calldata weights
-    ) external {
+    ) external onlyOwner {
         require(users.length == weights.length, "DividendManager: Length mismatch");
 
         for (uint256 i = 0; i < users.length; i++) {

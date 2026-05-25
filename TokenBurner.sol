@@ -1,18 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
-
-interface INFTMint {
-    function mintNormal(address to) external returns (uint256);
-    function mintRare(address to) external returns (uint256);
-    function mintNormalTen(address to) external returns (uint256[] memory);
-    function mintRareTen(address to) external returns (uint256[] memory);
-    function mintTargeted(address to, uint8 baseZodiac) external returns (uint256[] memory);
-}
 
 contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
@@ -23,6 +16,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     address public tokenContract;
     address public authorizedNFTContract;
     address public nftMintContract;
+    address public authorizer;
 
     event TokenBurned(address indexed user, uint256 amount, uint256 timestamp);
     event MintCostUpdated(uint256 oldNormalCost, uint256 newNormalCost, uint256 oldRareCost, uint256 newRareCost, uint256 timestamp);
@@ -33,26 +27,36 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
         _;
     }
 
+    modifier onlyAdminOrAuthorizer() {
+        require(msg.sender == owner() || msg.sender == authorizer, "TokenBurner: Not admin or authorizer");
+        _;
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
 
-    function initialize(address _tokenContract, address _nftMint) external initializer {
+    function initialize(address _tokenContract, address _nftMint, address _authorizer) external initializer {
         __UUPSUpgradeable_init();
         __Ownable2Step_init();
         tokenContract = _tokenContract;
         nftMintContract = _nftMint;
+        authorizer = _authorizer;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    function setNFTContract(address _nftMint) external onlyOwner {
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    function setNFTContract(address _nftMint) external onlyAdminOrAuthorizer {
         require(_nftMint != address(0), "TokenBurner: Zero address");
         nftMintContract = _nftMint;
     }
 
-    function setAuthorizedNFTContract(address _authorized) external onlyOwner {
+    function setAuthorizedNFTContract(address _authorized) external onlyAdminOrAuthorizer {
         require(_authorized != address(0), "TokenBurner: Zero address");
         authorizedNFTContract = _authorized;
     }
@@ -71,7 +75,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
         emit MintCostUpdated(normalMintCost, normalMintCost, oldRare, cost, block.timestamp);
     }
 
-    function setTokenContract(address _tokenContract) external onlyOwner {
+    function setTokenContract(address _tokenContract) external onlyAdminOrAuthorizer {
         require(_tokenContract != address(0), "TokenBurner: Zero address");
         tokenContract = _tokenContract;
     }

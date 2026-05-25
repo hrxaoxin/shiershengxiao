@@ -1,25 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
-
-interface INFTMint {
-    function mintNormal(address to) external returns (uint256);
-    function mintRare(address to) external returns (uint256);
-    function tokenType(uint256 tokenId) external view returns (uint256);
-}
-
-interface INFTData {
-    function getNFTInfo(uint256 tokenId) external view returns (
-        uint256 tokenType,
-        uint8 attack,
-        uint8 defense,
-        uint8 health,
-        uint8 speed,
-        uint8 level,
-        uint256 rank
-    );
-}
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "./NFTInterface.sol";
 
 /**
  * @title Breeding
@@ -51,7 +36,7 @@ interface INFTData {
  * - 父亲所有者: 15%
  * - 共有人（如果有）: 5%
  */
-contract Breeding is Ownable {
+contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 自繁殖冷却时间（秒）
      * 12小时 = 12 * 60 * 60
@@ -78,6 +63,42 @@ contract Breeding is Ownable {
      * @dev NFT合约地址
      */
     address public nftMintContract;
+
+    /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+
+    /**
+     * @dev 初始化函数
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _authorizer) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        authorizer = _authorizer;
+    }
+
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "Breeding: Not authorized");
+        _;
+    }
+
+    /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /**
      * @dev 繁殖对结构体
@@ -321,7 +342,7 @@ contract Breeding is Ownable {
 
         uint256 zodiacType = _getChildZodiacType(fatherId, motherId);
 
-        bool isRare = zodiacType == 6 || zodiacType == 7;
+        bool isRare = zodiacType >= 72;
 
         INFTMint nftMint = INFTMint(nftMintContract);
 
@@ -409,7 +430,7 @@ contract Breeding is Ownable {
     /**
      * @dev 设置NFT合约地址
      */
-    function setNFTContract(address _nftContract) external onlyOwner {
+    function setNFTContract(address _nftContract) external onlyAuthorized {
         require(_nftContract != address(0), "Breeding: Invalid NFT contract address");
         nftMintContract = _nftContract;
         emit NFTContractSet(nftMintContract);

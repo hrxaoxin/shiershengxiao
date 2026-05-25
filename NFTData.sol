@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+
 /**
  * @title NFTData
  * @dev NFT数据存储合约
@@ -23,8 +27,11 @@ pragma solidity ^0.8.20;
  * - 读取NFT信息：直接查询_nftInfo
  * - 遍历用户NFT：遍历_userNFTs[user]
  * - 统计某类型NFT：遍历_nftTypeOwners[nftType]
+ *
+ * 升级支持：
+ * - 支持UUPS代理升级模式
  */
-contract NFTData {
+contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev NFT信息映射
      *
@@ -75,6 +82,42 @@ contract NFTData {
         uint256 zodiacType;       // 生肖类型（0-119）
         uint8 level;              // 等级（1-5）
         uint256 mintTime;         // 铸造时间戳
+    }
+
+    /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+
+    /**
+     * @dev 初始化函数
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _authorizer) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        authorizer = _authorizer;
+    }
+
+    /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "NFTData: Not authorized");
+        _;
     }
 
     /**
@@ -222,7 +265,7 @@ contract NFTData {
      * @param owner 持有者地址
      */
     function _addToTypeOwners(uint256 nftType, address owner) internal {
-        _nftTypeOwners[nftftype].push(owner);
+        _nftTypeOwners[nftType].push(owner);
     }
 
     /**

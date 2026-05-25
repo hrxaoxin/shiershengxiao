@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+
 /**
  * @title MintModule
  * @dev NFT铸造模块，提供多种铸造方式
@@ -22,8 +26,11 @@ pragma solidity ^0.8.20;
  * 3. 生成随机数确定属性和性别
  * 4. 调用NFT合约铸造NFT
  * 5. 转移NFT给用户
+ *
+ * 升级支持：
+ * - 支持UUPS代理升级模式
  */
-contract MintModule {
+contract MintModule is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 普通铸造费用（代币）
      *
@@ -116,6 +123,44 @@ contract MintModule {
      * @dev 最后一次铸造的区块号（用于随机数生成）
      */
     uint256 public lastMintBlock;
+
+    /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+
+    /**
+     * @dev 初始化函数
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _authorizer) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        authorizer = _authorizer;
+        mintCounter = 0;
+        lastMintBlock = 0;
+    }
+
+    /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "MintModule: Not authorized");
+        _;
+    }
 
     /**
      * @dev 普通铸造事件

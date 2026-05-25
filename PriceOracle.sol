@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+
 /**
  * @title PriceOracle
  * @dev 价格预言机合约，提供代币和ETH的USD价格查询
@@ -20,7 +24,7 @@ pragma solidity ^0.8.20;
  * - 铸造费用验证
  * - NFT定价参考
  */
-contract PriceOracle {
+contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 代币地址
      */
@@ -30,6 +34,42 @@ contract PriceOracle {
      * @dev USDT代币地址
      */
     address public usdtAddress;
+
+    /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+
+    /**
+     * @dev 初始化函数
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _authorizer) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        authorizer = _authorizer;
+    }
+
+    /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "PriceOracle: Not authorized");
+        _;
+    }
 
     /**
      * @dev 代币的USD价格（精度18位）
@@ -69,7 +109,7 @@ contract PriceOracle {
      *
      * @param _tokenAddress 代币合约地址
      */
-    function setTokenAddress(address _tokenAddress) external {
+    function setTokenAddress(address _tokenAddress) external onlyAuthorized {
         require(_tokenAddress != address(0), "PriceOracle: Invalid token address");
         tokenAddress = _tokenAddress;
     }
@@ -79,7 +119,7 @@ contract PriceOracle {
      *
      * @param _usdtAddress USDT代币合约地址
      */
-    function setUSDTAddress(address _usdtAddress) external {
+    function setUSDTAddress(address _usdtAddress) external onlyAuthorized {
         require(_usdtAddress != address(0), "PriceOracle: Invalid USDT address");
         usdtAddress = _usdtAddress;
     }
@@ -89,7 +129,7 @@ contract PriceOracle {
      *
      * @param _tokenPriceUSD 新的代币价格（USD，精度18位）
      */
-    function updateTokenPrice(uint256 _tokenPriceUSD) external {
+    function updateTokenPrice(uint256 _tokenPriceUSD) external onlyOwner {
         require(_tokenPriceUSD > 0, "PriceOracle: Invalid token price");
         tokenPriceUSD = _tokenPriceUSD;
         emit PriceUpdated(_tokenPriceUSD, ethPriceUSD, msg.sender);
@@ -100,7 +140,7 @@ contract PriceOracle {
      *
      * @param _ethPriceUSD 新的ETH价格（USD，精度18位）
      */
-    function updateETHPrice(uint256 _ethPriceUSD) external {
+    function updateETHPrice(uint256 _ethPriceUSD) external onlyOwner {
         require(_ethPriceUSD > 0, "PriceOracle: Invalid ETH price");
         ethPriceUSD = _ethPriceUSD;
         emit PriceUpdated(tokenPriceUSD, _ethPriceUSD, msg.sender);
@@ -112,7 +152,7 @@ contract PriceOracle {
      * @param _tokenPriceUSD 代币价格
      * @param _ethPriceUSD ETH价格
      */
-    function updatePrices(uint256 _tokenPriceUSD, uint256 _ethPriceUSD) external {
+    function updatePrices(uint256 _tokenPriceUSD, uint256 _ethPriceUSD) external onlyOwner {
         require(_tokenPriceUSD > 0, "PriceOracle: Invalid token price");
         require(_ethPriceUSD > 0, "PriceOracle: Invalid ETH price");
         tokenPriceUSD = _tokenPriceUSD;

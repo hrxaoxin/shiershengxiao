@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+
 /**
  * @title UpgradeModule
  * @dev NFT升级模块，提供多种升级方式
@@ -28,7 +32,43 @@ pragma solidity ^0.8.20;
  * - 升级后主NFT等级+1
  * - 5级为最高等级，不可再升级
  */
-contract UpgradeModule {
+contract UpgradeModule is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+    /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+
+    /**
+     * @dev 初始化函数
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _authorizer) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        authorizer = _authorizer;
+    }
+
+    /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "UpgradeModule: Not authorized");
+        _;
+    }
+
     /**
      * @dev 升级费用（代币）- 1级升2级
      */
@@ -233,7 +273,7 @@ contract UpgradeModule {
      *
      * @param _usdtAddress USDT代币合约地址
      */
-    function setUSDTAddress(address _usdtAddress) external {
+    function setUSDTAddress(address _usdtAddress) external onlyAuthorized {
         require(_usdtAddress != address(0), "UpgradeModule: Invalid USDT address");
         usdtAddress = _usdtAddress;
     }
@@ -243,7 +283,7 @@ contract UpgradeModule {
      *
      * @param _tokenPriceUSD 代币价格（USD，精度18位）
      */
-    function setTokenPrice(uint256 _tokenPriceUSD) external {
+    function setTokenPrice(uint256 _tokenPriceUSD) external onlyOwner {
         require(_tokenPriceUSD > 0, "UpgradeModule: Invalid token price");
         tokenPriceUSD = _tokenPriceUSD;
     }

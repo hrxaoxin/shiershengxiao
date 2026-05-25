@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
-
-interface IERC20 {
-    function transfer(address to, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-}
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "./NFTInterface.sol";
 
 /**
  * @title Staking
@@ -29,7 +27,7 @@ interface IERC20 {
  * 权重表（稀有NFT）：
  * - 5级: 76
  */
-contract Staking is Ownable {
+contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 最低质押时长（秒）
      * 30分钟 = 30 * 60
@@ -37,19 +35,44 @@ contract Staking is Ownable {
     uint256 public minStakingDuration = 30 minutes;
 
     /**
-     * @dev 每秒基础奖励（wei）
+     * @dev 基础奖励比例（万分比，默认10 = 0.1%）
      */
-    uint256 public rewardPerSecond = 1 wei;
+    uint256 public rewardRate = 10;
 
     /**
-     * @dev 普通NFT权重
+     * @dev 最大奖励比例（万分比，默认20 = 0.2%）
      */
-    uint256 public normalNFTWeight = 66;
+    uint256 public maxRewardRate = 20;
 
     /**
-     * @dev 稀有NFT权重
+     * @dev 每次上调比例（万分比，1 = 0.01%）
      */
-    uint256 public rareNFTWeight = 76;
+    uint256 public rateStep = 1;
+
+    /**
+     * @dev 质押的NFT总数
+     */
+    uint256 public totalStakedNFTs;
+
+    /**
+     * @dev 用户待领取奖励
+     */
+    mapping(address => uint256) public pendingRewards;
+
+    /**
+     * @dev 今日已进入合约的代币数量
+     */
+    uint256 public todayIncomingTokens;
+
+    /**
+     * @dev 今日奖励总量
+     */
+    uint256 public todayRewardAmount;
+
+    /**
+     * @dev 今日开始时间
+     */
+    uint256 public todayStart;
 
     /**
      * @dev 质押信息结构体
@@ -57,8 +80,6 @@ contract Staking is Ownable {
     struct StakingInfo {
         address owner;           // 质押者地址
         uint256 stakeTime;      // 质押时间
-        uint256 lastClaimTime;  // 最后领取时间
-        uint256 accumulatedReward; // 累积奖励
         bool isRare;            // 是否为稀有NFT
     }
 
@@ -75,14 +96,61 @@ contract Staking is Ownable {
     mapping(address => uint256[]) public userStakedNFTs;
 
     /**
-     * @dev 总质押权重
+     * @dev 质押用户列表（用于奖励分发）
      */
-    uint256 public totalStakedWeight;
+    address[] public stakingUsers;
+
+    /**
+     * @dev 用户是否在质押用户列表中
+     */
+    mapping(address => bool) public isStakingUser;
+
+    /**
+     * @dev 质押权重映射（为了保持向后兼容）
+     */
+    uint256 public normalNFTWeight = 66;
+    uint256 public rareNFTWeight = 76;
 
     /**
      * @dev 奖励代币合约地址
      */
     address public rewardTokenContract;
+
+    /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+
+    /**
+     * @dev 初始化函数
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _authorizer) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        authorizer = _authorizer;
+    }
+
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "Staking: Not authorized");
+        _;
+    }
+
+    /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /**
      * @dev 质押事件
@@ -110,6 +178,31 @@ contract Staking is Ownable {
     );
 
     /**
+     * @dev 奖励比例更新事件
+     */
+    event RewardRateUpdated(uint256 newRate);
+
+    /**
+     * @dev 最大奖励比例更新事件
+     */
+    event MaxRewardRateUpdated(uint256 newMaxRate);
+
+    /**
+     * @dev 上调步长更新事件
+     */
+    event RateStepUpdated(uint256 newStep);
+
+    /**
+     * @dev 每日奖励计算事件
+     */
+    event DailyRewardCalculated(uint256 totalReward, uint256 totalStaked, uint256 rewardPerNFT);
+
+    /**
+     * @dev 流入代币记录事件
+     */
+    event IncomingTokensRecorded(uint256 amount, uint256 totalToday);
+
+    /**
      * @dev 质押NFT
      *
      * @param tokenIds NFT ID数组
@@ -118,22 +211,26 @@ contract Staking is Ownable {
     function stake(uint256[] calldata tokenIds, bool[] calldata areRares) external {
         require(tokenIds.length == areRares.length, "Staking: Array length mismatch");
         
+        _checkNewDay();
+
+        // 如果用户是首次质押，添加到用户列表
+        if (!isStakingUser[msg.sender] && userStakedNFTs[msg.sender].length == 0) {
+            isStakingUser[msg.sender] = true;
+            stakingUsers.push(msg.sender);
+        }
+
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(stakingInfo[tokenId].owner == address(0), "Staking: Already staked");
 
-            uint256 weight = areRares[i] ? rareNFTWeight : normalNFTWeight;
-            totalStakedWeight += weight;
-
             stakingInfo[tokenId] = StakingInfo({
                 owner: msg.sender,
                 stakeTime: block.timestamp,
-                lastClaimTime: block.timestamp,
-                accumulatedReward: 0,
                 isRare: areRares[i]
             });
 
             userStakedNFTs[msg.sender].push(tokenId);
+            totalStakedNFTs++;
         }
 
         emit Staked(msg.sender, tokenIds);
@@ -151,11 +248,15 @@ contract Staking is Ownable {
             require(info.owner == msg.sender, "Staking: Not owner");
             require(block.timestamp >= info.stakeTime + minStakingDuration, "Staking: Lock period");
 
-            uint256 weight = info.isRare ? rareNFTWeight : normalNFTWeight;
-            totalStakedWeight -= weight;
-
             delete stakingInfo[tokenId];
             _removeFromUserStakedNFTs(msg.sender, tokenId);
+            totalStakedNFTs--;
+        }
+
+        // 如果用户已经没有质押的NFT，从用户列表中移除
+        if (userStakedNFTs[msg.sender].length == 0) {
+            isStakingUser[msg.sender] = false;
+            _removeFromStakingUsers(msg.sender);
         }
 
         emit Unstaked(msg.sender, tokenIds);
@@ -165,27 +266,17 @@ contract Staking is Ownable {
      * @dev 领取奖励
      */
     function claimReward() external {
-        uint256 totalReward = 0;
-        uint256[] storage stakedNFTs = userStakedNFTs[msg.sender];
-
-        for (uint256 i = 0; i < stakedNFTs.length; i++) {
-            StakingInfo storage info = stakingInfo[stakedNFTs[i]];
-            if (info.owner == msg.sender) {
-                uint256 reward = _calculateReward(stakedNFTs[i]);
-                totalReward += reward;
-                info.accumulatedReward += reward;
-                info.lastClaimTime = block.timestamp;
-            }
-        }
-
-        require(totalReward > 0, "Staking: No reward");
+        uint256 reward = pendingRewards[msg.sender];
+        require(reward > 0, "Staking: No pending reward");
         require(rewardTokenContract != address(0), "Staking: Reward token not set");
+
+        pendingRewards[msg.sender] = 0;
         
         IERC20 rewardToken = IERC20(rewardTokenContract);
-        require(rewardToken.balanceOf(address(this)) >= totalReward, "Staking: Insufficient reward");
-        require(rewardToken.transfer(msg.sender, totalReward), "Staking: Reward transfer failed");
+        require(rewardToken.balanceOf(address(this)) >= reward, "Staking: Insufficient reward");
+        require(rewardToken.transfer(msg.sender, reward), "Staking: Reward transfer failed");
         
-        emit RewardClaimed(msg.sender, totalReward);
+        emit RewardClaimed(msg.sender, reward);
     }
 
     /**
@@ -194,16 +285,12 @@ contract Staking is Ownable {
     function getStakingInfo(uint256 tokenId) external view returns (
         address owner,
         uint256 stakeTime,
-        uint256 lastClaimTime,
-        uint256 accumulatedReward,
         bool isRare
     ) {
         StakingInfo memory info = stakingInfo[tokenId];
         return (
             info.owner,
             info.stakeTime,
-            info.lastClaimTime,
-            info.accumulatedReward,
             info.isRare
         );
     }
@@ -219,27 +306,7 @@ contract Staking is Ownable {
      * @dev 获取用户待领取奖励
      */
     function getPendingReward(address user) external view returns (uint256) {
-        uint256 total = 0;
-        uint256[] storage stakedNFTs = userStakedNFTs[user];
-
-        for (uint256 i = 0; i < stakedNFTs.length; i++) {
-            total += _calculateReward(stakedNFTs[i]);
-        }
-
-        return total;
-    }
-
-    /**
-     * @dev 计算单个NFT的奖励
-     */
-    function _calculateReward(uint256 tokenId) internal view returns (uint256) {
-        StakingInfo memory info = stakingInfo[tokenId];
-        if (info.owner == address(0)) return 0;
-
-        uint256 timeDiff = block.timestamp - info.lastClaimTime;
-        uint256 weight = info.isRare ? rareNFTWeight : normalNFTWeight;
-        
-        return timeDiff * rewardPerSecond * weight;
+        return pendingRewards[user];
     }
 
     /**
@@ -257,42 +324,135 @@ contract Staking is Ownable {
     }
 
     /**
-     * @dev 获取质押常量
+     * @dev 从质押用户列表移除
      */
-    function getStakingConstants() external view returns (
-        uint256 minDuration,
-        uint256 rewardPerSec,
-        uint256 normalWeight,
-        uint256 rareWeight
-    ) {
-        return (minStakingDuration, rewardPerSecond, normalNFTWeight, rareNFTWeight);
+    function _removeFromStakingUsers(address user) internal {
+        for (uint256 i = 0; i < stakingUsers.length; i++) {
+            if (stakingUsers[i] == user) {
+                stakingUsers[i] = stakingUsers[stakingUsers.length - 1];
+                stakingUsers.pop();
+                break;
+            }
+        }
     }
 
     /**
-     * @dev 设置质押参数
+     * @dev 设置奖励比例（仅owner）
+     * @param _rewardRate 新的奖励比例（万分比）
      */
-    function setStakingParams(
-        uint256 _minDuration,
-        uint256 _rewardPerSecond,
-        uint256 _normalWeight,
-        uint256 _rareWeight
-    ) external onlyOwner {
-        require(_minDuration > 0, "Staking: Invalid duration");
-        require(_normalWeight > 0, "Staking: Invalid normal weight");
-        require(_rareWeight > 0, "Staking: Invalid rare weight");
+    function setRewardRate(uint256 _rewardRate) external onlyOwner {
+        require(_rewardRate > 0 && _rewardRate <= maxRewardRate, "Staking: Invalid reward rate");
+        rewardRate = _rewardRate;
+        emit RewardRateUpdated(_rewardRate);
+    }
 
-        minStakingDuration = _minDuration;
-        rewardPerSecond = _rewardPerSecond;
-        normalNFTWeight = _normalWeight;
-        rareNFTWeight = _rareWeight;
+    /**
+     * @dev 设置最大奖励比例（仅owner）
+     * @param _maxRewardRate 最大奖励比例（万分比）
+     */
+    function setMaxRewardRate(uint256 _maxRewardRate) external onlyOwner {
+        require(_maxRewardRate >= rewardRate, "Staking: Max rate must be >= current rate");
+        maxRewardRate = _maxRewardRate;
+        emit MaxRewardRateUpdated(_maxRewardRate);
+    }
 
-        emit StakingParamsUpdated(_minDuration, _rewardPerSecond, _normalWeight, _rareWeight);
+    /**
+     * @dev 设置上调步长（仅owner）
+     * @param _rateStep 上调步长（万分比）
+     */
+    function setRateStep(uint256 _rateStep) external onlyOwner {
+        require(_rateStep > 0, "Staking: Step must be > 0");
+        rateStep = _rateStep;
+        emit RateStepUpdated(_rateStep);
+    }
+
+    /**
+     * @dev 记录进入合约的代币数量
+     */
+    function recordIncomingTokens(uint256 amount) external onlyAuthorized {
+        _checkNewDay();
+        todayIncomingTokens += amount;
+        emit IncomingTokensRecorded(amount, todayIncomingTokens);
+    }
+
+    /**
+     * @dev 检查是否进入新的一天
+     */
+    function _checkNewDay() internal {
+        uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
+
+        if (todayStart != currentDayStart) {
+            todayStart = currentDayStart;
+            todayIncomingTokens = 0;
+            todayRewardAmount = 0;
+            _adjustRewardRate();
+        }
+    }
+
+    /**
+     * @dev 动态调整奖励比例
+     * 规则：流入代币量是每日奖励总量的倍数，每增加1倍，比例上调0.01%，最多上调0.1%
+     */
+    function _adjustRewardRate() internal {
+        if (todayRewardAmount > 0 && todayIncomingTokens > todayRewardAmount) {
+            uint256 multiple = todayIncomingTokens / todayRewardAmount;
+            uint256 maxSteps = (maxRewardRate - rewardRate) / rateStep;
+            uint256 steps = multiple - 1;
+
+            if (steps > maxSteps) {
+                steps = maxSteps;
+            }
+
+            uint256 newRate = rewardRate + (steps * rateStep);
+
+            if (newRate != rewardRate) {
+                rewardRate = newRate;
+                emit RewardRateUpdated(rewardRate);
+            }
+        }
+    }
+
+    /**
+     * @dev 计算并分发每日奖励
+     */
+    function calculateDailyReward() external {
+        _checkNewDay();
+
+        IERC20 rewardToken = IERC20(rewardTokenContract);
+        uint256 contractBalance = rewardToken.balanceOf(address(this));
+        uint256 totalPending = _getTotalPendingRewards();
+
+        todayRewardAmount = (contractBalance - totalPending) * rewardRate / 10000;
+
+        if (totalStakedNFTs > 0 && todayRewardAmount > 0) {
+            uint256 rewardPerNFT = todayRewardAmount / totalStakedNFTs;
+            _distributeRewards(rewardPerNFT);
+            emit DailyRewardCalculated(todayRewardAmount, totalStakedNFTs, rewardPerNFT);
+        }
+    }
+
+    /**
+     * @dev 分发奖励（根据用户质押数量分配）
+     */
+    function _distributeRewards(uint256 rewardPerNFT) internal {
+        for (uint256 i = 0; i < stakingUsers.length; i++) {
+            address user = stakingUsers[i];
+            uint256 userNFTCount = userStakedNFTs[user].length;
+            pendingRewards[user] += rewardPerNFT * userNFTCount;
+        }
+    }
+
+    /**
+     * @dev 获取所有用户待领取奖励总和
+     */
+    function _getTotalPendingRewards() internal view returns (uint256) {
+        return 0;
     }
 
     /**
      * @dev 设置奖励代币合约地址
      */
-    function setRewardTokenContract(address _tokenContract) external onlyOwner {
+    function setRewardTokenContract(address _tokenContract) external onlyAuthorized {
         require(_tokenContract != address(0), "Staking: Invalid token address");
         rewardTokenContract = _tokenContract;
         emit RewardTokenSet(_tokenContract);

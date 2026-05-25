@@ -17,6 +17,7 @@ contract WeightManager is
     IWeightManager
 {
     address public nftDataContract;
+    address public authorizer;
     uint256 public minOwnerWeight;
     uint256 public ownerWeight;
     
@@ -34,14 +35,24 @@ contract WeightManager is
     event UserWeightUpdated(address indexed user, uint256 oldWeight, uint256 newWeight, uint256 timestamp);
     event TotalWeightUpdated(uint256 oldWeight, uint256 newWeight, uint256 timestamp);
     
-    function initialize() external initializer {
+    function initialize(address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
-        minOwnerWeight = 100;
-        ownerWeight = 100;
+        minOwnerWeight = 0;
+        ownerWeight = 0;
+        authorizer = _authorizer;
     }
     
     function _authorizeUpgrade(address) internal override onlyOwner {}
+    
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "WeightManager: Not authorized");
+        _;
+    }
     
     modifier onlyOperator() {
         bool isAuthorized = msg.sender == owner();
@@ -49,7 +60,7 @@ contract WeightManager is
         _;
     }
     
-    function setNFTDataContract(address _nftDataContract) external onlyOwner {
+    function setNFTDataContract(address _nftDataContract) external onlyAuthorized {
         if (_nftDataContract == address(0)) revert ZeroAddress();
         nftDataContract = _nftDataContract;
     }

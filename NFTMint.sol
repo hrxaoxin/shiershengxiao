@@ -2,10 +2,11 @@
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 
-contract NFTMint is ERC721, Ownable, UUPSUpgradeable {
+contract NFTMint is ERC721, Ownable2StepUpgradeable, UUPSUpgradeable {
     uint256 public constant MINT_COST = 8888 * 10**18;
     uint256 public constant RARE_MINT_COST = 88888 * 10**18;
     uint256 public constant BATCH_MINT_COST = 88880 * 10**18;
@@ -20,6 +21,7 @@ contract NFTMint is ERC721, Ownable, UUPSUpgradeable {
     uint256 public _nextCardId;
 
     address public tokenBurnerContract;
+    address public authorizer;
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
 
     mapping(uint256 => uint256) public tokenType;
@@ -29,11 +31,27 @@ contract NFTMint is ERC721, Ownable, UUPSUpgradeable {
     event BatchMint(address indexed to, uint256[] tokenIds);
     event Upgrade(address indexed owner, uint256 indexed tokenId, uint8 oldLevel, uint8 newLevel);
 
-    constructor() ERC721("Zodiac NFT", "ZNFT") {
+    function initialize(address _authorizer) external initializer {
+        __ERC721_init("Zodiac NFT", "ZNFT");
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
         _nextCardId = 1;
+        authorizer = _authorizer;
     }
 
-    function setTokenBurner(address _tokenBurner) external onlyOwner {
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "NFTMint: Not authorized");
+        _;
+    }
+
+    function setTokenBurner(address _tokenBurner) external onlyAuthorized {
+        require(_tokenBurner != address(0), "NFTMint: Invalid token burner address");
         tokenBurnerContract = _tokenBurner;
     }
 
@@ -94,6 +112,30 @@ contract NFTMint is ERC721, Ownable, UUPSUpgradeable {
         uint256 zodiac = (randomSeed / 100) % 12;
         uint256 gender = (randomSeed / 100 / 12) % 2;
         return _calculateZodiacType(element, zodiac, gender);
+    }
+
+    function mint(address to, uint256 zodiacType) external returns (uint256) {
+        require(msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+        uint256 tokenId = _nextCardId++;
+        _safeMint(to, tokenId);
+        tokenType[tokenId] = zodiacType;
+        tokenLevel[tokenId] = 1;
+        emit Mint(to, tokenId, zodiacType);
+        return tokenId;
+    }
+
+    function mintBatch(address to, uint256[] calldata zodiacTypes) external returns (uint256[] memory) {
+        require(msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+        uint256[] memory tokenIds = new uint256[](zodiacTypes.length);
+        for (uint256 i = 0; i < zodiacTypes.length; i++) {
+            uint256 tokenId = _nextCardId++;
+            _safeMint(to, tokenId);
+            tokenType[tokenId] = zodiacTypes[i];
+            tokenLevel[tokenId] = 1;
+            tokenIds[i] = tokenId;
+        }
+        emit BatchMint(to, tokenIds);
+        return tokenIds;
     }
 
     function mintNormal(address to) external returns (uint256) {
@@ -245,9 +287,6 @@ contract NFTMint is ERC721, Ownable, UUPSUpgradeable {
     }
 
     function unpause() external onlyOwner {
-    }
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
     }
 
     function upgradeTo(address newImplementation) external override onlyOwner {

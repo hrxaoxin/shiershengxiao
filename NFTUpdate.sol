@@ -17,7 +17,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  */
 contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, INFTUpdate {
     using NFTLib for uint256;
-    using NFTLib for address;
 
     /** @dev 黑洞地址，用于销毁NFT和代币 */
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
@@ -54,25 +53,34 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
 
-    /**
-     * @dev 初始化合约
+    /** @dev 初始化函数
      * @param initialOwner 初始所有者地址
      * @param _nftContract NFT合约地址
      * @param _metadataContract 元数据合约地址
+     * @param _authorizer 授权合约地址
      */
-    function initialize(address initialOwner, address _nftContract, address _metadataContract) external initializer {
+    function initialize(address initialOwner, address _nftContract, address _metadataContract, address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         transferOwnership(initialOwner);
         nftContract = _nftContract;
         metadataContract = _metadataContract;
+        authorizer = _authorizer;
     }
 
     /**
      * @dev 升级授权函数
      */
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    /**
+     * @dev 检查是否为授权地址
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "NFTUpdate: Not authorized");
+        _;
+    }
 
     /**
      * @dev 设置授权合约地址
@@ -86,8 +94,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 设置NFT合约地址
      * @param a NFT合约地址
      */
-    function setNFTContract(address a) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
+    function setNFTContract(address a) external onlyAuthorized {
         nftContract = a;
     }
 
@@ -95,8 +102,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 设置元数据合约地址
      * @param a 元数据合约地址
      */
-    function setMetadataContract(address a) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
+    function setMetadataContract(address a) external onlyAuthorized {
         metadataContract = a;
     }
 
@@ -104,8 +110,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 设置代币合约地址
      * @param a 代币合约地址
      */
-    function setTokenContract(address a) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
+    function setTokenContract(address a) external onlyAuthorized {
         tokenContract = a;
     }
 
@@ -113,8 +118,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 设置PancakeSwap流动性池地址
      * @param pair 流动性池地址
      */
-    function setPancakeSwapPair(address pair) external {
-        require(msg.sender == owner() || msg.sender == authorizer, "E10");
+    function setPancakeSwapPair(address pair) external onlyAuthorized {
         require(pair != address(0), "E27: Zero address");
         pancakeSwapPair = pair;
     }

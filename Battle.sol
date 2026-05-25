@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+
 /**
  * @title Battle
  * @dev 战斗合约，实现NFT之间的自动战斗系统
@@ -23,7 +27,8 @@ pragma solidity ^0.8.20;
  * - 获胜者获得失败者的部分代币
  * - 战斗手续费进入奖励池
  */
-contract Battle {
+contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+
     /**
      * @dev NFT属性结构体
      */
@@ -75,6 +80,42 @@ contract Battle {
     address public nftContract;
 
     /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+
+    /**
+     * @dev 初始化函数
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _authorizer) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        authorizer = _authorizer;
+    }
+
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "Battle: Not authorized");
+        _;
+    }
+
+    /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
      * @dev 元素类型枚举
      */
     uint8 public constant ELEMENT_WATER = 0;
@@ -107,8 +148,8 @@ contract Battle {
     /**
      * @dev 设置NFT合约地址
      */
-    function setNFTContract(address _nftContract) external {
-        require(nftContract == address(0), "Battle: NFT contract already set");
+    function setNFTContract(address _nftContract) external onlyAuthorized {
+        require(_nftContract != address(0), "Battle: Invalid NFT contract address");
         nftContract = _nftContract;
     }
 
@@ -465,14 +506,14 @@ contract Battle {
     /**
      * @dev 设置基础战斗奖励
      */
-    function setBaseBattleReward(uint256 reward) external {
+    function setBaseBattleReward(uint256 reward) external onlyOwner {
         baseBattleReward = reward;
     }
 
     /**
      * @dev 设置战斗手续费率
      */
-    function setBattleFeePercent(uint256 feePercent) external {
+    function setBattleFeePercent(uint256 feePercent) external onlyOwner {
         require(feePercent <= 100, "Battle: Fee too high");
         battleFeePercent = feePercent;
     }

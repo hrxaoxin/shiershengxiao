@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "./NFTInterface.sol";
+
 /**
  * @title ArenaRanking
  * @dev 竞技场排名合约，实现PVP竞技场系统
@@ -17,10 +22,17 @@ pragma solidity ^0.8.20;
  * - 最低积分: 0
  *
  * 奖励机制：
- * - 每日领取基础奖励
- * - 赛季结束领取排名奖励
+ * - 赛季结束后根据排名领取奖励
+ *
+ * 升级支持：
+ * - 支持UUPS代理升级模式
  */
-contract ArenaRanking {
+contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+    /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+
     /**
      * @dev 赛季信息结构体
      */
@@ -85,14 +97,30 @@ contract ArenaRanking {
     mapping(address => uint256) public playerScores;
 
     /**
+     * @dev 代币合约地址
+     */
+    address public tokenContract;
+
+    /**
+     * @dev 奖励池地址
+     */
+    address public rewardPool;
+
+    /**
+     * @dev 赛季奖励配置 [第一名, 第二名, 第三名]
+     */
+    uint256[3] public seasonRewards;
+
+    /**
+     * @dev 玩家赛季奖励领取记录
+     * player => rewardAmount
+     */
+    mapping(address => uint256) public seasonRewardsClaimed;
+
+    /**
      * @dev 玩家信息映射
      */
     mapping(address => PlayerRanking) public playerInfo;
-
-    /**
-     * @dev 每日基础奖励
-     */
-    uint256 public dailyBaseReward = 10 * 10**18;
 
     /**
      * @dev 挑战胜利得分
@@ -115,14 +143,93 @@ contract ArenaRanking {
     uint256 public constant SEASON_DURATION = 7 days;
 
     /**
+     * @dev 初始化函数
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _authorizer) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        authorizer = _authorizer;
+    }
+
+    /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    /**
+     * @dev 设置代币合约地址
+     * @param _tokenContract 代币合约地址
+     */
+    function setTokenContract(address _tokenContract) external onlyAuthorized {
+        require(_tokenContract != address(0), "ArenaRanking: Invalid token contract");
+        tokenContract = _tokenContract;
+        emit TokenContractSet(_tokenContract);
+    }
+
+    /**
+     * @dev 设置奖励池地址
+     * @param _rewardPool 奖励池地址
+     */
+    function setRewardPool(address _rewardPool) external onlyAuthorized {
+        require(_rewardPool != address(0), "ArenaRanking: Invalid reward pool");
+        rewardPool = _rewardPool;
+        emit RewardPoolSet(_rewardPool);
+    }
+
+    /**
+     * @dev 设置赛季奖励金额
+     * @param firstReward 第一名奖励
+     * @param secondReward 第二名奖励
+     * @param thirdReward 第三名奖励
+     */
+    function setSeasonRewards(uint256 firstReward, uint256 secondReward, uint256 thirdReward) external onlyOwner {
+        seasonRewards[0] = firstReward;
+        seasonRewards[1] = secondReward;
+        seasonRewards[2] = thirdReward;
+        emit SeasonRewardsSet(firstReward, secondReward, thirdReward);
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "ArenaRanking: Not authorized");
+        _;
+    }
+
+    /**
      * @dev 挑战事件
      */
     event ChallengeResult(
         address indexed player,
         bool isVictory,
-        uint256 scoreChange,
+        int256 scoreChange,
         uint256 newScore
     );
+
+    /**
+     * @dev 代币合约地址设置事件
+     */
+    event TokenContractSet(address indexed tokenContract);
+
+    /**
+     * @dev 奖励池地址设置事件
+     */
+    event RewardPoolSet(address indexed rewardPool);
+
+    /**
+     * @dev 赛季奖励配置设置事件
+     */
+    event SeasonRewardsSet(uint256 first, uint256 second, uint256 third);
 
     /**
      * @dev 赛季结束事件
@@ -132,7 +239,7 @@ contract ArenaRanking {
     /**
      * @dev 初始化赛季
      */
-    function initializeSeason() external {
+    function initializeSeason() external onlyOwner {
         currentSeason = Season({
             seasonId: 1,
             startTime: block.timestamp,
@@ -198,16 +305,6 @@ contract ArenaRanking {
         }
 
         return victory;
-    }
-
-    /**
-     * @dev 领取每日奖励
-     */
-    function claimDailyReward() external {
-        require(playerScores[msg.sender] > 0, "ArenaRanking: No score");
-
-        uint256 reward = dailyBaseReward * playerScores[msg.sender] / 1000;
-        emit ChallengeResult(msg.sender, false, 0, 0);
     }
 
     /**
@@ -281,7 +378,7 @@ contract ArenaRanking {
         uint256 score,
         uint256 tier,
         uint256[6] memory team
-    ) external {
+    ) external onlyOwner {
         mockPlayers.push(MockPlayer({
             score: score,
             tier: tier,
@@ -295,6 +392,81 @@ contract ArenaRanking {
     function getMockPlayerCount() external view returns (uint256) {
         return mockPlayers.length;
     }
+
+    /**
+     * @dev 结束当前赛季
+     */
+    function endSeason() external onlyOwner {
+        require(currentSeason.isActive, "ArenaRanking: Season not active");
+        require(block.timestamp >= currentSeason.endTime, "ArenaRanking: Season not ended");
+
+        currentSeason.isActive = false;
+
+        emit SeasonEnded(currentSeason.seasonId, block.timestamp);
+    }
+
+    /**
+     * @dev 领取赛季奖励
+     */
+    function claimSeasonReward() external returns (uint256) {
+        require(!currentSeason.isActive, "ArenaRanking: Season still active");
+        require(seasonRewardsClaimed[msg.sender] == 0, "ArenaRanking: Reward already claimed");
+
+        uint256 playerScore = playerScores[msg.sender];
+        require(playerScore > 0, "ArenaRanking: No score");
+
+        uint256 reward = _calculateSeasonReward(playerScore);
+        require(reward > 0, "ArenaRanking: No reward");
+
+        require(tokenContract != address(0), "ArenaRanking: Token contract not set");
+        require(rewardPool != address(0), "ArenaRanking: Reward pool not set");
+
+        IERC20 token = IERC20(tokenContract);
+        require(token.balanceOf(rewardPool) >= reward, "ArenaRanking: Insufficient reward pool balance");
+
+        token.transferFrom(rewardPool, msg.sender, reward);
+
+        seasonRewardsClaimed[msg.sender] = reward;
+
+        emit SeasonRewardClaimed(msg.sender, reward);
+
+        return reward;
+    }
+
+    /**
+     * @dev 计算赛季奖励（内部函数）
+     */
+    function _calculateSeasonReward(uint256 score) internal view returns (uint256) {
+        if (score >= 1000) {
+            return seasonRewards[0];
+        } else if (score >= 500) {
+            return seasonRewards[1];
+        } else if (score >= 100) {
+            return seasonRewards[2];
+        }
+        return 0;
+    }
+
+    /**
+     * @dev 获取赛季奖励金额
+     */
+    function getSeasonReward(address player) external view returns (uint256) {
+        if (currentSeason.isActive || seasonRewardsClaimed[player] > 0) {
+            return 0;
+        }
+        uint256 score = playerScores[player];
+        return _calculateSeasonReward(score);
+    }
+
+    /**
+     * @dev 赛季结束事件
+     */
+    event SeasonEnded(uint256 indexed seasonId, uint256 endTime);
+
+    /**
+     * @dev 赛季奖励领取事件
+     */
+    event SeasonRewardClaimed(address indexed player, uint256 amount);
 
     /**
      * @dev 获取玩家剩余挑战次数

@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+
 /**
  * @title NFTMintDelegator
- * @dev NFT主合约的公共逻辑库，通过DELEGATECALL调用
+ * @dev NFT主合约的存储合约，使用UUPS代理模式
  *
- * 本合约使用代理模式，将存储和逻辑分离：
- * - NFTMintDelegator: 存储所有状态变量
- * - NFTMint: 包含所有业务逻辑，通过DELEGATECALL执行
+ * 本合约使用UUPS代理模式，将存储和逻辑分离：
+ * - NFTMintDelegator: 存储所有状态变量（通过代理调用）
+ * - NFTMint: 包含所有业务逻辑
  *
  * 这种设计允许：
  * 1. 逻辑合约可升级
@@ -16,10 +20,10 @@ pragma solidity ^0.8.20;
  *
  * 升级流程：
  * 1. 部署新的逻辑合约
- * 2. 调用NFTMint的upgradeTo方法
- * 3. 新逻辑合约通过DELEGATECALL操作存储
+ * 2. 调用upgradeTo方法升级
+ * 3. 新逻辑合约通过代理调用操作存储
  */
-contract NFTMintDelegator {
+contract NFTMintDelegator is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 代币地址
      */
@@ -175,10 +179,11 @@ contract NFTMintDelegator {
     string public symbol;
 
     /**
-     * @dev 构造函数
+     * @dev 初始化函数
      */
-    constructor() {
-        admin = msg.sender;
+    function initialize() external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
         tokenIdCounter = 0;
         totalSupply = 0;
         paused = false;
@@ -188,26 +193,28 @@ contract NFTMintDelegator {
     }
 
     /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
      * @dev 设置实现版本
      */
-    function setImplementationVersion(string memory version) external {
-        require(msg.sender == admin, "Not admin");
+    function setImplementationVersion(string memory version) external onlyOwner {
         implementationVersion = version;
     }
 
     /**
      * @dev 设置合约名称
      */
-    function setName(string memory _name) external {
-        require(msg.sender == admin, "Not admin");
+    function setName(string memory _name) external onlyOwner {
         name = _name;
     }
 
     /**
      * @dev 设置合约符号
      */
-    function setSymbol(string memory _symbol) external {
-        require(msg.sender == admin, "Not admin");
+    function setSymbol(string memory _symbol) external onlyOwner {
         symbol = _symbol;
     }
 }

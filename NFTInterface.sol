@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "./NFTDataType.sol";
+
 /**
  * @title NFTInterface
  * @dev NFT主合约接口定义，定义与其他合约交互的标准接口
@@ -15,6 +17,119 @@ pragma solidity ^0.8.20;
  * - 升级NFT
  * - 处理NFT繁殖
  */
+
+// ============ ERC20接口 ============
+interface IERC20 {
+    function transfer(address to, uint256 amount) external returns (bool);
+    function balanceOf(address account) external view returns (uint256);
+}
+
+// ============ NFT铸造接口 ============
+interface INFTMint {
+    function mintNormal(address to) external returns (uint256);
+    function mintRare(address to) external returns (uint256);
+    function mintNormalTen(address to) external returns (uint256[] memory);
+    function mintRareTen(address to) external returns (uint256[] memory);
+    function mintTargeted(address to, uint8 baseZodiac) external returns (uint256[] memory);
+    function tokenType(uint256 tokenId) external view returns (uint256);
+}
+
+// ============ NFT数据查询接口 ============
+interface INFTData {
+    function getNFTInfo(uint256 tokenId) external view returns (
+        uint256 tokenType,
+        uint8 attack,
+        uint8 defense,
+        uint8 health,
+        uint8 speed,
+        uint8 level,
+        uint256 rank
+    );
+    function userAllTokens(address user) external view returns (uint256[] memory);
+    function tokenLevel(uint256 tokenId) external view returns (uint8);
+}
+
+// ============ NFT查询接口（用于分页） ============
+interface INFTQueryData {
+    function userAllTokens(address user) external view returns (uint256[] memory);
+    function tokenType(uint256 tokenId) external view returns (NFTDataTypes.ZodiacType);
+    function tokenLevel(uint256 tokenId) external view returns (uint8);
+}
+
+// ============ Authorizer一键设置接口 ============
+interface ISetNFTContract {
+    function setNFTContract(address _nftContract) external;
+}
+
+interface ISetRewardTokenContract {
+    function setRewardTokenContract(address _tokenContract) external;
+}
+
+interface ISetFeeReceiver {
+    function setFeeReceiver(address _feeReceiver) external;
+}
+
+interface ISetDividendPool {
+    function setDividendPool(address _dividendPool) external;
+}
+
+interface ISetNFTStakingPool {
+    function setNFTStakingPool(address _pool) external;
+}
+
+interface ISetTokenStakingPool {
+    function setTokenStakingPool(address _pool) external;
+}
+
+interface ISetTokenContract {
+    function setTokenContract(address _tokenContract) external;
+}
+
+interface ISetArenaRewardPool {
+    function setArenaRewardPool(address _pool) external;
+}
+
+interface ISetTokenAddress {
+    function setTokenAddress(address _tokenAddress) external;
+}
+
+interface ISetUSDTAddress {
+    function setUSDTAddress(address _usdtAddress) external;
+}
+
+interface ISetAuthorizer {
+    function setAuthorizer(address a) external;
+}
+
+interface ISetMetadataContract {
+    function setMetadataContract(address a) external;
+}
+
+interface ISetPancakeSwapPair {
+    function setPancakeSwapPair(address pair) external;
+}
+
+interface ISetAuthorizedNFTContract {
+    function setAuthorizedNFTContract(address _authorized) external;
+}
+
+interface ISetTokenBurner {
+    function setTokenBurner(address _tokenBurner) external;
+}
+
+interface ISetNFTDataContract {
+    function setNFTDataContract(address _nftDataContract) external;
+}
+
+interface ISetBattleContract {
+    function setBattleContract(address _battleContract) external;
+}
+
+interface ISetRewardPool {
+    function setRewardPool(address _rewardPool) external;
+}
+
+// ============ 主NFT接口 ============
 interface INFT {
     /**
      * @dev 铸造新NFT
@@ -283,15 +398,41 @@ interface IArenaRanking {
     );
 
     /**
-     * @dev 领取每日奖励
-     */
-    function claimDailyReward() external;
-
-    /**
      * @dev 获取当前赛季信息
      * @return tuple 赛季信息
      */
     function getSeasonInfo() external view returns (uint256, uint256, uint256);
+
+    /**
+     * @dev 获取虚拟玩家数量
+     * @return uint256 虚拟玩家数量
+     */
+    function getMockPlayerCount() external view returns (uint256);
+
+    /**
+     * @dev 获取玩家剩余挑战次数
+     * @param player 玩家地址
+     * @return uint256 剩余挑战次数
+     */
+    function getRemainingChallenges(address player) external view returns (uint256);
+
+    /**
+     * @dev 获取赛季奖励
+     * @param player 玩家地址
+     * @return uint256 赛季奖励金额
+     */
+    function getSeasonReward(address player) external view returns (uint256);
+
+    /**
+     * @dev 结束当前赛季（仅管理员）
+     */
+    function endSeason() external;
+
+    /**
+     * @dev 领取赛季奖励
+     * @return uint256 领取的奖励金额
+     */
+    function claimSeasonReward() external returns (uint256);
 }
 
 /**
@@ -307,8 +448,9 @@ interface IStaking {
     /**
      * @dev 质押NFT
      * @param tokenIds NFT ID数组
+     * @param areRares 是否为稀有NFT数组
      */
-    function stake(uint256[] calldata tokenIds) external;
+    function stake(uint256[] calldata tokenIds, bool[] calldata areRares) external;
 
     /**
      * @dev 解除质押
@@ -372,8 +514,9 @@ interface ITokenStaking {
 
     /**
      * @dev 领取奖励
+     * @return uint256 领取的奖励数量
      */
-    function claimReward() external;
+    function claimReward() external returns (uint256);
 
     /**
      * @dev 获取质押信息
@@ -601,20 +744,23 @@ interface IUpgradeModule {
     /**
      * @dev 使用NFT升级
      * @param tokenId 主NFT ID
+     * @return uint8 新等级
      */
-    function upgradeWithNFT(uint256 tokenId) external;
+    function upgradeWithNFT(uint256 tokenId) external returns (uint8);
 
     /**
      * @dev 使用代币升级
      * @param tokenId NFT ID
+     * @return uint8 新等级
      */
-    function upgradeWithToken(uint256 tokenId) external;
+    function upgradeWithToken(uint256 tokenId) external returns (uint8);
 
     /**
      * @dev 使用USDT升级
      * @param tokenId NFT ID
+     * @return uint8 新等级
      */
-    function upgradeWithUSDValue(uint256 tokenId) external;
+    function upgradeWithUSDValue(uint256 tokenId) external returns (uint8);
 
     /**
      * @dev 获取升级费用（代币）
@@ -781,4 +927,41 @@ interface IAuthorizer {
      * @return uint256 总权重
      */
     function getTotalWeight() external view returns (uint256);
+}
+
+/**
+ * @title INFTDataInterface
+ * @dev NFT数据接口
+ */
+interface INFTDataInterface {
+    function tokenType(uint256 tokenId) external view returns (NFTDataTypes.ZodiacType);
+    function tokenLevel(uint256 tokenId) external view returns (uint8);
+    function userTokens(address user, NFTDataTypes.ZodiacType zodiacType) external view returns (uint256[] memory);
+    function setTokenLevel(uint256 tokenId, uint8 newLevel) external;
+    function updateUserWeight(address user, uint8 level, bool add, NFTDataTypes.ElementType element) external;
+}
+
+/**
+ * @title IToken
+ * @dev 代币接口
+ */
+interface IToken {
+    function balanceOf(address account) external view returns (uint256);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+
+/**
+ * @title IPancakeSwapPair
+ * @dev PancakeSwap交易对接口
+ */
+interface IPancakeSwapPair {
+    function getReserves() external view returns (uint112, uint112, uint32);
+}
+
+/**
+ * @title IBEP20
+ * @dev BEP20代币接口
+ */
+interface IBEP20 {
+    function decimals() external view returns (uint8);
 }

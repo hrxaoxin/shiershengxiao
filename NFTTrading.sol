@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 
 /**
  * @title NFTTrading
@@ -13,7 +15,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * 3. 卖家收到BNB（扣除手续费）
  * 4. 5%手续费全部进入手续费接收地址
  */
-contract NFTTrading is Ownable {
+contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 挂牌信息结构体
      */
@@ -48,6 +50,42 @@ contract NFTTrading is Ownable {
      * @dev 紧急暂停
      */
     bool public paused;
+
+    /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+
+    /**
+     * @dev 初始化函数
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _authorizer) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        authorizer = _authorizer;
+    }
+
+    /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "NFTTrading: Not authorized");
+        _;
+    }
 
     /**
      * @dev 上架事件
@@ -103,6 +141,7 @@ contract NFTTrading is Ownable {
      */
     function buyNFT(uint256 tokenId) external payable {
         require(!paused, "NFTTrading: Paused");
+        require(listings[tokenId].seller != address(0), "NFTTrading: Listing not found");
         require(msg.value >= listings[tokenId].priceWei, "NFTTrading: Insufficient payment");
 
         Listing memory listing = listings[tokenId];
@@ -123,9 +162,9 @@ contract NFTTrading is Ownable {
 
     /**
      * @dev 设置手续费接收地址
-     * 仅合约所有者可调用
      */
-    function setFeeReceiver(address _feeReceiver) external onlyOwner {
+    function setFeeReceiver(address _feeReceiver) external onlyAuthorized {
+        require(_feeReceiver != address(0), "NFTTrading: Invalid fee receiver address");
         feeReceiver = _feeReceiver;
     }
 

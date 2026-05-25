@@ -5,16 +5,8 @@ pragma solidity ^0.8.20;
  * @title NFTQueryLib
  * @dev 查询/分页工具库，将大体积 view 函数从主合约中分离以减小 bytecode
  */
+import "./NFTInterface.sol";
 import "./NFTDataType.sol";
-
-/**
- * @dev 最小化数据合约接口（仅声明库中需要的函数）
- */
-interface INFTQueryData {
-    function userAllTokens(address user) external view returns (uint256[] memory);
-    function tokenType(uint256 tokenId) external view returns (NFTDataTypes.ZodiacType);
-    function tokenLevel(uint256 tokenId) external view returns (uint8);
-}
 
 library NFTQueryLib {
     /**
