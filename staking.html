@@ -466,7 +466,7 @@
 
         async function loadStakingConstants() {
             try {
-                const minDuration = await stakingContract.methods.MIN_STAKING_DURATION().call();
+                const minDuration = await stakingContract.methods.minStakingDuration().call();
                 const normalWeight = await stakingContract.methods.normalNFTWeight().call();
                 const rareWeight = await stakingContract.methods.rareNFTWeight().call();
                 document.getElementById('minStakingDuration').textContent = formatDuration(minDuration);
@@ -490,11 +490,9 @@
             return parseInt(level) >= 5;
         }
 
-        function isNFTRare(tokenId) {
-            // 根据tokenId或其他逻辑判断是否稀有
-            // 这里暂时用简单的判断，实际项目可能需要从合约获取
-            const id = parseInt(tokenId);
-            return id % 10 === 0; // 简单示例，每10个有一个稀有
+        function isNFTRare(tokenType) {
+            // 暗属性(72-95)和光属性(96-119)为稀有NFT
+            return parseInt(tokenType) >= 72;
         }
 
         async function loadEligibleNFTs() {
@@ -516,7 +514,7 @@
                         const stakeInfo = await stakingContract.methods.stakingInfo(tokenId).call();
                         if (stakeInfo.owner === '0x0000000000000000000000000000000000000000') {
                             const nftInfo = getNFTInfo(tokenType);
-                            const isRare = isNFTRare(tokenId);
+                            const isRare = isNFTRare(tokenType);
                             eligible.push({
                                 id: tokenId.toString(),
                                 type: tokenType.toString(),
@@ -798,26 +796,20 @@
                 document.getElementById('tokenBalance').textContent = web3.utils.fromWei(balance, 'ether').substring(0, 10);
 
                 const stakeInfo = await tokenStakingContract.methods.getUserStake(account).call();
-                const stakedAmount = stakeInfo.amount;
+                const stakedAmount = stakeInfo.amount || stakeInfo[0];
                 document.getElementById('myTokenStakeAmount').textContent = web3.utils.fromWei(stakedAmount, 'ether').substring(0, 10);
                 
-                // 计算用户可领取的BNB奖励
-                const todayReward = await tokenStakingContract.methods.todayRewardAmount().call();
-                const totalStaked = await tokenStakingContract.methods.getTotalStaked().call();
-                
-                let claimableBNB = '0';
-                if (totalStaked > 0 && todayReward > 0 && stakedAmount > 0) {
-                    const userReward = (todayReward * stakedAmount) / totalStaked;
-                    claimableBNB = web3.utils.fromWei(userReward.toString(), 'ether').substring(0, 10);
-                }
+                // 读取合约端累计奖励
+                const accumulatedRewards = stakeInfo.accumulatedRewards || stakeInfo[2] || '0';
+                const claimableBNB = web3.utils.fromWei(accumulatedRewards.toString(), 'ether').substring(0, 10);
                 
                 document.getElementById('tokenRewardsAmount').textContent = claimableBNB;
                 document.getElementById('claimableBNB').textContent = claimableBNB;
 
                 if (stakedAmount > 0) {
-                    const lastClaimTime = stakeInfo.lastRewardTime;
-                    if (lastClaimTime > 0) {
-                        const date = new Date(lastClaimTime * 1000);
+                    const stakedTime = stakeInfo.stakedAt || stakeInfo[3];
+                    if (stakedTime > 0) {
+                        const date = new Date(stakedTime * 1000);
                         document.getElementById('tokenStakedAt').textContent = date.toLocaleString('zh-CN');
                     } else {
                         document.getElementById('tokenStakedAt').textContent = '-';
@@ -826,17 +818,30 @@
                     document.getElementById('tokenStakedAt').textContent = '-';
                 }
 
-                const bnbBalance = '0';
+                let bnbBalance = '0';
+                try {
+                    const bnbBalanceWei = await tokenStakingContract.methods.getContractBNBBalance().call();
+                    bnbBalance = web3.utils.fromWei(bnbBalanceWei, 'ether').substring(0, 10);
+                } catch (e) {
+                    // getContractBNBBalance 可能不存在
+                }
                 document.getElementById('tokenStakingBNBBalance').textContent = bnbBalance;
 
-                document.getElementById('totalStakedTokens').textContent = web3.utils.fromWei(totalStaked, 'ether').substring(0, 10);
+                const totalStakedAll = await tokenStakingContract.methods.getTotalStaked().call();
+                document.getElementById('totalStakedTokens').textContent = web3.utils.fromWei(totalStakedAll, 'ether').substring(0, 10);
 
-                const releaseRatio = '0';
+                let releaseRatio = '0';
+                try {
+                    const rate = await tokenStakingContract.methods.rewardRate().call();
+                    releaseRatio = (rate / 100).toFixed(2);
+                } catch (e) {
+                    // rewardRate 可能不存在
+                }
                 document.getElementById('currentReleaseRatio').textContent = releaseRatio + '%';
 
                 document.getElementById('tokenStakeBtn').disabled = false;
                 document.getElementById('tokenUnstakeBtn').disabled = stakedAmount == 0;
-                document.getElementById('claimTokenRewardsBtn').disabled = accumulatedRewards == 0;
+                document.getElementById('claimTokenRewardsBtn').disabled = parseFloat(claimableBNB) <= 0;
             } catch (error) {
                 console.error('加载代币质押信息失败:', error);
                 ZODIAC_UI.showToast('加载代币质押信息失败: ' + error.message, 'error');

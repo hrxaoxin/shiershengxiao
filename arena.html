@@ -798,6 +798,43 @@
             document.getElementById('battleModeText').textContent = modeText;
         }
 
+        async function executeRealChallenge() {
+            if (!selectedOpponent || battleTeam.filter(n => n).length < 6) {
+                alert('请先选择对手并设置完整的战队（6张NFT）');
+                return;
+            }
+
+            try {
+                const challengeBtn = document.getElementById('challengeBtn');
+                challengeBtn.disabled = true;
+                challengeBtn.textContent = '挑战中...';
+
+                const teamTokenIds = battleTeam.map(nft => nft ? nft.tokenId : '0');
+                
+                let result;
+                if (selectedOpponent.isMock || selectedOpponent.mockIndex !== undefined) {
+                    const mockIndex = selectedOpponent.mockIndex !== undefined ? selectedOpponent.mockIndex : 0;
+                    result = await arenaContract.methods.challengeMockPlayer(teamTokenIds, mockIndex).send({ from: accounts[0] });
+                } else {
+                    result = await arenaContract.methods.challengeRealPlayer(selectedOpponent.address, teamTokenIds).send({ from: accounts[0] });
+                }
+
+                openBattleModal();
+                
+                challengeBtn.disabled = false;
+                challengeBtn.textContent = '发起挑战';
+                
+                await loadRemainingAttempts();
+                await loadMyStats();
+            } catch (error) {
+                console.error('挑战失败:', error);
+                ZODIAC_UI.handleError(error, '挑战');
+                const challengeBtn = document.getElementById('challengeBtn');
+                challengeBtn.disabled = false;
+                challengeBtn.textContent = '发起挑战';
+            }
+        }
+
         async function connectWallet() {
             if (typeof window.ethereum !== 'undefined') {
                 try {
@@ -825,9 +862,9 @@
         }
 
         async function initContracts() {
-            battleContract = new web3.eth.Contract(ZODIAC_CONFIG.ABIS.battleABI, ZODIAC_CONFIG.CONTRACT_ADDRESSES.battle);
-            arenaContract = new web3.eth.Contract(ZODIAC_CONFIG.ABIS.arenaABI, ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena);
-            nftContract = new web3.eth.Contract(ZODIAC_CONFIG.ABIS.nftABI, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftMint);
+            battleContract = await window.ZODIAC_WEB3.getContract('battle');
+            arenaContract = await window.ZODIAC_WEB3.getContract('arena');
+            nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
         }
 
         async function loadMyNfts() {
@@ -849,19 +886,19 @@
                     
                     const skillData = await battleContract.methods.getSkill(tokenType).call();
                     const skill = {
-                        name: skillData.name,
-                        type: SKILL_TYPE_MAP[skillData.skillType],
-                        value: skillData.value,
-                        cooldown: skillData.cooldown,
-                        duration: skillData.duration,
-                        isAoe: skillData.isAoe
+                        name: skillData.skillId || skillData[0],
+                        type: SKILL_TYPE_MAP[skillData.skillType || skillData[1]],
+                        value: skillData.damage || skillData[2],
+                        cooldown: skillData.cooldown || skillData[3],
+                        duration: skillData.duration || skillData[4],
+                        isAoe: skillData.isAoe || skillData[5]
                     };
                     
                     myNfts.push({
                         tokenId: tokenId,
                         tokenType: tokenType,
                         level: level,
-                        attr: nftInfo.element || nftInfo.attrName,
+                        attr: nftInfo.attrName,
                         attrName: nftInfo.attrName,
                         zodiacIndex: nftInfo.zodiacIndex,
                         zodiac: zodiac,
@@ -1065,6 +1102,7 @@
             updateSaveButtons();
             updateChallengeBtn();
             updateBattleTeamDisplay();
+            ZODIAC_UI.showToast('已清空本地战队。请点击"保存战队"将清空后的状态同步到链上以赎回NFT。', 'info');
         }
 
         async function saveBattleTeam() {
@@ -1165,10 +1203,15 @@
                 try {
                     rewardPoolWei = await arenaContract.methods.getCurrentRewardPool().call();
                 } catch (e) {
-                    // 如果没有这个方法，使用合约余额计算
-                    const balance = await web3.eth.getBalance(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena);
-                    const rewardRate = await arenaContract.methods.seasonRewardRate().call();
-                    rewardPoolWei = (balance * rewardRate) / 10000;
+                    // 回退方案：读取奖励率和合约代币余额
+                    try {
+                        const rewardRate = await arenaContract.methods.seasonRewardRate().call();
+                        const tokenContractObj = await window.ZODIAC_WEB3.getContract('tokenContract');
+                        const balance = await tokenContractObj.methods.balanceOf(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena).call();
+                        rewardPoolWei = (BigInt(balance) * BigInt(rewardRate)) / BigInt(100);
+                    } catch (e2) {
+                        rewardPoolWei = '0';
+                    }
                 }
                 
                 const rewardPoolEth = web3.utils.fromWei(rewardPoolWei, 'ether');
@@ -1177,7 +1220,7 @@
                 // 获取奖励比例
                 try {
                     const rate = await arenaContract.methods.seasonRewardRate().call();
-                    const ratePercent = (rate / 100) + '%';
+                    const ratePercent = rate + '%';
                     document.getElementById('rewardRateInfo').textContent = `奖励比例: ${ratePercent} (赛季结束发放)`;
                 } catch (e) {
                     document.getElementById('rewardRateInfo').textContent = '奖励比例: 0.2% (赛季结束发放)';
@@ -1533,7 +1576,7 @@
                         from: accounts[0],
                         gas: gas
                     });
-                    victory = tx.events?.ChallengeResult?.returnValues?.[1];
+                    victory = tx.events?.ChallengeResult?.returnValues?.[0];
                 } else {
                     const defenderAddress = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
                     const gas = await arenaContract.methods.challengeRealPlayer(defenderAddress, playerTeam).estimateGas({ from: accounts[0] });
@@ -1541,7 +1584,7 @@
                         from: accounts[0],
                         gas: gas
                     });
-                    victory = tx.events?.ChallengeResult?.returnValues?.[1];
+                    victory = tx.events?.ChallengeResult?.returnValues?.[0];
                 }
 
                 ZODIAC_UI.hideLoading();

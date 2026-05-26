@@ -113,6 +113,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     uint256 public rareNFTWeight = 76;
 
     /**
+     * @dev 最小质押时长（秒）
+     */
+    uint256 public constant MIN_STAKING_DURATION = 0;
+
+    /**
      * @dev 奖励代币合约地址
      */
     address public rewardTokenContract;
@@ -447,7 +452,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @dev 获取所有用户待领取奖励总和
      */
     function _getTotalPendingRewards() internal view returns (uint256) {
-        return 0;
+        uint256 total = 0;
+        for (uint256 i = 0; i < stakingUsers.length; i++) {
+            total += pendingRewards[stakingUsers[i]];
+        }
+        return total;
     }
 
     /**

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/ERC721Upgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 
-contract NFTMint is ERC721Upgradeable, Ownable2StepUpgradeable, UUPSUpgradeable {
+contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUpgradeable {
     uint256 public constant MINT_COST = 8888 * 10**18;
     uint256 public constant RARE_MINT_COST = 88888 * 10**18;
     uint256 public constant BATCH_MINT_COST = 88880 * 10**18;
@@ -33,6 +33,7 @@ contract NFTMint is ERC721Upgradeable, Ownable2StepUpgradeable, UUPSUpgradeable 
 
     function initialize(address _authorizer) external initializer {
         __ERC721_init("Zodiac NFT", "ZNFT");
+        __ERC721Enumerable_init();
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         _nextCardId = 1;
@@ -226,6 +227,47 @@ contract NFTMint is ERC721Upgradeable, Ownable2StepUpgradeable, UUPSUpgradeable 
         return (tokenType[tokenId], tokenLevel[tokenId], 0);
     }
 
+    /**
+     * @dev 获取NFT完整数据（前端调用）
+     */
+    function getNFTData(uint256 tokenId) external view returns (
+        uint256 tokenType_,
+        uint256 attack,
+        uint256 defense,
+        uint256 health,
+        uint256 speed,
+        uint256 level,
+        uint256 rank,
+        string memory name,
+        string memory imageUrl
+    ) {
+        uint256 t = tokenType[tokenId];
+        uint8 l = tokenLevel[tokenId];
+        
+        // 计算属性值
+        uint256 baseAttack = 10 + l * 5;
+        uint256 baseDefense = 10 + l * 4;
+        uint256 baseHealth = 100 + l * 20;
+        uint256 baseSpeed = 5 + l * 2;
+        
+        // 计算生肖速度
+        uint256 zodiac = (t / 2) % 12;
+        uint256[12] memory speeds = [uint256(95), 40, 70, 90, 80, 85, 100, 35, 110, 55, 60, 30];
+        baseSpeed = speeds[zodiac] + l * 2;
+        
+        return (
+            t,
+            baseAttack,
+            baseDefense,
+            baseHealth,
+            baseSpeed,
+            uint256(l),
+            l,
+            "",
+            ""
+        );
+    }
+
     function isRare(uint256 tokenId) external view returns (bool) {
         uint256 t = tokenType[tokenId];
         return t >= 72;
@@ -251,12 +293,25 @@ contract NFTMint is ERC721Upgradeable, Ownable2StepUpgradeable, UUPSUpgradeable 
         return super.ownerOf(tokenId);
     }
 
-    function safeTransferFrom(address from, address to, uint256 tokenId) public override {
+    function safeTransferFrom(address from, address to, uint256 tokenId) public override(ERC721Upgradeable, IERC721Upgradeable) {
         super.safeTransferFrom(from, to, tokenId);
     }
 
-    function transferFrom(address from, address to, uint256 tokenId) public override {
+    function transferFrom(address from, address to, uint256 tokenId) public override(ERC721Upgradeable, IERC721Upgradeable) {
         super.transferFrom(from, to, tokenId);
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 firstTokenId,
+        uint256 batchSize
+    ) internal virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
+        super._beforeTokenTransfer(from, to, firstTokenId, batchSize);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 
     function getNFTInfoBatch(uint256[] calldata tokenIds) external view returns (uint256[] memory) {

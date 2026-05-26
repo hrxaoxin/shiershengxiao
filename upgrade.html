@@ -341,9 +341,12 @@
             }
         }
 
+        let nftUpdateContract;
+
         async function initContracts() {
             nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
             tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
+            nftUpdateContract = await window.ZODIAC_WEB3.getContract('nftUpdate');
         }
 
         async function loadUserNFTs() {
@@ -449,34 +452,97 @@
         async function handleUpgradeWithNFT() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
+            if (!nftUpdateContract) {
+                await ZODIAC_UI.showErrorModal('合约未初始化');
+                return;
+            }
 
             const requiredNFTs = parseInt(selectedNft.level);
-            const confirm = await ZODIAC_UI.showConfirmModal(
-                '升级说明',
-                `此功能需要管理员手动操作升级。请联系管理员提供：\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level}\n将消耗 ${requiredNFTs} 张相同NFT进行升级。`
+            const confirmed = await ZODIAC_UI.showConfirmModal(
+                '升级确认',
+                `确认使用NFT升阶？\n\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level} → ${selectedNft.level + 1}\n将消耗 ${requiredNFTs} 张相同类型的NFT`
             );
+
+            if (!confirmed) return;
+
+            try {
+                ZODIAC_UI.showLoading('升级中...');
+                const result = await nftUpdateContract.methods.upgradeWithNFT(selectedNft.id).send({ from: account });
+                ZODIAC_UI.hideLoading();
+                await ZODIAC_UI.showSuccessModal('升级成功！', `NFT ID ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 级`);
+                await loadUserNFTs();
+            } catch (error) {
+                ZODIAC_UI.hideLoading();
+                const errorMsg = ZODIAC_CONFIG.getErrorMessage(error);
+                await ZODIAC_UI.showErrorModal(`升级失败: ${errorMsg}`);
+            }
         }
 
         async function handleUpgradeWithToken() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
+            if (!nftUpdateContract || !tokenContract) {
+                await ZODIAC_UI.showErrorModal('合约未初始化');
+                return;
+            }
 
             const requiredTokens = getRequiredTokens(selectedNft.level);
-            const confirm = await ZODIAC_UI.showConfirmModal(
-                '升级说明',
-                `此功能需要管理员手动操作升级。请联系管理员提供：\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level}\n将消耗 ${requiredTokens.toLocaleString()} 枚代币进行升级。`
+            const confirmed = await ZODIAC_UI.showConfirmModal(
+                '升级确认',
+                `确认使用代币升阶？\n\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level} → ${selectedNft.level + 1}\n将消耗 ${requiredTokens.toLocaleString()} 枚代币`
             );
+
+            if (!confirmed) return;
+
+            try {
+                ZODIAC_UI.showLoading('升级中...');
+                
+                const requiredTokensWei = web3.utils.toWei(requiredTokens.toString(), 'ether');
+                const allowance = await tokenContract.methods.allowance(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
+                if (BigInt(allowance) < BigInt(requiredTokensWei)) {
+                    const approveGas = await ZODIAC_WEB3.estimateGas(tokenContract, 'approve', [ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, requiredTokensWei], account);
+                    await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, requiredTokensWei).send({ from: account, gas: approveGas });
+                }
+
+                const upgradeGas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithToken', [selectedNft.id], account);
+                const result = await nftUpdateContract.methods.upgradeWithToken(selectedNft.id).send({ from: account, gas: upgradeGas });
+                ZODIAC_UI.hideLoading();
+                await ZODIAC_UI.showSuccessModal('升级成功！', `NFT ID ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 级`);
+                await loadUserNFTs();
+            } catch (error) {
+                ZODIAC_UI.hideLoading();
+                const errorMsg = ZODIAC_CONFIG.getErrorMessage(error);
+                await ZODIAC_UI.showErrorModal(`升级失败: ${errorMsg}`);
+            }
         }
 
         async function handleUpgradeWithUSDValue() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
+            if (!nftUpdateContract) {
+                await ZODIAC_UI.showErrorModal('合约未初始化');
+                return;
+            }
 
             const requiredUSD = getUSDValue(selectedNft.level);
-            const confirm = await ZODIAC_UI.showConfirmModal(
-                '升级说明',
-                `此功能需要管理员手动操作升级。请联系管理员提供：\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level}\n将消耗价值 ${requiredUSD} USDT的代币进行升级。`
+            const confirmed = await ZODIAC_UI.showConfirmModal(
+                '升级确认',
+                `确认使用USDT价值升阶？\n\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level} → ${selectedNft.level + 1}\n将消耗价值 ${requiredUSD} USDT的代币`
             );
+
+            if (!confirmed) return;
+
+            try {
+                ZODIAC_UI.showLoading('升级中...');
+                const result = await nftUpdateContract.methods.upgradeWithUSDValue(selectedNft.id).send({ from: account });
+                ZODIAC_UI.hideLoading();
+                await ZODIAC_UI.showSuccessModal('升级成功！', `NFT ID ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 级`);
+                await loadUserNFTs();
+            } catch (error) {
+                ZODIAC_UI.hideLoading();
+                const errorMsg = ZODIAC_CONFIG.getErrorMessage(error);
+                await ZODIAC_UI.showErrorModal(`升级失败: ${errorMsg}`);
+            }
         }
 
 

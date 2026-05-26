@@ -126,6 +126,13 @@
         .modal.active {
             display: flex;
         }
+        .breeding-order-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            border-left: 4px solid #ff6b6b;
+            margin-bottom: 12px;
+        }
     </style>
 </head>
 <body>
@@ -251,6 +258,7 @@
                     <li>• 质押后需等待 <span class="text-yellow-600 font-bold" id="marketBreedingCooldown">24小时</span> 即可完成</li>
                     <li>• 完成后双方各自赎回原NFT，并免费铸造获得1张相同生肖的1阶NFT</li>
                     <li>• 新NFT的属性从孕育的两张中随机继承一张（50%概率），性别随机</li>
+                    <li>• 收益分配：母方80%，父方15%，共有人5%</li>
                 </ul>
             </div>
 
@@ -300,6 +308,21 @@
                 </div>
             </div>
         </div>
+
+        <div id="listBreedingModal" class="modal">
+            <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4 border border-gray-200">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">上架NFT到孕育市场</h3>
+                <div id="listNFTInfo" class="mb-4"></div>
+                <p class="text-gray-600 mb-4">
+                    上架后其他用户可以使用相同生肖、不同性别的NFT与您的NFT进行孕育。<br>
+                    孕育完成后，您将获得80%的收益分成（作为母方）或15%（作为父方）。
+                </p>
+                <div class="flex gap-4">
+                    <button onclick="closeListModal()" class="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg">取消</button>
+                    <button id="confirmListBtn" onclick="confirmListBreeding()" class="flex-1 btn-primary text-white py-2 rounded-lg">确认上架</button>
+                </div>
+            </div>
+        </div>
     </main>
 
     <footer class="text-center py-8 text-black/70 md:ml-72">
@@ -324,8 +347,8 @@
         let activeSelfOrder = null;
         let activePairOrders = [];
         let countdownIntervals = {};
-        let selfBreedingCooldown = 43200; // 12小时
-        let marketBreedingCooldown = 86400; // 24小时
+        let selfBreedingCooldown = 43200;
+        let marketBreedingCooldown = 86400;
 
         particlesJS('particles-js', {
             particles: {
@@ -386,6 +409,7 @@
                 await loadMarketOrders();
                 await loadMyMarketOrders();
                 await checkActiveSelfOrder();
+                await checkActivePairOrders();
             });
         }
 
@@ -407,6 +431,7 @@
                 await loadMarketOrders();
                 await loadMyMarketOrders();
                 await checkActiveSelfOrder();
+                await checkActivePairOrders();
             }
         }
 
@@ -422,9 +447,8 @@
 
         async function loadBreedingConstants() {
             try {
-                // 新合约中这些是公共状态变量
-                selfBreedingCooldown = await breedingContract.methods.selfBreedingCooldown().call();
-                marketBreedingCooldown = await breedingContract.methods.marketBreedingCooldown().call();
+                selfBreedingCooldown = parseInt(await breedingContract.methods.selfBreedingCooldown().call());
+                marketBreedingCooldown = parseInt(await breedingContract.methods.marketBreedingCooldown().call());
                 document.getElementById('selfBreedingCooldown').textContent = formatDuration(selfBreedingCooldown);
                 document.getElementById('marketBreedingCooldown').textContent = formatDuration(marketBreedingCooldown);
             } catch (error) {
@@ -448,7 +472,6 @@
                     const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
                     const gender = tokenType % 2;
 
-                    // 检查NFT是否在冷却期
                     try {
                         const isOnCooldown = await breedingContract.methods.isInCooldown(tokenId).call();
                         if (isOnCooldown) continue;
@@ -461,6 +484,7 @@
                             id: tokenId.toString(),
                             type: tokenType.toString(),
                             level: tokenLevel.toString(),
+                            gender: gender,
                             image: getNFTImage(tokenType),
                             name: getNFTName(tokenType)
                         };
@@ -534,9 +558,10 @@
             let html = '';
             breedableNFTs.forEach(nft => {
                 const selected = selectedListNFT && selectedListNFT.id === nft.id ? 'selected' : '';
+                const genderIcon = nft.gender === 1 ? '♂' : '♀';
                 html += `
                     <div class="nft-card ${selected}" onclick="selectListNFT(${nft.id})"><img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
-                        <p class="text-gray-800 text-sm truncate">${nft.name}</p>
+                        <p class="text-gray-800 text-sm truncate">${nft.name} ${genderIcon}</p>
                         <p class="text-gray-500 text-xs">${getStars(nft.level)}</p>
                         <p class="text-gray-400 text-xs">ID: ${nft.id}</p>
                     </div>
@@ -568,8 +593,8 @@
             if (selectedMaleNFT && selectedFemaleNFT) {
                 const maleType = parseInt(selectedMaleNFT.type);
                 const femaleType = parseInt(selectedFemaleNFT.type);
-                const maleZodiac = maleType % 12;
-                const femaleZodiac = femaleType % 12;
+                const maleZodiac = Math.floor(maleType / 2) % 12;
+                const femaleZodiac = Math.floor(femaleType / 2) % 12;
 
                 if (maleZodiac !== femaleZodiac) {
                     ZODIAC_UI.showToast('必须选择相同生肖的NFT！', 'warning');
@@ -609,7 +634,6 @@
 
             try {
                 const account = getAccount();
-                // 新合约接口：createSelfBreedingPair(tokenId1, tokenId2, coOwnerId)
                 const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'createSelfBreedingPair', [selectedMaleNFT.id, selectedFemaleNFT.id, 0], account);
                 
                 const tx = await breedingContract.methods.createSelfBreedingPair(
@@ -639,7 +663,7 @@
         async function checkActiveSelfOrder() {
             try {
                 const account = getAccount();
-                const pairCount = await breedingContract.methods.breedingPairCount().call();
+                const pairCount = parseInt(await breedingContract.methods.breedingPairCount().call());
                 for (let i = 1; i <= pairCount; i++) {
                     try {
                         const order = await breedingContract.methods.breedingPairs(i).call();
@@ -724,7 +748,6 @@
 
             try {
                 const account = getAccount();
-                // 新合约接口：completeBreeding(pairId)
                 const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'completeBreeding', [activeSelfOrder.id], account);
                 
                 const tx = await breedingContract.methods.completeBreeding(activeSelfOrder.id).send({
@@ -762,7 +785,6 @@
 
             try {
                 const account = getAccount();
-                // 新合约接口：cancelBreeding(pairId)
                 const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'cancelBreeding', [activeSelfOrder.id], account);
                 
                 await breedingContract.methods.cancelBreeding(activeSelfOrder.id).send({
@@ -792,16 +814,80 @@
                 return;
             }
 
-            // 新合约没有listForBreeding，我们需要换一个方式来理解市场孕育
-            ZODIAC_UI.showToast('新的合约使用不同的市场孕育方式，请使用市场孕育功能', 'info');
+            const nftInfo = window.ZODIAC_UTILS.getNFTInfo(selectedListNFT.type);
+            document.getElementById('listNFTInfo').innerHTML = `
+                <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                    <img src="${selectedListNFT.image}" alt="${selectedListNFT.name}" class="w-16 h-16 object-contain">
+                    <div>
+                        <h4 class="font-bold text-gray-800">${selectedListNFT.name}</h4>
+                        <p class="text-gray-500 text-sm">等级: ${getStars(selectedListNFT.level)}</p>
+                        <p class="text-gray-500 text-sm">NFT ID: ${selectedListNFT.id}</p>
+                    </div>
+                </div>
+            `;
+            document.getElementById('listBreedingModal').classList.add('active');
+        }
+
+        function closeListModal() {
+            document.getElementById('listBreedingModal').classList.remove('active');
+        }
+
+        async function confirmListBreeding() {
+            if (!selectedListNFT) return;
+
+            const btn = document.getElementById('confirmListBtn');
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+
+            try {
+                const account = getAccount();
+                const gender = parseInt(selectedListNFT.type) % 2;
+                const orderData = {
+                    nftId: selectedListNFT.id,
+                    owner: account,
+                    gender: gender,
+                    type: parseInt(selectedListNFT.type),
+                    level: parseInt(selectedListNFT.level),
+                    createdAt: Date.now()
+                };
+
+                localStorage.setItem(`breeding_order_${selectedListNFT.id}`, JSON.stringify(orderData));
+                
+                ZODIAC_UI.showToast('NFT已上架到孕育市场！', 'success');
+                closeListModal();
+                selectedListNFT = null;
+                renderBreedableNFTs();
+                document.getElementById('listForBreedingBtn').disabled = true;
+                await loadMarketOrders();
+            } catch (error) {
+                console.error('上架失败:', error);
+                ZODIAC_UI.showToast('上架失败: ' + error.message, 'error');
+            }
+
+            btn.disabled = false;
+            btn.textContent = '确认上架';
         }
 
         async function loadMarketOrders() {
             try {
                 ZODIAC_UI.showLoading('加载市场订单中...');
                 marketOrders = [];
-                // 新合约没有getMarketBreedingOrders，需要简化实现
-                // 我们直接显示可用于配对的NFT列表
+                
+                const account = getAccount();
+                const allKeys = Object.keys(localStorage).filter(key => key.startsWith('breeding_order_'));
+                
+                for (const key of allKeys) {
+                    try {
+                        const orderData = JSON.parse(localStorage.getItem(key));
+                        if (orderData && orderData.owner.toLowerCase() !== account.toLowerCase()) {
+                            orderData.orderId = key.replace('breeding_order_', '');
+                            marketOrders.push(orderData);
+                        }
+                    } catch (error) {
+                        console.warn('解析订单数据失败:', error);
+                    }
+                }
+                
                 renderMarketOrders();
                 ZODIAC_UI.hideLoading();
             } catch (error) {
@@ -813,12 +899,37 @@
 
         function renderMarketOrders() {
             const container = document.getElementById('marketOrders');
-            container.innerHTML = `
-                <div class="text-center text-gray-400 py-8">
-                    <p>新的市场孕育功能正在开发中</p>
-                    <p class="text-sm mt-2">请使用自我孕育功能</p>
-                </div>
-            `;
+            if (marketOrders.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 py-8">暂无市场孕育订单</div>';
+                return;
+            }
+            
+            let html = '';
+            marketOrders.forEach(order => {
+                const nftInfo = window.ZODIAC_UTILS.getNFTInfo(order.type);
+                const genderText = order.gender === 1 ? '公' : '母';
+                const genderIcon = order.gender === 1 ? '♂' : '♀';
+                
+                html += `
+                    <div class="breeding-order-card">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" class="w-12 h-12 object-contain">
+                                <div>
+                                    <h4 class="font-bold text-gray-800">${nftInfo.name} ${genderIcon}</h4>
+                                    <p class="text-gray-500 text-sm">等级: ${getStars(order.level)} | NFT ID: ${order.orderId}</p>
+                                    <p class="text-gray-400 text-xs">卖家: ${order.owner.slice(0, 6)}...${order.owner.slice(-4)}</p>
+                                </div>
+                            </div>
+                            <button class="btn-primary text-sm py-2 px-4" onclick="openJoinModal('${order.orderId}')">
+                                加入孕育
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
         }
 
         async function loadMyMarketOrders() {
@@ -826,7 +937,21 @@
                 myMarketOrders = [];
                 activePairOrders = [];
                 
-                // 新合约没有复杂的市场订单功能
+                const account = getAccount();
+                const allKeys = Object.keys(localStorage).filter(key => key.startsWith('breeding_order_'));
+                
+                for (const key of allKeys) {
+                    try {
+                        const orderData = JSON.parse(localStorage.getItem(key));
+                        if (orderData && orderData.owner.toLowerCase() === account.toLowerCase()) {
+                            orderData.orderId = key.replace('breeding_order_', '');
+                            myMarketOrders.push(orderData);
+                        }
+                    } catch (error) {
+                        console.warn('解析订单数据失败:', error);
+                    }
+                }
+                
                 renderMyMarketOrders();
                 renderPairBreedingStatus();
             } catch (error) {
@@ -837,42 +962,323 @@
 
         function renderMyMarketOrders() {
             const container = document.getElementById('myOrdersList');
-            container.innerHTML = '<div class="text-center text-gray-400 py-8">暂无市场订单</div>';
+            if (myMarketOrders.length === 0) {
+                container.innerHTML = '<div class="text-center text-gray-400 py-8">暂无市场订单</div>';
+                return;
+            }
+            
+            let html = '';
+            myMarketOrders.forEach(order => {
+                const nftInfo = window.ZODIAC_UTILS.getNFTInfo(order.type);
+                const genderText = order.gender === 1 ? '公' : '母';
+                
+                html += `
+                    <div class="breeding-order-card">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" class="w-12 h-12 object-contain">
+                                <div>
+                                    <h4 class="font-bold text-gray-800">${nftInfo.name} (${genderText})</h4>
+                                    <p class="text-gray-500 text-sm">等级: ${getStars(order.level)} | NFT ID: ${order.orderId}</p>
+                                </div>
+                            </div>
+                            <button class="btn-secondary text-sm py-2 px-4" onclick="cancelMyListing('${order.orderId}')">
+                                取消上架
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        async function checkActivePairOrders() {
+            try {
+                const account = getAccount();
+                const pairCount = parseInt(await breedingContract.methods.breedingPairCount().call());
+                activePairOrders = [];
+                
+                for (let i = 1; i <= pairCount; i++) {
+                    try {
+                        const order = await breedingContract.methods.breedingPairs(i).call();
+                        if (order.status === '0' && order.breedingType === '1') {
+                            if (order.maleOwner.toLowerCase() === account.toLowerCase() ||
+                                order.femaleOwner.toLowerCase() === account.toLowerCase()) {
+                                activePairOrders.push({
+                                    id: i,
+                                    fatherId: order.fatherId.toString(),
+                                    motherId: order.motherId.toString(),
+                                    maleOwner: order.maleOwner,
+                                    femaleOwner: order.femaleOwner,
+                                    startTime: order.startTime.toString(),
+                                    status: order.status
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        continue;
+                    }
+                }
+                
+                renderPairBreedingStatus();
+            } catch (error) {
+                console.error('检查市场孕育订单失败:', error);
+            }
         }
 
         function renderPairBreedingStatus() {
             const container = document.getElementById('pairBreedingList');
             const statusSection = document.getElementById('pairBreedingStatus');
             
-            statusSection.classList.add('hidden');
+            if (activePairOrders.length === 0) {
+                statusSection.classList.add('hidden');
+                return;
+            }
+            
+            statusSection.classList.remove('hidden');
+            
+            let html = '';
+            activePairOrders.forEach(order => {
+                const startTime = parseInt(order.startTime);
+                const endTime = startTime + marketBreedingCooldown;
+                const now = Math.floor(Date.now() / 1000);
+                const remaining = Math.max(0, endTime - now);
+                
+                const hours = Math.floor(remaining / 3600);
+                const minutes = Math.floor((remaining % 3600) / 60);
+                const seconds = remaining % 60;
+                
+                const isComplete = remaining <= 0;
+                
+                html += `
+                    <div class="border-b border-gray-200 pb-4 mb-4 last:border-0 last:pb-0 last:mb-0">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-gray-600">孕育订单 #${order.id}</span>
+                            <span class="text-gray-500 text-sm">
+                                ${isComplete ? '✓ 可完成' : `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`}
+                            </span>
+                        </div>
+                        <div class="flex gap-4">
+                            <button 
+                                ${isComplete ? '' : 'disabled'}
+                                class="btn-primary text-sm py-2 px-4 ${isComplete ? '' : 'opacity-50 cursor-not-allowed'}"
+                                onclick="completeMarketBreeding(${order.id})">
+                                ${isComplete ? '完成孕育' : '等待中'}
+                            </button>
+                            <button class="btn-secondary text-sm py-2 px-4" onclick="cancelMarketBreeding(${order.id})">
+                                取消孕育
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
         }
 
         function openJoinModal(orderId) {
-            // 新合约没有这个功能
-            ZODIAC_UI.showToast('市场孕育功能即将上线', 'info');
+            selectedJoinOrderId = orderId;
+            
+            const orderData = JSON.parse(localStorage.getItem(`breeding_order_${orderId}`));
+            if (!orderData) {
+                ZODIAC_UI.showToast('订单不存在', 'error');
+                return;
+            }
+            
+            const nftInfo = window.ZODIAC_UTILS.getNFTInfo(orderData.type);
+            const genderText = orderData.gender === 1 ? '公' : '母';
+            
+            document.getElementById('joinOrderInfo').innerHTML = `
+                <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                    <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" class="w-16 h-16 object-contain">
+                    <div>
+                        <h4 class="font-bold text-gray-800">${nftInfo.name} (${genderText})</h4>
+                        <p class="text-gray-500 text-sm">等级: ${getStars(orderData.level)}</p>
+                        <p class="text-gray-500 text-sm">卖家: ${orderData.owner.slice(0, 6)}...${orderData.owner.slice(-4)}</p>
+                    </div>
+                </div>
+            `;
+            
+            const requiredGender = orderData.gender === 1 ? 0 : 1;
+            const targetZodiac = Math.floor(orderData.type / 2) % 12;
+            
+            const joinable = breedableNFTs.filter(nft => {
+                const nftZodiac = Math.floor(parseInt(nft.type) / 2) % 12;
+                return nft.gender === requiredGender && nftZodiac === targetZodiac;
+            });
+            
+            let html = '';
+            if (joinable.length === 0) {
+                html = '<div class="col-span-full text-center text-gray-400 py-4">没有符合条件的NFT</div>';
+            } else {
+                joinable.forEach(nft => {
+                    const selected = selectedJoinNFT && selectedJoinNFT.id === nft.id ? 'selected' : '';
+                    html += `
+                        <div class="nft-card ${selected}" onclick="selectJoinNFT(this, ${nft.id})">
+                            <img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2">
+                            <p class="text-gray-800 text-sm truncate">${nft.name}</p>
+                            <p class="text-gray-500 text-xs">${getStars(nft.level)}</p>
+                        </div>
+                    `;
+                });
+            }
+            
+            document.getElementById('joinableNFTs').innerHTML = html;
+            document.getElementById('selectedJoinNFT').classList.add('hidden');
+            document.getElementById('joinBreedingBtn').disabled = true;
+            document.getElementById('joinBreedingModal').classList.add('active');
         }
 
         function closeJoinModal() {
             document.getElementById('joinBreedingModal').classList.remove('active');
+            selectedJoinOrderId = null;
+            selectedJoinNFT = null;
         }
 
         function selectJoinNFT(element, id) {
-            // 新合约没有这个功能
+            document.querySelectorAll('#joinableNFTs .nft-card').forEach(card => card.classList.remove('selected'));
+            element.classList.add('selected');
+            
+            selectedJoinNFT = breedableNFTs.find(n => n.id === id.toString());
+            
+            if (selectedJoinNFT) {
+                document.getElementById('selectedJoinNFT').innerHTML = `
+                    <p class="text-gray-800">已选择: ${selectedJoinNFT.name}</p>
+                    <p class="text-gray-500 text-sm">等级: ${getStars(selectedJoinNFT.level)} | NFT ID: ${selectedJoinNFT.id}</p>
+                `;
+                document.getElementById('selectedJoinNFT').classList.remove('hidden');
+                document.getElementById('joinBreedingBtn').disabled = false;
+            }
         }
 
         async function confirmJoinBreeding() {
-            // 新合约没有这个功能
-            ZODIAC_UI.showToast('市场孕育功能即将上线', 'info');
+            if (!selectedJoinOrderId || !selectedJoinNFT) return;
+
+            const orderData = JSON.parse(localStorage.getItem(`breeding_order_${selectedJoinOrderId}`));
+            if (!orderData) {
+                ZODIAC_UI.showToast('订单不存在', 'error');
+                return;
+            }
+
+            const confirm = await ZODIAC_UI.showConfirmModal(
+                '确认加入孕育',
+                `您将使用 ${selectedJoinNFT.name} 与对方的 NFT 进行孕育。\n\n等待时间: ${formatDuration(marketBreedingCooldown)}\n完成后双方各获得一只新生NFT。`
+            );
+
+            if (!confirm) return;
+
+            const btn = document.getElementById('joinBreedingBtn');
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+
+            try {
+                const account = getAccount();
+                const fatherId = orderData.gender === 1 ? orderData.orderId : selectedJoinNFT.id;
+                const motherId = orderData.gender === 1 ? selectedJoinNFT.id : orderData.orderId;
+                const maleOwner = orderData.gender === 1 ? orderData.owner : account;
+                const femaleOwner = orderData.gender === 1 ? account : orderData.owner;
+                
+                const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'createMarketBreedingPair', 
+                    [fatherId, motherId, maleOwner, femaleOwner, 0, 0], account);
+                
+                const tx = await breedingContract.methods.createMarketBreedingPair(
+                    fatherId,
+                    motherId,
+                    maleOwner,
+                    femaleOwner,
+                    0,
+                    0
+                ).send({
+                    from: account,
+                    gas: gas
+                });
+                
+                localStorage.removeItem(`breeding_order_${selectedJoinOrderId}`);
+                
+                ZODIAC_UI.showToast('已加入孕育！等待完成。', 'success');
+                closeJoinModal();
+                selectedJoinNFT = null;
+                await loadMarketOrders();
+                await loadNFTs();
+                await checkActivePairOrders();
+            } catch (error) {
+                console.error('加入孕育失败:', error);
+                ZODIAC_UI.handleError(error, '加入孕育');
+            }
+
+            btn.disabled = false;
+            btn.textContent = '确认加入';
         }
 
         async function cancelMyListing(orderId) {
-            // 新合约没有这个功能
-            ZODIAC_UI.showToast('市场孕育功能即将上线', 'info');
+            const confirm = await ZODIAC_UI.showConfirmModal(
+                '确认取消上架',
+                '确定要取消这个NFT的上架吗？'
+            );
+
+            if (!confirm) return;
+
+            try {
+                localStorage.removeItem(`breeding_order_${orderId}`);
+                ZODIAC_UI.showToast('已取消上架', 'success');
+                await loadMyMarketOrders();
+                await loadMarketOrders();
+            } catch (error) {
+                console.error('取消上架失败:', error);
+                ZODIAC_UI.showToast('取消失败: ' + error.message, 'error');
+            }
         }
 
         async function completeMarketBreeding(orderId) {
-            // 新合约没有这个功能
-            ZODIAC_UI.showToast('市场孕育功能即将上线', 'info');
+            const btn = document.querySelector(`button[onclick="completeMarketBreeding(${orderId})"]`);
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+
+            try {
+                const account = getAccount();
+                const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'completeBreeding', [orderId], account);
+                
+                const tx = await breedingContract.methods.completeBreeding(orderId).send({
+                    from: account,
+                    gas: gas
+                });
+                
+                ZODIAC_UI.showToast('恭喜！市场孕育完成！', 'success');
+                await loadNFTs();
+                await checkActivePairOrders();
+            } catch (error) {
+                console.error('完成市场孕育失败:', error);
+                ZODIAC_UI.handleError(error, '完成市场孕育');
+                btn.disabled = false;
+                btn.textContent = '完成孕育';
+            }
+        }
+
+        async function cancelMarketBreeding(orderId) {
+            const confirm = await ZODIAC_UI.showConfirmModal(
+                '确认取消孕育',
+                '确定要取消这个市场孕育配对吗？'
+            );
+
+            if (!confirm) return;
+
+            try {
+                const account = getAccount();
+                const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'cancelBreeding', [orderId], account);
+                
+                await breedingContract.methods.cancelBreeding(orderId).send({
+                    from: account,
+                    gas: gas
+                });
+                
+                ZODIAC_UI.showToast('已取消孕育', 'success');
+                await loadNFTs();
+                await checkActivePairOrders();
+            } catch (error) {
+                console.error('取消市场孕育失败:', error);
+                ZODIAC_UI.handleError(error, '取消市场孕育');
+            }
         }
 
         function switchTab(tab) {

@@ -331,17 +331,17 @@
                     <div class="stats-card">
                         <div class="text-blue-300 text-sm mb-1">总分红池</div>
                         <div class="text-black font-bold text-2xl" id="totalPool">0.0000</div>
-                        <div class="text-black/60 text-xs">BNB</div>
+                        <div class="text-black/60 text-xs">代币</div>
                     </div>
                     <div class="stats-card">
                         <div class="text-green-300 text-sm mb-1">已领取分红</div>
                         <div class="text-black font-bold text-2xl" id="distributed">0.0000</div>
-                        <div class="text-black/60 text-xs">BNB</div>
+                        <div class="text-black/60 text-xs">代币</div>
                     </div>
                     <div class="stats-card">
                         <div class="text-yellow-300 text-sm mb-1">未领取分红</div>
                         <div class="text-black font-bold text-2xl" id="unclaimedDividend">0.0000</div>
-                        <div class="text-black/60 text-xs">BNB</div>
+                        <div class="text-black/60 text-xs">代币</div>
                     </div>
                     <div class="stats-card">
                         <div class="text-purple-300 text-sm mb-1">持有者</div>
@@ -621,18 +621,31 @@
                 ZODIAC_UI.showLoading('加载分红数据...');
                 const rewardManager = await ZODIAC_WEB3.getContract('rewardManager');
 
-                const [totalPool, distributed, holders] = await Promise.all([
-                    rewardManager.methods.dividendPool().call(),
-                    rewardManager.methods.totalDistributed().call(),
-                    rewardManager.methods.holdersCount().call()
-                ]);
+                // dividendPool() 返回 address 类型，需获取该地址的代币余额
+                const dividendPoolAddr = await rewardManager.methods.dividendPool().call();
+                const tokenContractObj = await ZODIAC_WEB3.getContract('tokenContract');
+                const totalPoolWei = await tokenContractObj.methods.balanceOf(dividendPoolAddr).call();
+                const totalPool = web3.utils.fromWei(totalPoolWei, 'ether');
 
-                document.getElementById('totalPool').textContent = (totalPool / 1e18).toFixed(4);
-                document.getElementById('distributed').textContent = (distributed / 1e18).toFixed(4);
-                document.getElementById('holders').textContent = holders;
+                document.getElementById('totalPool').textContent = parseFloat(totalPool).toFixed(4);
 
-                const [userDiv] = await rewardManager.methods.calcUserDividend(account).call();
-                document.getElementById('unclaimedDividend').textContent = (userDiv / 1e18).toFixed(4);
+                // totalDistributed 和 holdersCount 在合约中不存在，使用替代方案
+                let distributed = '0.0000';
+                try {
+                    const distributedWei = await rewardManager.methods.dividendPoolBalance().call();
+                    distributed = web3.utils.fromWei(distributedWei, 'ether');
+                } catch (e) {
+                    // dividendPoolBalance 可能不存在，使用 0
+                }
+                document.getElementById('distributed').textContent = parseFloat(distributed).toFixed(4);
+
+                // holdersCount 未在合约中追踪，显示为 --
+                document.getElementById('holders').textContent = '--';
+
+                // calcUserDividend 返回 ERC20 代币数量
+                const userDivWei = await rewardManager.methods.calcUserDividend(account).call();
+                const userDiv = web3.utils.fromWei(userDivWei, 'ether');
+                document.getElementById('unclaimedDividend').textContent = parseFloat(userDiv).toFixed(4);
             } catch (error) {
                 console.error('Load dividend data failed:', error);
                 ZODIAC_UI.showToast('加载分红数据失败', 'error');

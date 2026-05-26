@@ -409,6 +409,102 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
+     * @dev 战斗函数（匹配前端ABI）
+     * @param attackerTeam 攻击者队伍
+     * @param defenderTeam 防御者队伍
+     * @return (是否成功, 获胜者, 奖励)
+     */
+    function battle(
+        uint256[6] calldata attackerTeam,
+        uint256[6] calldata defenderTeam
+    ) external view returns (bool, uint256, uint256) {
+        require(_validateTeam(attackerTeam), "Battle: Invalid attacker team");
+        require(_validateTeam(defenderTeam), "Battle: Invalid defender team");
+        
+        uint256 battleId = block.timestamp % 1000 + 1;
+        uint8 winner = _executeBattleView(attackerTeam, defenderTeam, battleId);
+        
+        uint256 attackerReward = winner == 1 ? baseBattleReward : 0;
+        uint256 defenderReward = winner == 2 ? baseBattleReward : 0;
+        
+        return (true, winner, attackerReward);
+    }
+
+    /**
+     * @dev 执行战斗逻辑（view版本）
+     */
+    function _executeBattleView(
+        uint256[6] memory team1,
+        uint256[6] memory team2,
+        uint256 battleId
+    ) internal view returns (uint8) {
+        uint256 randomSeed = uint256(keccak256(abi.encodePacked(
+            battleId,
+            block.timestamp,
+            block.number
+        )));
+
+        TeamState memory state1;
+        TeamState memory state2;
+
+        for (uint i = 0; i < 6; i++) {
+            state1.traits[i] = _getNFTTraits(team1[i]);
+            state2.traits[i] = _getNFTTraits(team2[i]);
+            state1.hp[i] = uint256(state1.traits[i].level) * 100;
+            state2.hp[i] = uint256(state2.traits[i].level) * 100;
+            state1.alive[i] = true;
+            state2.alive[i] = true;
+        }
+
+        bool team1Alive = true;
+        bool team2Alive = true;
+
+        for (uint256 round = 0; round < MAX_ROUNDS && team1Alive && team2Alive; round++) {
+            randomSeed++;
+
+            for (uint i = 0; i < 6; i++) {
+                if (!state1.alive[i] || !team1Alive) continue;
+                uint defenderIndex = _findTarget(state2.alive, state2.traits);
+                if (defenderIndex == 6) {
+                    team1Alive = false;
+                    break;
+                }
+                uint damage = _calculateDamage(state1.traits[i], state2.traits[defenderIndex], randomSeed + i);
+                state2.hp[defenderIndex] = state2.hp[defenderIndex] > damage ? state2.hp[defenderIndex] - damage : 0;
+                if (state2.hp[defenderIndex] == 0) {
+                    state2.alive[defenderIndex] = false;
+                    if (!_hasAnyAlive(state2.alive)) {
+                        team2Alive = false;
+                    }
+                }
+            }
+
+            if (!team2Alive) break;
+
+            for (uint i = 0; i < 6; i++) {
+                if (!state2.alive[i] || !team2Alive) continue;
+                uint defenderIndex = _findTarget(state1.alive, state1.traits);
+                if (defenderIndex == 6) {
+                    team2Alive = false;
+                    break;
+                }
+                uint damage = _calculateDamage(state2.traits[i], state1.traits[defenderIndex], randomSeed + 1000 + i);
+                state1.hp[defenderIndex] = state1.hp[defenderIndex] > damage ? state1.hp[defenderIndex] - damage : 0;
+                if (state1.hp[defenderIndex] == 0) {
+                    state1.alive[defenderIndex] = false;
+                    if (!_hasAnyAlive(state1.alive)) {
+                        team1Alive = false;
+                    }
+                }
+            }
+        }
+
+        if (team1Alive && !team2Alive) return 1;
+        if (team2Alive && !team1Alive) return 2;
+        return 0;
+    }
+
+    /**
      * @dev 模拟战斗（不改变状态）
      */
     function simulateBattle(
@@ -524,5 +620,106 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      */
     function getBattleConstants() external pure returns (uint256, uint256) {
         return (MAX_ROUNDS, PRECISION);
+    }
+
+    struct Skill {
+        uint256 skillId;
+        uint8 skillType;
+        uint256 damage;
+        uint256 cooldown;
+        uint256 duration;
+        bool isAoe;
+    }
+
+    mapping(uint256 => Skill) public skills;
+
+    function initSkills() external onlyOwner {
+        _initWaterSkills();
+        _initWindSkills();
+        _initFireSkills();
+        _initDarkSkills();
+        _initLightSkills();
+    }
+
+    function _initWaterSkills() private {
+        _setSkill(0, 1, 125, 3, 0, false); _setSkill(12, 6, 110, 4, 0, false);
+        _setSkill(1, 0, 145, 5, 0, false); _setSkill(13, 8, 95, 4, 0, true);
+        _setSkill(2, 0, 165, 5, 0, false); _setSkill(14, 5, 85, 4, 0, true);
+        _setSkill(3, 0, 130, 3, 0, false); _setSkill(15, 2, 80, 3, 0, false);
+        _setSkill(4, 3, 220, 6, 0, true); _setSkill(16, 8, 120, 5, 0, true);
+        _setSkill(5, 7, 115, 4, 0, false); _setSkill(17, 6, 125, 4, 0, false);
+        for (uint i = 6; i < 12; i++) {
+            skills[i] = skills[i - 6];
+            skills[i + 12] = skills[i + 6];
+        }
+    }
+
+    function _initWindSkills() private {
+        _setSkill(24, 1, 135, 3, 0, false); _setSkill(36, 6, 115, 4, 0, false);
+        _setSkill(25, 0, 130, 5, 0, false); _setSkill(37, 8, 105, 4, 0, true);
+        _setSkill(26, 0, 155, 5, 0, false); _setSkill(38, 5, 90, 4, 0, true);
+        _setSkill(27, 0, 140, 3, 0, false); _setSkill(39, 2, 100, 3, 0, false);
+        _setSkill(28, 3, 210, 6, 0, true); _setSkill(40, 8, 115, 5, 0, true);
+        _setSkill(29, 7, 125, 4, 0, false); _setSkill(41, 6, 120, 4, 0, false);
+        for (uint i = 30; i < 36; i++) {
+            skills[i] = skills[i - 6];
+            skills[i + 12] = skills[i + 6];
+        }
+    }
+
+    function _initFireSkills() private {
+        _setSkill(48, 1, 120, 3, 0, false); _setSkill(60, 6, 105, 4, 0, false);
+        _setSkill(49, 0, 140, 5, 0, false); _setSkill(61, 8, 110, 4, 0, true);
+        _setSkill(50, 0, 160, 5, 0, false); _setSkill(62, 5, 85, 4, 0, true);
+        _setSkill(51, 0, 145, 3, 0, false); _setSkill(63, 2, 95, 3, 0, false);
+        _setSkill(52, 3, 200, 6, 0, true); _setSkill(64, 8, 110, 5, 0, true);
+        _setSkill(53, 7, 120, 4, 0, false); _setSkill(65, 6, 115, 4, 0, false);
+        for (uint i = 54; i < 60; i++) {
+            skills[i] = skills[i - 6];
+            skills[i + 12] = skills[i + 6];
+        }
+    }
+
+    function _initDarkSkills() private {
+        _setSkill(72, 1, 145, 3, 0, false); _setSkill(84, 6, 135, 4, 0, false);
+        _setSkill(73, 0, 150, 5, 0, false); _setSkill(85, 8, 115, 4, 0, true);
+        _setSkill(74, 0, 165, 5, 0, false); _setSkill(86, 5, 90, 4, 0, true);
+        _setSkill(75, 0, 160, 3, 0, false); _setSkill(87, 2, 100, 3, 0, false);
+        _setSkill(76, 3, 245, 6, 0, true); _setSkill(88, 8, 140, 5, 0, true);
+        _setSkill(77, 7, 145, 4, 0, false); _setSkill(89, 6, 130, 4, 0, false);
+        for (uint i = 78; i < 84; i++) {
+            skills[i] = skills[i - 6];
+            skills[i + 12] = skills[i + 6];
+        }
+    }
+
+    function _initLightSkills() private {
+        _setSkill(96, 1, 150, 3, 0, false); _setSkill(108, 6, 140, 4, 0, false);
+        _setSkill(97, 0, 155, 5, 0, false); _setSkill(109, 8, 110, 4, 0, true);
+        _setSkill(98, 0, 170, 5, 0, false); _setSkill(110, 5, 100, 4, 0, true);
+        _setSkill(99, 0, 165, 3, 0, false); _setSkill(111, 2, 105, 3, 0, false);
+        _setSkill(100, 3, 255, 6, 0, true); _setSkill(112, 8, 130, 5, 0, true);
+        _setSkill(101, 7, 150, 4, 0, false); _setSkill(113, 6, 135, 4, 0, false);
+        for (uint i = 102; i < 108; i++) {
+            skills[i] = skills[i - 6];
+            skills[i + 12] = skills[i + 6];
+        }
+    }
+
+    function _setSkill(uint256 tokenType, uint8 skillType, uint256 damage, uint256 cooldown, uint256 duration, bool isAoe) private {
+        skills[tokenType] = Skill(tokenType, skillType, damage, cooldown, duration, isAoe);
+    }
+
+    function getSkill(uint256 tokenType) external view returns (
+        uint256 skillId,
+        uint8 skillType_,
+        uint256 damage,
+        uint256 cooldown,
+        uint256 duration,
+        bool isAoe
+    ) {
+        require(tokenType < 120, "Battle: Invalid token type");
+        Skill memory skill = skills[tokenType];
+        return (skill.skillId, skill.skillType, skill.damage, skill.cooldown, skill.duration, skill.isAoe);
     }
 }

@@ -618,8 +618,11 @@
                         for (let tokenId = startId; tokenId <= endId; tokenId++) {
                             promises.push((async (id) => {
                                 try {
-                                    const [seller, price, active] = await nftTradingContract.methods.getListingInfo(id).call();
-                                    if (active) {
+                                    const listingInfo = await nftTradingContract.methods.getListingInfo(id).call();
+                                    const seller = listingInfo.seller || listingInfo[0];
+                                    const price = listingInfo.priceWei || listingInfo[1];
+                                    const listTime = listingInfo.listTime || listingInfo[2];
+                                    if (parseInt(listTime) > 0) {
                                         const type = await nftMintContract.methods.tokenType(id).call();
                                         const level = await nftMintContract.methods.tokenLevel(id).call();
                                         return {
@@ -771,14 +774,13 @@
             currentTokenIdToBuy = tokenId;
             const nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
             const fee = (parseFloat(price) * 0.05).toFixed(4);
-            const total = (parseFloat(price) + parseFloat(fee)).toFixed(4);
             
             document.getElementById('modalTokenId').textContent = tokenId;
             document.getElementById('modalTokenType').textContent = nftInfo.name;
             document.getElementById('modalSeller').textContent = seller.substring(0, 6) + '...' + seller.substring(seller.length - 4);
             document.getElementById('modalPrice').textContent = price;
-            document.getElementById('modalFee').textContent = fee;
-            document.getElementById('modalTotal').textContent = total;
+            document.getElementById('modalFee').textContent = fee + ' (卖方承担)';
+            document.getElementById('modalTotal').textContent = price;
             
             document.getElementById('buyModal').classList.remove('hidden');
         }

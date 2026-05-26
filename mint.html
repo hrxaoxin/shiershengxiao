@@ -334,27 +334,34 @@
             try {
                 if (!tokenBurnerContract) return;
                 
-                MINT_PRICE = parseInt(await tokenBurnerContract.methods.normalMintCost().call());
-                LIGHT_DARK_COST = parseInt(await tokenBurnerContract.methods.rareMintCost().call());
+                // 合约返回的已经是 wei 单位，避免 parseInt 精度丢失
+                MINT_PRICE = (await tokenBurnerContract.methods.normalMintCost().call()).toString();
+                LIGHT_DARK_COST = (await tokenBurnerContract.methods.rareMintCost().call()).toString();
                 
                 try {
-                    NORMAL_TEN_COST = parseInt(await tokenBurnerContract.methods.normalMintTenCost().call());
-                    RARE_TEN_COST = parseInt(await tokenBurnerContract.methods.rareMintTenCost().call());
+                    NORMAL_TEN_COST = (await tokenBurnerContract.methods.normalMintTenCost().call()).toString();
+                    RARE_TEN_COST = (await tokenBurnerContract.methods.rareMintTenCost().call()).toString();
                     const targetedCosts = await tokenBurnerContract.methods.targetedMintCost().call();
-                    TARGETED_NORMAL_PART = parseInt(targetedCosts.normalPart);
-                    TARGETED_RARE_PART = parseInt(targetedCosts.rarePart);
+                    TARGETED_NORMAL_PART = (targetedCosts.normalPart || targetedCosts[0]).toString();
+                    TARGETED_RARE_PART = (targetedCosts.rarePart || targetedCosts[1]).toString();
                 } catch (e) {
-                    NORMAL_TEN_COST = MINT_PRICE * 10;
-                    RARE_TEN_COST = LIGHT_DARK_COST * 10;
-                    TARGETED_NORMAL_PART = MINT_PRICE * 6;
-                    TARGETED_RARE_PART = LIGHT_DARK_COST * 4;
+                    NORMAL_TEN_COST = (BigInt(MINT_PRICE) * BigInt(10)).toString();
+                    RARE_TEN_COST = (BigInt(LIGHT_DARK_COST) * BigInt(10)).toString();
+                    TARGETED_NORMAL_PART = (BigInt(MINT_PRICE) * BigInt(6)).toString();
+                    TARGETED_RARE_PART = (BigInt(LIGHT_DARK_COST) * BigInt(4)).toString();
                 }
 
-                document.getElementById('mintPriceDisplay').textContent = `${MINT_PRICE} 代币`;
-                document.getElementById('mintBtn').innerHTML = `<i class="fas fa-magic mr-2"></i> 普通铸造（消耗${MINT_PRICE}代币）`;
-                document.getElementById('mintLightDarkBtn').innerHTML = `<i class="fas fa-star mr-2"></i> 光暗铸造（消耗${LIGHT_DARK_COST}代币）`;
-                document.getElementById('mintNormalTenBtn').innerHTML = `<i class="fas fa-layer-group mr-2"></i> 普通十连（消耗${NORMAL_TEN_COST}代币）`;
-                document.getElementById('mintRareTenBtn').innerHTML = `<i class="fas fa-fire mr-2"></i> 光暗十连（消耗${RARE_TEN_COST}代币）`;
+                const web3 = ZODIAC_WEB3.getWeb3();
+                const mintPriceEth = web3.utils.fromWei(MINT_PRICE, 'ether').substring(0, 10);
+                const lightDarkEth = web3.utils.fromWei(LIGHT_DARK_COST, 'ether').substring(0, 10);
+                const normalTenEth = web3.utils.fromWei(NORMAL_TEN_COST, 'ether').substring(0, 10);
+                const rareTenEth = web3.utils.fromWei(RARE_TEN_COST, 'ether').substring(0, 10);
+
+                document.getElementById('mintPriceDisplay').textContent = `${mintPriceEth} 代币`;
+                document.getElementById('mintBtn').innerHTML = `<i class="fas fa-magic mr-2"></i> 普通铸造（消耗${mintPriceEth}代币）`;
+                document.getElementById('mintLightDarkBtn').innerHTML = `<i class="fas fa-star mr-2"></i> 光暗铸造（消耗${lightDarkEth}代币）`;
+                document.getElementById('mintNormalTenBtn').innerHTML = `<i class="fas fa-layer-group mr-2"></i> 普通十连（消耗${normalTenEth}代币）`;
+                document.getElementById('mintRareTenBtn').innerHTML = `<i class="fas fa-fire mr-2"></i> 光暗十连（消耗${rareTenEth}代币）`;
             } catch (error) {
                 console.log('获取铸造费用失败，使用默认值:', error);
             }
@@ -443,23 +450,23 @@
                 }
 
                 const burnerAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenBurner;
-                const web3 = ZODIAC_WEB3.getWeb3();
 
-                const amountInWei = web3.utils.toWei(MINT_PRICE.toString(), 'ether');
-                const lightDarkCostInWei = web3.utils.toWei(LIGHT_DARK_COST.toString(), 'ether');
-                const normalTenCostInWei = web3.utils.toWei(NORMAL_TEN_COST.toString(), 'ether');
-                const rareTenCostInWei = web3.utils.toWei(RARE_TEN_COST.toString(), 'ether');
-                const targetedCostInWei = web3.utils.toWei((TARGETED_NORMAL_PART + TARGETED_RARE_PART).toString(), 'ether');
+                // MINT_PRICE 等已经是 wei 单位的字符串，直接用于 BigInt 比较
+                const mintCostWei = MINT_PRICE.toString();
+                const lightDarkCostWei = LIGHT_DARK_COST.toString();
+                const normalTenCostWei = NORMAL_TEN_COST.toString();
+                const rareTenCostWei = RARE_TEN_COST.toString();
+                const targetedCostWei = (BigInt(TARGETED_NORMAL_PART) + BigInt(TARGETED_RARE_PART)).toString();
                 
                 const allowance = await tokenContract.methods.allowance(account, burnerAddress).call();
                 const balance = await tokenContract.methods.balanceOf(account).call();
                 
-                const hasEnoughBalance = parseInt(balance) >= parseInt(amountInWei);
-                const hasEnoughBalanceForLightDark = parseInt(balance) >= parseInt(lightDarkCostInWei);
-                const hasEnoughBalanceForNormalTen = parseInt(balance) >= parseInt(normalTenCostInWei);
-                const hasEnoughBalanceForRareTen = parseInt(balance) >= parseInt(rareTenCostInWei);
-                const hasEnoughBalanceForTargeted = parseInt(balance) >= parseInt(targetedCostInWei);
-                const hasApproval = parseInt(allowance) >= parseInt(amountInWei);
+                const hasEnoughBalance = BigInt(balance) >= BigInt(mintCostWei);
+                const hasEnoughBalanceForLightDark = BigInt(balance) >= BigInt(lightDarkCostWei);
+                const hasEnoughBalanceForNormalTen = BigInt(balance) >= BigInt(normalTenCostWei);
+                const hasEnoughBalanceForRareTen = BigInt(balance) >= BigInt(rareTenCostWei);
+                const hasEnoughBalanceForTargeted = BigInt(balance) >= BigInt(targetedCostWei);
+                const hasApproval = BigInt(allowance) >= BigInt(mintCostWei);
 
                 document.getElementById('mintBtn').disabled = !(hasApproval && hasEnoughBalance);
                 document.getElementById('mintLightDarkBtn').disabled = !(hasApproval && hasEnoughBalanceForLightDark);

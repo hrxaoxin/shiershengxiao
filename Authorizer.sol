@@ -30,7 +30,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         address weightManagerAddress;
         address battleHistoryAddress;
         address nftTradingAddress;
-        address authorizerAddress;
         address feeReceiverAddress;
         address pancakeSwapPairAddress;
         address metadataContractAddress;
@@ -62,7 +61,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     address public weightManagerAddress;
     address public battleHistoryAddress;
     address public nftTradingAddress;
-    address public authorizerAddress;
     address public feeReceiverAddress;
     address public pancakeSwapPairAddress;
     address public metadataContractAddress;
@@ -273,7 +271,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         poolManagerAddress = _addresses.poolManagerAddress;
         tradingAddress = _addresses.tradingAddress;
         nftDataAddress = _addresses.nftDataAddress;
-        authorizerAddress = _addresses.authorizerAddress;
         feeReceiverAddress = _addresses.feeReceiverAddress;
         pancakeSwapPairAddress = _addresses.pancakeSwapPairAddress;
         metadataContractAddress = _addresses.metadataContractAddress;

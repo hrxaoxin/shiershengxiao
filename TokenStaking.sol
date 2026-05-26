@@ -145,6 +145,8 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         _checkNewDay();
         
+        _accumulateRewards(msg.sender);
+        
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         require(token.balanceOf(msg.sender) >= amount, "TokenStaking: Insufficient balance");
         require(token.allowance(msg.sender, address(this)) >= amount, "TokenStaking: Insufficient allowance");
@@ -173,6 +175,8 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(stake.stakedAt > 0, "TokenStaking: No stake found");
         require(block.timestamp >= stake.stakedAt + MIN_STAKING_DURATION, 
                 "TokenStaking: Must stake for at least 30 minutes");
+        
+        _accumulateRewards(msg.sender);
         
         stake.amount -= amount;
         totalStakedTokens -= amount;
@@ -264,15 +268,27 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     /**
+     * @dev 每日奖励比率（基于质押量）
+     */
+    uint256 public dailyRewardPerToken;
+    /**
+     * @dev 上次计算奖励的时间
+     */
+    uint256 public lastRewardCalculationTime;
+
+    /**
      * @dev 计算并分发每日奖励
      */
     function calculateDailyReward() external {
         _checkNewDay();
 
         uint256 contractBalance = address(this).balance;
-        todayRewardAmount = (contractBalance - totalPendingRewards) * rewardRate / 10000;
-
-        if (totalStakedTokens > 0 && todayRewardAmount > 0) {
+        uint256 availableBalance = contractBalance - totalPendingRewards;
+        
+        if (availableBalance > 0 && totalStakedTokens > 0) {
+            todayRewardAmount = availableBalance * rewardRate / 10000;
+            dailyRewardPerToken = todayRewardAmount / totalStakedTokens;
+            lastRewardCalculationTime = block.timestamp;
             emit DailyRewardCalculated(todayRewardAmount, totalStakedTokens);
         }
     }
@@ -284,19 +300,33 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         StakeInfo storage stake = userStakes[msg.sender];
         require(stake.amount > 0, "TokenStaking: No staked tokens");
 
-        uint256 userStake = stake.amount;
-        uint256 userReward = (todayRewardAmount * userStake) / totalStakedTokens;
+        uint256 userReward = stake.accumulatedRewards;
+        
+        if (dailyRewardPerToken > 0) {
+            uint256 newReward = stake.amount * dailyRewardPerToken;
+            userReward += newReward;
+            stake.accumulatedRewards = 0;
+        }
 
         require(userReward > 0, "TokenStaking: No rewards to claim");
         require(address(this).balance >= userReward, "TokenStaking: Insufficient BNB in contract");
 
-        // 减少今日奖励总量，防止重复发放
-        todayRewardAmount -= userReward;
+        totalPendingRewards -= userReward;
 
         (bool success, ) = payable(msg.sender).call{value: userReward}("");
         require(success, "TokenStaking: Failed to transfer BNB rewards");
 
         emit RewardsClaimed(msg.sender, userReward);
+    }
+
+    /**
+     * @dev 累积用户奖励（在质押/解除质押时调用）
+     */
+    function _accumulateRewards(address user) internal {
+        if (dailyRewardPerToken > 0 && userStakes[user].amount > 0) {
+            userStakes[user].accumulatedRewards += userStakes[user].amount * dailyRewardPerToken;
+            totalPendingRewards += userStakes[user].amount * dailyRewardPerToken;
+        }
     }
 
     /**

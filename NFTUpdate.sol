@@ -41,11 +41,11 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /** @dev 上次价格更新时间 */
     uint256 public lastPriceUpdateTime;
 
-    /** @dev 各级别升级费用（代币数量） */
-    uint256 public level1UpgradeCost = 10000;
-    uint256 public level2UpgradeCost = 40000;
-    uint256 public level3UpgradeCost = 120000;
-    uint256 public level4UpgradeCost = 480000;
+    /** @dev 各级别升级费用（代币数量，含精度18） */
+    uint256 public level1UpgradeCost = 10000 * 10**18;
+    uint256 public level2UpgradeCost = 40000 * 10**18;
+    uint256 public level3UpgradeCost = 120000 * 10**18;
+    uint256 public level4UpgradeCost = 480000 * 10**18;
 
     /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[50] private __gap;

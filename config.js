@@ -99,13 +99,14 @@ window.ZODIAC_CONFIG = (function() {
         poolManager: getEnvContractAddress('poolManager', '0xabcdef1234567890abcdef1234567890abcdef24'),
         tokenBurner: getEnvContractAddress('tokenBurner', '0xabcdef1234567890abcdef1234567890abcdef13'),
         nftMint: getEnvContractAddress('nftMint', '0xabcdef1234567890abcdef1234567890abcdef14'),
-        nftUpdate: getEnvContractAddress('nftUpdate', '0xabcdef1234567890abcdef1234567890abcdef15'),
-        nftTrading: getEnvContractAddress('nftTrading', '0xabcdef1234567890abcdef1234567890abcdef16'),
-        breeding: getEnvContractAddress('breeding', '0xabcdef1234567890abcdef1234567890abcdef17'),
-        staking: getEnvContractAddress('staking', '0xabcdef1234567890abcdef1234567890abcdef18'),
-        tokenStaking: getEnvContractAddress('tokenStaking', '0xabcdef1234567890abcdef1234567890abcdef19'),
-        arena: getEnvContractAddress('arena', '0xabcdef1234567890abcdef1234567890abcdef20'),
-        battle: getEnvContractAddress('battle', '0xabcdef1234567890abcdef1234567890abcdef21')
+        nftUpdate: getEnvContractAddress('nftUpdate', '0xabcdef1234567890abcdef15'),
+        nftTrading: getEnvContractAddress('nftTrading', '0xabcdef1234567890abcdef16'),
+        breeding: getEnvContractAddress('breeding', '0xabcdef1234567890abcdef17'),
+        staking: getEnvContractAddress('staking', '0xabcdef1234567890abcdef18'),
+        tokenStaking: getEnvContractAddress('tokenStaking', '0xabcdef1234567890abcdef19'),
+        arena: getEnvContractAddress('arena', '0xabcdef1234567890abcdef20'),
+        battle: getEnvContractAddress('battle', '0xabcdef1234567890abcdef21'),
+        authorizer: getEnvContractAddress('authorizer', '0xabcdef1234567890abcdef1234567890abcdef25')
     };
 
     function getContractAddresses() {
@@ -301,7 +302,8 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[{"internalType":"uint256","name":"rank","type":"uint256"}],"name":"calculateRewardForRank","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"rank","type":"uint256"}],"name":"getRewardForRank","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"seasonNumber","type":"uint256"}],"name":"calculateSeasonRewards","outputs":[],"stateMutability":"nonpayable","type":"function"},
-            {"inputs":[{"internalType":"address","name":"defender","type":"address"}],"name":"challenge","outputs":[{"internalType":"bool","name":"","type":"bool"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256[6]","name":"playerTeam","type":"uint256[6]"},{"internalType":"uint256","name":"mockIndex","type":"uint256"}],"name":"challengeMockPlayer","outputs":[{"internalType":"bool","name":"success","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"address","name":"challengedPlayer","type":"address"},{"internalType":"uint256[6]","name":"playerTeam","type":"uint256[6]"}],"name":"challengeRealPlayer","outputs":[{"internalType":"bool","name":"success","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"seasonNumber","type":"uint256"}],"name":"claimReward","outputs":[],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"seasonNumber","type":"uint256"}],"name":"getPendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"getPendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
@@ -311,7 +313,7 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"getRemainingAttempts","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"battleContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"nftContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
-            {"inputs":[],"name":"tokenContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"tokenContract","outputs":[{"internalType":"address","name","type":"address"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"DAILY_ATTEMPTS","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"RECHARGE_AMOUNT","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"DEFAULT_RECHARGE_COST","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},

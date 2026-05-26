@@ -218,6 +218,13 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
+     * @dev 计算用户可领取分红（前端调用）
+     */
+    function calcUserDividend(address user) external view returns (uint256) {
+        return pendingDividends[user];
+    }
+
+    /**
      * @dev 分配奖励到各个池
      */
     function _distributeReward(uint256 amount) internal {

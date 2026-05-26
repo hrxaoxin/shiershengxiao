@@ -409,27 +409,13 @@
             return allTypes;
         }
 
-        function getNFTInfo(typeId) {
-            const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
-            return {
-                typeId: nftInfo.typeId,
-                element: nftInfo.attrName,
-                elementIndex: nftInfo.attrIndex,
-                zodiac: nftInfo.zodiac,
-                zodiacIndex: nftInfo.zodiacIndex,
-                gender: nftInfo.gender,
-                name: nftInfo.name,
-                imagePath: nftInfo.imagePath
-            };
-        }
-
         async function updateDividends() {
             try {
                 if (!account || !rewardManagerContract) {
                     document.getElementById('totalDividends').textContent = '0';
                     return;
                 }
-                const [unclaimed] = await rewardManagerContract.methods.calcUserDividend(account).call();
+                const unclaimed = await rewardManagerContract.methods.calcUserDividend(account).call();
                 const unclaimedBNB = web3.utils.fromWei(unclaimed.toString(), 'ether');
                 document.getElementById('totalDividends').textContent = parseFloat(unclaimedBNB).toFixed(4);
             } catch (error) {
@@ -554,7 +540,7 @@
             const isOwned = ownedTypes.has(typeId);
             const userToken = userTokens.find(t => t.typeId === typeId);
             const count = userToken ? userToken.count : 0;
-            const desc = isOwned ? `${nftInfo.element}属性生肖·${nftInfo.zodiac}·${nftInfo.gender} · 持有可享受税收分红` : '尚未拥有此生肖';
+            const desc = isOwned ? `${nftInfo.attrName}属性生肖·${nftInfo.zodiac}·${nftInfo.gender} · 持有可享受税收分红` : '尚未拥有此生肖';
 
             document.getElementById('modalCardImage').src = isOwned ? nftInfo.imagePath : 'images/fu-cards/shuishu_1.png';
             document.getElementById('modalCardImage').style.filter = isOwned ? 'none' : 'grayscale(100%)';

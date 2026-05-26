@@ -8,6 +8,10 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 
+interface IBattle {
+    function battle(uint256[6] calldata attackerTeam, uint256[6] calldata defenderTeam) external view returns (bool, uint256, uint256);
+}
+
 /**
  * @title ArenaRanking
  * @dev 竞技场排名合约，实现PVP竞技场系统
@@ -36,6 +40,11 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @dev 授权合约地址（Authorizer）
      */
     address public authorizer;
+
+    /**
+     * @dev 战斗合约地址
+     */
+    address public battleContract;
 
     /**
      * @dev 赛季信息结构体
@@ -190,6 +199,16 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     /**
+     * @dev 设置战斗合约地址
+     * @param _battleContract 战斗合约地址
+     */
+    function setBattleContract(address _battleContract) external onlyAuthorized {
+        require(_battleContract != address(0), "ArenaRanking: Invalid battle contract");
+        battleContract = _battleContract;
+        emit BattleContractSet(_battleContract);
+    }
+
+    /**
      * @dev 设置赛季奖励金额
      * @param firstReward 第一名奖励
      * @param secondReward 第二名奖励
@@ -234,6 +253,11 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @dev 赛季奖励配置设置事件
      */
     event SeasonRewardsSet(uint256 first, uint256 second, uint256 third);
+
+    /**
+     * @dev 战斗合约地址设置事件
+     */
+    event BattleContractSet(address indexed battleContract);
 
     /**
      * @dev 初始化赛季
@@ -281,6 +305,26 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     /**
+     * @dev 玩家队伍映射
+     */
+    mapping(address => uint256[6]) public playerTeams;
+
+    /**
+     * @dev 设置玩家战斗队伍
+     */
+    function setBattleTeam(uint256[6] calldata team) external {
+        require(team.length == 6, "ArenaRanking: Invalid team size");
+        playerTeams[msg.sender] = team;
+    }
+
+    /**
+     * @dev 获取玩家战斗队伍（前端调用）
+     */
+    function getPlayerBattleTeam(address player) external view returns (uint256[6] memory) {
+        return playerTeams[player];
+    }
+
+    /**
      * @dev 挑战真实玩家
      */
     function challengeRealPlayer(
@@ -288,22 +332,45 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256[6] calldata playerTeam
     ) external returns (bool) {
         require(challengedPlayer != msg.sender, "ArenaRanking: Cannot challenge self");
+        require(playerTeam.length == 6, "ArenaRanking: Invalid team size");
 
         _resetDailyChallengesIfNeeded(msg.sender);
         require(dailyChallenges[msg.sender] > 0, "ArenaRanking: No challenges left");
 
         dailyChallenges[msg.sender]--;
 
-        bool victory = true;
+        uint256[6] memory defenderTeam = playerTeams[challengedPlayer];
+        require(defenderTeam[0] != 0 || defenderTeam[1] != 0, "ArenaRanking: Defender has no team");
+
+        bool victory = _executeBattle(playerTeam, defenderTeam);
 
         if (victory) {
             playerScores[msg.sender] += WIN_SCORE;
             playerScores[challengedPlayer] = playerScores[challengedPlayer] >= LOSS_SCORE
                 ? playerScores[challengedPlayer] - LOSS_SCORE
                 : 0;
+            emit ChallengeResult(msg.sender, true, int256(WIN_SCORE), playerScores[msg.sender]);
+        } else {
+            if (playerScores[msg.sender] >= LOSS_SCORE) {
+                playerScores[msg.sender] -= LOSS_SCORE;
+            } else {
+                playerScores[msg.sender] = 0;
+            }
+            emit ChallengeResult(msg.sender, false, int256(-LOSS_SCORE), playerScores[msg.sender]);
         }
 
         return victory;
+    }
+
+    /**
+     * @dev 执行战斗（调用Battle合约）
+     */
+    function _executeBattle(uint256[6] memory attackerTeam, uint256[6] memory defenderTeam) internal view returns (bool) {
+        if (battleContract == address(0)) {
+            return _simulateBattleResult(attackerTeam, defenderTeam);
+        }
+        (bool success, uint256 winner, ) = IBattle(battleContract).battle(attackerTeam, defenderTeam);
+        return success && winner == 1;
     }
 
     /**
@@ -330,6 +397,35 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         tiers = new uint256[](length);
 
         return (players, scores, tiers);
+    }
+
+    /**
+     * @dev 获取排行榜 (前端调用)
+     */
+    function getLeaderboard(uint256 limit) external view returns (
+        address[] memory playerAddresses,
+        uint256[] memory playerScores,
+        uint256[] memory playerWins,
+        uint256[] memory playerLosses,
+        bool[] memory isMockPlayer
+    ) {
+        uint256 actualLimit = limit > rankings.length ? rankings.length : limit;
+        playerAddresses = new address[](actualLimit);
+        playerScores = new uint256[](actualLimit);
+        playerWins = new uint256[](actualLimit);
+        playerLosses = new uint256[](actualLimit);
+        isMockPlayer = new bool[](actualLimit);
+
+        for (uint256 i = 0; i < actualLimit; i++) {
+            PlayerRanking memory ranking = rankings[i];
+            playerAddresses[i] = ranking.player;
+            playerScores[i] = ranking.score;
+            playerWins[i] = ranking.wins;
+            playerLosses[i] = ranking.losses;
+            isMockPlayer[i] = i < mockPlayers.length;
+        }
+
+        return (playerAddresses, playerScores, playerWins, playerLosses, isMockPlayer);
     }
 
     /**
@@ -468,9 +564,60 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     event SeasonRewardClaimed(address indexed player, uint256 amount);
 
     /**
-     * @dev 获取玩家剩余挑战次数
+     * @dev 获取玩家剩余挑战次数（与前端ABI兼容）
      */
     function getRemainingChallenges(address player) external view returns (uint256) {
         return dailyChallenges[player];
+    }
+
+    /**
+     * @dev 获取玩家剩余挑战次数（前端调用的函数名）
+     */
+    function getRemainingAttempts(address player) external view returns (uint256) {
+        return dailyChallenges[player];
+    }
+
+    /**
+     * @dev 充值挑战次数
+     */
+    function rechargeChallengeAttempts() external {
+        // 实现充值逻辑，这里可以添加代币消耗
+        dailyChallenges[msg.sender] = DAILY_CHALLENGES;
+        lastResetTime[msg.sender] = block.timestamp;
+    }
+
+    /**
+     * @dev 获取当前奖励池
+     */
+    function getCurrentRewardPool() external view returns (uint256) {
+        return IERC20(tokenContract).balanceOf(rewardPool);
+    }
+
+    /**
+     * @dev 获取赛季奖励率
+     */
+    function seasonRewardRate() external view returns (uint256) {
+        return 100; // 默认100%
+    }
+
+    /**
+     * @dev 根据排名获取奖励
+     */
+    function getRewardForRank(uint256 rank) external view returns (uint256) {
+        if (rank == 1) return seasonRewards[0];
+        if (rank == 2) return seasonRewards[1];
+        if (rank == 3) return seasonRewards[2];
+        return 0;
+    }
+
+    /**
+     * @dev 获取待领取奖励（与前端ABI兼容）
+     */
+    function getPendingRewards(address player) external view returns (uint256) {
+        return seasonRewardsClaimed[player];
+    }
+
+    function getPendingRewards(uint256 seasonNumber) external view returns (uint256) {
+        return 0;
     }
 }
