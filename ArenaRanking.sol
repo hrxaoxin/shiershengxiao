@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 
 /**
@@ -28,6 +30,8 @@ import "./NFTInterface.sol";
  * - 支持UUPS代理升级模式
  */
 contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+    using SafeERC20 for IERC20;
+
     /**
      * @dev 授权合约地址（Authorizer）
      */
@@ -232,11 +236,6 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     event SeasonRewardsSet(uint256 first, uint256 second, uint256 third);
 
     /**
-     * @dev 赛季结束事件
-     */
-    event SeasonEnded(uint256 seasonId, uint256 totalWinners);
-
-    /**
      * @dev 初始化赛季
      */
     function initializeSeason() external onlyOwner {
@@ -268,7 +267,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         if (victory) {
             playerScores[msg.sender] += WIN_SCORE;
-            emit ChallengeResult(msg.sender, true, WIN_SCORE, playerScores[msg.sender]);
+            emit ChallengeResult(msg.sender, true, int256(WIN_SCORE), playerScores[msg.sender]);
         } else {
             if (playerScores[msg.sender] >= LOSS_SCORE) {
                 playerScores[msg.sender] -= LOSS_SCORE;
@@ -424,7 +423,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(rewardPool) >= reward, "ArenaRanking: Insufficient reward pool balance");
 
-        token.transferFrom(rewardPool, msg.sender, reward);
+        token.safeTransferFrom(rewardPool, msg.sender, reward);
 
         seasonRewardsClaimed[msg.sender] = reward;
 

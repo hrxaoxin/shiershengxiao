@@ -18,12 +18,6 @@ import "./NFTDataType.sol";
  * - 处理NFT繁殖
  */
 
-// ============ ERC20接口 ============
-interface IERC20 {
-    function transfer(address to, uint256 amount) external returns (bool);
-    function balanceOf(address account) external view returns (uint256);
-}
-
 // ============ NFT铸造接口 ============
 interface INFTMint {
     function mintNormal(address to) external returns (uint256);
@@ -32,6 +26,8 @@ interface INFTMint {
     function mintRareTen(address to) external returns (uint256[] memory);
     function mintTargeted(address to, uint8 baseZodiac) external returns (uint256[] memory);
     function tokenType(uint256 tokenId) external view returns (uint256);
+    function ownerOf(uint256 tokenId) external view returns (address);
+    function safeTransferFrom(address from, address to, uint256 tokenId) external;
 }
 
 // ============ NFT数据查询接口 ============
@@ -286,7 +282,13 @@ interface IBreeding {
     /**
      * @dev 获取繁殖信息
      * @param pairId 繁殖对ID
-     * @return tuple 繁殖详情
+     * @return fatherId 父NFT ID
+     * @return motherId 母NFT ID
+     * @return maleOwner 公NFT所有者
+     * @return femaleOwner 母NFT所有者
+     * @return startTime 开始时间
+     * @return breedingType 繁殖类型
+     * @return status 状态
      */
     function getBreedingInfo(uint256 pairId) external view returns (
         uint256 fatherId,
@@ -341,7 +343,11 @@ interface IBattle {
     /**
      * @dev 获取战斗记录
      * @param index 记录索引
-     * @return tuple 战斗详情
+     * @return battleId 战斗ID
+     * @return challengerId 挑战者NFT ID
+     * @return challengedId 被挑战者NFT ID
+     * @return winner 获胜方
+     * @return timestamp 时间戳
      */
     function getBattleLog(uint256 index) external view returns (
         uint256 battleId,
@@ -389,7 +395,9 @@ interface IArenaRanking {
      * @dev 获取排名信息
      * @param startIndex 起始索引
      * @param endIndex 结束索引
-     * @return tuple[] 排名信息数组
+     * @return players 玩家地址数组
+     * @return scores 分数数组
+     * @return tiers 等级数组
      */
     function getRankings(uint256 startIndex, uint256 endIndex) external view returns (
         address[] memory players,
@@ -466,7 +474,10 @@ interface IStaking {
     /**
      * @dev 获取质押信息
      * @param tokenId NFT ID
-     * @return tuple 质押详情
+     * @return owner 所有者地址
+     * @return stakeTime 质押时间
+     * @return lastClaimTime 上次领取时间
+     * @return accumulatedReward 累计奖励
      */
     function getStakingInfo(uint256 tokenId) external view returns (
         address owner,
@@ -521,7 +532,9 @@ interface ITokenStaking {
     /**
      * @dev 获取质押信息
      * @param user 用户地址
-     * @return tuple 质押详情
+     * @return stakedAmount 质押数量
+     * @return lastClaimTime 上次领取时间
+     * @return accumulatedReward 累计奖励
      */
     function getStakingInfo(address user) external view returns (
         uint256 stakedAmount,
@@ -716,7 +729,9 @@ interface INFTTrading {
     /**
      * @dev 获取挂牌信息
      * @param tokenId NFT ID
-     * @return tuple 挂牌详情
+     * @return seller 卖家地址
+     * @return priceWei 价格（Wei）
+     * @return listTime 挂牌时间
      */
     function getListingInfo(uint256 tokenId) external view returns (
         address seller,
@@ -939,6 +954,7 @@ interface INFTDataInterface {
     function userTokens(address user, NFTDataTypes.ZodiacType zodiacType) external view returns (uint256[] memory);
     function setTokenLevel(uint256 tokenId, uint8 newLevel) external;
     function updateUserWeight(address user, uint8 level, bool add, NFTDataTypes.ElementType element) external;
+    function calcUserWeight(address user) external view returns (uint256);
 }
 
 /**
@@ -956,6 +972,8 @@ interface IToken {
  */
 interface IPancakeSwapPair {
     function getReserves() external view returns (uint112, uint112, uint32);
+    function token0() external view returns (address);
+    function token1() external view returns (address);
 }
 
 /**

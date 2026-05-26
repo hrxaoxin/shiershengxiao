@@ -64,6 +64,33 @@ library BattleLib {
     }
 
     /**
+     * @dev 完整技能数据结构
+     */
+    struct FullSkill {
+        bytes32 skillId;      // 技能唯一标识
+        uint8 skillType;      // 技能类型
+        uint256 damage;      // 伤害值
+        uint256 cooldown;    // 冷却时间
+        uint256 duration;    // 持续时间
+        bool isAoe;          // 是否AOE技能
+    }
+
+    /**
+     * @dev 单场战斗结果
+     */
+    struct SingleBattleResult {
+        uint256 battleId;           // 战斗ID
+        uint256 timestamp;          // 战斗时间戳
+        address team1Player;        // 队伍1玩家地址
+        address team2Player;        // 队伍2玩家地址
+        uint256[] team1TokenIds;    // 队伍1 NFT ID数组
+        uint256[] team2TokenIds;    // 队伍2 NFT ID数组
+        BattleResult result;        // 战斗结果
+        uint256 team1Score;        // 队伍1得分
+        uint256 team2Score;        // 队伍2得分
+    }
+
+    /**
      * @dev 队伍速度排序
      *
      * 按速度从高到低排序

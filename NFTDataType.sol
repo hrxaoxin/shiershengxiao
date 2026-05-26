@@ -292,10 +292,10 @@ library NFTDataTypes {
      * @param zodiacType 生肖类型（0-119）
      * @return ElementType 属性类型（水/风/火/暗/光）
      *
-     * @example
-     * getElement(0) = WATER (水鼠/水牛...属于水属性)
-     * getElement(24) = WIND (风鼠/风牛...属于风属性)
-     * getElement(96) = LIGHT (光鼠/光牛...属于光属性)
+     * 使用示例:
+     * - getElement(0) = WATER (水鼠/水牛...属于水属性)
+     * - getElement(24) = WIND (风鼠/风牛...属于风属性)
+     * - getElement(96) = LIGHT (光鼠/光牛...属于光属性)
      */
     function getElement(ZodiacType zodiacType) internal pure returns (ElementType) {
         uint256 typeValue = uint256(zodiacType);
@@ -312,9 +312,9 @@ library NFTDataTypes {
      * @param zodiacType 生肖类型（0-119）
      * @return GenderType 性别类型（母/公）
      *
-     * @example
-     * getGender(0) = MALE (水鼠_1，末尾为1表示公)
-     * getGender(12) = FEMALE (水鼠_0，末尾为0表示母)
+     * 使用示例:
+     * - getGender(0) = MALE (水鼠_1，末尾为1表示公)
+     * - getGender(12) = FEMALE (水鼠_0，末尾为0表示母)
      */
     function getGender(ZodiacType zodiacType) internal pure returns (GenderType) {
         uint256 typeValue = uint256(zodiacType);
@@ -331,10 +331,10 @@ library NFTDataTypes {
      * @param zodiacType 生肖类型（0-119）
      * @return BaseZodiac 基础生肖类型（鼠/牛/虎.../猪）
      *
-     * @example
-     * getBaseZodiac(0) = RAT (水鼠)
-     * getBaseZodiac(1) = RAT (水鼠_1)
-     * getBaseZodiac(2) = OX (水牛)
+     * 使用示例:
+     * - getBaseZodiac(0) = RAT (水鼠)
+     * - getBaseZodiac(1) = RAT (水鼠_1)
+     * - getBaseZodiac(2) = OX (水牛)
      */
     function getBaseZodiac(ZodiacType zodiacType) internal pure returns (BaseZodiac) {
         uint256 typeValue = uint256(zodiacType);
@@ -353,7 +353,7 @@ library NFTDataTypes {
      * @param gender 性别类型（母/公）
      * @return ZodiacType 完整的生肖类型（0-119）
      *
-     * @example
+     * 使用示例:
      * createZodiacType(WATER, RAT, MALE) = 0 (水鼠_1)
      * createZodiacType(LIGHT, DRAGON, FEMALE) = 112 (光龙_0)
      */
@@ -371,7 +371,7 @@ library NFTDataTypes {
      * @param zodiacType 生肖类型
      * @return bool 是否有效（0-119为有效值）
      *
-     * @example
+     * 使用示例:
      * isValidZodiacType(0) = true
      * isValidZodiacType(119) = true
      * isValidZodiacType(120) = false

@@ -50,6 +50,15 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
+     * @dev 队伍状态结构体
+     */
+    struct TeamState {
+        NFTTraits[6] traits;
+        uint256[6] hp;
+        bool[6] alive;
+    }
+
+    /**
      * @dev 战斗历史记录数组
      */
     BattleState[] public battleHistory;
@@ -278,20 +287,16 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             msg.sender
         )));
 
-        NFTTraits[6] memory traits1;
-        NFTTraits[6] memory traits2;
-        uint256[6] memory hp1;
-        uint256[6] memory hp2;
-        bool[6] memory alive1;
-        bool[6] memory alive2;
+        TeamState memory state1;
+        TeamState memory state2;
 
         for (uint i = 0; i < 6; i++) {
-            traits1[i] = _getNFTTraits(team1[i]);
-            traits2[i] = _getNFTTraits(team2[i]);
-            hp1[i] = uint256(traits1[i].level) * 100;
-            hp2[i] = uint256(traits2[i].level) * 100;
-            alive1[i] = true;
-            alive2[i] = true;
+            state1.traits[i] = _getNFTTraits(team1[i]);
+            state2.traits[i] = _getNFTTraits(team2[i]);
+            state1.hp[i] = uint256(state1.traits[i].level) * 100;
+            state2.hp[i] = uint256(state2.traits[i].level) * 100;
+            state1.alive[i] = true;
+            state2.alive[i] = true;
         }
 
         bool team1Alive = true;
@@ -301,17 +306,17 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             randomSeed++;
 
             for (uint i = 0; i < 6; i++) {
-                if (!alive1[i] || !team1Alive) continue;
-                uint defenderIndex = _findTarget(alive2, traits2);
+                if (!state1.alive[i] || !team1Alive) continue;
+                uint defenderIndex = _findTarget(state2.alive, state2.traits);
                 if (defenderIndex == 6) {
                     team1Alive = false;
                     break;
                 }
-                uint damage = _calculateDamage(traits1[i], traits2[defenderIndex], randomSeed + i);
-                hp2[defenderIndex] = hp2[defenderIndex] > damage ? hp2[defenderIndex] - damage : 0;
-                if (hp2[defenderIndex] == 0) {
-                    alive2[defenderIndex] = false;
-                    if (!_hasAnyAlive(alive2)) {
+                uint damage = _calculateDamage(state1.traits[i], state2.traits[defenderIndex], randomSeed + i);
+                state2.hp[defenderIndex] = state2.hp[defenderIndex] > damage ? state2.hp[defenderIndex] - damage : 0;
+                if (state2.hp[defenderIndex] == 0) {
+                    state2.alive[defenderIndex] = false;
+                    if (!_hasAnyAlive(state2.alive)) {
                         team2Alive = false;
                     }
                 }
@@ -320,17 +325,17 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             if (!team2Alive) break;
 
             for (uint i = 0; i < 6; i++) {
-                if (!alive2[i] || !team2Alive) continue;
-                uint defenderIndex = _findTarget(alive1, traits1);
+                if (!state2.alive[i] || !team2Alive) continue;
+                uint defenderIndex = _findTarget(state1.alive, state1.traits);
                 if (defenderIndex == 6) {
                     team2Alive = false;
                     break;
                 }
-                uint damage = _calculateDamage(traits2[i], traits1[defenderIndex], randomSeed + 1000 + i);
-                hp1[defenderIndex] = hp1[defenderIndex] > damage ? hp1[defenderIndex] - damage : 0;
-                if (hp1[defenderIndex] == 0) {
-                    alive1[defenderIndex] = false;
-                    if (!_hasAnyAlive(alive1)) {
+                uint damage = _calculateDamage(state2.traits[i], state1.traits[defenderIndex], randomSeed + 1000 + i);
+                state1.hp[defenderIndex] = state1.hp[defenderIndex] > damage ? state1.hp[defenderIndex] - damage : 0;
+                if (state1.hp[defenderIndex] == 0) {
+                    state1.alive[defenderIndex] = false;
+                    if (!_hasAnyAlive(state1.alive)) {
                         team1Alive = false;
                     }
                 }
@@ -411,20 +416,16 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         uint256[6] calldata team2
     ) external view returns (uint8) {
         uint256 battleId = block.timestamp % 1000 + 1;
-        NFTTraits[6] memory traits1;
-        NFTTraits[6] memory traits2;
-        uint256[6] memory hp1;
-        uint256[6] memory hp2;
-        bool[6] memory alive1;
-        bool[6] memory alive2;
+        TeamState memory state1;
+        TeamState memory state2;
 
         for (uint i = 0; i < 6; i++) {
-            traits1[i] = _getNFTTraits(team1[i]);
-            traits2[i] = _getNFTTraits(team2[i]);
-            hp1[i] = uint256(traits1[i].level) * 100;
-            hp2[i] = uint256(traits2[i].level) * 100;
-            alive1[i] = true;
-            alive2[i] = true;
+            state1.traits[i] = _getNFTTraits(team1[i]);
+            state2.traits[i] = _getNFTTraits(team2[i]);
+            state1.hp[i] = uint256(state1.traits[i].level) * 100;
+            state2.hp[i] = uint256(state2.traits[i].level) * 100;
+            state1.alive[i] = true;
+            state2.alive[i] = true;
         }
 
         bool team1Alive = true;
@@ -434,17 +435,17 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         for (uint256 round = 0; round < MAX_ROUNDS && team1Alive && team2Alive; round++) {
             seed++;
             for (uint i = 0; i < 6; i++) {
-                if (!alive1[i] || !team1Alive) continue;
-                uint defenderIndex = _findTarget(alive2, traits2);
+                if (!state1.alive[i] || !team1Alive) continue;
+                uint defenderIndex = _findTarget(state2.alive, state2.traits);
                 if (defenderIndex == 6) {
                     team1Alive = false;
                     break;
                 }
-                uint damage = _calculateDamage(traits1[i], traits2[defenderIndex], seed + i);
-                hp2[defenderIndex] = hp2[defenderIndex] > damage ? hp2[defenderIndex] - damage : 0;
-                if (hp2[defenderIndex] == 0) {
-                    alive2[defenderIndex] = false;
-                    if (!_hasAnyAlive(alive2)) {
+                uint damage = _calculateDamage(state1.traits[i], state2.traits[defenderIndex], seed + i);
+                state2.hp[defenderIndex] = state2.hp[defenderIndex] > damage ? state2.hp[defenderIndex] - damage : 0;
+                if (state2.hp[defenderIndex] == 0) {
+                    state2.alive[defenderIndex] = false;
+                    if (!_hasAnyAlive(state2.alive)) {
                         team2Alive = false;
                     }
                 }
@@ -453,17 +454,17 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             if (!team2Alive) break;
 
             for (uint i = 0; i < 6; i++) {
-                if (!alive2[i] || !team2Alive) continue;
-                uint defenderIndex = _findTarget(alive1, traits1);
+                if (!state2.alive[i] || !team2Alive) continue;
+                uint defenderIndex = _findTarget(state1.alive, state1.traits);
                 if (defenderIndex == 6) {
                     team2Alive = false;
                     break;
                 }
-                uint damage = _calculateDamage(traits2[i], traits1[defenderIndex], seed + 1000 + i);
-                hp1[defenderIndex] = hp1[defenderIndex] > damage ? hp1[defenderIndex] - damage : 0;
-                if (hp1[defenderIndex] == 0) {
-                    alive1[defenderIndex] = false;
-                    if (!_hasAnyAlive(alive1)) {
+                uint damage = _calculateDamage(state2.traits[i], state1.traits[defenderIndex], seed + 1000 + i);
+                state1.hp[defenderIndex] = state1.hp[defenderIndex] > damage ? state1.hp[defenderIndex] - damage : 0;
+                if (state1.hp[defenderIndex] == 0) {
+                    state1.alive[defenderIndex] = false;
+                    if (!_hasAnyAlive(state1.alive)) {
                         team1Alive = false;
                     }
                 }

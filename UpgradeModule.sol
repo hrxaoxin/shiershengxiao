@@ -156,11 +156,11 @@ contract UpgradeModule is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @param currentLevel 当前等级（1-4）
      * @return uint256 升级费用（代币）
      *
-     * @example
-     * getUpgradeCost(1, false) = 10000 * 10**18
-     * getUpgradeCost(2, false) = 40000 * 10**18
-     * getUpgradeCost(3, false) = 120000 * 10**18
-     * getUpgradeCost(4, false) = 480000 * 10**18
+     * 例如：
+     * _getUpgradeCost(1) = 10000 * 10**18
+     * _getUpgradeCost(2) = 40000 * 10**18
+     * _getUpgradeCost(3) = 120000 * 10**18
+     * _getUpgradeCost(4) = 480000 * 10**18
      */
     function _getUpgradeCost(uint256 currentLevel) internal pure returns (uint256) {
         require(currentLevel >= 1 && currentLevel < 5, "UpgradeModule: Invalid level");
@@ -179,11 +179,11 @@ contract UpgradeModule is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @param currentLevel 当前等级（1-4）
      * @return uint256 所需材料数量
      *
-     * @example
-     * getUpgradeMaterialCount(1) = 1
-     * getUpgradeMaterialCount(2) = 2
-     * getUpgradeMaterialCount(3) = 3
-     * getUpgradeMaterialCount(4) = 4
+     * 例如：
+     * _getUpgradeMaterialCount(1) = 1
+     * _getUpgradeMaterialCount(2) = 2
+     * _getUpgradeMaterialCount(3) = 3
+     * _getUpgradeMaterialCount(4) = 4
      */
     function _getUpgradeMaterialCount(uint256 currentLevel) internal pure returns (uint256) {
         require(currentLevel >= 1 && currentLevel < 5, "UpgradeModule: Invalid level");
@@ -207,7 +207,7 @@ contract UpgradeModule is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * 计算公式：
      * usdtAmount = (upgradeCost / TOKEN_PRECISION) / tokenPriceUSD * USDT_PRECISION
      *
-     * @example
+     * 例如：
      * 如果代币价格 $0.1，升级费用 10000 代币
      * 则 USDT 费用 = 10000 / 0.1 = 100000 USDT
      */

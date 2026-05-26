@@ -77,18 +77,18 @@ library NFTLib {
      */
     function getBaseSpeed(uint256 zodiacType) internal pure returns (uint256) {
         uint256[12] memory baseSpeeds = [
-            95,   // RAT (0) - 鼠
-            40,   // OX (1) - 牛
-            70,   // TIGER (2) - 虎
-            90,   // RABBIT (3) - 兔
-            80,   // DRAGON (4) - 龙
-            85,   // SNAKE (5) - 蛇
-            100,  // HORSE (6) - 马
-            35,   // GOAT (7) - 羊
-            110,  // MONKEY (8) - 猴
-            55,   // ROOSTER (9) - 鸡
-            60,   // DOG (10) - 狗
-            30    // PIG (11) - 猪
+            uint256(95),   // RAT (0) - 鼠
+            uint256(40),   // OX (1) - 牛
+            uint256(70),   // TIGER (2) - 虎
+            uint256(90),   // RABBIT (3) - 兔
+            uint256(80),   // DRAGON (4) - 龙
+            uint256(85),   // SNAKE (5) - 蛇
+            uint256(100),  // HORSE (6) - 马
+            uint256(35),   // GOAT (7) - 羊
+            uint256(110),  // MONKEY (8) - 猴
+            uint256(55),   // ROOSTER (9) - 鸡
+            uint256(60),   // DOG (10) - 狗
+            uint256(30)    // PIG (11) - 猪
         ];
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         return baseSpeeds[zodiacType];
@@ -132,10 +132,22 @@ library NFTLib {
      * - dodge: 基础闪避 + 等级加成(每级+1%)
      */
     function calculateBattleAttributes(uint256 zodiacType, uint256 level) internal pure returns (BattleAttributes memory) {
-        uint256[12] memory baseHP = [1200, 2000, 1600, 1000, 1800, 1400, 1500, 900, 1100, 800, 1300, 700];
-        uint256[12] memory baseAttack = [120, 80, 150, 90, 180, 140, 130, 60, 160, 70, 100, 50];
-        uint256[12] memory baseDefense = [80, 120, 100, 70, 130, 110, 90, 60, 100, 50, 110, 40];
-        uint256[12] memory baseCritical = [800, 500, 900, 600, 850, 750, 700, 400, 950, 550, 650, 350];
+        uint256[12] memory baseHP = [
+            uint256(1200), uint256(2000), uint256(1600), uint256(1000), uint256(1800), uint256(1400),
+            uint256(1500), uint256(900), uint256(1100), uint256(800), uint256(1300), uint256(700)
+        ];
+        uint256[12] memory baseAttack = [
+            uint256(120), uint256(80), uint256(150), uint256(90), uint256(180), uint256(140),
+            uint256(130), uint256(60), uint256(160), uint256(70), uint256(100), uint256(50)
+        ];
+        uint256[12] memory baseDefense = [
+            uint256(80), uint256(120), uint256(100), uint256(70), uint256(130), uint256(110),
+            uint256(90), uint256(60), uint256(100), uint256(50), uint256(110), uint256(40)
+        ];
+        uint256[12] memory baseCritical = [
+            uint256(800), uint256(500), uint256(900), uint256(600), uint256(850), uint256(750),
+            uint256(700), uint256(400), uint256(950), uint256(550), uint256(650), uint256(350)
+        ];
 
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         require(level >= 1 && level <= 5, "NFTLib: Invalid level");
@@ -246,7 +258,10 @@ library NFTLib {
      * @return uint256 攻击力
      */
     function calculateAttack(uint256 zodiacType, uint256 level) internal pure returns (uint256) {
-        uint256[12] memory baseAttack = [120, 80, 150, 90, 180, 140, 130, 60, 160, 70, 100, 50];
+        uint256[12] memory baseAttack = [
+            uint256(120), uint256(80), uint256(150), uint256(90), uint256(180), uint256(140),
+            uint256(130), uint256(60), uint256(160), uint256(70), uint256(100), uint256(50)
+        ];
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         require(level >= 1 && level <= 5, "NFTLib: Invalid level");
         uint256 multiplier = getLevelMultiplier(level);
@@ -261,7 +276,10 @@ library NFTLib {
      * @return uint256 防御力
      */
     function calculateDefense(uint256 zodiacType, uint256 level) internal pure returns (uint256) {
-        uint256[12] memory baseDefense = [80, 120, 100, 70, 130, 110, 90, 60, 100, 50, 110, 40];
+        uint256[12] memory baseDefense = [
+            uint256(80), uint256(120), uint256(100), uint256(70), uint256(130), uint256(110),
+            uint256(90), uint256(60), uint256(100), uint256(50), uint256(110), uint256(40)
+        ];
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         require(level >= 1 && level <= 5, "NFTLib: Invalid level");
         uint256 multiplier = getLevelMultiplier(level);
@@ -276,7 +294,10 @@ library NFTLib {
      * @return uint256 生命值
      */
     function calculateHP(uint256 zodiacType, uint256 level) internal pure returns (uint256) {
-        uint256[12] memory baseHP = [1200, 2000, 1600, 1000, 1800, 1400, 1500, 900, 1100, 800, 1300, 700];
+        uint256[12] memory baseHP = [
+            uint256(1200), uint256(2000), uint256(1600), uint256(1000), uint256(1800), uint256(1400),
+            uint256(1500), uint256(900), uint256(1100), uint256(800), uint256(1300), uint256(700)
+        ];
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         require(level >= 1 && level <= 5, "NFTLib: Invalid level");
         uint256 multiplier = getLevelMultiplier(level);
@@ -314,7 +335,9 @@ library NFTLib {
      * - 5级: 66
      */
     function getCommonUpgradeWeight(uint256 level) internal pure returns (uint256) {
-        uint256[6] memory weights = [0, 1, 2, 6, 18, 66];
+        uint256[6] memory weights = [
+            uint256(0), uint256(1), uint256(2), uint256(6), uint256(18), uint256(66)
+        ];
         require(level <= 5, "NFTLib: Invalid level");
         return weights[level];
     }
@@ -335,7 +358,9 @@ library NFTLib {
      * - 5级: 76
      */
     function getRareUpgradeWeight(uint256 level) internal pure returns (uint256) {
-        uint256[6] memory weights = [0, 10, 12, 16, 28, 76];
+        uint256[6] memory weights = [
+            uint256(0), uint256(10), uint256(12), uint256(16), uint256(28), uint256(76)
+        ];
         require(level <= 5, "NFTLib: Invalid level");
         return weights[level];
     }

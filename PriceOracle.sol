@@ -189,7 +189,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      * 计算公式：
      * usdtAmount = tokenAmount * tokenPriceUSD / (1 USD) / TOKEN_PRECISION * USDT_PRECISION
      *
-     * @example
+     * 例如：
      * tokenAmount = 10000 * 10^18 (10000代币)
      * tokenPriceUSD = 0.1 * 10^18 ($0.1)
      * usdtAmount = 10000 * 0.1 = 1000 USDT
@@ -210,7 +210,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      * 计算公式：
      * tokenAmount = usdtAmount * (1 USD) / tokenPriceUSD / USDT_PRECISION * TOKEN_PRECISION
      *
-     * @example
+     * 例如：
      * usdtAmount = 1000 * 10^6 (1000 USDT)
      * tokenPriceUSD = 0.1 * 10^18 ($0.1)
      * tokenAmount = 1000 / 0.1 = 10000 代币

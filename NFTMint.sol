@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC721/ERC721.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/ERC721Upgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 
-contract NFTMint is ERC721, Ownable2StepUpgradeable, UUPSUpgradeable {
+contract NFTMint is ERC721Upgradeable, Ownable2StepUpgradeable, UUPSUpgradeable {
     uint256 public constant MINT_COST = 8888 * 10**18;
     uint256 public constant RARE_MINT_COST = 88888 * 10**18;
     uint256 public constant BATCH_MINT_COST = 88880 * 10**18;

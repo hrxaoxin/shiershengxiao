@@ -13,8 +13,7 @@ error NotOperator();
 contract WeightManager is 
     Initializable,
     Ownable2StepUpgradeable,
-    UUPSUpgradeable,
-    IWeightManager
+    UUPSUpgradeable
 {
     address public nftDataContract;
     address public authorizer;

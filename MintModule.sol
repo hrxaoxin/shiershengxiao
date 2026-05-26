@@ -280,9 +280,9 @@ contract MintModule is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * 计算公式：
      * ZodiacType = element × 24 + zodiac × 2 + gender
      *
-     * @example
-     * (0, 0, 1) = 0 × 24 + 0 × 2 + 1 = 1 (水鼠_1)
-     * (4, 4, 0) = 4 × 24 + 4 × 2 + 0 = 96 + 8 = 104 (光龙_0)
+     * 使用示例：
+     * - (0, 0, 1) = 0 × 24 + 0 × 2 + 1 = 1 (水鼠_1)
+     * - (4, 4, 0) = 4 × 24 + 4 × 2 + 0 = 96 + 8 = 104 (光龙_0)
      */
     function _calculateZodiacType(uint256 element, uint256 zodiac, uint256 gender) internal pure returns (uint256) {
         return element * 24 + zodiac * 2 + gender;
@@ -359,8 +359,8 @@ contract MintModule is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * - 但同一属性的公母算作同一"类型"的基础
      * - 实际返回10张：水/风/火/暗/光 各公母 = 10张
      *
-     * @example
-     * zodiac = 0 (鼠) 返回：水鼠_1, 水鼠_0, 风鼠_1, 风鼠_0, 火鼠_1, 火鼠_0, 暗鼠_1, 暗鼠_0, 光鼠_1, 光鼠_0
+     * 使用示例：
+     * - zodiac = 0 (鼠) 返回：水鼠_1, 水鼠_0, 风鼠_1, 风鼠_0, 火鼠_1, 火鼠_0, 暗鼠_1, 暗鼠_0, 光鼠_1, 光鼠_0
      */
     function _mintZodiac(uint256 zodiac) internal pure returns (uint256[] memory) {
         require(zodiac < 12, "MintModule: Invalid zodiac");
@@ -399,7 +399,11 @@ contract MintModule is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @return uint256[] 概率数组
      */
     function getElementProbabilities() external view returns (uint256[] memory) {
-        return elementProbabilities;
+        uint256[] memory result = new uint256[](5);
+        for (uint256 i = 0; i < 5; i++) {
+            result[i] = elementProbabilities[i];
+        }
+        return result;
     }
 
     /**
@@ -408,7 +412,11 @@ contract MintModule is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @return uint256[] 概率数组
      */
     function getRareElementProbabilities() external view returns (uint256[] memory) {
-        return rareElementProbabilities;
+        uint256[] memory result = new uint256[](2);
+        for (uint256 i = 0; i < 2; i++) {
+            result[i] = rareElementProbabilities[i];
+        }
+        return result;
     }
 
     /**
