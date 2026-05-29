@@ -464,7 +464,7 @@
             <div class="md:flex-1 flex flex-col md:flex-row gap-1.5 md:gap-3 relative">
                 <!-- 进攻方 -->
                 <div class="flex-1 flex flex-col order-1">
-                    <h3 class="text-blue-400 font-semibold text-center mb-0.5 md:mb-2 text-xs md:text-sm">进攻方</h3>
+                    <h3 class="text-blue-400 font-semibold text-center mb-0.5 md:mb-2 text-xs md:text-sm">防守方</h3>
                     <div class="flex-1 flex flex-col justify-around min-h-0">
                         <div class="space-y-0">
                             <div class="text-center text-gray-500 text-[10px] mb-0">前排</div>
@@ -553,7 +553,7 @@
 
                 <!-- 防守方 -->
                 <div class="flex-1 flex flex-col order-3">
-                    <h3 class="text-red-400 font-semibold text-center mb-0.5 md:mb-2 text-xs md:text-sm">防守方</h3>
+                    <h3 class="text-red-400 font-semibold text-center mb-0.5 md:mb-2 text-xs md:text-sm">进攻方</h3>
                     <div class="flex-1 flex flex-col justify-around min-h-0">
                         <div class="space-y-0">
                             <div class="text-center text-gray-500 text-[10px] mb-0">前排</div>
@@ -698,8 +698,8 @@
             Dark: '🌑'
         };
 
+
         const ZODIAC_EMOJIS = ['🐀', '🐂', '🐅', '🐇', '🐉', '🐍', '🐎', '🐑', '🐒', '🐓', '🐕', '🐷'];
-        const CONFIG = ZODIAC_UTILS.CONFIG;
         const ELEMENTS = ['water', 'wind', 'fire', 'dark', 'light'];
 
         const SKILL_TYPE_MAP = {
@@ -788,6 +788,39 @@
                 document.getElementById('challengeBtn').disabled = true;
                 loadLeaderboard();
             });
+            
+            setupEventListeners();
+        }
+
+        async function setupEventListeners() {
+            try {
+                await ZODIAC_WEB3.listenToEvent('arena', 'ScoreUpdated', async (event) => {
+                    console.log('Score updated:', event.returnValues);
+                    await loadMyStats();
+                    await loadLeaderboard();
+                });
+                
+                await ZODIAC_WEB3.listenToEvent('arena', 'ChallengeResult', async (event) => {
+                    console.log('Challenge result:', event.returnValues);
+                    await loadRemainingAttempts();
+                    await loadMyStats();
+                });
+                
+                await ZODIAC_WEB3.listenToEvent('arena', 'RewardClaimed', async (event) => {
+                    console.log('Reward claimed:', event.returnValues);
+                    await loadRewards();
+                });
+                
+                await ZODIAC_WEB3.listenToEvent('arena', 'SeasonStarted', async (event) => {
+                    console.log('New season started:', event.returnValues);
+                    await loadLeaderboard();
+                    await loadMyStats();
+                });
+                
+                console.log('Arena event listeners setup complete');
+            } catch (error) {
+                console.error('Failed to setup event listeners:', error);
+            }
         }
 
         function updateCurrentModeDisplay(mode) {
@@ -796,43 +829,6 @@
             document.getElementById('currentModeDisplay').textContent = modeText;
             document.getElementById('currentModeDisplay').className = `flex-1 py-2 px-3 rounded-lg border border-${modeColor}-500/50 bg-${modeColor}-500/10 text-${modeColor}-400 text-sm text-center font-medium`;
             document.getElementById('battleModeText').textContent = modeText;
-        }
-
-        async function executeRealChallenge() {
-            if (!selectedOpponent || battleTeam.filter(n => n).length < 6) {
-                alert('请先选择对手并设置完整的战队（6张NFT）');
-                return;
-            }
-
-            try {
-                const challengeBtn = document.getElementById('challengeBtn');
-                challengeBtn.disabled = true;
-                challengeBtn.textContent = '挑战中...';
-
-                const teamTokenIds = battleTeam.map(nft => nft ? nft.tokenId : '0');
-                
-                let result;
-                if (selectedOpponent.isMock || selectedOpponent.mockIndex !== undefined) {
-                    const mockIndex = selectedOpponent.mockIndex !== undefined ? selectedOpponent.mockIndex : 0;
-                    result = await arenaContract.methods.challengeMockPlayer(teamTokenIds, mockIndex).send({ from: accounts[0] });
-                } else {
-                    result = await arenaContract.methods.challengeRealPlayer(selectedOpponent.address, teamTokenIds).send({ from: accounts[0] });
-                }
-
-                openBattleModal();
-                
-                challengeBtn.disabled = false;
-                challengeBtn.textContent = '发起挑战';
-                
-                await loadRemainingAttempts();
-                await loadMyStats();
-            } catch (error) {
-                console.error('挑战失败:', error);
-                ZODIAC_UI.handleError(error, '挑战');
-                const challengeBtn = document.getElementById('challengeBtn');
-                challengeBtn.disabled = false;
-                challengeBtn.textContent = '发起挑战';
-            }
         }
 
         async function connectWallet() {
@@ -854,7 +850,7 @@
                     await loadRewardPool();
                 } catch (error) {
                     console.error('连接钱包失败:', error);
-                    ZODIAC_UI.handleError(error, '连接钱包');
+                    ZODIAC_UI.showToast('连接钱包失败: ' + (error.message || '未知错误'), 'error');
                 }
             } else {
                 alert('请安装MetaMask钱包');
@@ -862,9 +858,10 @@
         }
 
         async function initContracts() {
-            battleContract = await window.ZODIAC_WEB3.getContract('battle');
-            arenaContract = await window.ZODIAC_WEB3.getContract('arena');
-            nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
+            const config = ZODIAC_CONFIG;
+            battleContract = new web3.eth.Contract(config.ABIS.battleABI, config.CONTRACT_ADDRESSES.battle);
+            arenaContract = new web3.eth.Contract(config.ABIS.arenaABI, config.CONTRACT_ADDRESSES.arena);
+            nftContract = new web3.eth.Contract(config.ABIS.nftMintABI, config.CONTRACT_ADDRESSES.nftMint);
         }
 
         async function loadMyNfts() {
@@ -875,14 +872,14 @@
                 for (let i = 0; i < balance; i++) {
                     const tokenId = await nftContract.methods.tokenOfOwnerByIndex(accounts[0], i).call();
                     const tokenInfo = await nftContract.methods.getNFTData(tokenId).call();
-                    const tokenType = tokenInfo.tokenType;
+                    const tokenType = tokenInfo.tokenType_;
                     const level = tokenInfo.level;
                     
                     const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
                     const zodiac = ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiacIndex];
                     const name = `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`;
                     
-                    const imagePath = getNFTImagePath(tokenType);
+                    const imagePath = ZODIAC_UTILS.getNFTInfo(tokenType).imagePath;
                     
                     const skillData = await battleContract.methods.getSkill(tokenType).call();
                     const skill = {
@@ -1090,19 +1087,29 @@
             }
         }
 
-        function clearBattleTeam() {
-            battleTeam.forEach(nft => {
-                if (nft) {
-                    const myNft = myNfts.find(n => n.tokenId === nft.tokenId);
-                    if (myNft) myNft.inBattleTeam = false;
-                }
-            });
-            battleTeam = [];
-            renderTeamSlots();
-            updateSaveButtons();
-            updateChallengeBtn();
-            updateBattleTeamDisplay();
-            ZODIAC_UI.showToast('已清空本地战队。请点击"保存战队"将清空后的状态同步到链上以赎回NFT。', 'info');
+        async function clearBattleTeam() {
+            try {
+                ZODIAC_UI.showLoading('正在赎回NFT...');
+                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'clearBattleTeam', [], accounts[0], 'arena');
+                await arenaContract.methods.clearBattleTeam().send({ from: accounts[0], gas: gas });
+                ZODIAC_UI.hideLoading();
+                battleTeam.forEach(nft => {
+                    if (nft) {
+                        const myNft = myNfts.find(n => n.tokenId === nft.tokenId);
+                        if (myNft) myNft.inBattleTeam = false;
+                    }
+                });
+                battleTeam = [];
+                renderTeamSlots();
+                updateSaveButtons();
+                updateChallengeBtn();
+                updateBattleTeamDisplay();
+                ZODIAC_UI.showToast('战队已清空，NFT已赎回！', 'success');
+            } catch (error) {
+                ZODIAC_UI.hideLoading();
+                console.error('清空战队失败:', error);
+                ZODIAC_UI.handleError(error, '清空战队');
+            }
         }
 
         async function saveBattleTeam() {
@@ -1110,9 +1117,20 @@
             
             try {
                 const tokenIds = battleTeam.map(nft => nft.tokenId);
-                await arenaContract.methods.setBattleTeam(tokenIds).send({ from: accounts[0] });
-                alert('战队设置成功！NFT已质押进合约');
-                updateBattleTeamDisplay();
+                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'setBattleTeam', [tokenIds], accounts[0], 'arena');
+                
+                await ZODIAC_UI.handleTransaction(
+                    arenaContract.methods.setBattleTeam(tokenIds).send({ from: accounts[0], gas: gas }),
+                    {
+                        actionName: '设置战队',
+                        loadingMessage: '正在设置战队...',
+                        successMessage: '战队设置成功！NFT已质押进合约',
+                        showConfirmation: true,
+                        onConfirmation: () => {
+                            updateBattleTeamDisplay();
+                        }
+                    }
+                );
             } catch (error) {
                 console.error('设置战队失败:', error);
                 ZODIAC_UI.handleError(error, '设置战队');
@@ -1121,9 +1139,20 @@
 
         async function rechargeAttempts() {
             try {
-                await arenaContract.methods.rechargeChallengeAttempts().send({ from: accounts[0] });
-                alert('充值成功！已获得5次挑战机会');
-                await loadRemainingAttempts();
+                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'rechargeChallengeAttempts', [], accounts[0], 'arena');
+                
+                await ZODIAC_UI.handleTransaction(
+                    arenaContract.methods.rechargeChallengeAttempts().send({ from: accounts[0], gas: gas }),
+                    {
+                        actionName: '充值挑战次数',
+                        loadingMessage: '正在充值...',
+                        successMessage: '充值成功！已获得挑战机会',
+                        showConfirmation: true,
+                        onConfirmation: () => {
+                            loadRemainingAttempts();
+                        }
+                    }
+                );
             } catch (error) {
                 console.error('充值失败:', error);
                 ZODIAC_UI.handleError(error, '充值挑战次数');
@@ -1196,6 +1225,48 @@
             }
         }
 
+        async function loadMyStats() {
+            try {
+                const points = await arenaContract.methods.playerScores(accounts[0]).call();
+                let wins = '0', losses = '0';
+                try {
+                    const ranking = await arenaContract.methods.playerInfo(accounts[0]).call();
+                    wins = ranking.wins || '0';
+                    losses = ranking.losses || '0';
+                } catch (e) {
+                    // playerInfo may fail for unranked players
+                }
+
+                document.getElementById('myPoints').textContent = points || '0';
+                document.getElementById('myWins').textContent = wins;
+                document.getElementById('myLosses').textContent = losses;
+
+                const totalWins = parseInt(wins, 10);
+                const totalLosses = parseInt(losses, 10);
+                const total = totalWins + totalLosses;
+                const winRate = total > 0 ? ((totalWins / total) * 100).toFixed(1) + '%' : '-';
+                document.getElementById('myWinRate').textContent = winRate;
+                document.getElementById('myRank').textContent = '-';
+            } catch (error) {
+                console.error('加载战绩失败:', error);
+                document.getElementById('myPoints').textContent = '0';
+                document.getElementById('myWins').textContent = '0';
+                document.getElementById('myLosses').textContent = '0';
+                document.getElementById('myWinRate').textContent = '-';
+                document.getElementById('myRank').textContent = '-';
+            }
+        }
+
+        async function getPlayerPoints() {
+            try {
+                const points = await arenaContract.methods.playerScores(accounts[0]).call();
+                return parseInt(points || '0', 10);
+            } catch (error) {
+                console.error('获取玩家积分失败:', error);
+                return 0;
+            }
+        }
+
         async function loadRewardPool() {
             try {
                 // 获取当前奖励池
@@ -1230,69 +1301,208 @@
             }
         }
 
-        async function loadLeaderboard() {
+        async function loadRewards() {
             try {
-                // 获取排行榜数据
-                let leaderboardData = [];
+                const unclaimedDiv = document.getElementById('unclaimedRewards');
+                const claimedDiv = document.getElementById('claimedRewards');
+
+                // 检查当前赛季状态
+                let seasonIsActive = true;
                 try {
-                    leaderboardData = await arenaContract.methods.getLeaderboard(20).call();
+                    const seasonInfo = await arenaContract.methods.currentSeason().call();
+                    seasonIsActive = seasonInfo.isActive;
                 } catch (e) {
-                    // 如果获取失败，使用模拟数据
-                    console.log('使用模拟数据');
+                    // 如果无法获取赛季信息，使用默认值
                 }
 
+                if (seasonIsActive) {
+                    // 赛季进行中：显示当前积分对应的潜在奖励
+                    try {
+                        const playerScore = await arenaContract.methods.playerScores(accounts[0]).call();
+                        let estimatedReward = '0';
+                        try {
+                            const rewardWei = await arenaContract.methods.getSeasonReward(accounts[0]).call();
+                            estimatedReward = web3.utils.fromWei(rewardWei, 'ether');
+                        } catch (e) { /* ignore */ }
+
+                        unclaimedDiv.innerHTML = `
+                            <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                                <div class="text-yellow-400 text-sm font-medium">赛季进行中</div>
+                                <div class="text-gray-300 text-xs mt-1">
+                                    当前积分: ${playerScore || '0'} 
+                                    ${parseFloat(estimatedReward) > 0 ? ` | 预估奖励: ${estimatedReward} Token` : ''}
+                                </div>
+                                <div class="text-gray-500 text-xs mt-1">赛季结束后可领取奖励</div>
+                            </div>
+                        `;
+                    } catch (e) {
+                        unclaimedDiv.innerHTML = '<div class="text-center text-gray-500 py-2">赛季进行中，结束后可领取</div>';
+                    }
+                } else {
+                    // 赛季已结束：检查是否有可领取的奖励
+                    const claimed = await arenaContract.methods.seasonRewardsClaimed(accounts[0]).call();
+                    const claimedAmount = web3.utils.fromWei(claimed, 'ether');
+
+                    if (parseFloat(claimedAmount) > 0) {
+                        // 已领取
+                        unclaimedDiv.innerHTML = '<div class="text-center text-gray-500 py-2">暂无待领取奖励</div>';
+                        claimedDiv.innerHTML = `
+                            <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                                <div class="text-green-400 text-sm font-medium">已领取</div>
+                                <div class="text-gray-300 text-xs mt-1">赛季奖励: ${claimedAmount} Token</div>
+                            </div>
+                        `;
+                    } else {
+                        // 未领取：显示可领取的奖励
+                        try {
+                            const rewardWei = await arenaContract.methods.getSeasonReward(accounts[0]).call();
+                            const rewardAmount = web3.utils.fromWei(rewardWei, 'ether');
+
+                            if (parseFloat(rewardAmount) > 0) {
+                                unclaimedDiv.innerHTML = `
+                                    <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <div class="text-blue-400 text-sm font-medium">赛季奖励</div>
+                                                <div class="text-white text-xs mt-1">${rewardAmount} Token</div>
+                                            </div>
+                                            <button onclick="claimSeasonReward()" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg transition-colors">
+                                                领取
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                            } else {
+                                unclaimedDiv.innerHTML = '<div class="text-center text-gray-500 py-2">赛季结束，无奖励可领取</div>';
+                            }
+                        } catch (e) {
+                            unclaimedDiv.innerHTML = '<div class="text-center text-gray-500 py-2">暂无待领取奖励</div>';
+                        }
+                        claimedDiv.innerHTML = '<div class="text-center text-gray-500 py-2">暂无已领取奖励</div>';
+                    }
+                }
+            } catch (error) {
+                console.error('加载奖励失败:', error);
+                document.getElementById('unclaimedRewards').innerHTML = '<div class="text-center text-gray-500 py-2">加载失败</div>';
+                document.getElementById('claimedRewards').innerHTML = '<div class="text-center text-gray-500 py-2">加载失败</div>';
+            }
+        }
+
+        async function claimSeasonRewardHandler() {
+            try {
+                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'claimSeasonReward', [], accounts[0], 'arena');
+                
+                await ZODIAC_UI.handleTransaction(
+                    arenaContract.methods.claimSeasonReward().send({ from: accounts[0], gas: gas }),
+                    {
+                        actionName: '领取赛季奖励',
+                        loadingMessage: '正在领取奖励...',
+                        successMessage: '奖励领取成功！',
+                        showConfirmation: true,
+                        onHash: (hash, shortHash) => {
+                            console.log('Transaction hash:', shortHash);
+                        },
+                        onConfirmation: () => {
+                            loadRewards();
+                        }
+                    }
+                );
+            } catch (error) {
+                console.error('领取奖励失败:', error);
+                ZODIAC_UI.handleError(error, '领取奖励');
+            }
+        }
+
+        // 暴露给 inline onclick
+        window.claimSeasonReward = claimSeasonRewardHandler;
+
+            async function loadLeaderboard() {
+            try {
                 const topPlayers = [];
-                if (leaderboardData.length > 0) {
-                    for (let i = 0; i < leaderboardData.length; i++) {
-                        const player = leaderboardData[i];
+                let players = [];
+                let scores = [];
+                
+                try {
+                    const result = await arenaContract.methods.getTopPlayers(currentSeasonId, 20).call();
+                    players = result.playerAddrs || result.players || [];
+                    scores = result.scores || [];
+                } catch (e) {
+                    console.log('获取排行榜失败，使用模拟数据:', e);
+                }
+                
+                if (players.length > 0) {
+                    const leaderboardEntries = [];
+                    
+                    for (let i = 0; i < players.length; i++) {
+                        if (players[i] === '0x0000000000000000000000000000000000000000') continue;
+                        
+                        let playerRecord = null;
+                        try {
+                            playerRecord = await arenaContract.methods.getPlayerRecord(players[i]).call();
+                        } catch (e) {}
+                        
+                        const points = playerRecord ? parseInt(playerRecord[0] || '1000') : parseInt(scores[i] || '1000');
+                        const wins = playerRecord ? parseInt(playerRecord[1] || '0') : 0;
+                        const losses = playerRecord ? parseInt(playerRecord[2] || '0') : 0;
+                        const isMock = points >= 10000;
+                        
+                        leaderboardEntries.push({
+                            address: players[i],
+                            points: points,
+                            wins: wins,
+                            losses: losses,
+                            isMock: isMock
+                        });
+                    }
+                    
+                    leaderboardEntries.sort((a, b) => b.points - a.points);
+                    
+                    for (let i = 0; i < leaderboardEntries.length; i++) {
+                        const entry = leaderboardEntries[i];
                         let team = [];
                         
-                        if (!player.isMock) {
+                        if (!entry.isMock) {
                             try {
-                                const teamTokens = await arenaContract.methods.getPlayerBattleTeam(player.playerAddress).call();
+                                const teamTokens = await arenaContract.methods.getPlayerBattleTeam(entry.address).call();
                                 for (const tokenId of teamTokens) {
-                                    if (tokenId !== '0') {
+                                    if (tokenId && tokenId !== '0' && tokenId !== 0) {
                                         try {
-                                            const tokenInfo = await nftContract.methods.getNFTData(tokenId).call();
-                                            const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenInfo.tokenType);
+                                            const nftData = await nftContract.methods.getNFTData(tokenId).call();
+                                            const tokenType = nftData.tokenType_ || nftData[0];
+                                            const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
                                             const zodiac = ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiacIndex];
                                             team.push({
                                                 tokenId: tokenId,
                                                 name: `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`,
-                                                level: tokenInfo.level,
-                                                element: tokenInfo.tokenType < 48 ? (tokenInfo.tokenType < 16 ? 'Water' : tokenInfo.tokenType < 32 ? 'Wind' : 'Fire') : (tokenInfo.tokenType < 80 ? 'Dark' : 'Light'),
-                                                imagePath: getNFTImagePath(tokenInfo.tokenType)
+                                                level: nftData.level || nftData[1],
+                                                element: ZODIAC_UTILS.getNFTInfo(tokenType).elementKey,
+                                                imagePath: nftInfo.imagePath
                                             });
                                         } catch (e) {
                                             team.push({
                                                 tokenId: tokenId,
                                                 name: '未知',
                                                 level: 1,
-                                                element: 'Water',
+                                                element: 'water',
                                                 imagePath: `${IPFS_BASE_1}shuishu_0.png`
                                             });
                                         }
                                     }
                                 }
-                            } catch (e) {
-                                team = mockOpponents[i % mockOpponents.length].team;
-                            }
-                        } else {
-                            team = mockOpponents[i % mockOpponents.length].team;
+                            } catch (e) {}
                         }
                         
                         topPlayers.push({
-                            address: player.playerAddress,
-                            points: player.points,
-                            wins: player.wins,
-                            losses: player.losses,
+                            address: entry.address,
+                            points: entry.points,
+                            wins: entry.wins,
+                            losses: entry.losses,
                             rank: i + 1,
-                            isMock: player.isMock,
+                            isMock: entry.isMock,
                             team: team
                         });
                     }
                 } else {
-                    // 使用模拟数据
                     for (let i = 0; i < 10; i++) {
                         const opponent = mockOpponents[i % mockOpponents.length];
                         topPlayers.push({
@@ -1308,10 +1518,8 @@
                     }
                 }
                 
-                // 保存排行榜数据供selectOpponent使用
                 document.getElementById('leaderboard').dataset.leaderboardData = JSON.stringify(topPlayers);
                 
-                // 获取每个排名的奖励
                 const rewards = [];
                 for (let i = 0; i < topPlayers.length; i++) {
                     try {
@@ -1436,7 +1644,7 @@
         }
 
         function showOpponentTeam(opponent) {
-            const opponentDiv = document.getElementById('opponentDefenseTeam');
+            const opponentDiv = document.getElementById('opponentBattleTeam');
             opponentDiv.innerHTML = `
                 <div class="space-y-2">
                     <div class="grid grid-cols-3 gap-2">
@@ -1568,34 +1776,48 @@
                     return;
                 }
 
-                let victory;
+                let victory = null;
+                let challengeTx = null;
                 if (selectedOpponent.isMock) {
                     const mockIndex = selectedOpponent.mockIndex !== undefined ? selectedOpponent.mockIndex : 0;
-                    const gas = await arenaContract.methods.challengeMockPlayer(playerTeam, mockIndex).estimateGas({ from: accounts[0] });
-                    const tx = await arenaContract.methods.challengeMockPlayer(playerTeam, mockIndex).send({
+                    const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'challengeMockPlayer', [playerTeam, mockIndex], accounts[0], 'arena');
+                    challengeTx = await arenaContract.methods.challengeMockPlayer(playerTeam, mockIndex).send({
                         from: accounts[0],
                         gas: gas
                     });
-                    victory = tx.events?.ChallengeResult?.returnValues?.[0];
+                    victory = challengeTx.events?.ChallengeResult?.returnValues?.isVictory;
+                    if (victory === undefined) {
+                        victory = selectedOpponent.points < getPlayerPoints();
+                    }
                 } else {
                     const defenderAddress = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
-                    const gas = await arenaContract.methods.challengeRealPlayer(defenderAddress, playerTeam).estimateGas({ from: accounts[0] });
-                    const tx = await arenaContract.methods.challengeRealPlayer(defenderAddress, playerTeam).send({
+                    const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'challengeRealPlayer', [defenderAddress, playerTeam], accounts[0], 'arena');
+                    challengeTx = await arenaContract.methods.challengeRealPlayer(defenderAddress, playerTeam).send({
                         from: accounts[0],
                         gas: gas
                     });
-                    victory = tx.events?.ChallengeResult?.returnValues?.[0];
+                    victory = challengeTx.events?.ChallengeResult?.returnValues?.isVictory;
+                    if (victory === undefined) {
+                        victory = selectedOpponent.points < getPlayerPoints();
+                    }
                 }
 
                 ZODIAC_UI.hideLoading();
 
-                if (victory !== undefined) {
+                if (victory !== null && victory !== undefined) {
+                    victory = Boolean(victory);
                     openBattleModal();
+                    const attackerWins = victory ? 1 : 0;
+                    const defenderWins = victory ? 0 : 1;
                     setTimeout(() => {
-                        simulateBattleWithResult(victory, victory ? 1 : 0, victory ? 0 : 1);
+                        simulateBattleWithResult(victory, attackerWins, defenderWins);
                     }, 2000);
                 } else {
-                    ZODIAC_UI.showToast('战斗结果解析失败', 'error');
+                    ZODIAC_UI.showToast('战斗结果解析失败，显示默认结果', 'warning');
+                    openBattleModal();
+                    setTimeout(() => {
+                        simulateBattleWithResult(false, 0, 1);
+                    }, 2000);
                 }
 
                 await loadRemainingAttempts();
@@ -1956,7 +2178,7 @@
         }
 
         function addBattleLog(message) {
-            const log = document.getElementById('battleProcessLog');
+            const log = document.getElementById('battleProcess');
             const logEntry = document.createElement('div');
             logEntry.textContent = message;
             logEntry.style.color = '#ffffff';

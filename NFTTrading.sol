@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
+import "./NFTInterface.sol";
 
 /**
  * @title NFTTrading
@@ -15,7 +17,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * 3. 卖家收到BNB（扣除手续费）
  * 4. 5%手续费全部进入手续费接收地址
  */
-contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     /**
      * @dev 挂牌信息结构体
      */
@@ -57,12 +59,18 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     address public authorizer;
 
     /**
+     * @dev NFT合约地址
+     */
+    address public nftContract;
+
+    /**
      * @dev 初始化函数
      * @param _authorizer 授权合约地址
      */
     function initialize(address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         authorizer = _authorizer;
     }
 
@@ -111,9 +119,10 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 上架NFT
      */
-    function listNFT(uint256 tokenId, uint256 priceWei) external {
-        require(!paused, "NFTTrading: Paused");
+    function listNFT(uint256 tokenId, uint256 priceWei) external whenNotPaused {
         require(priceWei > 0, "NFTTrading: Invalid price");
+        require(nftContract != address(0), "NFTTrading: NFT contract not set");
+        require(INFTMint(nftContract).ownerOf(tokenId) == msg.sender, "NFTTrading: Not token owner");
 
         listings[tokenId] = Listing({
             seller: msg.sender,
@@ -128,7 +137,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 下架NFT
      */
-    function delistNFT(uint256 tokenId) external {
+    function delistNFT(uint256 tokenId) external whenNotPaused {
         require(listings[tokenId].seller == msg.sender, "NFTTrading: Not owner");
 
         delete listings[tokenId];
@@ -139,12 +148,16 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 购买NFT
      */
-    function buyNFT(uint256 tokenId) external payable {
-        require(!paused, "NFTTrading: Paused");
+    function buyNFT(uint256 tokenId) external payable whenNotPaused nonReentrant {
         require(listings[tokenId].seller != address(0), "NFTTrading: Listing not found");
         require(msg.value >= listings[tokenId].priceWei, "NFTTrading: Insufficient payment");
+        require(nftContract != address(0), "NFTTrading: NFT contract not set");
 
         Listing memory listing = listings[tokenId];
+        
+        require(INFTMint(nftContract).ownerOf(tokenId) == listing.seller, "NFTTrading: Seller no longer owns NFT");
+        require(INFTMint(nftContract).isApprovedForAll(listing.seller, address(this)), "NFTTrading: Contract not approved");
+
         uint256 price = listing.priceWei;
         uint256 fee = price * feePercent / 100;
         uint256 sellerAmount = price - fee;
@@ -152,12 +165,17 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
 
-        if (feeReceiver != address(0)) {
-            payable(feeReceiver).transfer(fee);
-        }
-        payable(listing.seller).transfer(sellerAmount);
-
         emit NFTBought(tokenId, msg.sender, listing.seller, price, fee);
+
+        INFTMint(nftContract).transferFrom(listing.seller, msg.sender, tokenId);
+
+        if (feeReceiver != address(0) && fee > 0) {
+            (bool feeSuccess, ) = payable(feeReceiver).call{value: fee}("");
+            require(feeSuccess, "NFTTrading: Fee transfer failed");
+        }
+        
+        (bool sellerSuccess, ) = payable(listing.seller).call{value: sellerAmount}("");
+        require(sellerSuccess, "NFTTrading: Seller payment failed");
     }
 
     /**
@@ -166,6 +184,14 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function setFeeReceiver(address _feeReceiver) external onlyAuthorized {
         require(_feeReceiver != address(0), "NFTTrading: Invalid fee receiver address");
         feeReceiver = _feeReceiver;
+    }
+
+    /**
+     * @dev 设置NFT合约地址
+     */
+    function setNFTContract(address _nftContract) external onlyAuthorized {
+        require(_nftContract != address(0), "NFTTrading: Invalid NFT contract address");
+        nftContract = _nftContract;
     }
 
     /**

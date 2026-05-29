@@ -1,936 +1,754 @@
 window.ZODIAC_WEB3 = (function() {
-    let web3;
-    let account = null;
-    let isConnected = false;
-    let contracts = {};
-    let contractPromises = {};
-    let cacheData = {};
-    let cacheAccessOrder = [];
+    let web3Instance = null;
+    let currentAccount = null;
+    let chainId = null;
+    const listeners = {};
 
-    const contractEventSubscriptions = new Map();
-    const registeredListeners = new Map();
-    const MAX_CACHE_SIZE = 1000;
-    const CACHE_TTL = 5 * 60 * 1000;
-
-    const GAS_LIMITS = {
-        default: 3000000,
-        mint: {
-            normal: 2000000,
-            rare: 2000000,
-            normalTen: 5000000,
-            rareTen: 5000000,
-            targeted: 2500000
-        },
-        upgrade: {
-            withNFT: 2500000,
-            withToken: 1500000,
-            withUSDValue: 2000000
-        },
-        trading: {
-            list: 1000000,
-            buy: 1500000,
-            delist: 1000000
-        },
-        breeding: {
-            breed: 3000000,
-            claimBaby: 1000000
-        },
-        staking: {
-            stakeNFT: 1500000,
-            unstakeNFT: 1500000,
-            stakeTokens: 1000000,
-            unstakeTokens: 1000000,
-            claimRewards: 1000000
-        },
-        arena: {
-            challenge: 4000000,
-            setBattleTeam: 2000000,
-            claimReward: 1000000,
-            recharge: 1000000
-        },
-        reward: {
-            claimDividend: 1000000
-        }
-    };
-
-    const CACHE_INVALIDATION_RULES = {
-        nftMint: {
-            Transfer: ['nftMint:*', 'staking:*', 'arena:*', 'trading:*'],
-            Mint: ['nftMint:*', 'collection:*'],
-            Approval: ['nftApproval:*'],
-            ApprovalForAll: ['nftApproval:*'],
-            MintBatch: ['nftMint:*', 'collection:*'],
-            Burn: ['nftMint:*', 'collection:*']
-        },
-        nftUpdate: {
-            Upgrade: ['nftMint:*', 'nftUpdate:*', 'staking:*', 'arena:*'],
-            UpgradeBatch: ['nftMint:*', 'nftUpdate:*'],
-            LevelUp: ['nftMint:*', 'arena:*'],
-            AttributeChange: ['nftMint:*', 'arena:*']
-        },
-        nftTrading: {
-            Listed: ['nftTrading:*'],
-            Sold: ['nftTrading:*', 'nftMint:*', 'userTokens:*', 'collection:*'],
-            Delisted: ['nftTrading:*'],
-            PriceChanged: ['nftTrading:*'],
-            OfferMade: ['nftTrading:*'],
-            OfferAccepted: ['nftTrading:*', 'nftMint:*'],
-            OfferCancelled: ['nftTrading:*']
-        },
-        breeding: {
-            BreedingStarted: ['breeding:*', 'nftMint:*'],
-            BreedingCompleted: ['breeding:*', 'nftMint:*', 'collection:*'],
-            BabyClaimed: ['breeding:*', 'nftMint:*'],
-            MarketOrderListed: ['breeding:*'],
-            MarketOrderCancelled: ['breeding:*'],
-            MarketOrderMatched: ['breeding:*']
-        },
-        staking: {
-            Staked: ['staking:*', 'arena:*'],
-            Unstaked: ['staking:*', 'arena:*'],
-            RewardsClaimed: ['staking:*'],
-            RewardsUpdated: ['staking:*'],
-            StakeDurationChanged: ['staking:*']
-        },
-        tokenStaking: {
-            Staked: ['tokenStaking:*'],
-            Unstaked: ['tokenStaking:*'],
-            RewardsClaimed: ['tokenStaking:*'],
-            RewardsUpdated: ['tokenStaking:*'],
-            Compounding: ['tokenStaking:*']
-        },
-        arena: {
-            Challenge: ['arena:*'],
-            TeamSet: ['arena:*'],
-            RewardClaimed: ['arena:*'],
-            BattleStarted: ['arena:*'],
-            BattleEnded: ['arena:*', 'rewards:*'],
-            RankChanged: ['arena:*'],
-            SeasonStarted: ['arena:*'],
-            SeasonEnded: ['arena:*', 'rewards:*'],
-            AttemptsRecharged: ['arena:*']
-        },
-        rewardManager: {
-            DividendClaimed: ['rewardManager:*'],
-            RewardsDistributed: ['rewardManager:*'],
-            PoolUpdated: ['rewardManager:*'],
-            TaxDistributed: ['rewardManager:*', 'staking:*', 'arena:*']
-        },
-        tokenContract: {
-            Transfer: ['userTokens:*', 'staking:*', 'tokenStaking:*', 'rewardManager:*'],
-            Approval: ['tokenApproval:*'],
-            Mint: ['userTokens:*'],
-            Burn: ['userTokens:*']
-        }
-    };
-
-    const eventListeners = {
-        'connect': [],
-        'disconnect': [],
-        'accountChange': [],
-        'chainChange': [],
-        'cacheInvalidated': []
-    };
-
-    function getErrorCodeMessage(code) {
-        if (ZODIAC_CONFIG && typeof ZODIAC_CONFIG.getErrorCodeMessage === 'function') {
-            return ZODIAC_CONFIG.getErrorCodeMessage(code);
-        }
-        const ERROR_CODES_FALLBACK = {
-            4001: '用户拒绝了操作',
-            '-32000': 'RPC错误',
-            '-32601': '方法不存在',
-            '-32602': '参数无效'
-        };
-        if (ERROR_CODES_FALLBACK[code] !== undefined) {
-            return ERROR_CODES_FALLBACK[code];
-        }
-        const stringCode = String(code);
-        if (ERROR_CODES_FALLBACK[stringCode] !== undefined) {
-            return ERROR_CODES_FALLBACK[stringCode];
-        }
-        return null;
+    function getConfig() {
+        return window.ZODIAC_CONFIG;
     }
 
-    const ERROR_PATTERNS = [
-        { pattern: /MetaMask not detected/i, message: '未检测到MetaMask钱包，请安装后重试' },
-        { pattern: /User rejected the request/i, message: '用户拒绝了操作' },
-        { pattern: /Wallet not connected/i, message: '钱包未连接，请先连接钱包' },
-        { pattern: /Web3 not initialized/i, message: 'Web3初始化失败，请刷新页面重试' },
-        { pattern: /insufficient funds/i, message: '余额不足，请确保钱包有足够的资金' },
-        { pattern: /Gas estimation failed/i, message: 'Gas估算失败，请稍后重试' },
-        { pattern: /reverted/i, message: '交易执行失败，合约调用被拒绝' },
-        { pattern: /execution reverted/i, message: '交易执行失败，合约调用被拒绝' },
-        { pattern: /invalid opcode/i, message: '无效操作码，合约执行失败' },
-        { pattern: /out of gas/i, message: 'Gas不足，交易失败' },
-        { pattern: /nonce too low/i, message: '交易序号过低，请等待上一笔交易完成' },
-        { pattern: /already known/i, message: '交易已存在，正在处理中' },
-        { pattern: /unknown contract/i, message: '未知合约，请检查配置' },
-        { pattern: /address not configured/i, message: '合约地址未配置' },
-        { pattern: /contract method not found/i, message: '合约方法不存在' },
-        { pattern: /invalid address/i, message: '无效的钱包地址' },
-        { pattern: /block gas limit/i, message: '区块Gas限制不足' },
-        { pattern: /max priority fee per gas/i, message: 'Gas费用设置不合理' },
-        { pattern: /replacement transaction underpriced/i, message: '替换交易价格过低' },
-        { pattern: /cannot estimate gas/i, message: '无法估算Gas，请检查合约状态' }
-    ];
-
-    function formatErrorMessage(error) {
-        return getErrorMessage(error);
-    }
-
-    function getCache(key) {
-        const item = cacheData[key];
-        if (!item) return null;
-        
-        if (Date.now() > item.expiry) {
-            delete cacheData[key];
-            const idx = cacheAccessOrder.indexOf(key);
-            if (idx > -1) cacheAccessOrder.splice(idx, 1);
-            return null;
-        }
-        
-        const idx = cacheAccessOrder.indexOf(key);
-        if (idx > -1) cacheAccessOrder.splice(idx, 1);
-        cacheAccessOrder.push(key);
-        
-        return item.value;
-    }
-
-    function setCache(key, value, ttl = CACHE_TTL) {
-        if (cacheAccessOrder.length >= MAX_CACHE_SIZE) {
-            const oldestKey = cacheAccessOrder.shift();
-            delete cacheData[oldestKey];
-        }
-        
-        const existingIdx = cacheAccessOrder.indexOf(key);
-        if (existingIdx > -1) cacheAccessOrder.splice(existingIdx, 1);
-        
-        cacheData[key] = {
-            value,
-            expiry: Date.now() + ttl,
-            timestamp: Date.now()
-        };
-        cacheAccessOrder.push(key);
-    }
-
-    function clearCache(key) {
-        if (key) {
-            if (typeof key === 'string' && key.includes('*')) {
-                const pattern = new RegExp('^' + key.replace(/\*/g, '.*') + '$');
-                Object.keys(cacheData).forEach(cacheKey => {
-                    if (pattern.test(cacheKey)) {
-                        delete cacheData[cacheKey];
-                        const idx = cacheAccessOrder.indexOf(cacheKey);
-                        if (idx > -1) cacheAccessOrder.splice(idx, 1);
-                    }
-                });
-            } else if (typeof key === 'string' && cacheData[key]) {
-                delete cacheData[key];
-                const idx = cacheAccessOrder.indexOf(key);
-                if (idx > -1) cacheAccessOrder.splice(idx, 1);
-            } else if (Array.isArray(key)) {
-                key.forEach(k => {
-                    if (cacheData[k]) {
-                        delete cacheData[k];
-                        const idx = cacheAccessOrder.indexOf(k);
-                        if (idx > -1) cacheAccessOrder.splice(idx, 1);
-                    }
-                });
-            }
-        } else {
-            cacheData = {};
-            cacheAccessOrder = [];
-        }
-        emitEvent('cacheInvalidated', { key });
-    }
-
-    function isCacheValid(key) {
-        const item = cacheData[key];
-        if (!item) return false;
-        return Date.now() <= item.expiry;
-    }
-
-    function getCacheStats() {
-        return {
-            size: Object.keys(cacheData).length,
-            maxSize: MAX_CACHE_SIZE,
-            ttl: CACHE_TTL
-        };
-    }
-
-    function getGasLimitForOperation(contractName, methodName) {
-        const operationMap = {
-            nftMint: {
-                mintNormal: GAS_LIMITS.mint.normal,
-                mintRare: GAS_LIMITS.mint.rare,
-                mintNormalTen: GAS_LIMITS.mint.normalTen,
-                mintRareTen: GAS_LIMITS.mint.rareTen,
-                mintTargeted: GAS_LIMITS.mint.targeted
-            },
-            nftUpdate: {
-                upgradeWithNFT: GAS_LIMITS.upgrade.withNFT,
-                upgradeWithToken: GAS_LIMITS.upgrade.withToken,
-                upgradeWithUSDValue: GAS_LIMITS.upgrade.withUSDValue,
-                upgradeLevel: GAS_LIMITS.upgrade.withNFT,
-                upgradeToLevel: GAS_LIMITS.upgrade.withNFT
-            },
-            nftTrading: {
-                listNFT: GAS_LIMITS.trading.list,
-                buyNFT: GAS_LIMITS.trading.buy,
-                delistNFT: GAS_LIMITS.trading.delist
-            },
-            breeding: {
-                breed: GAS_LIMITS.breeding.breed,
-                claimBaby: GAS_LIMITS.breeding.claimBaby
-            },
-            staking: {
-                stakeNFT: GAS_LIMITS.staking.stakeNFT,
-                unstakeNFT: GAS_LIMITS.staking.unstakeNFT,
-                claimRewards: GAS_LIMITS.staking.claimRewards
-            },
-            tokenStaking: {
-                stakeTokens: GAS_LIMITS.staking.stakeTokens,
-                unstakeTokens: GAS_LIMITS.staking.unstakeTokens,
-                claimRewards: GAS_LIMITS.staking.claimRewards
-            },
-            arena: {
-                challenge: GAS_LIMITS.arena.challenge,
-                setBattleTeam: GAS_LIMITS.arena.setBattleTeam,
-                claimReward: GAS_LIMITS.arena.claimReward,
-                rechargeChallengeAttempts: GAS_LIMITS.arena.recharge
-            },
-            rewardManager: {
-                claimDividend: GAS_LIMITS.reward.claimDividend
-            }
-        };
-
-        if (operationMap[contractName] && operationMap[contractName][methodName]) {
-            return operationMap[contractName][methodName];
-        }
-        
-        return GAS_LIMITS.default;
-    }
-
-    function invalidateCacheForEvent(contractName, eventName) {
-        const rules = CACHE_INVALIDATION_RULES[contractName];
-        if (!rules || !rules[eventName]) return;
-        
-        const cacheKeys = rules[eventName];
-        cacheKeys.forEach(pattern => {
-            clearCache(pattern);
-        });
-    }
-
-    async function subscribeToContractEvent(contractName, eventName, callback, options = {}) {
-        const key = `${contractName}:${eventName}:${JSON.stringify(options)}`;
-        
-        if (contractEventSubscriptions.has(key)) {
-            console.warn(`Subscription already exists for ${key}`);
-            const existing = contractEventSubscriptions.get(key);
-            return { key, unsubscribe: () => unsubscribeFromContractEvent(key) };
-        }
-        
-        try {
-            const contract = await getContract(contractName);
-            const eventOptions = {
-                fromBlock: options.fromBlock || 'latest',
-                ...options.filter || {}
-            };
-            
-            const enhancedCallback = (event) => {
-                invalidateCacheForEvent(contractName, eventName);
-                callback(event);
-            };
-            
-            const subscription = contract.events[eventName](eventOptions, (error, event) => {
-                if (error) {
-                    console.error(`Event subscription error (${contractName}.${eventName}):`, error);
-                    return;
-                }
-                try {
-                    enhancedCallback(event);
-                } catch (cbError) {
-                    console.error(`Event callback error (${contractName}.${eventName}):`, cbError);
-                }
-            });
-            
-            const cleanup = () => {
-                unsubscribeFromContractEvent(key);
-            };
-            
-            if (typeof window !== 'undefined') {
-                window.addEventListener('beforeunload', cleanup, { once: true });
-                window.addEventListener('pagehide', cleanup, { once: true });
-            }
-            
-            contractEventSubscriptions.set(key, {
-                subscription,
-                contractName,
-                eventName,
-                callback,
-                cleanup
-            });
-            
-            return { key, unsubscribe: cleanup };
-        } catch (error) {
-            console.error(`Failed to subscribe to event ${contractName}.${eventName}:`, error);
-            throw error;
-        }
-    }
-
-    function unsubscribeFromContractEvent(subscriptionKey) {
-        const sub = contractEventSubscriptions.get(subscriptionKey);
-        if (!sub) {
-            console.warn(`No subscription found for key: ${subscriptionKey}`);
-            return false;
-        }
-        
-        try {
-            sub.subscription.unsubscribe((error, success) => {
-                if (error) {
-                    console.error(`Unsubscribe error:`, error);
-                }
-            });
-            contractEventSubscriptions.delete(subscriptionKey);
-            return true;
-        } catch (error) {
-            console.error(`Failed to unsubscribe from ${subscriptionKey}:`, error);
-            return false;
-        }
-    }
-
-    function unsubscribeAllContractEvents() {
-        contractEventSubscriptions.forEach((sub, key) => {
-            try {
-                sub.subscription.unsubscribe();
-            } catch (error) {
-                console.error(`Error unsubscribing ${key}:`, error);
-            }
-        });
-        contractEventSubscriptions.clear();
-    }
-
-    function getActiveSubscriptions() {
-        return Array.from(contractEventSubscriptions.keys());
-    }
-
-    function getErrorMessage(error) {
-        if (ZODIAC_CONFIG && typeof ZODIAC_CONFIG.getErrorMessage === 'function') {
-            return ZODIAC_CONFIG.getErrorMessage(error);
-        }
-        const errorStr = error.message || error.toString();
-
-        if (error.code !== undefined && error.code !== null) {
-            const codeMessage = getErrorCodeMessage(error.code);
-            if (codeMessage) {
-                return codeMessage;
-            }
-        }
-
-        for (const { pattern, message } of ERROR_PATTERNS) {
-            if (pattern.test(errorStr)) {
-                return message;
-            }
-        }
-
-        if (errorStr.includes('0x')) {
-            const hexError = errorStr.match(/0x[0-9a-fA-F]+/);
-            if (hexError) {
-                return `交易失败 (错误码: ${hexError[0]})`;
-            }
-        }
-
-        return errorStr.length > 100 ? '操作失败，请稍后重试' : errorStr;
-    }
-
-    function emitEvent(eventName, data) {
-        eventListeners[eventName].forEach(callback => {
-            try {
-                callback(data);
-            } catch (error) {
-                console.error('Event listener error:', error);
-            }
-        });
-    }
-
-    function requireInitialized() {
-        if (!web3) {
-            const error = new Error('Web3 not initialized');
-            error.code = 'WEB3_NOT_INITIALIZED';
-            throw error;
-        }
-    }
-
-    function requireConnected() {
-        if (!isConnected) {
-            const error = new Error('Wallet not connected');
-            error.code = 'WALLET_NOT_CONNECTED';
-            throw error;
-        }
-    }
-
-    function on(eventName, callback) {
-        if (!eventListeners[eventName]) {
-            eventListeners[eventName] = [];
-        }
-        
-        const callbackId = callback.name || Symbol().toString();
-        const key = `${eventName}:${callbackId}`;
-        
-        if (registeredListeners.has(key)) {
-            console.warn(`Listener already registered for event "${eventName}" with callback "${callbackId}"`);
-            return;
-        }
-        
-        eventListeners[eventName].push(callback);
-        registeredListeners.set(key, callback);
-    }
-
-    function off(eventName, callback) {
-        if (!eventListeners[eventName]) return;
-        
-        const callbackId = callback.name || Symbol().toString();
-        const key = `${eventName}:${callbackId}`;
-        
-        const index = eventListeners[eventName].indexOf(callback);
-        if (index > -1) {
-            eventListeners[eventName].splice(index, 1);
-            registeredListeners.delete(key);
-        }
-    }
-
-    function clearListeners(eventName) {
-        if (eventListeners[eventName]) {
-            eventListeners[eventName].forEach(callback => {
-                const callbackId = callback.name || Symbol().toString();
-                registeredListeners.delete(`${eventName}:${callbackId}`);
-            });
-            eventListeners[eventName] = [];
-        }
-    }
-
+    /**
+     * 初始化 Web3（连接 MetaMask）
+     */
     async function initWeb3() {
+        const config = getConfig();
+        if (!config) {
+            throw new Error('ZODIAC_CONFIG 未加载');
+        }
+
+        // 检测 MetaMask
+        if (typeof window.ethereum === 'undefined') {
+            throw new Error('未检测到MetaMask钱包，请安装后重试');
+        }
+
+        web3Instance = new Web3(window.ethereum);
+
         try {
-            if (typeof window.ethereum === 'undefined') {
-                console.error('MetaMask not detected');
-                throw new Error('未检测到钱包，请安装MetaMask');
-            }
-            if (typeof Web3 === 'undefined') {
-                console.error('Web3 library not loaded');
-                throw new Error('Web3库未加载，请检查脚本引入');
-            }
-            web3 = new Web3(window.ethereum);
-            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-            if (accounts.length > 0) {
-                account = accounts[0];
-                isConnected = true;
-                emitEvent('connect', { account });
-            }
+            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            currentAccount = accounts[0];
+            chainId = await window.ethereum.request({ method: 'eth_chainId' });
+
+            // 监听账户切换
+            window.ethereum.on('accountsChanged', (accounts) => {
+                currentAccount = accounts[0] || null;
+                emit('accountsChanged', { account: currentAccount });
+            });
+
+            // 监听链切换
+            window.ethereum.on('chainChanged', (id) => {
+                chainId = id;
+                emit('chainChanged', { chainId: id });
+            });
+
+            emit('connect', { account: currentAccount, chainId: chainId });
+
+            return { account: currentAccount, chainId: chainId };
         } catch (error) {
-            console.error('Web3 initialization error:', error);
+            if (error.code === 4001) {
+                throw new Error('用户拒绝了连接请求');
+            }
             throw error;
         }
-        return isConnected;
     }
 
-    async function connectWallet() {
-        try {
-            if (!web3) {
-                await initWeb3();
-            }
-            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-            if (accounts.length > 0) {
-                account = accounts[0];
-                isConnected = true;
-                contracts = {};
-                clearCache();
-                emitEvent('connect', { account });
-                return { success: true, account };
-            }
-        } catch (error) {
-            console.error('Wallet connection error:', error);
-            return { success: false, error: error.message };
-        }
-        return { success: false, error: 'No accounts found' };
-    }
-
-    function disconnectWallet() {
-        account = null;
-        isConnected = false;
-        contracts = {};
-        contractPromises = {};
-        unsubscribeAllContractEvents();
-        clearCache();
-        emitEvent('disconnect', {});
-    }
-
+    /**
+     * 获取当前账户
+     */
     function getAccount() {
-        return account;
+        return currentAccount;
     }
 
-    function isWalletConnected() {
-        return isConnected;
-    }
-
+    /**
+     * 获取 Web3 实例
+     */
     function getWeb3() {
-        return web3;
+        if (!web3Instance) {
+            throw new Error('Web3未初始化，请先连接钱包');
+        }
+        return web3Instance;
     }
 
-    function createContract(abi, address) {
-        if (!web3) {
-            throw new Error('Web3 not initialized');
+    /**
+     * 根据名称获取合约实例
+     */
+    function getContract(name) {
+        const config = getConfig();
+        if (!config) throw new Error('ZODIAC_CONFIG 未加载');
+
+        const addresses = config.CONTRACT_ADDRESSES;
+        const abis = config.ABIS;
+
+        const address = addresses[name];
+        if (!address) {
+            throw new Error(`合约地址未找到: ${name}`);
         }
+        
+        if (address === '0x0000000000000000000000000000000000000000') {
+            throw new Error(`合约 ${name} 的地址未配置（为零地址）`);
+        }
+        
+        if (!address.startsWith('0x') || address.length !== 42) {
+            throw new Error(`合约 ${name} 的地址格式无效: ${address}`);
+        }
+
+        // 映射合约名称到 ABI 名称
+        const abiMap = {
+            'tokenContract': 'tokenABI',
+            'rewardManager': 'rewardManagerABI',
+            'dividendManager': 'dividendManagerABI',
+            'tokenBurner': 'tokenBurnerABI',
+            'nftMint': 'nftMintABI',
+            'nftUpdate': 'nftUpdateABI',
+            'nftTrading': 'NFTTradingABI',
+            'breeding': 'breedingABI',
+            'staking': 'stakingABI',
+            'tokenStaking': 'tokenStakingABI',
+            'arena': 'arenaABI',
+            'battle': 'battleABI'
+        };
+
+        const abiKey = abiMap[name] || (name + 'ABI');
+        const abi = abis[abiKey];
+
+        if (!abi) {
+            throw new Error(`合约ABI未找到: ${name} (${abiKey})`);
+        }
+
+        const web3 = getWeb3();
         return new web3.eth.Contract(abi, address);
     }
 
-    async function getContract(contractName) {
-        if (!isConnected) {
-            throw new Error('Wallet not connected');
+    /**
+     * 估算 Gas
+     */
+    async function estimateGas(contract, methodName, args, from) {
+        try {
+            const gasEstimate = await contract.methods[methodName](...args).estimateGas({
+                from: from || currentAccount
+            });
+            // 增加 30% 的 buffer
+            const gasWithBuffer = Math.floor(Number(gasEstimate) * 1.3);
+            return gasWithBuffer;
+        } catch (error) {
+            console.warn(`Gas估算失败 (${methodName}):`, error.message);
+            // 返回默认 Gas 限制
+            return 300000;
+        }
+    }
+
+    /**
+     * 事件系统
+     */
+    function on(event, callback) {
+        if (!listeners[event]) {
+            listeners[event] = [];
+        }
+        listeners[event].push(callback);
+    }
+
+    function off(event, callback) {
+        if (!listeners[event]) return;
+        listeners[event] = listeners[event].filter(cb => cb !== callback);
+    }
+
+    function emit(event, data) {
+        if (!listeners[event]) return;
+        listeners[event].forEach(cb => {
+            try {
+                cb(data);
+            } catch (e) {
+                console.error(`事件 ${event} 回调错误:`, e);
+            }
+        });
+    }
+
+    /**
+     * 检查钱包是否连接
+     */
+    function isConnected() {
+        return currentAccount !== null && web3Instance !== null;
+    }
+
+    /**
+     * 切换网络到 BSC 主网
+     * @param {number} retries - 重试次数（默认3次）
+     * @param {number} delayMs - 重试间隔（默认1000ms）
+     */
+    async function switchToBSC(retries = 3, delayMs = 1000) {
+        const config = getConfig();
+        if (!window.ethereum) throw new Error('未检测到MetaMask');
+
+        for (let attempt = 1; attempt <= retries; attempt++) {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x38' }]
+                });
+                return true;
+            } catch (switchError) {
+                if (switchError.code === 4902) {
+                    try {
+                        await window.ethereum.request({
+                            method: 'wallet_addEthereumChain',
+                            params: [{
+                                chainId: '0x38',
+                                chainName: 'Binance Smart Chain Mainnet',
+                                nativeCurrency: { name: 'BNB', symbol: 'BNB', decimals: 18 },
+                                rpcUrls: ['https://bsc-dataseed.binance.org/'],
+                                blockExplorerUrls: ['https://bscscan.com/']
+                            }]
+                        });
+                        return true;
+                    } catch (addError) {
+                        if (attempt < retries) {
+                            await new Promise(resolve => setTimeout(resolve, delayMs));
+                            continue;
+                        }
+                        throw addError;
+                    }
+                } else if (attempt < retries) {
+                    await new Promise(resolve => setTimeout(resolve, delayMs));
+                    continue;
+                } else {
+                    throw switchError;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 检查当前网络是否匹配配置
+     */
+    function isCorrectNetwork() {
+        const config = getConfig();
+        if (!config) return false;
+        
+        const expectedChainId = '0x' + config.NETWORK_ID.toString(16);
+        return chainId === expectedChainId;
+    }
+
+    /**
+     * 获取网络名称
+     */
+    function getNetworkName(chainIdHex) {
+        const networks = {
+            '0x1': 'Ethereum Mainnet',
+            '0x38': 'Binance Smart Chain Mainnet',
+            '0x56': 'BNB Smart Chain Mainnet',
+            '0x61': 'BSC Testnet',
+            '0x97': 'BSC Testnet',
+            '0x5': 'Goerli Testnet',
+            '0xaa36a7': 'Sepolia Testnet'
+        };
+        return networks[chainIdHex] || `Chain ID: ${chainIdHex}`;
+    }
+
+    /**
+     * 显示网络错误提示
+     */
+    function showNetworkError(expectedNetwork) {
+        const currentNetwork = getNetworkName(chainId);
+        const expected = expectedNetwork || 'Binance Smart Chain Mainnet';
+        
+        const errorMsg = `请切换到正确的网络\n\n当前网络: ${currentNetwork}\n需要的网络: ${expected}`;
+        
+        if (typeof window.ZODIAC_UI !== 'undefined') {
+            window.ZODIAC_UI.showToast(errorMsg, 'warning');
+        } else {
+            alert(errorMsg);
+        }
+    }
+
+    /**
+     * 强制检查网络并提示切换
+     * @param {boolean} forceSwitch - 是否强制切换
+     * @returns {Promise<boolean>} 是否成功切换到正确网络
+     */
+    async function checkAndSwitchNetwork(forceSwitch = true) {
+        if (isCorrectNetwork()) {
+            return true;
+        }
+
+        const config = getConfig();
+        const currentNetwork = getNetworkName(chainId);
+        const expectedNetwork = config.NETWORK_LABEL || 'BSC主网';
+
+        if (typeof window.ZODIAC_UI !== 'undefined') {
+            const confirmed = await window.ZODIAC_UI.showConfirmModal(
+                '网络不匹配',
+                `当前网络: ${currentNetwork}\n需要网络: ${expectedNetwork}\n\n是否立即切换？`
+            );
+
+            if (confirmed) {
+                try {
+                    await switchToBSC();
+                    return true;
+                } catch (error) {
+                    console.error('Failed to switch network:', error);
+                    if (typeof window.ZODIAC_UI !== 'undefined') {
+                        window.ZODIAC_UI.showToast('网络切换失败，请手动切换', 'error');
+                    }
+                    return false;
+                }
+            }
+        } else {
+            const confirmed = confirm(`当前网络: ${currentNetwork}\n需要网络: ${expectedNetwork}\n\n是否立即切换？`);
+            if (confirmed) {
+                try {
+                    await switchToBSC();
+                    return true;
+                } catch (error) {
+                    alert('网络切换失败，请手动切换');
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 获取链ID的十进制值
+     */
+    function getChainIdDecimal() {
+        if (!chainId) return null;
+        return parseInt(chainId, 16);
+    }
+
+    /**
+     * 合约事件监听器管理
+     */
+    const eventListeners = {};
+
+    /**
+     * 监听合约事件（带自动重连）
+     * @param {string} contractName - 合约名称
+     * @param {string} eventName - 事件名称
+     * @param {Function} callback - 回调函数
+     * @param {Object} options - 选项
+     * @param {number} options.maxRetries - 最大重试次数（默认5次）
+     * @param {number} options.retryDelayMs - 重试间隔（默认3000ms）
+     * @returns {Function} 取消监听函数
+     */
+    function listenToEvent(contractName, eventName, callback, options = {}) {
+        const maxRetries = options.maxRetries || 5;
+        const retryDelayMs = options.retryDelayMs || 3000;
+        let retries = 0;
+        let currentListener = null;
+        let isUnsubscribed = false;
+        const key = `${contractName}_${eventName}_${Date.now()}`;
+
+        const setupListener = async () => {
+            if (isUnsubscribed) return;
+
+            if (currentListener) {
+                try {
+                    currentListener.unsubscribe();
+                } catch (e) {
+                    console.warn(`Previous listener unsubscribe failed: ${e.message}`);
+                }
+                currentListener = null;
+            }
+
+            try {
+                const contract = await getContract(contractName);
+                const event = contract.events[eventName];
+                
+                if (!event) {
+                    console.warn(`Event ${eventName} not found in ${contractName}`);
+                    return;
+                }
+
+                currentListener = event({ fromBlock: 'latest' }, (error, eventResult) => {
+                    if (error) {
+                        console.error(`Event ${eventName} error, attempting reconnect (${retries + 1}/${maxRetries}):`, error);
+                        retries++;
+                        if (retries < maxRetries) {
+                            setTimeout(setupListener, retryDelayMs);
+                        } else {
+                            console.error(`Event ${eventName} max retries reached, stopping`);
+                        }
+                        return;
+                    }
+                    retries = 0;
+                    callback(eventResult);
+                });
+
+                eventListeners[key] = { listener: currentListener, contractName, eventName };
+            } catch (error) {
+                console.error(`Failed to listen to ${eventName} (${retries + 1}/${maxRetries}):`, error);
+                retries++;
+                if (retries < maxRetries) {
+                    setTimeout(setupListener, retryDelayMs);
+                } else {
+                    console.error(`Event ${eventName} max retries reached, stopping`);
+                }
+            }
+        };
+
+        setupListener();
+
+        const unsubscribe = () => {
+            isUnsubscribed = true;
+            if (currentListener) {
+                currentListener.unsubscribe((err, success) => {
+                    if (success) {
+                        delete eventListeners[key];
+                    }
+                });
+            }
+        };
+
+        return Promise.resolve(unsubscribe);
+    }
+
+    /**
+     * 批量监听合约事件
+     * @param {Array} events - 事件配置数组
+     * @example [{ contractName: 'arena', eventName: 'ChallengeResult', callback: fn }]
+     */
+    async function listenToEvents(events) {
+        const unsubscribeFns = [];
+        for (const { contractName, eventName, callback } of events) {
+            const unsubscribe = await listenToEvent(contractName, eventName, callback);
+            unsubscribeFns.push(unsubscribe);
+        }
+        return () => unsubscribeFns.forEach(fn => fn());
+    }
+
+    /**
+     * 监听所有关键事件
+     * @param {Object} callbacks - 回调函数对象
+     * @returns {Function} 取消监听函数
+     */
+    async function listenToAllEvents(callbacks = {}) {
+        const events = [
+            { contractName: 'nftTrading', eventName: 'NFTListed', callback: callbacks.onNFTListed || defaultEventCallback },
+            { contractName: 'nftTrading', eventName: 'NFTDelisted', callback: callbacks.onNFTDelisted || defaultEventCallback },
+            { contractName: 'nftTrading', eventName: 'NFTBought', callback: callbacks.onNFTBought || defaultEventCallback },
+            { contractName: 'breeding', eventName: 'BreedingPairCreated', callback: callbacks.onBreedingPairCreated || defaultEventCallback },
+            { contractName: 'breeding', eventName: 'BreedingCompleted', callback: callbacks.onBreedingCompleted || defaultEventCallback },
+            { contractName: 'breeding', eventName: 'BreedingCancelled', callback: callbacks.onBreedingCancelled || defaultEventCallback },
+            { contractName: 'breeding', eventName: 'BreedingRewardsClaimed', callback: callbacks.onBreedingRewardsClaimed || defaultEventCallback },
+            { contractName: 'breeding', eventName: 'MarketListingCreated', callback: callbacks.onMarketListingCreated || defaultEventCallback },
+            { contractName: 'breeding', eventName: 'MarketListingRemoved', callback: callbacks.onMarketListingRemoved || defaultEventCallback },
+            { contractName: 'staking', eventName: 'Staked', callback: callbacks.onStaked || defaultEventCallback },
+            { contractName: 'staking', eventName: 'Unstaked', callback: callbacks.onUnstaked || defaultEventCallback },
+            { contractName: 'staking', eventName: 'RewardClaimed', callback: callbacks.onRewardClaimed || defaultEventCallback },
+            { contractName: 'battle', eventName: 'BattleStarted', callback: callbacks.onBattleStarted || defaultEventCallback },
+            { contractName: 'battle', eventName: 'BattleEnded', callback: callbacks.onBattleEnded || defaultEventCallback },
+            { contractName: 'arena', eventName: 'ChallengeResult', callback: callbacks.onChallengeResult || defaultEventCallback },
+            { contractName: 'arena', eventName: 'ScoreUpdated', callback: callbacks.onScoreUpdated || defaultEventCallback },
+            { contractName: 'arena', eventName: 'SeasonStarted', callback: callbacks.onSeasonStarted || defaultEventCallback },
+            { contractName: 'arena', eventName: 'SeasonSettled', callback: callbacks.onSeasonSettled || defaultEventCallback },
+            { contractName: 'arena', eventName: 'RewardClaimed', callback: callbacks.onArenaRewardClaimed || defaultEventCallback },
+            { contractName: 'arena', eventName: 'SeasonRewardClaimed', callback: callbacks.onSeasonRewardClaimed || defaultEventCallback }
+        ];
+        return await listenToEvents(events);
+    }
+
+    function defaultEventCallback(eventResult) {
+        console.log(`Event received: ${eventResult.event}`, eventResult.returnValues);
+        emit('contractEvent', eventResult);
+    }
+
+    /**
+     * 清理所有事件监听器
+     */
+    function clearAllEventListeners() {
+        Object.values(eventListeners).forEach(({ listener }) => {
+            listener.unsubscribe();
+        });
+        Object.keys(eventListeners).forEach(key => delete eventListeners[key]);
+    }
+
+    /**
+     * 获取事件监听器状态
+     */
+    function getEventListeners() {
+        return Object.keys(eventListeners).length;
+    }
+
+    async function challenge(challengerId, challengedId, challengerTeam, challengedTeam, challengedAddress) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('battle');
+        return await contract.methods.challenge(challengerId, challengedId, challengerTeam, challengedTeam, challengedAddress).send({ from: currentAccount });
+    }
+
+    async function simulateBattle(team1, team2) {
+        const contract = await getContract('battle');
+        return await contract.methods.simulateBattle(team1, team2).call();
+    }
+
+    async function battle(attackerTeam, defenderTeam) {
+        const contract = await getContract('battle');
+        return await contract.methods.battle(attackerTeam, defenderTeam).call();
+    }
+
+    async function stake(tokenIds) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('staking');
+        return await contract.methods.stake(tokenIds).send({ from: currentAccount });
+    }
+
+    async function unstake(tokenIds) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('staking');
+        return await contract.methods.unstake(tokenIds).send({ from: currentAccount });
+    }
+
+    async function claimReward() {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('staking');
+        return await contract.methods.claimReward().send({ from: currentAccount });
+    }
+
+    async function createBreedingPair(fatherId, motherId, coOwnerId) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('breeding');
+        return await contract.methods.createSelfBreedingPair(fatherId, motherId, coOwnerId).send({ from: currentAccount });
+    }
+
+    async function completeBreeding(pairId) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('breeding');
+        return await contract.methods.completeBreeding(pairId).send({ from: currentAccount });
+    }
+
+    async function cancelBreeding(pairId) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('breeding');
+        return await contract.methods.cancelBreeding(pairId).send({ from: currentAccount });
+    }
+
+    async function claimBreedingRewards(pairId) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('breeding');
+        return await contract.methods.claimBreedingRewards(pairId).send({ from: currentAccount });
+    }
+
+    async function listNFT(tokenId, priceWei) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('nftTrading');
+        return await contract.methods.listNFT(tokenId, priceWei).send({ from: currentAccount });
+    }
+
+    async function buyNFT(tokenId, priceWei) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('nftTrading');
+        const web3 = await getWeb3();
+        const value = web3.utils.toBN(priceWei).toString();
+        return await contract.methods.buyNFT(tokenId).send({ from: currentAccount, value: value });
+    }
+
+    async function delistNFT(tokenId) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('nftTrading');
+        return await contract.methods.delistNFT(tokenId).send({ from: currentAccount });
+    }
+
+    async function mintNormal(to) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('nftMint');
+        return await contract.methods.mintNormal(to).send({ from: currentAccount });
+    }
+
+    async function mintRare(to) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('nftMint');
+        return await contract.methods.mintRare(to).send({ from: currentAccount });
+    }
+
+    async function mintNormalTen(to) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('nftMint');
+        return await contract.methods.mintNormalTen(to).send({ from: currentAccount });
+    }
+
+    async function mintRareTen(to) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('nftMint');
+        return await contract.methods.mintRareTen(to).send({ from: currentAccount });
+    }
+
+    async function mintTargeted(to, baseZodiac) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('nftMint');
+        return await contract.methods.mintTargeted(to, baseZodiac).send({ from: currentAccount });
+    }
+
+    async function setNFTLevel(tokenId, newLevel) {
+        await checkAndSwitchNetwork();
+        const contract = await getContract('nftMint');
+        return await contract.methods.setNFTLevel(tokenId, newLevel).send({ from: currentAccount });
+    }
+
+    async function challengeMockPlayer(mockPlayerId, team) {
+        try {
+            await checkAndSwitchNetwork();
+            const contract = await getContract('arena');
+            return await contract.methods.challengeMockPlayer(mockPlayerId, team).send({ from: currentAccount });
+        } catch (error) {
+            handleContractError(error, '挑战模拟玩家');
+            throw error;
+        }
+    }
+
+    async function challengeRealPlayer(playerAddress, team) {
+        try {
+            await checkAndSwitchNetwork();
+            const contract = await getContract('arena');
+            return await contract.methods.challengeRealPlayer(playerAddress, team).send({ from: currentAccount });
+        } catch (error) {
+            handleContractError(error, '挑战真实玩家');
+            throw error;
+        }
+    }
+
+    async function claimSeasonReward() {
+        try {
+            await checkAndSwitchNetwork();
+            const contract = await getContract('arena');
+            return await contract.methods.claimSeasonReward().send({ from: currentAccount });
+        } catch (error) {
+            handleContractError(error, '领取赛季奖励');
+            throw error;
+        }
+    }
+
+    async function stakeTokens(amount) {
+        try {
+            await checkAndSwitchNetwork();
+            const contract = await getContract('tokenStaking');
+            const web3 = await getWeb3();
+            const value = web3.utils.toBN(amount).toString();
+            return await contract.methods.stake(value).send({ from: currentAccount });
+        } catch (error) {
+            handleContractError(error, '代币质押');
+            throw error;
+        }
+    }
+
+    async function unstakeTokens(amount) {
+        try {
+            await checkAndSwitchNetwork();
+            const contract = await getContract('tokenStaking');
+            const web3 = await getWeb3();
+            const value = web3.utils.toBN(amount).toString();
+            return await contract.methods.unstake(value).send({ from: currentAccount });
+        } catch (error) {
+            handleContractError(error, '代币解除质押');
+            throw error;
+        }
+    }
+
+    async function claimTokenRewards() {
+        try {
+            await checkAndSwitchNetwork();
+            const contract = await getContract('tokenStaking');
+            return await contract.methods.claimRewards().send({ from: currentAccount });
+        } catch (error) {
+            handleContractError(error, '领取代币奖励');
+            throw error;
+        }
+    }
+
+    async function getNFTBatch(tokenIds) {
+        if (!Array.isArray(tokenIds) || tokenIds.length === 0) {
+            return [];
         }
         
-        if (contracts[contractName]) {
-            return contracts[contractName];
+        const contract = await getContract('nftMint');
+        const promises = tokenIds.map(id => contract.methods.getNFTInfo(id).call().catch(() => null));
+        return await Promise.all(promises);
+    }
+    
+    async function getStakingBatch(tokenIds) {
+        if (!Array.isArray(tokenIds) || tokenIds.length === 0) {
+            return [];
         }
-
-        if (contractPromises[contractName]) {
-            return contractPromises[contractName];
+        
+        const contract = await getContract('staking');
+        const promises = tokenIds.map(id => contract.methods.getStakingInfo(id).call().catch(() => null));
+        return await Promise.all(promises);
+    }
+    
+    async function getBreedingBatch(pairIds) {
+        if (!Array.isArray(pairIds) || pairIds.length === 0) {
+            return [];
         }
-
-        const promise = (async () => {
-            const config = window.ZODIAC_CONFIG || {};
-            const addresses = config.CONTRACT_ADDRESSES || {};
-            const abis = config.ABIS || {};
-            
-            const abiMap = {
-                tokenContract: abis.tokenABI,
-                rewardManager: abis.rewardManagerABI,
-                tokenBurner: abis.tokenBurnerABI,
-                nftMint: abis.nftMintABI,
-                nftUpdate: abis.nftUpdateABI,
-                nftTrading: abis.NFTTradingABI,
-                breeding: abis.breedingABI,
-                staking: abis.stakingABI,
-                tokenStaking: abis.tokenStakingABI,
-                arena: abis.arenaABI,
-                battle: abis.battleABI
-            };
-
-            const contractAddress = addresses[contractName];
-            const abi = abiMap[contractName];
-            
-            if (!abi) {
-                throw new Error(`Unknown contract: ${contractName}`);
+        
+        const contract = await getContract('breeding');
+        const promises = pairIds.map(id => contract.methods.getBreedingInfo(id).call().catch(() => null));
+        return await Promise.all(promises);
+    }
+    
+    async function listNFTBatch(tokenIds, prices) {
+        if (!Array.isArray(tokenIds) || tokenIds.length === 0) {
+            throw new Error('tokenIds 不能为空');
+        }
+        
+        const contract = await getContract('nftTrading');
+        const promises = tokenIds.map((id, index) => {
+            const price = prices && prices[index];
+            if (!price) {
+                return Promise.reject(new Error(`价格未提供 for tokenId: ${id}`));
             }
-
-            if (!contractAddress || contractAddress === '0x0000000000000000000000000000000000000000') {
-                throw new Error(`Contract ${contractName} address not configured`);
-            }
-
-            contracts[contractName] = createContract(abi, contractAddress);
-            delete contractPromises[contractName];
-            return contracts[contractName];
-        })();
-
-        contractPromises[contractName] = promise;
-        return promise;
-    }
-
-    async function getBalance() {
-        if (!isConnected || !account) return '0';
-        try {
-            const balance = await web3.eth.getBalance(account);
-            return web3.utils.fromWei(balance, 'ether');
-        } catch (error) {
-            console.error('Get balance error:', error);
-            return '0';
-        }
-    }
-
-    async function getTokenBalance() {
-        if (!isConnected || !account) return '0';
-        try {
-            const tokenContract = await getContract('tokenContract');
-            const balance = await tokenContract.methods.balanceOf(account).call();
-            return (parseInt(balance) / 1e18).toFixed(4);
-        } catch (error) {
-            console.error('Token balance error:', error);
-            return '0';
-        }
-    }
-
-    async function approveToken(spender, amount) {
-        if (!isConnected || !account) {
-            throw new Error('Wallet not connected');
-        }
-        try {
-            const tokenContract = await getContract('tokenContract');
-            const tx = await tokenContract.methods.approve(spender, amount).send({ from: account });
-            clearCache('tokenApproval:*');
-            return tx;
-        } catch (error) {
-            console.error('Approve token error:', error);
-            throw error;
-        }
-    }
-
-    async function checkApproval(spender, amount) {
-        if (!isConnected || !account) return false;
-        try {
-            const tokenContract = await getContract('tokenContract');
-            const allowance = await tokenContract.methods.allowance(account, spender).call();
-            return parseInt(allowance) >= parseInt(amount);
-        } catch (error) {
-            console.error('Check approval error:', error);
-            return false;
-        }
-    }
-
-    async function checkApprovalForAll(spender) {
-        if (!isConnected || !account) return false;
-        try {
-            const nftContract = await getContract('nftMint');
-            const approval = await nftContract.methods.isApprovedForAll(account, spender).call();
-            return approval;
-        } catch (error) {
-            console.error('Check approval for all error:', error);
-            return false;
-        }
-    }
-
-    async function approveForAll(spender, approved = true) {
-        if (!isConnected || !account) {
-            throw new Error('Wallet not connected');
-        }
-        try {
-            const nftContract = await getContract('nftMint');
-            const tx = await nftContract.methods.setApprovalForAll(spender, approved).send({ from: account });
-            clearCache('nftApproval:*');
-            return tx;
-        } catch (error) {
-            console.error('Approve for all error:', error);
-            throw error;
-        }
-    }
-
-    function getContractMethod(contract, method, args) {
-        const methods = contract.methods[method];
-        if (!methods) {
-            throw new Error(`Method ${method} not found on contract`);
-        }
-
-        if (Array.isArray(methods)) {
-            const argTypes = args.map(arg => {
-                if (typeof arg === 'string' && arg.startsWith('0x') && arg.length === 42) {
-                    return 'address';
-                }
-                if (typeof arg === 'number' || (typeof arg === 'string' && /^\d+$/.test(arg))) {
-                    return 'uint256';
-                }
-                return 'unknown';
-            });
-
-            const matched = methods.find((m, idx) => {
-                const inputTypes = m._method?.inputs?.map(i => i.type) || [];
-                if (inputTypes.length !== argTypes.length) return false;
-                return inputTypes.every((type, i) => type === argTypes[i]);
-            });
-
-            if (matched) {
-                return matched;
-            }
-
-            return methods[0];
-        }
-
-        return methods;
-    }
-
-    async function estimateGas(contract, method, args, from, contractName = '') {
-        try {
-            const gas = await contract.methods[method](...args).estimateGas({ from });
-            const estimatedGas = Math.floor(gas * 1.2);
-            const configuredGas = getGasLimitForOperation(contractName, method);
-            let result;
-            if (estimatedGas > configuredGas) {
-                console.warn(`Gas estimate (${estimatedGas}) exceeds configured limit (${configuredGas}), using estimate`);
-                result = estimatedGas;
-            } else {
-                result = configuredGas;
-            }
-            console.debug(`Gas estimated: ${gas}, adjusted: ${estimatedGas}, configured: ${configuredGas}, result: ${result}`);
-            return result;
-        } catch (error) {
-            console.warn('Gas estimation failed, using fallback:', error.message);
-            const fallback = getGasLimitForOperation(contractName, method);
-            console.warn(`Using fallback gas limit: ${fallback}`);
-            return fallback;
-        }
-    }
-
-    async function getChainId() {
-        if (!web3) return null;
-        try {
-            return await web3.eth.getChainId();
-        } catch (error) {
-            console.error('Get chain ID error:', error);
-            return null;
-        }
-    }
-
-    async function getNetworkName() {
-        const chainId = await getChainId();
-        const networks = {
-            1: '以太坊主网',
-            5: 'Goerli测试网',
-            56: 'BSC主网',
-            97: 'BSC测试网'
-        };
-        return networks[chainId] || '未知网络';
-    }
-
-    if (typeof window.ethereum !== 'undefined' && typeof window.ethereum.on === 'function') {
-        window.ethereum.on('accountsChanged', async (accounts) => {
-            try {
-                if (accounts.length > 0) {
-                    account = accounts[0];
-                    isConnected = true;
-                    contracts = {};
-                    clearCache();
-                    emitEvent('accountChange', { account });
-                } else {
-                    disconnectWallet();
-                }
-            } catch (error) {
-                console.error('Accounts changed error:', error);
-            }
+            return contract.methods.listNFT(id, price).send({ from: currentAccount }).catch(() => null);
         });
-
-        window.ethereum.on('chainChanged', async (chainId) => {
-            try {
-                const numericChainId = typeof chainId === 'string' ? parseInt(chainId, 16) : chainId;
-                const config = window.ZODIAC_CONFIG || {};
-                const expectedChainId = config.NETWORK_ID || 56;
-                
-                console.warn(`Chain changed to ${chainId} (${numericChainId}).`);
-                
-                contracts = {};
-                contractPromises = {};
-                clearCache();
-                unsubscribeAllContractEvents();
-                
-                if (numericChainId !== expectedChainId) {
-                    console.warn(`Network mismatch: expected chain ${expectedChainId}, got ${numericChainId}`);
-                    emitEvent('networkMismatch', { 
-                        currentChainId: numericChainId, 
-                        expectedChainId 
-                    });
-                }
-                
-                emitEvent('chainChange', { chainId, numericChainId });
-            } catch (error) {
-                console.error('Chain changed error:', error);
-            }
-        });
-    }
-
-    function withErrorHandling(fn, context) {
-        const wrappedFn = function(...args) {
-            try {
-                const result = fn.apply(context || this, args);
-                if (result instanceof Promise) {
-                    return result.catch(error => {
-                        console.error('ZODIAC_WEB3 Error:', error);
-                        const friendlyMessage = getErrorMessage(error);
-                        const wrappedError = new Error(friendlyMessage);
-                        wrappedError.originalError = error;
-                        wrappedError.code = error.code;
-                        throw wrappedError;
-                    });
-                }
-                return result;
-            } catch (error) {
-                console.error('ZODIAC_WEB3 Error:', error);
-                const friendlyMessage = getErrorMessage(error);
-                const wrappedError = new Error(friendlyMessage);
-                wrappedError.originalError = error;
-                wrappedError.code = error.code;
-                throw wrappedError;
-            }
-        };
-        wrappedFn.displayName = `withErrorHandling(${fn.name || 'anonymous'})`;
-        wrappedFn.originalName = fn.name;
-        return wrappedFn;
-    }
-
-    async function callContractMethod(contractName, methodName, args = [], options = {}) {
-        try {
-            const contract = await getContract(contractName);
-            const method = getContractMethod(contract, methodName, args);
-            
-            if (typeof method !== 'function') {
-                throw new Error(`Contract method not found: ${methodName}`);
-            }
-
-            const { send = false, from = account, value = 0, gas = null } = options;
-            
-            if (send) {
-                const gasLimit = gas || await estimateGas(contract, methodName, args, from, contractName);
-                const txOptions = { from };
-                if (value > 0) txOptions.value = web3.utils.toWei(value.toString(), 'ether');
-                if (gasLimit) txOptions.gas = gasLimit;
-                
-                return await method(...args).send(txOptions);
-            } else {
-                return await method(...args).call({ from });
-            }
-        } catch (error) {
-            console.error(`Contract call error (${contractName}.${methodName}):`, error);
-            const friendlyMessage = getErrorMessage(error);
-            const wrappedError = new Error(friendlyMessage);
-            wrappedError.originalError = error;
-            wrappedError.contract = contractName;
-            wrappedError.method = methodName;
-            throw wrappedError;
-        }
+        return await Promise.all(promises);
     }
 
     return {
-        initWeb3: withErrorHandling(initWeb3),
-        connectWallet: withErrorHandling(connectWallet),
-        disconnectWallet: withErrorHandling(disconnectWallet),
+        initWeb3,
         getAccount,
-        isWalletConnected,
         getWeb3,
-        getContract: withErrorHandling(getContract),
-        getBalance: withErrorHandling(getBalance),
-        getTokenBalance: withErrorHandling(getTokenBalance),
-        approveToken: withErrorHandling(approveToken),
-        checkApproval: withErrorHandling(checkApproval),
-        checkApprovalForAll: withErrorHandling(checkApprovalForAll),
-        approveForAll: withErrorHandling(approveForAll),
-        estimateGas: withErrorHandling(estimateGas),
-        getChainId: withErrorHandling(getChainId),
-        getNetworkName: withErrorHandling(getNetworkName),
-        callContractMethod: withErrorHandling(callContractMethod),
+        getContract,
+        estimateGas,
         on,
         off,
-        clearListeners,
-        emitEvent,
-        withErrorHandling,
-        getCache,
-        setCache,
-        clearCache,
-        isCacheValid,
-        getCacheStats,
-        subscribeToContractEvent: withErrorHandling(subscribeToContractEvent),
-        unsubscribeFromContractEvent: withErrorHandling(unsubscribeFromContractEvent),
-        unsubscribeAllContractEvents: withErrorHandling(unsubscribeAllContractEvents),
-        getActiveSubscriptions,
-        requireInitialized,
-        requireConnected,
-        getGasLimitForOperation,
-        getErrorMessage,
-        formatErrorMessage
+        emit,
+        isConnected,
+        switchToBSC,
+        isCorrectNetwork,
+        getNetworkName,
+        showNetworkError,
+        checkAndSwitchNetwork,
+        getChainIdDecimal,
+        listenToEvent,
+        listenToEvents,
+        listenToAllEvents,
+        clearAllEventListeners,
+        getEventListeners,
+        challenge,
+        simulateBattle,
+        battle,
+        stake,
+        unstake,
+        claimReward,
+        createBreedingPair,
+        completeBreeding,
+        cancelBreeding,
+        claimBreedingRewards,
+        listNFT,
+        buyNFT,
+        delistNFT,
+        mintNormal,
+        mintRare,
+        mintNormalTen,
+        mintRareTen,
+        mintTargeted,
+        setNFTLevel,
+        challengeMockPlayer,
+        challengeRealPlayer,
+        claimSeasonReward,
+        stakeTokens,
+        unstakeTokens,
+        claimTokenRewards,
+        getNFTBatch,
+        getStakingBatch,
+        getBreedingBatch,
+        listNFTBatch
     };
 })();

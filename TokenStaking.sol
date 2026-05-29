@@ -31,6 +31,9 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /** @dev 所有用户待领取奖励总和（简化处理） */
     uint256 public totalPendingRewards;
 
+    /** @dev 奖励精度缩放因子（1e18，用于避免 dailyRewardPerToken 整数截断） */
+    uint256 private constant REWARD_PRECISION = 1e18;
+
     /** @dev 代币合约地址 */
     address public tokenContract;
     /** @dev 授权合约地址 */
@@ -224,7 +227,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /**
      * @dev 记录进入合约的BNB数量
      */
-    function recordIncomingBNB(uint256 amount) public {
+    function recordIncomingBNB(uint256 amount) internal {
         _checkNewDay();
         todayIncomingBNB += amount;
         emit IncomingBNBRecorded(amount, todayIncomingBNB);
@@ -232,6 +235,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     /**
      * @dev 检查是否进入新的一天
+     * 仅重置每日统计，dailyRewardPerToken 保持累计不重置
      */
     function _checkNewDay() internal {
         uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
@@ -240,6 +244,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             todayStart = currentDayStart;
             todayIncomingBNB = 0;
             todayRewardAmount = 0;
+            // dailyRewardPerToken 为累积值，跨日不重置
             _adjustRewardRate();
         }
     }
@@ -277,7 +282,14 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public lastRewardCalculationTime;
 
     /**
+     * @dev 用户上次累积时使用的奖励率，防止重复累加
+     * user => lastAccumulatedRate
+     */
+    mapping(address => uint256) private lastAccumulatedRate;
+
+    /**
      * @dev 计算并分发每日奖励
+     * dailyRewardPerToken 为累积值（持续递增），避免跨日覆盖导致奖励丢失
      */
     function calculateDailyReward() external {
         _checkNewDay();
@@ -287,7 +299,8 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         
         if (availableBalance > 0 && totalStakedTokens > 0) {
             todayRewardAmount = availableBalance * rewardRate / 10000;
-            dailyRewardPerToken = todayRewardAmount / totalStakedTokens;
+            // 使用高精度累积 dailyRewardPerToken，持续递增而非覆盖
+            dailyRewardPerToken += todayRewardAmount * REWARD_PRECISION / totalStakedTokens;
             lastRewardCalculationTime = block.timestamp;
             emit DailyRewardCalculated(todayRewardAmount, totalStakedTokens);
         }
@@ -300,16 +313,15 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         StakeInfo storage stake = userStakes[msg.sender];
         require(stake.amount > 0, "TokenStaking: No staked tokens");
 
-        uint256 userReward = stake.accumulatedRewards;
-        
-        if (dailyRewardPerToken > 0) {
-            uint256 newReward = stake.amount * dailyRewardPerToken;
-            userReward += newReward;
-            stake.accumulatedRewards = 0;
-        }
+        // 领取前先累积最新未计入的奖励
+        _accumulateRewards(msg.sender);
 
+        uint256 userReward = stake.accumulatedRewards;
         require(userReward > 0, "TokenStaking: No rewards to claim");
         require(address(this).balance >= userReward, "TokenStaking: Insufficient BNB in contract");
+
+        // 清零累积奖励（无论 dailyRewardPerToken 是否为0）
+        stake.accumulatedRewards = 0;
 
         totalPendingRewards -= userReward;
 
@@ -321,12 +333,21 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     /**
      * @dev 累积用户奖励（在质押/解除质押时调用）
+     * dailyRewardPerToken 为累积值，持续递增；通过差值计算用户未领取奖励
      */
     function _accumulateRewards(address user) internal {
-        if (dailyRewardPerToken > 0 && userStakes[user].amount > 0) {
-            userStakes[user].accumulatedRewards += userStakes[user].amount * dailyRewardPerToken;
-            totalPendingRewards += userStakes[user].amount * dailyRewardPerToken;
+        uint256 currentRate = dailyRewardPerToken;
+        uint256 lastRate = lastAccumulatedRate[user];
+        uint256 stakedAmount = userStakes[user].amount;
+
+        if (currentRate > lastRate && stakedAmount > 0) {
+            uint256 newReward = stakedAmount * (currentRate - lastRate) / REWARD_PRECISION;
+            userStakes[user].accumulatedRewards += newReward;
+            totalPendingRewards += newReward;
         }
+
+        // 更新用户上次累积的奖励率，防止重复累加
+        lastAccumulatedRate[user] = currentRate;
     }
 
     /**
@@ -339,10 +360,27 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     /**
-     * @dev 设置代币合约地址
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "TokenStaking: Not authorized");
+        _;
+    }
+
+    /**
+     * @dev 设置代币合约地址（内部方法）
      * @param _tokenContract 代币合约地址
      */
     function setTokenContract(address _tokenContract) external onlyOwner {
+        tokenContract = _tokenContract;
+    }
+
+    /**
+     * @dev 设置代币合约地址（Authorizer 调用接口，与 ISetTokenAddress 匹配）
+     * @param _tokenContract 代币合约地址
+     */
+    function setTokenAddress(address _tokenContract) external onlyAuthorized {
+        require(_tokenContract != address(0), "TokenStaking: Invalid token address");
         tokenContract = _tokenContract;
     }
 

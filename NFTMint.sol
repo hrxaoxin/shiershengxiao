@@ -23,13 +23,22 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     address public tokenBurnerContract;
     address public authorizer;
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
-
+    
+    bool public paused;
+    string public pauseReason;
+    bool public allowPublicMinting = false;
+    uint256 public rareTypeThreshold = 72;
+    
     mapping(uint256 => uint256) public tokenType;
     mapping(uint256 => uint8) public tokenLevel;
+    mapping(uint256 => uint8) public tokenGrowth;
 
-    event Mint(address indexed to, uint256 indexed tokenId, uint256 zodiacType);
+    event Mint(address indexed to, uint256 indexed tokenId, uint256 zodiacType, uint8 growth);
     event BatchMint(address indexed to, uint256[] tokenIds);
     event Upgrade(address indexed owner, uint256 indexed tokenId, uint8 oldLevel, uint8 newLevel);
+    event Paused(address account, string reason);
+    event Unpaused(address account);
+    event PublicMintingToggled(bool allowed);
 
     function initialize(address _authorizer) external initializer {
         __ERC721_init("Zodiac NFT", "ZNFT");
@@ -74,6 +83,11 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return uint256(entropy);
     }
 
+    function _generateGrowthValue(uint256 randomSeed) internal pure returns (uint8) {
+        uint256 roll = randomSeed % 91;
+        return uint8(roll + 10);
+    }
+
     function _chooseElement(uint256 randomVal) internal view returns (uint256) {
         uint256[5] memory cumulativeProbabilities;
         cumulativeProbabilities[0] = elementProbabilities[0];
@@ -115,101 +129,115 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return _calculateZodiacType(element, zodiac, gender);
     }
 
-    function mint(address to, uint256 zodiacType) external returns (uint256) {
-        require(msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+    modifier whenPublicMintingAllowed() {
+        require(allowPublicMinting || msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+        _;
+    }
+
+    function mint(address to, uint256 zodiacType) external whenNotPaused whenPublicMintingAllowed returns (uint256) {
         uint256 tokenId = _nextCardId++;
+        uint8 growth = _generateGrowthValue(_generateSecureRandom());
         _safeMint(to, tokenId);
         tokenType[tokenId] = zodiacType;
         tokenLevel[tokenId] = 1;
-        emit Mint(to, tokenId, zodiacType);
+        tokenGrowth[tokenId] = growth;
+        emit Mint(to, tokenId, zodiacType, growth);
         return tokenId;
     }
 
-    function mintBatch(address to, uint256[] calldata zodiacTypes) external returns (uint256[] memory) {
-        require(msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+    function mintBatch(address to, uint256[] calldata zodiacTypes) external whenNotPaused whenPublicMintingAllowed returns (uint256[] memory) {
         uint256[] memory tokenIds = new uint256[](zodiacTypes.length);
+        uint256 baseSeed = _generateSecureRandom();
         for (uint256 i = 0; i < zodiacTypes.length; i++) {
             uint256 tokenId = _nextCardId++;
+            uint8 growth = _generateGrowthValue(baseSeed + i * 1000003);
             _safeMint(to, tokenId);
             tokenType[tokenId] = zodiacTypes[i];
             tokenLevel[tokenId] = 1;
+            tokenGrowth[tokenId] = growth;
             tokenIds[i] = tokenId;
         }
         emit BatchMint(to, tokenIds);
         return tokenIds;
     }
 
-    function mintNormal(address to) external returns (uint256) {
-        require(msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+    function mintNormal(address to) external whenNotPaused whenPublicMintingAllowed returns (uint256) {
         uint256 randomSeed = _generateSecureRandom();
         uint256 zodiacType = _mintNormal(randomSeed);
+        uint8 growth = _generateGrowthValue(randomSeed);
         uint256 tokenId = _nextCardId++;
         _safeMint(to, tokenId);
         tokenType[tokenId] = zodiacType;
         tokenLevel[tokenId] = 1;
-        emit Mint(to, tokenId, zodiacType);
+        tokenGrowth[tokenId] = growth;
+        emit Mint(to, tokenId, zodiacType, growth);
         return tokenId;
     }
 
-    function mintRare(address to) external returns (uint256) {
-        require(msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+    function mintRare(address to) external whenNotPaused whenPublicMintingAllowed returns (uint256) {
         uint256 randomSeed = _generateSecureRandom();
         uint256 zodiacType = _mintRare(randomSeed);
+        uint8 growth = _generateGrowthValue(randomSeed);
         uint256 tokenId = _nextCardId++;
         _safeMint(to, tokenId);
         tokenType[tokenId] = zodiacType;
         tokenLevel[tokenId] = 1;
-        emit Mint(to, tokenId, zodiacType);
+        tokenGrowth[tokenId] = growth;
+        emit Mint(to, tokenId, zodiacType, growth);
         return tokenId;
     }
 
-    function mintNormalTen(address to) external returns (uint256[] memory) {
-        require(msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+    function mintNormalTen(address to) external whenNotPaused whenPublicMintingAllowed returns (uint256[] memory) {
         uint256[] memory tokenIds = new uint256[](10);
         uint256 baseSeed = _generateSecureRandom();
         for (uint256 i = 0; i < 10; i++) {
             uint256 seed = baseSeed + i * 7919;
             uint256 zodiacType = _mintNormal(seed);
+            uint8 growth = _generateGrowthValue(seed);
             uint256 tokenId = _nextCardId++;
             _safeMint(to, tokenId);
             tokenType[tokenId] = zodiacType;
             tokenLevel[tokenId] = 1;
+            tokenGrowth[tokenId] = growth;
             tokenIds[i] = tokenId;
         }
         emit BatchMint(to, tokenIds);
         return tokenIds;
     }
 
-    function mintRareTen(address to) external returns (uint256[] memory) {
-        require(msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+    function mintRareTen(address to) external whenNotPaused whenPublicMintingAllowed returns (uint256[] memory) {
         uint256[] memory tokenIds = new uint256[](10);
         uint256 baseSeed = _generateSecureRandom();
         for (uint256 i = 0; i < 10; i++) {
             uint256 seed = baseSeed + i * 7919;
             uint256 zodiacType = _mintRare(seed);
+            uint8 growth = _generateGrowthValue(seed);
             uint256 tokenId = _nextCardId++;
             _safeMint(to, tokenId);
             tokenType[tokenId] = zodiacType;
             tokenLevel[tokenId] = 1;
+            tokenGrowth[tokenId] = growth;
             tokenIds[i] = tokenId;
         }
         emit BatchMint(to, tokenIds);
         return tokenIds;
     }
 
-    function mintTargeted(address to, uint8 baseZodiac) external returns (uint256[] memory) {
-        require(msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+    function mintTargeted(address to, uint8 baseZodiac) external whenNotPaused whenPublicMintingAllowed returns (uint256[] memory) {
         require(baseZodiac < 12, "NFTMint: Invalid zodiac");
         uint256[] memory tokenIds = new uint256[](10);
         uint256 index = 0;
+        uint256 baseSeed = _generateSecureRandom();
         for (uint256 element = 0; element < 5; element++) {
             for (uint256 gender = 0; gender < 2; gender++) {
                 if (index < 10) {
                     uint256 zodiacType = _calculateZodiacType(element, baseZodiac, gender);
+                    uint8 growth = _generateGrowthValue(baseSeed + index * 9973);
                     uint256 tokenId = _nextCardId++;
                     _safeMint(to, tokenId);
                     tokenType[tokenId] = zodiacType;
                     tokenLevel[tokenId] = 1;
+                    tokenGrowth[tokenId] = growth;
                     tokenIds[index] = tokenId;
                     index++;
                 }
@@ -219,17 +247,23 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenIds;
     }
 
+    function setAllowPublicMinting(bool allowed) external onlyOwner {
+        allowPublicMinting = allowed;
+        emit PublicMintingToggled(allowed);
+    }
+
     function getNFTType(uint256 tokenId) external view returns (uint256) {
         return tokenType[tokenId];
     }
 
-    function getNFTInfo(uint256 tokenId) external view returns (uint256, uint8, uint256) {
-        return (tokenType[tokenId], tokenLevel[tokenId], 0);
+    function getNFTInfo(uint256 tokenId) external view returns (uint256, uint8, uint8) {
+        return (tokenType[tokenId], tokenLevel[tokenId], tokenGrowth[tokenId]);
     }
 
-    /**
-     * @dev 获取NFT完整数据（前端调用）
-     */
+    function getNFTGrowth(uint256 tokenId) external view returns (uint8) {
+        return tokenGrowth[tokenId];
+    }
+
     function getNFTData(uint256 tokenId) external view returns (
         uint256 tokenType_,
         uint256 attack,
@@ -243,24 +277,41 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     ) {
         uint256 t = tokenType[tokenId];
         uint8 l = tokenLevel[tokenId];
+        uint8 g = tokenGrowth[tokenId];
         
-        // 计算属性值
-        uint256 baseAttack = 10 + l * 5;
-        uint256 baseDefense = 10 + l * 4;
-        uint256 baseHealth = 100 + l * 20;
-        uint256 baseSpeed = 5 + l * 2;
+        uint256 baseAttack = 10;
+        uint256 baseDefense = 10;
+        uint256 baseHealth = 100;
+        uint256 baseSpeed = 60;
         
-        // 计算生肖速度
+        uint256 attackIncrement = 0;
+        uint256 defenseIncrement = 0;
+        uint256 healthIncrement = 0;
+        uint256 speedIncrement = 0;
+        
+        if (l > 1) {
+            uint256 growthMultiplier = uint256(g);
+            
+            for (uint256 i = 2; i <= l; i++) {
+                attackIncrement += (5 * growthMultiplier) / 100;
+                defenseIncrement += (4 * growthMultiplier) / 100;
+                healthIncrement += (20 * growthMultiplier) / 100;
+                speedIncrement += (3 * growthMultiplier) / 100;
+            }
+        }
+        
         uint256 zodiac = (t / 2) % 12;
-        uint256[12] memory speeds = [uint256(95), 40, 70, 90, 80, 85, 100, 35, 110, 55, 60, 30];
-        baseSpeed = speeds[zodiac] + l * 2;
+        uint256[12] memory zodiacSpeedBase = [
+            uint256(65), 45, 75, 85, 78, 82, 90, 40, 95, 55, 60, 38
+        ];
+        uint256 zodiacSpeedBonus = zodiacSpeedBase[zodiac] - 60;
         
         return (
             t,
-            baseAttack,
-            baseDefense,
-            baseHealth,
-            baseSpeed,
+            baseAttack + attackIncrement,
+            baseDefense + defenseIncrement,
+            baseHealth + healthIncrement,
+            baseSpeed + speedIncrement + zodiacSpeedBonus,
             uint256(l),
             l,
             "",
@@ -270,7 +321,12 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
 
     function isRare(uint256 tokenId) external view returns (bool) {
         uint256 t = tokenType[tokenId];
-        return t >= 72;
+        return t >= rareTypeThreshold;
+    }
+    
+    function setRareTypeThreshold(uint256 _threshold) external onlyOwner {
+        require(_threshold <= 120, "NFTMint: Invalid threshold");
+        rareTypeThreshold = _threshold;
     }
 
     function isMaxLevel(uint256 tokenId) external view returns (bool) {
@@ -281,9 +337,16 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenLevel[tokenId];
     }
 
-    function setNFTLevel(uint256 tokenId, uint256 newLevel) external {
-        require(ownerOf(tokenId) == msg.sender || msg.sender == owner(), "NFTMint: Not owner");
+    function setNFTLevel(uint256 tokenId, uint256 newLevel) external whenNotPaused {
+        require(ownerOf(tokenId) == msg.sender, "NFTMint: Not owner");
         require(newLevel <= 5 && newLevel >= tokenLevel[tokenId], "NFTMint: Invalid level");
+        uint8 oldLevel = tokenLevel[tokenId];
+        tokenLevel[tokenId] = uint8(newLevel);
+        emit Upgrade(ownerOf(tokenId), tokenId, oldLevel, uint8(newLevel));
+    }
+
+    function adminSetNFTLevel(uint256 tokenId, uint256 newLevel) external whenNotPaused onlyOwner {
+        require(newLevel <= 5 && newLevel >= 1, "NFTMint: Invalid level");
         uint8 oldLevel = tokenLevel[tokenId];
         tokenLevel[tokenId] = uint8(newLevel);
         emit Upgrade(ownerOf(tokenId), tokenId, oldLevel, uint8(newLevel));
@@ -338,10 +401,21 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return _nextCardId - 1;
     }
 
+    modifier whenNotPaused() {
+        require(!paused, "NFTMint: Paused");
+        _;
+    }
+
     function pause(string memory reason) external onlyOwner {
+        paused = true;
+        pauseReason = reason;
+        emit Paused(msg.sender, reason);
     }
 
     function unpause() external onlyOwner {
+        paused = false;
+        pauseReason = "";
+        emit Unpaused(msg.sender);
     }
 
     function upgradeTo(address newImplementation) external override onlyOwner {

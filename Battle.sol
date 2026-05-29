@@ -5,137 +5,79 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 
-/**
- * @title Battle
- * @dev 战斗合约，实现NFT之间的自动战斗系统
- *
- * 战斗规则：
- * 1. 6v6队伍对战
- * 2. 速度决定出手顺序
- * 3. 属性克制影响伤害
- * 4. 暴击和闪避机制
- * 5. 一队全部阵亡则战斗结束
- *
- * 战斗流程：
- * 1. 验证双方NFT所有权
- * 2. 初始化战斗状态
- * 3. 按速度排序决定出手顺序
- * 4. 循环执行回合直到一队全灭
- * 5. 记录战斗结果并分发奖励
- *
- * 奖励机制：
- * - 获胜者获得失败者的部分代币
- * - 战斗手续费进入奖励池
- */
-contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+interface INFTMint {
+    function ownerOf(uint256 tokenId) external view returns (address);
+    function tokenType(uint256 tokenId) external view returns (uint256);
+    function tokenLevel(uint256 tokenId) external view returns (uint8);
+    function tokenGrowth(uint256 tokenId) external view returns (uint8);
+}
 
-    /**
-     * @dev NFT属性结构体
-     */
+contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     struct NFTTraits {
         uint256 tokenId;
         uint8 level;
         uint8 element;
         uint8 power;
+        uint8 growth;
+        uint8 zodiac;
     }
 
-    /**
-     * @dev 战斗状态结构体
-     */
     struct BattleState {
         uint256 battleId;
         uint256 startTime;
         uint8 status;
         uint8 winner;
+        uint256 challengerId;
+        uint256 challengedId;
+        address challenger;
+        address challenged;
     }
 
-    /**
-     * @dev 队伍状态结构体
-     */
     struct TeamState {
         NFTTraits[6] traits;
         uint256[6] hp;
         bool[6] alive;
+        uint256[6] maxHp;
     }
 
-    /**
-     * @dev 战斗历史记录数组
-     */
     BattleState[] public battleHistory;
 
-    /**
-     * @dev 每次战斗的基础奖励（代币）
-     */
     uint256 public baseBattleReward;
-
-    /**
-     * @dev 战斗手续费率（百分比）
-     */
     uint256 public battleFeePercent;
-
-    /**
-     * @dev 最大回合数限制
-     */
     uint256 public constant MAX_ROUNDS = 50;
-
-    /**
-     * @dev 战斗常量
-     */
     uint256 public constant PRECISION = 10000;
 
-    /**
-     * @dev NFT合约地址
-     */
     address public nftContract;
-
-    /**
-     * @dev 授权合约地址（Authorizer）
-     */
     address public authorizer;
 
-    /**
-     * @dev 初始化函数
-     * @param _authorizer 授权合约地址
-     */
     function initialize(address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         authorizer = _authorizer;
+        _initWaterSkills();
+        _initWindSkills();
+        _initFireSkills();
+        _initDarkSkills();
+        _initLightSkills();
     }
 
-    /**
-     * @dev 设置授权合约地址
-     * @param a 授权合约地址
-     */
     function setAuthorizer(address a) external onlyOwner {
         authorizer = a;
     }
 
-    /**
-     * @dev 检查是否为授权调用者（owner或authorizer）
-     */
     modifier onlyAuthorized() {
         require(msg.sender == owner() || msg.sender == authorizer, "Battle: Not authorized");
         _;
     }
 
-    /**
-     * @dev UUPS升级授权
-     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    /**
-     * @dev 元素类型枚举
-     */
     uint8 public constant ELEMENT_WATER = 0;
     uint8 public constant ELEMENT_WIND = 1;
     uint8 public constant ELEMENT_FIRE = 2;
     uint8 public constant ELEMENT_DARK = 3;
     uint8 public constant ELEMENT_LIGHT = 4;
 
-    /**
-     * @dev 战斗事件
-     */
     event BattleStarted(
         uint256 indexed battleId,
         address indexed challenger,
@@ -144,9 +86,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         uint256[6] challengedTeam
     );
 
-    /**
-     * @dev 战斗结束事件
-     */
     event BattleEnded(
         uint256 indexed battleId,
         uint8 winner,
@@ -154,39 +93,35 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         uint256 challengedReward
     );
 
-    /**
-     * @dev 设置NFT合约地址
-     */
     function setNFTContract(address _nftContract) external onlyAuthorized {
         require(_nftContract != address(0), "Battle: Invalid NFT contract address");
         nftContract = _nftContract;
     }
 
-    /**
-     * @dev 获取NFT属性
-     */
     function _getNFTTraits(uint256 tokenId) internal view returns (NFTTraits memory) {
         NFTTraits memory traits;
         traits.tokenId = tokenId;
         if (nftContract != address(0)) {
-            (uint256 tokenType, uint256 level) = _getNFTData(tokenId);
+            (uint256 zodiacType, uint256 level, uint256 growth) = _getNFTData(tokenId);
             traits.level = uint8(level);
-            traits.element = uint8(tokenType / 24);
-            traits.power = _calculatePower(level, tokenType);
+            traits.element = uint8(zodiacType / 24);
+            traits.zodiac = uint8((zodiacType / 2) % 12);
+            traits.growth = uint8(growth);
+            traits.power = _calculatePower(traits.level, traits.growth);
         } else {
-            traits.level = uint8((tokenId % 5) + 1);
-            traits.element = uint8(tokenId % 5);
-            traits.power = _calculatePower(traits.level, traits.element * 24);
+            uint256 zodiacType = tokenId % 120;
+            traits.level = uint8((zodiacType / 24) + 1);
+            traits.element = uint8(zodiacType / 24);
+            traits.zodiac = uint8((zodiacType / 2) % 12);
+            traits.growth = uint8(50 + (tokenId % 51));
+            traits.power = _calculatePower(traits.level, traits.growth);
         }
         return traits;
     }
 
-    /**
-     * @dev 获取NFT数据（如果NFT合约已设置）
-     */
-    function _getNFTData(uint256 tokenId) internal view returns (uint256 tokenType, uint256 level) {
+    function _getNFTData(uint256 tokenId) internal view returns (uint256 tokenType, uint256 level, uint256 growth) {
         if (nftContract == address(0)) {
-            return (0, 1);
+            return (0, 1, 50);
         }
         (bool success, bytes memory data) = nftContract.staticcall(
             abi.encodeWithSignature("tokenType(uint256)", tokenId)
@@ -200,21 +135,20 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         if (success && data.length >= 32) {
             level = abi.decode(data, (uint256));
         }
+        (success, data) = nftContract.staticcall(
+            abi.encodeWithSignature("tokenGrowth(uint256)", tokenId)
+        );
+        if (success && data.length >= 32) {
+            growth = abi.decode(data, (uint256));
+        }
     }
 
-    /**
-     * @dev 计算NFT战力
-     */
-    function _calculatePower(uint256 level, uint256 tokenType) internal pure returns (uint8) {
-        uint8 basePower = uint8(level * 20);
-        uint8 elementBonus = uint8((tokenType / 24) * 5);
-        return basePower + elementBonus;
+    function _calculatePower(uint256 level, uint256 growth) internal pure returns (uint8) {
+        uint256 basePower = level * 20;
+        uint256 growthBonus = (level - 1) * growth * 2 / 100;
+        return uint8(basePower + growthBonus);
     }
 
-    /**
-     * @dev 检查属性克制
-     * 火>风>水>火，光>暗>光
-     */
     function _checkAdvantage(uint8 attackerElement, uint8 defenderElement) internal pure returns (bool) {
         if (attackerElement == ELEMENT_FIRE && defenderElement == ELEMENT_WIND) return true;
         if (attackerElement == ELEMENT_WIND && defenderElement == ELEMENT_WATER) return true;
@@ -224,34 +158,56 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         return false;
     }
 
-    /**
-     * @dev 挑战对手
-     *
-     * @param challengerId 挑战者领队NFT ID
-     * @param challengedId 被挑战者领队NFT ID
-     * @param challengerTeam 挑战者队伍（6个NFT ID）
-     * @param challengedTeam 被挑战者队伍（6个NFT ID）
-     * @return tuple (是否成功, 获胜者, 奖励分配)
-     */
+    function _requireNFTOwnership(uint256[6] memory team) internal view {
+        require(nftContract != address(0), "Battle: NFT contract not set");
+        for (uint256 i = 0; i < 6; i++) {
+            uint256 tokenId = team[i];
+            (bool success, bytes memory data) = nftContract.staticcall(
+                abi.encodeWithSignature("ownerOf(uint256)", tokenId)
+            );
+            require(success && data.length >= 32, "Battle: Failed to query NFT owner");
+            address owner = abi.decode(data, (address));
+            require(owner == msg.sender, "Battle: Not owner of NFT in team");
+        }
+    }
+
     function challenge(
         uint256 challengerId,
         uint256 challengedId,
         uint256[6] calldata challengerTeam,
-        uint256[6] calldata challengedTeam
+        uint256[6] calldata challengedTeam,
+        address challengedAddress
     ) external returns (bool, uint256, uint256[] memory) {
         require(_validateTeam(challengerTeam), "Battle: Invalid challenger team");
         require(_validateTeam(challengedTeam), "Battle: Invalid challenged team");
+        require(challengedAddress != address(0), "Battle: Invalid challenged address");
+
+        _requireNFTOwnership(challengerTeam);
+        _requireNFTOwnershipForAddress(challengedTeam, challengedAddress);
+
+        if (challengerId != 0) {
+            require(_isValidNFT(challengerId), "Battle: Invalid challenger NFT");
+            require(INFTMint(nftContract).ownerOf(challengerId) == msg.sender, "Battle: Not owner of challenger NFT");
+        }
+        if (challengedId != 0) {
+            require(_isValidNFT(challengedId), "Battle: Invalid challenged NFT");
+            require(INFTMint(nftContract).ownerOf(challengedId) == challengedAddress, "Battle: Not owner of challenged NFT");
+        }
 
         battleHistory.push(BattleState({
             battleId: battleHistory.length + 1,
             startTime: block.timestamp,
             status: 1,
-            winner: 0
+            winner: 0,
+            challengerId: challengerId,
+            challengedId: challengedId,
+            challenger: msg.sender,
+            challenged: challengedAddress
         }));
 
         uint256 battleId = battleHistory.length;
 
-        emit BattleStarted(battleId, msg.sender, address(0), challengerTeam, challengedTeam);
+        emit BattleStarted(battleId, msg.sender, challengedAddress, challengerTeam, challengedTeam);
 
         uint8 winner = _executeBattle(challengerTeam, challengedTeam, battleId);
 
@@ -272,9 +228,214 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         return (true, winner, rewards);
     }
 
-    /**
-     * @dev 执行战斗逻辑
-     */
+    function _requireNFTOwnershipForAddress(uint256[6] memory team, address owner) internal view {
+        require(nftContract != address(0), "Battle: NFT contract not set");
+        for (uint256 i = 0; i < 6; i++) {
+            uint256 tokenId = team[i];
+            (bool success, bytes memory data) = nftContract.staticcall(
+                abi.encodeWithSignature("ownerOf(uint256)", tokenId)
+            );
+            require(success && data.length >= 32, "Battle: Failed to query NFT owner");
+            address tokenOwner = abi.decode(data, (address));
+            require(tokenOwner == owner, "Battle: Not owner of NFT in team");
+        }
+    }
+
+    function _isValidNFT(uint256 tokenId) internal view returns (bool) {
+        if (nftContract == address(0)) return true;
+        (bool success, bytes memory data) = nftContract.staticcall(
+            abi.encodeWithSignature("ownerOf(uint256)", tokenId)
+        );
+        return success && data.length >= 32 && abi.decode(data, (address)) != address(0);
+    }
+
+    function _executeBattleCore(
+        uint256[6] memory team1,
+        uint256[6] memory team2,
+        uint256 randomSeed
+    ) internal view returns (uint8) {
+        TeamState memory state1;
+        TeamState memory state2;
+
+        for (uint i = 0; i < 6; i++) {
+            state1.traits[i] = _getNFTTraits(team1[i]);
+            state2.traits[i] = _getNFTTraits(team2[i]);
+            state1.maxHp[i] = _calculateMaxHP(state1.traits[i]);
+            state2.maxHp[i] = _calculateMaxHP(state2.traits[i]);
+            state1.hp[i] = state1.maxHp[i];
+            state2.hp[i] = state2.maxHp[i];
+            state1.alive[i] = true;
+            state2.alive[i] = true;
+        }
+
+        uint256[6] memory skillCooldown1;
+        uint256[6] memory skillCooldown2;
+
+        bool team1Alive = true;
+        bool team2Alive = true;
+
+        for (uint256 round = 0; round < MAX_ROUNDS && team1Alive && team2Alive; round++) {
+            randomSeed++;
+
+            for (uint i = 0; i < 6; i++) {
+                if (skillCooldown1[i] > 0) skillCooldown1[i]--;
+                if (skillCooldown2[i] > 0) skillCooldown2[i]--;
+            }
+
+            uint256[6] memory speedOrder1 = _getSpeedOrder(state1, randomSeed);
+            uint256[6] memory speedOrder2 = _getSpeedOrder(state2, randomSeed + 1000);
+
+            for (uint i = 0; i < 6; i++) {
+                uint attackerIndex = speedOrder1[i];
+                if (!state1.alive[attackerIndex] || !team1Alive) continue;
+                
+                NFTTraits memory attackerTrait = state1.traits[attackerIndex];
+                uint256 skillKey = attackerTrait.element * 24 + attackerTrait.zodiac;
+                Skill memory skill = skills[skillKey];
+                bool useSkill = skillCooldown1[attackerIndex] == 0 && (randomSeed % 5 == 0 || _shouldUseSkill(state1, attackerIndex));
+                
+                if (useSkill && skill.skillId > 0) {
+                    state2 = _applySkill(attackerTrait, state2, attackerIndex, skill);
+                    skillCooldown1[attackerIndex] = skill.cooldown;
+                } else {
+                    uint defenderIndex = _findTarget(state2.alive, state2.traits, state2.hp);
+                    if (defenderIndex == 6) {
+                        team2Alive = false;
+                        break;
+                    }
+                    uint damage = _calculateDamage(state1.traits[attackerIndex], state2.traits[defenderIndex], randomSeed + i);
+                    state2.hp[defenderIndex] = state2.hp[defenderIndex] > damage ? state2.hp[defenderIndex] - damage : 0;
+                    if (state2.hp[defenderIndex] == 0) {
+                        state2.alive[defenderIndex] = false;
+                        if (!_hasAnyAlive(state2.alive)) {
+                            team2Alive = false;
+                        }
+                    }
+                }
+            }
+
+            if (!team2Alive) break;
+
+            for (uint i = 0; i < 6; i++) {
+                uint attackerIndex = speedOrder2[i];
+                if (!state2.alive[attackerIndex] || !team2Alive) continue;
+                
+                NFTTraits memory attackerTrait = state2.traits[attackerIndex];
+                uint256 skillKey = attackerTrait.element * 24 + attackerTrait.zodiac;
+                Skill memory skill = skills[skillKey];
+                bool useSkill = skillCooldown2[attackerIndex] == 0 && (randomSeed % 5 == 0 || _shouldUseSkill(state2, attackerIndex));
+                
+                if (useSkill && skill.skillId > 0) {
+                    state1 = _applySkill(attackerTrait, state1, attackerIndex, skill);
+                    skillCooldown2[attackerIndex] = skill.cooldown;
+                } else {
+                    uint defenderIndex = _findTarget(state1.alive, state1.traits, state1.hp);
+                    if (defenderIndex == 6) {
+                        team1Alive = false;
+                        break;
+                    }
+                    uint damage = _calculateDamage(state2.traits[attackerIndex], state1.traits[defenderIndex], randomSeed + 1000 + i);
+                    state1.hp[defenderIndex] = state1.hp[defenderIndex] > damage ? state1.hp[defenderIndex] - damage : 0;
+                    if (state1.hp[defenderIndex] == 0) {
+                        state1.alive[defenderIndex] = false;
+                        if (!_hasAnyAlive(state1.alive)) {
+                            team1Alive = false;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (team1Alive && !team2Alive) return 1;
+        if (team2Alive && !team1Alive) return 2;
+        return 0;
+    }
+
+    function _shouldUseSkill(TeamState memory state, uint attackerIndex) internal pure returns (bool) {
+        uint256 hpPercent = (state.hp[attackerIndex] * 100) / state.maxHp[attackerIndex];
+        return hpPercent < 50;
+    }
+
+    function _applySkill(NFTTraits memory attacker, TeamState memory defenderState, uint attackerIndex, Skill memory skill) internal view returns (TeamState memory) {
+        uint256 baseDamage = 0;
+        uint256 targetIndex = 6;
+        uint256 validTargetIndex = 6;
+        
+        for (uint i = 0; i < 6; i++) {
+            if (defenderState.alive[i]) {
+                validTargetIndex = i;
+                break;
+            }
+        }
+        
+        if (validTargetIndex < 6) {
+            targetIndex = skill.isAoe ? validTargetIndex : _findTarget(defenderState.alive, defenderState.traits, defenderState.hp);
+            if (targetIndex >= 6) {
+                targetIndex = validTargetIndex;
+            }
+            baseDamage = _calculateDamage(attacker, defenderState.traits[targetIndex], attackerIndex);
+        }
+        uint256 skillDamage = (baseDamage * skill.damage) / 100;
+
+        if (skill.isAoe) {
+            for (uint i = 0; i < 6; i++) {
+                if (defenderState.alive[i]) {
+                    defenderState.hp[i] = defenderState.hp[i] > skillDamage ? defenderState.hp[i] - skillDamage : 0;
+                    if (defenderState.hp[i] == 0) {
+                        defenderState.alive[i] = false;
+                    }
+                }
+            }
+        } else if (targetIndex < 6) {
+            defenderState.hp[targetIndex] = defenderState.hp[targetIndex] > skillDamage ? defenderState.hp[targetIndex] - skillDamage : 0;
+            if (defenderState.hp[targetIndex] == 0) {
+                defenderState.alive[targetIndex] = false;
+            }
+        }
+        
+        return defenderState;
+    }
+
+    function _getSpeedOrder(TeamState memory state, uint256 seed) internal pure returns (uint256[6] memory) {
+        uint256[6] memory order = [uint256(0), 1, 2, 3, 4, 5];
+        uint256[6] memory speeds = [
+            _calculateSpeed(state.traits[0]),
+            _calculateSpeed(state.traits[1]),
+            _calculateSpeed(state.traits[2]),
+            _calculateSpeed(state.traits[3]),
+            _calculateSpeed(state.traits[4]),
+            _calculateSpeed(state.traits[5])
+        ];
+
+        for (uint i = 0; i < 6; i++) {
+            for (uint j = i + 1; j < 6; j++) {
+                if (speeds[j] > speeds[i] || (speeds[j] == speeds[i] && ((seed + j) % 100) > ((seed + i) % 100))) {
+                    (speeds[i], speeds[j]) = (speeds[j], speeds[i]);
+                    (order[i], order[j]) = (order[j], order[i]);
+                }
+            }
+        }
+        return order;
+    }
+
+    function _calculateSpeed(NFTTraits memory traits) internal pure returns (uint256) {
+        uint256 baseSpeed = 60;
+        uint256 levelBonus = uint256(traits.level) * 5;
+        uint256 growthBonus = ((traits.level - 1) * uint256(traits.growth) * 3) / 100;
+        
+        uint256[12] memory zodiacSpeedBonus = [
+            uint256(5), 25, 15, 5, 12, 8, 30, 20, 35, 5, 20, 22
+        ];
+        return baseSpeed + levelBonus + growthBonus + zodiacSpeedBonus[traits.zodiac];
+    }
+
+    function _calculateMaxHP(NFTTraits memory traits) internal pure returns (uint256) {
+        uint256 baseHp = 100;
+        uint256 levelBonus = uint256(traits.level) * 30;
+        uint256 growthBonus = ((traits.level - 1) * uint256(traits.growth) * 20) / 100;
+        return baseHp + levelBonus + growthBonus;
+    }
+
     function _executeBattle(
         uint256[6] memory team1,
         uint256[6] memory team2,
@@ -286,71 +447,47 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             block.number,
             msg.sender
         )));
-
-        TeamState memory state1;
-        TeamState memory state2;
-
-        for (uint i = 0; i < 6; i++) {
-            state1.traits[i] = _getNFTTraits(team1[i]);
-            state2.traits[i] = _getNFTTraits(team2[i]);
-            state1.hp[i] = uint256(state1.traits[i].level) * 100;
-            state2.hp[i] = uint256(state2.traits[i].level) * 100;
-            state1.alive[i] = true;
-            state2.alive[i] = true;
-        }
-
-        bool team1Alive = true;
-        bool team2Alive = true;
-
-        for (uint256 round = 0; round < MAX_ROUNDS && team1Alive && team2Alive; round++) {
-            randomSeed++;
-
-            for (uint i = 0; i < 6; i++) {
-                if (!state1.alive[i] || !team1Alive) continue;
-                uint defenderIndex = _findTarget(state2.alive, state2.traits);
-                if (defenderIndex == 6) {
-                    team1Alive = false;
-                    break;
-                }
-                uint damage = _calculateDamage(state1.traits[i], state2.traits[defenderIndex], randomSeed + i);
-                state2.hp[defenderIndex] = state2.hp[defenderIndex] > damage ? state2.hp[defenderIndex] - damage : 0;
-                if (state2.hp[defenderIndex] == 0) {
-                    state2.alive[defenderIndex] = false;
-                    if (!_hasAnyAlive(state2.alive)) {
-                        team2Alive = false;
-                    }
-                }
-            }
-
-            if (!team2Alive) break;
-
-            for (uint i = 0; i < 6; i++) {
-                if (!state2.alive[i] || !team2Alive) continue;
-                uint defenderIndex = _findTarget(state1.alive, state1.traits);
-                if (defenderIndex == 6) {
-                    team2Alive = false;
-                    break;
-                }
-                uint damage = _calculateDamage(state2.traits[i], state1.traits[defenderIndex], randomSeed + 1000 + i);
-                state1.hp[defenderIndex] = state1.hp[defenderIndex] > damage ? state1.hp[defenderIndex] - damage : 0;
-                if (state1.hp[defenderIndex] == 0) {
-                    state1.alive[defenderIndex] = false;
-                    if (!_hasAnyAlive(state1.alive)) {
-                        team1Alive = false;
-                    }
-                }
-            }
-        }
-
-        if (team1Alive && !team2Alive) return 1;
-        if (team2Alive && !team1Alive) return 2;
-        return 0;
+        return _executeBattleCore(team1, team2, randomSeed);
     }
 
-    /**
-     * @dev 查找存活目标
-     */
-    function _findTarget(bool[6] memory alive, NFTTraits[6] memory traits) internal pure returns (uint) {
+    function _executeBattleView(
+        uint256[6] memory team1,
+        uint256[6] memory team2,
+        uint256 battleId
+    ) internal view returns (uint8) {
+        uint256 randomSeed = uint256(keccak256(abi.encodePacked(
+            battleId,
+            block.timestamp,
+            block.number
+        )));
+        return _executeBattleCore(team1, team2, randomSeed);
+    }
+
+    function simulateBattle(
+        uint256[6] calldata team1,
+        uint256[6] calldata team2
+    ) external view returns (uint8) {
+        uint256 battleId = block.timestamp % 1000 + 1;
+        return _executeBattleCore(team1, team2, battleId);
+    }
+
+    function _findTarget(bool[6] memory alive, NFTTraits[6] memory traits, uint256[6] memory currentHp) internal pure returns (uint) {
+        uint minHpIndex = 6;
+        uint256 minHpPercent = type(uint256).max;
+        
+        for (uint i = 0; i < 6; i++) {
+            if (alive[i]) {
+                uint256 maxHp = _calculateMaxHP(traits[i]);
+                uint256 currentHpPercent = (maxHp == 0) ? 0 : (currentHp[i] * 100) / maxHp;
+                if (currentHpPercent < minHpPercent) {
+                    minHpPercent = currentHpPercent;
+                    minHpIndex = i;
+                }
+            }
+        }
+        
+        if (minHpIndex != 6) return minHpIndex;
+        
         for (uint i = 0; i < 3; i++) {
             if (alive[i]) return i;
         }
@@ -360,9 +497,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         return 6;
     }
 
-    /**
-     * @dev 检查是否有任何存活单位
-     */
     function _hasAnyAlive(bool[6] memory alive) internal pure returns (bool) {
         for (uint i = 0; i < 6; i++) {
             if (alive[i]) return true;
@@ -370,37 +504,36 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         return false;
     }
 
-    /**
-     * @dev 计算伤害
-     */
     function _calculateDamage(NFTTraits memory attacker, NFTTraits memory defender, uint256 seed) internal pure returns (uint) {
-        uint baseDamage = uint(attacker.level) * 30 + uint(attacker.power) * 2;
+        uint baseDamage = uint(attacker.level) * 30 + uint(attacker.power) * 3;
 
         if (_checkAdvantage(attacker.element, defender.element)) {
-            baseDamage = baseDamage * 150 / 100;
+            baseDamage = baseDamage * 130 / 100;
         } else if (_checkAdvantage(defender.element, attacker.element)) {
-            baseDamage = baseDamage * 75 / 100;
+            baseDamage = baseDamage * 80 / 100;
         }
 
         uint256 random = seed % 100;
-        if (random < 15) {
-            baseDamage = baseDamage * 200 / 100;
+        if (random < 12) {
+            baseDamage = baseDamage * 180 / 100;
         }
 
         uint256 dodgeCheck = (seed + 1) % 100;
-        if (dodgeCheck < 20) {
-            baseDamage = 0;
+        uint256 dodgeChance = 15 + (uint256(defender.growth) - 50) / 10;
+        if (dodgeChance > 25) dodgeChance = 25;
+        if (dodgeChance < 5) dodgeChance = 5;
+        
+        if (dodgeCheck < dodgeChance) {
+            return 0;
         }
 
-        uint256 defense = uint(defender.level) * 10 + uint(defender.power);
-        baseDamage = baseDamage * 100 / (100 + defense / 10);
+        uint256 defense = uint(defender.level) * 15 + uint(defender.power);
+        uint256 reduction = (defense * 50) / (100 + defense);
+        baseDamage = baseDamage * (100 - reduction) / 100;
 
         return baseDamage;
     }
 
-    /**
-     * @dev 验证队伍
-     */
     function _validateTeam(uint256[6] memory team) internal pure returns (bool) {
         for (uint256 i = 0; i < 6; i++) {
             if (team[i] == 0) return false;
@@ -408,12 +541,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         return true;
     }
 
-    /**
-     * @dev 战斗函数（匹配前端ABI）
-     * @param attackerTeam 攻击者队伍
-     * @param defenderTeam 防御者队伍
-     * @return (是否成功, 获胜者, 奖励)
-     */
     function battle(
         uint256[6] calldata attackerTeam,
         uint256[6] calldata defenderTeam
@@ -430,194 +557,43 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         return (true, winner, attackerReward);
     }
 
-    /**
-     * @dev 执行战斗逻辑（view版本）
-     */
-    function _executeBattleView(
-        uint256[6] memory team1,
-        uint256[6] memory team2,
-        uint256 battleId
-    ) internal view returns (uint8) {
-        uint256 randomSeed = uint256(keccak256(abi.encodePacked(
-            battleId,
-            block.timestamp,
-            block.number
-        )));
-
-        TeamState memory state1;
-        TeamState memory state2;
-
-        for (uint i = 0; i < 6; i++) {
-            state1.traits[i] = _getNFTTraits(team1[i]);
-            state2.traits[i] = _getNFTTraits(team2[i]);
-            state1.hp[i] = uint256(state1.traits[i].level) * 100;
-            state2.hp[i] = uint256(state2.traits[i].level) * 100;
-            state1.alive[i] = true;
-            state2.alive[i] = true;
-        }
-
-        bool team1Alive = true;
-        bool team2Alive = true;
-
-        for (uint256 round = 0; round < MAX_ROUNDS && team1Alive && team2Alive; round++) {
-            randomSeed++;
-
-            for (uint i = 0; i < 6; i++) {
-                if (!state1.alive[i] || !team1Alive) continue;
-                uint defenderIndex = _findTarget(state2.alive, state2.traits);
-                if (defenderIndex == 6) {
-                    team1Alive = false;
-                    break;
-                }
-                uint damage = _calculateDamage(state1.traits[i], state2.traits[defenderIndex], randomSeed + i);
-                state2.hp[defenderIndex] = state2.hp[defenderIndex] > damage ? state2.hp[defenderIndex] - damage : 0;
-                if (state2.hp[defenderIndex] == 0) {
-                    state2.alive[defenderIndex] = false;
-                    if (!_hasAnyAlive(state2.alive)) {
-                        team2Alive = false;
-                    }
-                }
-            }
-
-            if (!team2Alive) break;
-
-            for (uint i = 0; i < 6; i++) {
-                if (!state2.alive[i] || !team2Alive) continue;
-                uint defenderIndex = _findTarget(state1.alive, state1.traits);
-                if (defenderIndex == 6) {
-                    team2Alive = false;
-                    break;
-                }
-                uint damage = _calculateDamage(state2.traits[i], state1.traits[defenderIndex], randomSeed + 1000 + i);
-                state1.hp[defenderIndex] = state1.hp[defenderIndex] > damage ? state1.hp[defenderIndex] - damage : 0;
-                if (state1.hp[defenderIndex] == 0) {
-                    state1.alive[defenderIndex] = false;
-                    if (!_hasAnyAlive(state1.alive)) {
-                        team1Alive = false;
-                    }
-                }
-            }
-        }
-
-        if (team1Alive && !team2Alive) return 1;
-        if (team2Alive && !team1Alive) return 2;
-        return 0;
-    }
-
-    /**
-     * @dev 模拟战斗（不改变状态）
-     */
-    function simulateBattle(
-        uint256[6] calldata team1,
-        uint256[6] calldata team2
-    ) external view returns (uint8) {
-        uint256 battleId = block.timestamp % 1000 + 1;
-        TeamState memory state1;
-        TeamState memory state2;
-
-        for (uint i = 0; i < 6; i++) {
-            state1.traits[i] = _getNFTTraits(team1[i]);
-            state2.traits[i] = _getNFTTraits(team2[i]);
-            state1.hp[i] = uint256(state1.traits[i].level) * 100;
-            state2.hp[i] = uint256(state2.traits[i].level) * 100;
-            state1.alive[i] = true;
-            state2.alive[i] = true;
-        }
-
-        bool team1Alive = true;
-        bool team2Alive = true;
-        uint256 seed = battleId;
-
-        for (uint256 round = 0; round < MAX_ROUNDS && team1Alive && team2Alive; round++) {
-            seed++;
-            for (uint i = 0; i < 6; i++) {
-                if (!state1.alive[i] || !team1Alive) continue;
-                uint defenderIndex = _findTarget(state2.alive, state2.traits);
-                if (defenderIndex == 6) {
-                    team1Alive = false;
-                    break;
-                }
-                uint damage = _calculateDamage(state1.traits[i], state2.traits[defenderIndex], seed + i);
-                state2.hp[defenderIndex] = state2.hp[defenderIndex] > damage ? state2.hp[defenderIndex] - damage : 0;
-                if (state2.hp[defenderIndex] == 0) {
-                    state2.alive[defenderIndex] = false;
-                    if (!_hasAnyAlive(state2.alive)) {
-                        team2Alive = false;
-                    }
-                }
-            }
-
-            if (!team2Alive) break;
-
-            for (uint i = 0; i < 6; i++) {
-                if (!state2.alive[i] || !team2Alive) continue;
-                uint defenderIndex = _findTarget(state1.alive, state1.traits);
-                if (defenderIndex == 6) {
-                    team2Alive = false;
-                    break;
-                }
-                uint damage = _calculateDamage(state2.traits[i], state1.traits[defenderIndex], seed + 1000 + i);
-                state1.hp[defenderIndex] = state1.hp[defenderIndex] > damage ? state1.hp[defenderIndex] - damage : 0;
-                if (state1.hp[defenderIndex] == 0) {
-                    state1.alive[defenderIndex] = false;
-                    if (!_hasAnyAlive(state1.alive)) {
-                        team1Alive = false;
-                    }
-                }
-            }
-        }
-
-        if (team1Alive && !team2Alive) return 1;
-        if (team2Alive && !team1Alive) return 2;
-        return 0;
-    }
-
-    /**
-     * @dev 获取战斗记录数量
-     */
     function getBattleLogCount() external view returns (uint256) {
         return battleHistory.length;
     }
 
-    /**
-     * @dev 获取战斗记录
-     */
     function getBattleLog(uint256 index) external view returns (
         uint256 battleId,
         uint256 challengerId,
         uint256 challengedId,
+        address challenger,
+        address challenged,
         uint8 winner,
-        uint256 timestamp
+        uint256 timestamp,
+        uint8 status
     ) {
         require(index < battleHistory.length, "Battle: Invalid index");
         BattleState memory battle = battleHistory[index];
         return (
             battle.battleId,
-            0,
-            0,
+            battle.challengerId,
+            battle.challengedId,
+            battle.challenger,
+            battle.challenged,
             battle.winner,
-            battle.startTime
+            battle.startTime,
+            battle.status
         );
     }
 
-    /**
-     * @dev 设置基础战斗奖励
-     */
     function setBaseBattleReward(uint256 reward) external onlyOwner {
         baseBattleReward = reward;
     }
 
-    /**
-     * @dev 设置战斗手续费率
-     */
     function setBattleFeePercent(uint256 feePercent) external onlyOwner {
         require(feePercent <= 100, "Battle: Fee too high");
         battleFeePercent = feePercent;
     }
 
-    /**
-     * @dev 获取战斗常量
-     */
     function getBattleConstants() external pure returns (uint256, uint256) {
         return (MAX_ROUNDS, PRECISION);
     }

@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title DividendManager
@@ -92,6 +93,16 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     uint256 public dividendPoolBalance;
 
     /**
+     * @dev 分红池地址（用于查询外部池余额）
+     */
+    address public dividendPool;
+
+    /**
+     * @dev 代币合约地址（用于领取分红转账）
+     */
+    address public tokenContract;
+
+    /**
      * @dev 最后更新快照时间
      */
     uint256 public lastSnapshotTime;
@@ -111,10 +122,41 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     DividendSnapshot[] public snapshots;
 
     /**
-     * @dev 添加到分红池
+     * @dev 上次同步时的合约代币余额（用于自动检测新增资金）
+     */
+    uint256 public lastSyncedBalance;
+
+    /**
+     * @dev 添加到分红池（手动指定金额）
      */
     function addDividendPool(uint256 amount) external onlyOwner {
         require(amount > 0, "DividendManager: Invalid amount");
+        _addToDividendPool(amount);
+        if (tokenContract != address(0)) {
+            lastSyncedBalance = IERC20(tokenContract).balanceOf(address(this));
+        }
+    }
+
+    /**
+     * @dev 同步分红池余额（自动检测合约中新增的代币）
+     */
+    function syncDividendPool() external {
+        require(tokenContract != address(0), "DividendManager: Token contract not set");
+        IERC20 token = IERC20(tokenContract);
+        uint256 currentBalance = token.balanceOf(address(this));
+
+        if (currentBalance > lastSyncedBalance) {
+            uint256 newFunds = currentBalance - lastSyncedBalance;
+            _addToDividendPool(newFunds);
+        }
+
+        lastSyncedBalance = currentBalance;
+    }
+
+    /**
+     * @dev 内部函数：将金额添加到分红池并创建快照
+     */
+    function _addToDividendPool(uint256 amount) internal {
         dividendPoolBalance += amount;
 
         if (totalWeight > 0) {
@@ -138,8 +180,60 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         require(dividend > 0, "DividendManager: No dividend");
 
         pendingDividends[msg.sender] = 0;
+
+        require(tokenContract != address(0), "DividendManager: Token contract not set");
+        IERC20 token = IERC20(tokenContract);
+        require(token.balanceOf(address(this)) >= dividend, "DividendManager: Insufficient contract balance");
+        require(token.transfer(msg.sender, dividend), "DividendManager: Transfer failed");
+
         return dividend;
     }
+
+    /**
+     * @dev 领取分红并转账（供前端直接调用）
+     */
+    function claimDividend() external {
+        uint256 dividend = pendingDividends[msg.sender];
+        require(dividend > 0, "DividendManager: No dividend");
+        require(tokenContract != address(0), "DividendManager: Token contract not set");
+
+        pendingDividends[msg.sender] = 0;
+
+        IERC20 token = IERC20(tokenContract);
+        require(token.balanceOf(address(this)) >= dividend, "DividendManager: Insufficient contract balance");
+        require(token.transfer(msg.sender, dividend), "DividendManager: Transfer failed");
+    }
+
+    /**
+     * @dev 计算用户可领取分红（别名，兼容前端调用）
+     * @param user 用户地址
+     * @return 可领取分红金额和用户权重
+     */
+    function calcUserDividend(address user) external view returns (uint256, uint256) {
+        return (pendingDividends[user], userWeights[user]);
+    }
+
+    /**
+     * @dev 设置分红池地址
+     * @param _pool 分红池合约地址
+     */
+    function setDividendPool(address _pool) external onlyOwner {
+        dividendPool = _pool;
+    }
+
+    /**
+     * @dev 设置代币合约地址
+     * @param _tokenContract 代币合约地址
+     */
+    function setTokenContract(address _tokenContract) external onlyAuthorized {
+        require(_tokenContract != address(0), "DividendManager: Invalid token contract");
+        tokenContract = _tokenContract;
+    }
+
+    /**
+     * @dev 接收BNB（用于分红池充值）
+     */
+    receive() external payable {}
 
     /**
      * @dev 获取可领取分红
@@ -163,11 +257,50 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 更新用户权重
+     * @dev 更新用户权重（旧版：直接设置权重）
      */
     function updateUserWeight(address user, uint256 weight) external onlyOwner {
         totalWeight = totalWeight - userWeights[user] + weight;
         userWeights[user] = weight;
+    }
+
+    /**
+     * @dev 更新用户权重（新版：支持等级和元素计算）
+     * @param user 用户地址
+     * @param level NFT等级
+     * @param isAdd 是否增加权重（true=增加，false=减少）
+     * @param element 元素类型（0-4对应水风火暗光）
+     */
+    function updateUserWeight(address user, uint256 level, bool isAdd, uint8 element) external onlyOwner {
+        uint256 weight = _calculateWeight(level, element);
+        
+        if (isAdd) {
+            totalWeight += weight;
+            userWeights[user] += weight;
+        } else {
+            totalWeight -= weight;
+            userWeights[user] -= weight;
+        }
+    }
+
+    /**
+     * @dev 根据等级和元素计算权重
+     */
+    function _calculateWeight(uint256 level, uint8 element) internal pure returns (uint256) {
+        bool isRare = (element == 3 || element == 4);
+        if (isRare) {
+            uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
+            if (level > 0 && level <= 5) {
+                return weights[level - 1];
+            }
+            return 76;
+        } else {
+            uint256[5] memory weights = [uint256(1), 2, 6, 18, 66];
+            if (level > 0 && level <= 5) {
+                return weights[level - 1];
+            }
+            return 66;
+        }
     }
 
     /**

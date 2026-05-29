@@ -25,7 +25,7 @@ library BattleSkills {
      * @param skills 技能映射存储
      */
     function initFireSkills(mapping(uint256 => mapping(uint256 => mapping(uint256 => BattleLib.FullSkill))) storage skills) internal {
-        _initElement0(skills);
+        _initElement2(skills);
     }
     
     /**
@@ -41,7 +41,7 @@ library BattleSkills {
      * @param skills 技能映射存储
      */
     function initWaterSkills(mapping(uint256 => mapping(uint256 => mapping(uint256 => BattleLib.FullSkill))) storage skills) internal {
-        _initElement2(skills);
+        _initElement0(skills);
     }
     
     /**
@@ -49,7 +49,7 @@ library BattleSkills {
      * @param skills 技能映射存储
      */
     function initLightSkills(mapping(uint256 => mapping(uint256 => mapping(uint256 => BattleLib.FullSkill))) storage skills) internal {
-        _initElement3(skills);
+        _initElement4(skills);
     }
     
     /**
@@ -57,7 +57,7 @@ library BattleSkills {
      * @param skills 技能映射存储
      */
     function initDarkSkills(mapping(uint256 => mapping(uint256 => mapping(uint256 => BattleLib.FullSkill))) storage skills) internal {
-        _initElement4(skills);
+        _initElement3(skills);
     }
     
     /**

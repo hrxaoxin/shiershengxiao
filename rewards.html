@@ -170,7 +170,7 @@
                 </div>
                 <div class="border-t border-gray-200 pt-3">
                     <p class="text-gray-600 mb-3">权重分配规则</p>
-                    <p class="text-blue-600 mb-2 font-medium">🌊 风/水/火属性（普通）：</p>
+                    <p class="text-blue-600 mb-2 font-medium">🌊 水/风/火属性（普通）：</p>
                     <p class="text-gray-600 mb-1">• 1阶NFT权重：1</p>
                     <p class="text-gray-600 mb-1">• 2阶NFT权重：2</p>
                     <p class="text-gray-600 mb-1">• 3阶NFT权重：6</p>
@@ -196,7 +196,7 @@
                     <h2 class="text-lg font-semibold text-gray-800">生肖奖励</h2>
                 </div>
                 <div class="flex space-x-2">
-                    <button class="btn-primary" id="claimAllBtn">一键领取所有BNB</button>
+                    <button class="btn-primary" id="claimAllBtn">一键领取所有代币</button>
                     <button class="btn-secondary" id="refreshRewardBtn">
                         <i class="fas fa-sync-alt mr-2"></i> 刷新分红
                     </button>
@@ -204,8 +204,8 @@
             </div>
 
             <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-                <span class="text-lg font-medium text-gray-800">BNB奖励</span>
-                <span class="text-lg font-bold text-gray-800" id="bnbReward">0.0000 BNB</span>
+                <span class="text-lg font-medium text-gray-800">代币奖励</span>
+                <span class="text-lg font-bold text-gray-800" id="bnbReward">0.0000 代币</span>
             </div>
         </div>
     </main>
@@ -238,10 +238,10 @@
         let account;
         let rewardManagerContract;
 
-        document.addEventListener('DOMContentLoaded', function() {
-            initWeb3();
+        document.addEventListener('DOMContentLoaded', async function() {
             initWalletUI();
             ZODIAC_COMPONENTS.injectNavigation('rewards');
+            await initWeb3();
         });
 
         function initWalletUI() {
@@ -296,17 +296,17 @@
         async function loadBNBReward() {
             try {
                 if (!rewardManagerContract || !account) {
-                    document.getElementById('bnbReward').textContent = '0.0000 BNB';
+                    document.getElementById('bnbReward').textContent = '0.0000 代币';
                     return;
                 }
                 
                 const dividendData = await rewardManagerContract.methods.calcUserDividend(account).call();
-                const baseAmount = dividendData[0];
+                const baseAmount = dividendData;
                 const bnbAmount = web3.utils.fromWei(baseAmount, 'ether');
-                document.getElementById('bnbReward').textContent = bnbAmount.substring(0, 6) + ' BNB';
+                document.getElementById('bnbReward').textContent = bnbAmount.substring(0, 6) + ' 代币';
             } catch (error) {
-                console.error('获取BNB奖励失败:', error);
-                document.getElementById('bnbReward').textContent = '0.0000 BNB';
+                console.error('获取代币分红失败:', error);
+                document.getElementById('bnbReward').textContent = '0.0000 代币';
             }
         }
 
@@ -319,7 +319,7 @@
             }
 
             const currentReward = document.getElementById('bnbReward').textContent;
-            if (currentReward === '0.0000 BNB') {
+            if (currentReward === '0.0000 代币') {
                 ZODIAC_UI.showToast('当前没有可领取的分红', 'info');
                 return;
             }
@@ -347,7 +347,7 @@
             } catch (error) {
                 ZODIAC_UI.handleError(error, '领取分红');
             } finally {
-                btn.innerHTML = '一键领取所有BNB';
+                btn.innerHTML = '一键领取所有代币';
                 btn.disabled = false;
             }
         });

@@ -1,29 +1,41 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "./NFTDataType.sol";
 import "./BattleLib.sol";
 import "./BattleSkills.sol";
 
-contract BattleSkillData {
+contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     mapping(uint256 => mapping(uint256 => mapping(uint256 => BattleLib.FullSkill))) public fullSkills;
 
-    address public owner;
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Not owner");
-        _;
+    function initialize() external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
     }
 
-    constructor() {
-        owner = msg.sender;
-    }
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function initAllSkills() external onlyOwner {
         BattleSkills.initAllSkills(fullSkills);
     }
 
     function getSkillByIndexes(uint256 elementIndex, uint256 zodiacIndex, uint256 gender) external view returns (BattleLib.FullSkill memory) {
+        return fullSkills[elementIndex][zodiacIndex][gender];
+    }
+
+    /**
+     * @dev 通过一维tokenType获取技能（与Battle.sol接口兼容）
+     * @param tokenType 生肖类型 (0-119)
+     * formula: tokenType = elementIndex * 24 + zodiacIndex * 2 + gender
+     */
+    function getSkill(uint256 tokenType) external view returns (BattleLib.FullSkill memory) {
+        uint256 elementIndex = tokenType / 24;
+        uint256 remainder = tokenType % 24;
+        uint256 zodiacIndex = remainder / 2;
+        uint256 gender = remainder % 2;
         return fullSkills[elementIndex][zodiacIndex][gender];
     }
 

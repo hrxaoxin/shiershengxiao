@@ -375,7 +375,7 @@
                 const burnerAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenBurner;
                 
                 const allowance = await tokenContract.methods.allowance(account, burnerAddress).call();
-                const isApproved = parseInt(allowance) > 0;
+                const isApproved = parseInt(allowance, 10) > 0;
                 
                 if (isApproved) {
                     document.getElementById('approvalStatus').textContent = '已授权';
@@ -569,7 +569,7 @@
 
                 if (methodName.includes('Ten')) {
                     const mintedTokenIds = [];
-                    const currentNextCardId = parseInt(await nftMintContract.methods.nextCardId().call());
+                    const currentNextCardId = parseInt(await nftMintContract.methods.nextCardId().call(), 10);
                     for (let i = 0; i < 10; i++) {
                         const tokenId = (currentNextCardId - 1 - i).toString();
                         const cardType = await nftMintContract.methods.tokenType(tokenId).call();
@@ -578,7 +578,7 @@
                     displayMultiCardInfo(mintedTokenIds);
                 } else {
                     const currentNextCardId = await nftMintContract.methods.nextCardId().call();
-                    const actualCardId = (parseInt(currentNextCardId) - 1).toString();
+                    const actualCardId = (parseInt(currentNextCardId, 10) - 1).toString();
                     const cardType = await nftMintContract.methods.tokenType(actualCardId).call();
 
                     const cardInfo = { cardId: actualCardId, cardType: cardType };
@@ -608,7 +608,7 @@
             document.getElementById('mintedCardsGrid').classList.add('hidden');
             document.getElementById('mintCountText').textContent = '恭喜您获得了一张生肖NFT';
             
-            const cardType = parseInt(cardInfo.cardType);
+            const cardType = parseInt(cardInfo.cardType, 10);
             const nftInfo = ZODIAC_UTILS.getNFTInfo(cardType);
             const desc = `${nftInfo.attrName}属性生肖·${nftInfo.zodiac}·${nftInfo.gender} · 持有可享受税收分红`;
 
@@ -626,7 +626,7 @@
             grid.innerHTML = '';
             
             cardInfos.forEach((cardInfo, index) => {
-                const cardType = parseInt(cardInfo.cardType);
+                const cardType = parseInt(cardInfo.cardType, 10);
                 const nftInfo = ZODIAC_UTILS.getNFTInfo(cardType);
                 
                 const cardDiv = document.createElement('div');

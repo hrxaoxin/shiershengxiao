@@ -7,8 +7,14 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 
 /**
  * @title MintModule
- * @dev NFT铸造模块，提供多种铸造方式
+ * @dev 【已废弃】NFT铸造模块。实际铸造入口为 TokenBurner → NFTMint 流程，本合约不再使用。
  *
+ * 保留原因：参考实现（概率计算、类型枚举），便于后续升级参考。
+ * 前端铸造流程：mint.html → TokenBurner.burnAndMint() → NFTMint.mintNormal()
+ *
+ * @deprecated 请使用 TokenBurner + NFTMint 合约进行铸造操作。
+ *
+ * 原始设计：
  * 铸造方式：
  * 1. 普通铸造 - 消耗8888代币，随机属性
  * 2. 稀有铸造 - 消耗88888代币，仅光/暗属性
@@ -19,16 +25,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * 属性概率分布：
  * - 普通铸造：水32%、火32%、风32%、暗2%、光2%
  * - 稀有铸造：暗50%、光50%
- *
- * 铸造流程：
- * 1. 验证用户余额足够支付铸造费用
- * 2. 扣除代币（部分销毁，部分进入奖励池）
- * 3. 生成随机数确定属性和性别
- * 4. 调用NFT合约铸造NFT
- * 5. 转移NFT给用户
- *
- * 升级支持：
- * - 支持UUPS代理升级模式
  */
 contract MintModule is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
@@ -426,5 +422,52 @@ contract MintModule is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      */
     function getMintCounter() external view returns (uint256) {
         return mintCounter;
+    }
+
+    // ============ 外部铸造入口（供 Burner/前端调用） ============
+
+    /**
+     * @dev 普通铸造 - 外部入口
+     * @return uint256 zodiacType
+     */
+    function mintNormal() external returns (uint256) {
+        uint256 seed = _generateSecureRandom();
+        return _mintNormal(seed);
+    }
+
+    /**
+     * @dev 稀有铸造 - 外部入口
+     * @return uint256 zodiacType
+     */
+    function mintRare() external returns (uint256) {
+        uint256 seed = _generateSecureRandom();
+        return _mintRare(seed);
+    }
+
+    /**
+     * @dev 十连普通铸造 - 外部入口
+     * @return uint256[] zodiacTypes
+     */
+    function mintNormalTen() external returns (uint256[] memory) {
+        uint256 seed = _generateSecureRandom();
+        return _mintBatch(false, seed);
+    }
+
+    /**
+     * @dev 十连稀有铸造 - 外部入口
+     * @return uint256[] zodiacTypes
+     */
+    function mintRareTen() external returns (uint256[] memory) {
+        uint256 seed = _generateSecureRandom();
+        return _mintBatch(true, seed);
+    }
+
+    /**
+     * @dev 指定生肖铸造 - 外部入口
+     * @param zodiac 生肖索引 (0-11)
+     * @return uint256[] zodiacTypes
+     */
+    function mintTargeted(uint256 zodiac) external returns (uint256[] memory) {
+        return _mintZodiac(zodiac);
     }
 }

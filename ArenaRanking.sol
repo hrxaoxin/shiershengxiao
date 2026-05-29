@@ -4,620 +4,470 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./NFTInterface.sol";
-
-interface IBattle {
-    function battle(uint256[6] calldata attackerTeam, uint256[6] calldata defenderTeam) external view returns (bool, uint256, uint256);
-}
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title ArenaRanking
- * @dev 竞技场排名合约，实现PVP竞技场系统
- *
- * 竞技场规则：
- * 1. 赛季制（默认7天）
- * 2. 每日5次挑战机会
- * 3. 可挑战虚拟玩家或真实玩家
- * 4. 排名基于积分
- *
- * 积分系统：
- * - 胜利: +25分
- * - 失败: -10分
- * - 最低积分: 0
- *
- * 奖励机制：
- * - 赛季结束后根据排名领取奖励
- *
- * 升级支持：
- * - 支持UUPS代理升级模式
+ * @dev 竞技场排名与赛季管理合约（优化版：支持自动化结算）
  */
 contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
-    using SafeERC20 for IERC20;
+    struct PlayerRecord {
+        uint256 score;
+        uint256 wins;
+        uint256 losses;
+        uint256 lastBattleTime;
+        uint256 lastResetTime;
+        uint256 remainingAttempts;
+        uint256[] battleTeam;
+        bool hasTeam;
+        uint256 seasonId;
+    }
 
-    /**
-     * @dev 授权合约地址（Authorizer）
-     */
-    address public authorizer;
-
-    /**
-     * @dev 战斗合约地址
-     */
-    address public battleContract;
-
-    /**
-     * @dev 赛季信息结构体
-     */
-    struct Season {
+    struct SeasonInfo {
         uint256 seasonId;
         uint256 startTime;
         uint256 endTime;
-        uint256 totalRewards;
         bool isActive;
+        bool isSettled;
+        uint256 totalPlayers;
+        uint256 rewardPool;
     }
 
-    /**
-     * @dev 玩家排名信息
-     */
-    struct PlayerRanking {
-        address player;
-        uint256 score;
-        uint256 tier;
+    struct LeaderboardEntry {
+        address playerAddress;
+        uint256 points;
         uint256 wins;
         uint256 losses;
-        uint256 lastChallengeTime;
+        bool isMock;
     }
 
-    /**
-     * @dev 虚拟玩家配置
-     */
-    struct MockPlayer {
-        uint256 score;
-        uint256 tier;
-        uint256[6] team;
-    }
+    mapping(address => PlayerRecord) public players;
+    mapping(uint256 => SeasonInfo) public seasons;
+    
+    mapping(uint256 => address[]) public seasonRankings;
+    mapping(uint256 => mapping(address => uint256)) public playerRankIndex;
 
-    /**
-     * @dev 虚拟玩家列表
-     */
-    MockPlayer[] public mockPlayers;
-
-    /**
-     * @dev 排名列表
-     */
-    PlayerRanking[] public rankings;
-
-    /**
-     * @dev 当前赛季
-     */
-    Season public currentSeason;
-
-    /**
-     * @dev 玩家每日挑战次数
-     * player => challengesRemaining
-     */
-    mapping(address => uint256) public dailyChallenges;
-
-    /**
-     * @dev 玩家上次重置时间
-     */
-    mapping(address => uint256) public lastResetTime;
-
-    /**
-     * @dev 玩家积分映射
-     */
-    mapping(address => uint256) public playerScores;
-
-    /**
-     * @dev 代币合约地址
-     */
+    uint256 public currentSeasonId;
+    uint256 public seasonDuration = 7 days;
+    uint256 public baseRewardPerWin = 10 ether;
+    
+    address public rewardTokenContract;
+    address public authorizer;
+    address public battleContract;
+    address public nftContract;
     address public tokenContract;
+    
+    uint256 public constant DAILY_ATTEMPTS = 10;
+    uint256 public rechargeCost;
+    uint256 public seasonRewardRate;
 
-    /**
-     * @dev 奖励池地址
-     */
-    address public rewardPool;
-
-    /**
-     * @dev 赛季奖励配置 [第一名, 第二名, 第三名]
-     */
-    uint256[3] public seasonRewards;
-
-    /**
-     * @dev 玩家赛季奖励领取记录
-     * player => rewardAmount
-     */
-    mapping(address => uint256) public seasonRewardsClaimed;
-
-    /**
-     * @dev 玩家信息映射
-     */
-    mapping(address => PlayerRanking) public playerInfo;
-
-    /**
-     * @dev 挑战胜利得分
-     */
-    uint256 public constant WIN_SCORE = 25;
-
-    /**
-     * @dev 挑战失败扣分
-     */
-    uint256 public constant LOSS_SCORE = 10;
-
-    /**
-     * @dev 每日挑战次数
-     */
-    uint256 public constant DAILY_CHALLENGES = 5;
-
-    /**
-     * @dev 赛季时长（秒）
-     */
-    uint256 public constant SEASON_DURATION = 7 days;
-
-    /**
-     * @dev 初始化函数
-     * @param _authorizer 授权合约地址
-     */
-    function initialize(address _authorizer) external initializer {
+    function initialize(address _battleContract, address _nftContract, address _tokenContract) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
-        authorizer = _authorizer;
-    }
-
-    /**
-     * @dev UUPS升级授权
-     */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    /**
-     * @dev 设置授权合约地址
-     * @param a 授权合约地址
-     */
-    function setAuthorizer(address a) external onlyOwner {
-        authorizer = a;
-    }
-
-    /**
-     * @dev 设置代币合约地址
-     * @param _tokenContract 代币合约地址
-     */
-    function setTokenContract(address _tokenContract) external onlyAuthorized {
-        require(_tokenContract != address(0), "ArenaRanking: Invalid token contract");
-        tokenContract = _tokenContract;
-        emit TokenContractSet(_tokenContract);
-    }
-
-    /**
-     * @dev 设置奖励池地址
-     * @param _rewardPool 奖励池地址
-     */
-    function setRewardPool(address _rewardPool) external onlyAuthorized {
-        require(_rewardPool != address(0), "ArenaRanking: Invalid reward pool");
-        rewardPool = _rewardPool;
-        emit RewardPoolSet(_rewardPool);
-    }
-
-    /**
-     * @dev 设置战斗合约地址
-     * @param _battleContract 战斗合约地址
-     */
-    function setBattleContract(address _battleContract) external onlyAuthorized {
-        require(_battleContract != address(0), "ArenaRanking: Invalid battle contract");
         battleContract = _battleContract;
-        emit BattleContractSet(_battleContract);
+        nftContract = _nftContract;
+        tokenContract = _tokenContract;
+        _startNewSeason();
     }
 
-    /**
-     * @dev 设置赛季奖励金额
-     * @param firstReward 第一名奖励
-     * @param secondReward 第二名奖励
-     * @param thirdReward 第三名奖励
-     */
-    function setSeasonRewards(uint256 firstReward, uint256 secondReward, uint256 thirdReward) external onlyOwner {
-        seasonRewards[0] = firstReward;
-        seasonRewards[1] = secondReward;
-        seasonRewards[2] = thirdReward;
-        emit SeasonRewardsSet(firstReward, secondReward, thirdReward);
-    }
+    function setAuthorizer(address a) external onlyOwner { authorizer = a; }
+    function setBattleContract(address a) external onlyOwner { battleContract = a; }
+    function setNFTContract(address a) external onlyOwner { nftContract = a; }
+    function setTokenContract(address a) external onlyOwner { tokenContract = a; }
+    function setRechargeCost(uint256 cost) external onlyOwner { rechargeCost = cost; }
+    function setSeasonRewardRate(uint256 rate) external onlyOwner { seasonRewardRate = rate; }
 
-    /**
-     * @dev 检查是否为授权调用者（owner或authorizer）
-     */
     modifier onlyAuthorized() {
         require(msg.sender == owner() || msg.sender == authorizer, "ArenaRanking: Not authorized");
         _;
     }
 
-    /**
-     * @dev 挑战事件
-     */
-    event ChallengeResult(
-        address indexed player,
-        bool isVictory,
-        int256 scoreChange,
-        uint256 newScore
-    );
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    /**
-     * @dev 代币合约地址设置事件
-     */
-    event TokenContractSet(address indexed tokenContract);
+    event ScoreUpdated(address indexed player, uint256 newScore, uint256 seasonId);
+    event SeasonStarted(uint256 indexed seasonId, uint256 startTime);
+    event SeasonSettled(uint256 indexed seasonId, uint256 endTime);
+    event RewardClaimed(address indexed player, uint256 amount, uint256 seasonId);
+    event ChallengeResult(address indexed challenger, bool isVictory);
 
-    /**
-     * @dev 奖励池地址设置事件
-     */
-    event RewardPoolSet(address indexed rewardPool);
-
-    /**
-     * @dev 赛季奖励配置设置事件
-     */
-    event SeasonRewardsSet(uint256 first, uint256 second, uint256 third);
-
-    /**
-     * @dev 战斗合约地址设置事件
-     */
-    event BattleContractSet(address indexed battleContract);
-
-    /**
-     * @dev 初始化赛季
-     */
-    function initializeSeason() external onlyOwner {
-        currentSeason = Season({
-            seasonId: 1,
-            startTime: block.timestamp,
-            endTime: block.timestamp + SEASON_DURATION,
-            totalRewards: 1000 * 10**18,
-            isActive: true
-        });
+    function _resetAttempts(address player) internal {
+        PlayerRecord storage record = players[player];
+        record.lastResetTime = block.timestamp;
+        record.remainingAttempts = DAILY_ATTEMPTS;
     }
 
-    /**
-     * @dev 挑战虚拟玩家
-     */
-    function challengeMockPlayer(
-        uint256[6] calldata playerTeam,
-        uint256 mockIndex
-    ) external returns (bool) {
-        require(playerTeam.length == 6, "ArenaRanking: Invalid team size");
-        require(mockIndex < mockPlayers.length, "ArenaRanking: Invalid mock player");
-
-        _resetDailyChallengesIfNeeded(msg.sender);
-
-        require(dailyChallenges[msg.sender] > 0, "ArenaRanking: No challenges left");
-        dailyChallenges[msg.sender]--;
-
-        bool victory = _simulateBattleResult(playerTeam, mockPlayers[mockIndex].team);
-
-        if (victory) {
-            playerScores[msg.sender] += WIN_SCORE;
-            emit ChallengeResult(msg.sender, true, int256(WIN_SCORE), playerScores[msg.sender]);
-        } else {
-            if (playerScores[msg.sender] >= LOSS_SCORE) {
-                playerScores[msg.sender] -= LOSS_SCORE;
-            } else {
-                playerScores[msg.sender] = 0;
-            }
-            emit ChallengeResult(msg.sender, false, int256(LOSS_SCORE), playerScores[msg.sender]);
+    function _checkAndResetAttempts(address player) internal {
+        PlayerRecord storage record = players[player];
+        if (block.timestamp >= record.lastResetTime + 24 hours) {
+            _resetAttempts(player);
         }
-
-        return victory;
     }
 
-    /**
-     * @dev 玩家队伍映射
-     */
-    mapping(address => uint256[6]) public playerTeams;
+    function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external returns (bool success) {
+        require(nftContract != address(0), "ArenaRanking: NFT contract not set");
+        
+        PlayerRecord storage record = players[msg.sender];
+        _checkAndResetAttempts(msg.sender);
+        require(record.remainingAttempts > 0, "ArenaRanking: No attempts left");
+        record.remainingAttempts--;
 
-    /**
-     * @dev 设置玩家战斗队伍
-     */
-    function setBattleTeam(uint256[6] calldata team) external {
-        require(team.length == 6, "ArenaRanking: Invalid team size");
-        playerTeams[msg.sender] = team;
+        _validateTeamOwnership(msg.sender, playerTeam);
+
+        (bool success_, uint256 winner, ) = IBattle(battleContract).challenge(
+            playerTeam[0],
+            uint256(mockIndex + 1) * 1000,
+            playerTeam,
+            _generateMockTeam(mockIndex)
+        );
+
+        _updateScore(msg.sender, winner == 1);
+        emit ChallengeResult(msg.sender, winner == 1);
+        return success_;
     }
 
-    /**
-     * @dev 获取玩家战斗队伍（前端调用）
-     */
-    function getPlayerBattleTeam(address player) external view returns (uint256[6] memory) {
-        return playerTeams[player];
-    }
-
-    /**
-     * @dev 挑战真实玩家
-     */
-    function challengeRealPlayer(
-        address challengedPlayer,
-        uint256[6] calldata playerTeam
-    ) external returns (bool) {
+    function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external returns (bool success) {
+        require(nftContract != address(0), "ArenaRanking: NFT contract not set");
         require(challengedPlayer != msg.sender, "ArenaRanking: Cannot challenge self");
-        require(playerTeam.length == 6, "ArenaRanking: Invalid team size");
+        
+        PlayerRecord storage challengerRecord = players[msg.sender];
+        PlayerRecord storage challengedRecord = players[challengedPlayer];
+        
+        _checkAndResetAttempts(msg.sender);
+        require(challengerRecord.remainingAttempts > 0, "ArenaRanking: No attempts left");
+        challengerRecord.remainingAttempts--;
 
-        _resetDailyChallengesIfNeeded(msg.sender);
-        require(dailyChallenges[msg.sender] > 0, "ArenaRanking: No challenges left");
+        _validateTeamOwnership(msg.sender, playerTeam);
 
-        dailyChallenges[msg.sender]--;
+        uint256[6] memory challengedTeam = challengedRecord.battleTeam;
+        require(challengedRecord.hasTeam && challengedTeam.length == 6, "ArenaRanking: Target has no team");
 
-        uint256[6] memory defenderTeam = playerTeams[challengedPlayer];
-        require(defenderTeam[0] != 0 || defenderTeam[1] != 0, "ArenaRanking: Defender has no team");
+        (bool success_, uint256 winner, ) = IBattle(battleContract).challenge(
+            playerTeam[0],
+            challengedTeam[0],
+            playerTeam,
+            challengedTeam
+        );
 
-        bool victory = _executeBattle(playerTeam, defenderTeam);
-
-        if (victory) {
-            playerScores[msg.sender] += WIN_SCORE;
-            playerScores[challengedPlayer] = playerScores[challengedPlayer] >= LOSS_SCORE
-                ? playerScores[challengedPlayer] - LOSS_SCORE
-                : 0;
-            emit ChallengeResult(msg.sender, true, int256(WIN_SCORE), playerScores[msg.sender]);
-        } else {
-            if (playerScores[msg.sender] >= LOSS_SCORE) {
-                playerScores[msg.sender] -= LOSS_SCORE;
-            } else {
-                playerScores[msg.sender] = 0;
-            }
-            emit ChallengeResult(msg.sender, false, int256(-LOSS_SCORE), playerScores[msg.sender]);
-        }
-
-        return victory;
+        _updateScore(msg.sender, winner == 1);
+        _updateScore(challengedPlayer, winner == 2);
+        emit ChallengeResult(msg.sender, winner == 1);
+        return success_;
     }
 
-    /**
-     * @dev 执行战斗（调用Battle合约）
-     */
-    function _executeBattle(uint256[6] memory attackerTeam, uint256[6] memory defenderTeam) internal view returns (bool) {
-        if (battleContract == address(0)) {
-            return _simulateBattleResult(attackerTeam, defenderTeam);
-        }
-        (bool success, uint256 winner, ) = IBattle(battleContract).battle(attackerTeam, defenderTeam);
-        return success && winner == 1;
-    }
-
-    /**
-     * @dev 获取玩家排名
-     */
-    function getPlayerRank(address player) external view returns (uint256) {
-        return playerScores[player];
-    }
-
-    /**
-     * @dev 获取排名信息
-     */
-    function getRankings(
-        uint256 startIndex,
-        uint256 endIndex
-    ) external view returns (
-        address[] memory players,
-        uint256[] memory scores,
-        uint256[] memory tiers
-    ) {
-        uint256 length = endIndex - startIndex + 1;
-        players = new address[](length);
-        scores = new uint256[](length);
-        tiers = new uint256[](length);
-
-        return (players, scores, tiers);
-    }
-
-    /**
-     * @dev 获取排行榜 (前端调用)
-     */
-    function getLeaderboard(uint256 limit) external view returns (
-        address[] memory playerAddresses,
-        uint256[] memory playerScores,
-        uint256[] memory playerWins,
-        uint256[] memory playerLosses,
-        bool[] memory isMockPlayer
-    ) {
-        uint256 actualLimit = limit > rankings.length ? rankings.length : limit;
-        playerAddresses = new address[](actualLimit);
-        playerScores = new uint256[](actualLimit);
-        playerWins = new uint256[](actualLimit);
-        playerLosses = new uint256[](actualLimit);
-        isMockPlayer = new bool[](actualLimit);
-
-        for (uint256 i = 0; i < actualLimit; i++) {
-            PlayerRanking memory ranking = rankings[i];
-            playerAddresses[i] = ranking.player;
-            playerScores[i] = ranking.score;
-            playerWins[i] = ranking.wins;
-            playerLosses[i] = ranking.losses;
-            isMockPlayer[i] = i < mockPlayers.length;
-        }
-
-        return (playerAddresses, playerScores, playerWins, playerLosses, isMockPlayer);
-    }
-
-    /**
-     * @dev 获取赛季信息
-     */
-    function getSeasonInfo() external view returns (
-        uint256 seasonId,
-        uint256 startTime,
-        uint256 endTime
-    ) {
-        return (currentSeason.seasonId, currentSeason.startTime, currentSeason.endTime);
-    }
-
-    /**
-     * @dev 重置每日挑战次数
-     */
-    function _resetDailyChallengesIfNeeded(address player) internal {
-        if (block.timestamp - lastResetTime[player] >= 24 hours) {
-            dailyChallenges[player] = DAILY_CHALLENGES;
-            lastResetTime[player] = block.timestamp;
-        }
-    }
-
-    /**
-     * @dev 模拟战斗结果
-     */
-    function _simulateBattleResult(
-        uint256[6] memory team1,
-        uint256[6] memory team2
-    ) internal view returns (bool) {
-        uint256 seed = uint256(keccak256(abi.encodePacked(
-            block.timestamp,
-            block.number,
-            msg.sender,
-            team1[0],
-            team2[0]
-        )));
-        return seed % 100 > 40;
-    }
-
-    /**
-     * @dev 添加虚拟玩家
-     */
-    function addMockPlayer(
-        uint256 score,
-        uint256 tier,
-        uint256[6] memory team
-    ) external onlyOwner {
-        mockPlayers.push(MockPlayer({
-            score: score,
-            tier: tier,
-            team: team
-        }));
-    }
-
-    /**
-     * @dev 获取虚拟玩家数量
-     */
-    function getMockPlayerCount() external view returns (uint256) {
-        return mockPlayers.length;
-    }
-
-    /**
-     * @dev 结束当前赛季
-     */
-    function endSeason() external onlyOwner {
+    function _updateScore(address player, bool isWinner) internal {
+        SeasonInfo storage currentSeason = seasons[currentSeasonId];
         require(currentSeason.isActive, "ArenaRanking: Season not active");
-        require(block.timestamp >= currentSeason.endTime, "ArenaRanking: Season not ended");
 
-        currentSeason.isActive = false;
-
-        emit SeasonEnded(currentSeason.seasonId, block.timestamp);
-    }
-
-    /**
-     * @dev 领取赛季奖励
-     */
-    function claimSeasonReward() external returns (uint256) {
-        require(!currentSeason.isActive, "ArenaRanking: Season still active");
-        require(seasonRewardsClaimed[msg.sender] == 0, "ArenaRanking: Reward already claimed");
-
-        uint256 playerScore = playerScores[msg.sender];
-        require(playerScore > 0, "ArenaRanking: No score");
-
-        uint256 reward = _calculateSeasonReward(playerScore);
-        require(reward > 0, "ArenaRanking: No reward");
-
-        require(tokenContract != address(0), "ArenaRanking: Token contract not set");
-        require(rewardPool != address(0), "ArenaRanking: Reward pool not set");
-
-        IERC20 token = IERC20(tokenContract);
-        require(token.balanceOf(rewardPool) >= reward, "ArenaRanking: Insufficient reward pool balance");
-
-        token.safeTransferFrom(rewardPool, msg.sender, reward);
-
-        seasonRewardsClaimed[msg.sender] = reward;
-
-        emit SeasonRewardClaimed(msg.sender, reward);
-
-        return reward;
-    }
-
-    /**
-     * @dev 计算赛季奖励（内部函数）
-     */
-    function _calculateSeasonReward(uint256 score) internal view returns (uint256) {
-        if (score >= 1000) {
-            return seasonRewards[0];
-        } else if (score >= 500) {
-            return seasonRewards[1];
-        } else if (score >= 100) {
-            return seasonRewards[2];
+        PlayerRecord storage record = players[player];
+        
+        if (record.seasonId != currentSeasonId) {
+            record.seasonId = currentSeasonId;
+            record.score = 1000;
+            record.wins = 0;
+            record.losses = 0;
+            record.lastBattleTime = block.timestamp;
+            record.lastResetTime = block.timestamp;
+            record.remainingAttempts = DAILY_ATTEMPTS;
+            seasonRankings[currentSeasonId].push(player);
+            playerRankIndex[currentSeasonId][player] = seasonRankings[currentSeasonId].length - 1;
+            currentSeason.totalPlayers++;
         }
-        return 0;
-    }
 
-    /**
-     * @dev 获取赛季奖励金额
-     */
-    function getSeasonReward(address player) external view returns (uint256) {
-        if (currentSeason.isActive || seasonRewardsClaimed[player] > 0) {
-            return 0;
+        if (isWinner) {
+            record.score += 25;
+            record.wins++;
+        } else {
+            if (record.score > 25) record.score -= 25;
+            else record.score = 0;
+            record.losses++;
         }
-        uint256 score = playerScores[player];
-        return _calculateSeasonReward(score);
+        record.lastBattleTime = block.timestamp;
+
+        _updateRanking(player, record.score);
+        emit ScoreUpdated(player, record.score, currentSeasonId);
     }
 
-    /**
-     * @dev 赛季结束事件
-     */
-    event SeasonEnded(uint256 indexed seasonId, uint256 endTime);
+    function _updateRanking(address player, uint256 newScore) internal {
+        uint256 seasonId = currentSeasonId;
+        uint256 currentIndex = playerRankIndex[seasonId][player];
+        address[] storage rankings = seasonRankings[seasonId];
 
-    /**
-     * @dev 赛季奖励领取事件
-     */
-    event SeasonRewardClaimed(address indexed player, uint256 amount);
-
-    /**
-     * @dev 获取玩家剩余挑战次数（与前端ABI兼容）
-     */
-    function getRemainingChallenges(address player) external view returns (uint256) {
-        return dailyChallenges[player];
+        for (int256 i = int256(currentIndex); i > 0; i--) {
+            address prevPlayer = rankings[uint256(i - 1)];
+            if (players[prevPlayer].score >= newScore) break;
+            
+            rankings[uint256(i)] = prevPlayer;
+            playerRankIndex[seasonId][prevPlayer] = uint256(i);
+            rankings[uint256(i - 1)] = player;
+            playerRankIndex[seasonId][player] = uint256(i - 1);
+        }
     }
 
-    /**
-     * @dev 获取玩家剩余挑战次数（前端调用的函数名）
-     */
-    function getRemainingAttempts(address player) external view returns (uint256) {
-        return dailyChallenges[player];
+    function _generateMockTeam(uint256 mockIndex) internal pure returns (uint256[6] memory) {
+        uint256[6] memory team;
+        for (uint256 i = 0; i < 6; i++) {
+            team[i] = mockIndex * 100 + i + 1;
+        }
+        return team;
     }
 
-    /**
-     * @dev 充值挑战次数
-     */
-    function rechargeChallengeAttempts() external {
-        // 实现充值逻辑，这里可以添加代币消耗
-        dailyChallenges[msg.sender] = DAILY_CHALLENGES;
-        lastResetTime[msg.sender] = block.timestamp;
+    function setBattleTeam(uint256[6] calldata tokenIds) external {
+        PlayerRecord storage record = players[msg.sender];
+        record.battleTeam = tokenIds;
+        record.hasTeam = true;
     }
 
-    /**
-     * @dev 获取当前奖励池
-     */
-    function getCurrentRewardPool() external view returns (uint256) {
-        return IERC20(tokenContract).balanceOf(rewardPool);
+    function clearBattleTeam() external {
+        PlayerRecord storage record = players[msg.sender];
+        delete record.battleTeam;
+        record.hasTeam = false;
     }
 
-    /**
-     * @dev 获取赛季奖励率
-     */
-    function seasonRewardRate() external view returns (uint256) {
-        return 100; // 默认100%
+    function rechargeChallengeAttempts() external payable {
+        require(msg.value >= rechargeCost, "ArenaRanking: Insufficient payment");
+        PlayerRecord storage record = players[msg.sender];
+        record.remainingAttempts += DAILY_ATTEMPTS;
     }
 
-    /**
-     * @dev 根据排名获取奖励
-     */
-    function getRewardForRank(uint256 rank) external view returns (uint256) {
-        if (rank == 1) return seasonRewards[0];
-        if (rank == 2) return seasonRewards[1];
-        if (rank == 3) return seasonRewards[2];
-        return 0;
+    function startNewSeason() external onlyAuthorized {
+        require(block.timestamp >= seasons[currentSeasonId].endTime, "ArenaRanking: Current season not ended");
+        _settleCurrentSeason();
+        _startNewSeason();
     }
 
-    /**
-     * @dev 获取待领取奖励（与前端ABI兼容）
-     */
-    function getPendingRewards(address player) external view returns (uint256) {
-        return seasonRewardsClaimed[player];
+    function _startNewSeason() internal {
+        currentSeasonId++;
+        seasons[currentSeasonId] = SeasonInfo({
+            seasonId: currentSeasonId,
+            startTime: block.timestamp,
+            endTime: block.timestamp + seasonDuration,
+            isActive: true,
+            isSettled: false,
+            totalPlayers: 0,
+            rewardPool: 0
+        });
+        emit SeasonStarted(currentSeasonId, block.timestamp);
+    }
+
+    function _settleCurrentSeason() internal {
+        SeasonInfo storage season = seasons[currentSeasonId];
+        season.isActive = false;
+        season.isSettled = true;
+        emit SeasonSettled(currentSeasonId, block.timestamp);
+    }
+
+    function settleSeason(uint256 seasonId) external onlyAuthorized {
+        require(seasonId <= currentSeasonId, "ArenaRanking: Invalid season");
+        require(!seasons[seasonId].isSettled, "ArenaRanking: Already settled");
+        
+        if (seasonId == currentSeasonId) {
+            seasons[seasonId].isActive = false;
+        }
+        seasons[seasonId].isSettled = true;
+        emit SeasonSettled(seasonId, block.timestamp);
+    }
+
+    function claimReward(uint256 seasonNumber) external {
+        require(seasons[seasonNumber].isSettled, "ArenaRanking: Season not settled");
+
+        PlayerRecord storage record = players[msg.sender];
+        require(record.seasonId == seasonNumber, "ArenaRanking: No record in this season");
+
+        uint256 rank = playerRankIndex[seasonNumber][msg.sender] + 1;
+        require(rank > 0, "ArenaRanking: Player not found in rankings");
+
+        uint256 reward = _calculateRankReward(rank, seasons[seasonNumber].rewardPool);
+        require(reward > 0, "ArenaRanking: No reward for this rank");
+
+        IERC20 rewardToken = IERC20(rewardTokenContract);
+        require(rewardToken.balanceOf(address(this)) >= reward, "ArenaRanking: Insufficient reward balance");
+        
+        require(rewardToken.transfer(msg.sender, reward), "ArenaRanking: Transfer failed");
+        
+        emit RewardClaimed(msg.sender, reward, seasonNumber);
+    }
+
+    function claimSeasonReward() external {
+        claimReward(currentSeasonId);
     }
 
     function getPendingRewards(uint256 seasonNumber) external view returns (uint256) {
+        if (!seasons[seasonNumber].isSettled) return 0;
+        
+        PlayerRecord storage record = players[msg.sender];
+        if (record.seasonId != seasonNumber) return 0;
+        
+        uint256 rank = playerRankIndex[seasonNumber][msg.sender] + 1;
+        if (rank == 0) return 0;
+        
+        return _calculateRankReward(rank, seasons[seasonNumber].rewardPool);
+    }
+
+    function getPendingRewards(address player) external view returns (uint256) {
+        PlayerRecord storage record = players[player];
+        if (!seasons[record.seasonId].isSettled) return 0;
+        
+        uint256 rank = playerRankIndex[record.seasonId][player] + 1;
+        if (rank == 0) return 0;
+        
+        return _calculateRankReward(rank, seasons[record.seasonId].rewardPool);
+    }
+
+    function getPlayerRank(address player) external view returns (uint256) {
+        return playerRankIndex[currentSeasonId][player] + 1;
+    }
+
+    function _calculateRankReward(uint256 rank, uint256 pool) internal pure returns (uint256) {
+        if (rank == 1) return pool * 30 / 100;
+        if (rank == 2) return pool * 20 / 100;
+        if (rank == 3) return pool * 15 / 100;
+        if (rank <= 10) return pool * 5 / 100;
+        if (rank <= 50) return pool * 2 / 100;
         return 0;
     }
+
+    function getSeasonInfo(uint256 seasonId) external view returns (uint256 startTime, uint256 endTime, bool isActive, bool isSettled, uint256 totalPlayers) {
+        SeasonInfo memory s = seasons[seasonId];
+        return (s.startTime, s.endTime, s.isActive, s.isSettled, s.totalPlayers);
+    }
+
+    function getPlayerRecord(address player) external view returns (uint256 score, uint256 wins, uint256 losses, uint256 seasonId) {
+        PlayerRecord memory r = players[player];
+        return (r.score, r.wins, r.losses, r.seasonId);
+    }
+
+    function getTopPlayers(uint256 seasonId, uint256 count) external view returns (address[] memory playerAddrs, uint256[] memory scores) {
+        require(seasonId <= currentSeasonId, "ArenaRanking: Invalid season");
+        uint256 len = seasonRankings[seasonId].length;
+        if (count > len) count = len;
+        
+        playerAddrs = new address[](count);
+        scores = new uint256[](count);
+        
+        for (uint256 i = 0; i < count; i++) {
+            playerAddrs[i] = seasonRankings[seasonId][i];
+            scores[i] = players[playerAddrs[i]].score;
+        }
+        return (playerAddrs, scores);
+    }
+
+    function getLeaderboard(uint256 limit) external view returns (LeaderboardEntry[] memory) {
+        uint256 len = seasonRankings[currentSeasonId].length;
+        if (limit > len) limit = len;
+        
+        LeaderboardEntry[] memory entries = new LeaderboardEntry[](limit);
+        
+        for (uint256 i = 0; i < limit; i++) {
+            address player = seasonRankings[currentSeasonId][i];
+            PlayerRecord memory record = players[player];
+            entries[i] = LeaderboardEntry({
+                playerAddress: player,
+                points: record.score,
+                wins: record.wins,
+                losses: record.losses,
+                isMock: false
+            });
+        }
+        return entries;
+    }
+
+    function getPlayerBattleTeam(address player) external view returns (uint256[6] memory) {
+        PlayerRecord storage record = players[player];
+        uint256[6] memory team;
+        if (record.hasTeam && record.battleTeam.length >= 6) {
+            for (uint256 i = 0; i < 6; i++) {
+                team[i] = record.battleTeam[i];
+            }
+        }
+        return team;
+    }
+
+    function getRemainingAttempts(address player) external view returns (uint256) {
+        PlayerRecord storage record = players[player];
+        PlayerRecord memory temp = record;
+        if (block.timestamp >= temp.lastResetTime + 24 hours) {
+            return DAILY_ATTEMPTS;
+        }
+        return temp.remainingAttempts;
+    }
+
+    function playerScores(address player) external view returns (uint256) {
+        return players[player].score;
+    }
+
+    function playerInfo(address player) external view returns (uint256, uint256, uint256) {
+        PlayerRecord storage record = players[player];
+        return (record.score, record.wins, record.losses);
+    }
+
+    function getCurrentRewardPool() external view returns (uint256) {
+        return seasons[currentSeasonId].rewardPool;
+    }
+
+    function getSeasonReward(address player) external view returns (uint256) {
+        return getPendingRewards(player);
+    }
+
+    function seasonRewardsClaimed(address player) external view returns (bool) {
+        return pendingRewards[currentSeasonId][player] == 0;
+    }
+
+    function currentSeason() external view returns (uint256, uint256, uint256, bool) {
+        SeasonInfo storage season = seasons[currentSeasonId];
+        return (currentSeasonId, season.startTime, season.endTime, season.isActive);
+    }
+
+    function calculateRewardForRank(uint256 rank) external view returns (uint256) {
+        return _calculateRankReward(rank, seasons[currentSeasonId].rewardPool);
+    }
+
+    function getRewardForRank(uint256 rank) external view returns (uint256) {
+        return _calculateRankReward(rank, seasons[currentSeasonId].rewardPool);
+    }
+
+    function calculateSeasonRewards(uint256 seasonNumber) external onlyAuthorized {
+    }
+
+    function setRewardTokenContract(address _tokenContract) external onlyAuthorized {
+        require(_tokenContract != address(0), "ArenaRanking: Invalid token address");
+        rewardTokenContract = _tokenContract;
+    }
+
+    function setSeasonDuration(uint256 duration) external onlyOwner {
+        require(duration >= 1 days, "ArenaRanking: Duration too short");
+        seasonDuration = duration;
+    }
+
+    function addRewardToPool(uint256 amount) external onlyAuthorized {
+        require(rewardTokenContract != address(0), "ArenaRanking: Reward token not set");
+        require(IERC20(rewardTokenContract).transferFrom(msg.sender, address(this), amount), "ArenaRanking: Transfer failed");
+        seasons[currentSeasonId].rewardPool += amount;
+    }
+
+    /**
+     * @dev 验证用户是否拥有战队中的所有NFT
+     * @param owner 用户地址
+     * @param team 战队NFT ID数组
+     */
+    function _validateTeamOwnership(address owner, uint256[6] calldata team) internal view {
+        INFT nft = INFT(nftContract);
+        for (uint256 i = 0; i < 6; i++) {
+            uint256 tokenId = team[i];
+            require(tokenId > 0, "ArenaRanking: Invalid token ID");
+            require(nft.ownerOf(tokenId) == owner, "ArenaRanking: Not owner of token");
+        }
+    }
+}
+
+interface IBattle {
+    function challenge(
+        uint256 challengerId,
+        uint256 challengedId,
+        uint256[6] calldata challengerTeam,
+        uint256[6] calldata challengedTeam
+    ) external returns (bool, uint256, uint256[] memory);
+}
+
+interface INFT {
+    function ownerOf(uint256 tokenId) external view returns (address);
 }

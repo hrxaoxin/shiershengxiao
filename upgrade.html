@@ -255,7 +255,10 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <button id="upgradeWithNftBtn" class="btn-primary w-full">使用NFT升阶</button>
                         <button id="upgradeWithTokenBtn" class="btn-secondary w-full">使用代币升阶</button>
-                        <button id="upgradeWithUSDValueBtn" class="btn-secondary w-full">使用USDT价值代币升阶</button>
+                        <div>
+                            <button id="upgradeWithUSDValueBtn" class="btn-secondary w-full">使用USDT价值代币升阶</button>
+                            <p class="text-xs text-yellow-600 mt-2 text-center">⚠ 基于PancakeSwap实时价格，存在价格波动风险</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -271,9 +274,10 @@
         let web3;
         let account;
         let nftContract;
+        let tokenContract;
         let selectedNft = null;
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             particlesJS('particles-js', {
                 particles: {
                     number: { value: 80, density: { enable: true, value_area: 800 } },
@@ -292,10 +296,11 @@
                 retina_detect: true
             });
 
-            initWeb3();
+
             initWalletUI();
             initEventListeners();
             ZODIAC_COMPONENTS.injectNavigation('upgrade');
+            await initWeb3();
         });
 
         function initEventListeners() {
@@ -457,7 +462,7 @@
                 return;
             }
 
-            const requiredNFTs = parseInt(selectedNft.level);
+            const requiredNFTs = parseInt(selectedNft.level, 10);
             const confirmed = await ZODIAC_UI.showConfirmModal(
                 '升级确认',
                 `确认使用NFT升阶？\n\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level} → ${selectedNft.level + 1}\n将消耗 ${requiredNFTs} 张相同类型的NFT`
@@ -467,7 +472,8 @@
 
             try {
                 ZODIAC_UI.showLoading('升级中...');
-                const result = await nftUpdateContract.methods.upgradeWithNFT(selectedNft.id).send({ from: account });
+                const upgradeGas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithNFT', [selectedNft.id], account);
+                const result = await nftUpdateContract.methods.upgradeWithNFT(selectedNft.id).send({ from: account, gas: upgradeGas });
                 ZODIAC_UI.hideLoading();
                 await ZODIAC_UI.showSuccessModal('升级成功！', `NFT ID ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 级`);
                 await loadUserNFTs();
@@ -534,7 +540,8 @@
 
             try {
                 ZODIAC_UI.showLoading('升级中...');
-                const result = await nftUpdateContract.methods.upgradeWithUSDValue(selectedNft.id).send({ from: account });
+                const upgradeGas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithUSDValue', [selectedNft.id], account);
+                const result = await nftUpdateContract.methods.upgradeWithUSDValue(selectedNft.id).send({ from: account, gas: upgradeGas });
                 ZODIAC_UI.hideLoading();
                 await ZODIAC_UI.showSuccessModal('升级成功！', `NFT ID ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 级`);
                 await loadUserNFTs();
@@ -568,7 +575,7 @@
         }
 
         function getStars(level) {
-            return window.ZODIAC_UTILS.getStars(parseInt(level));
+            return window.ZODIAC_UTILS.getStars(parseInt(level, 10));
         }
     </script>
 </body>

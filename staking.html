@@ -341,9 +341,8 @@
         let stakingContract;
         let tokenStakingContract;
         let selectedNFTs = [];
-        let selectedNFTsRarity = []; // 记录每个选中NFT是否稀有
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             particlesJS('particles-js', {
                 particles: {
                     number: { value: 80, density: { enable: true, value_area: 800 } },
@@ -358,10 +357,10 @@
                 retina_detect: true
             });
 
-            initWeb3();
             initWalletUI();
             initTabSwitch();
             ZODIAC_COMPONENTS.injectNavigation('staking');
+            await initWeb3();
         });
 
         function initTabSwitch() {
@@ -487,12 +486,12 @@
         }
 
         function isNFTLevelEligible(level) {
-            return parseInt(level) >= 5;
+            return parseInt(level, 10) >= 5;
         }
 
         function isNFTRare(tokenType) {
             // 暗属性(72-95)和光属性(96-119)为稀有NFT
-            return parseInt(tokenType) >= 72;
+            return parseInt(tokenType, 10) >= 72;
         }
 
         async function loadEligibleNFTs() {
@@ -538,7 +537,7 @@
                     const rarityClass = nft.isRare ? 'rarity-rare' : 'rarity-normal';
                     const rarityLabel = nft.isRare ? '稀有' : '普通';
                     html += `
-                        <div class="nft-card" onclick="toggleNFTSelection('${nft.id}', ${nft.isRare})" data-token-id="${nft.id}">
+                        <div class="nft-card" onclick="toggleNFTSelection('${nft.id}')" data-token-id="${nft.id}">
                             <img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
                             <p class="text-gray-800 text-sm truncate">${nft.name}</p>
                             <p class="text-gray-500 text-xs">${getStars(nft.level)}</p>
@@ -609,7 +608,7 @@
 
         function formatStakingTime(timestamp) {
             const now = Math.floor(Date.now() / 1000);
-            const diff = now - parseInt(timestamp);
+            const diff = now - parseInt(timestamp, 10);
             const hours = Math.floor(diff / 3600);
             const minutes = Math.floor((diff % 3600) / 60);
             const seconds = diff % 60;
@@ -635,26 +634,57 @@
 
         async function loadContractInfo() {
             try {
-                const totalStaked = await stakingContract.methods.totalStakedNFTs().call();
-                document.getElementById('totalStakedWeight').textContent = totalStaked;
+                const totalWeighted = await stakingContract.methods.totalWeightedNFTs().call();
+                document.getElementById('totalStakedWeight').textContent = totalWeighted;
             } catch (error) {
                 console.error('加载合约信息失败:', error);
                 ZODIAC_UI.showToast('加载合约信息失败: ' + error.message, 'error');
             }
         }
 
-        function toggleNFTSelection(tokenId, isRare) {
+        function toggleNFTSelection(tokenId) {
             const index = selectedNFTs.indexOf(tokenId);
+            const cardElement = document.querySelector(`[data-token-id="${tokenId}"]`);
+            
             if (index === -1) {
                 selectedNFTs.push(tokenId);
-                selectedNFTsRarity.push(isRare);
-                event.currentTarget.classList.add('selected');
+                if (cardElement) cardElement.classList.add('selected');
             } else {
                 selectedNFTs.splice(index, 1);
-                selectedNFTsRarity.splice(index, 1);
-                event.currentTarget.classList.remove('selected');
+                if (cardElement) cardElement.classList.remove('selected');
             }
+            
             document.getElementById('stakeBtn').disabled = selectedNFTs.length === 0;
+        }
+
+        async function checkAlreadyStaked(tokenId) {
+            try {
+                const stakeInfo = await stakingContract.methods.stakingInfo(tokenId).call();
+                return stakeInfo.owner !== '0x0000000000000000000000000000000000000000';
+            } catch (error) {
+                console.error('检查质押状态失败:', error);
+                return false;
+            }
+        }
+
+        async function validateSelectedNFTs() {
+            const invalidNFTs = [];
+            
+            for (const tokenId of selectedNFTs) {
+                const isStaked = await checkAlreadyStaked(tokenId);
+                if (isStaked) {
+                    invalidNFTs.push(tokenId);
+                }
+            }
+            
+            if (invalidNFTs.length > 0) {
+                showToast(`以下NFT已被质押: ${invalidNFTs.join(', ')}`, 'warning');
+                selectedNFTs = selectedNFTs.filter(id => !invalidNFTs.includes(id));
+                updateNFTDisplay();
+                return false;
+            }
+            
+            return true;
         }
 
         async function stakeNFTs() {
@@ -666,9 +696,12 @@
                 return;
             }
 
+            const isValid = await validateSelectedNFTs();
+            if (!isValid) return;
+
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认质押',
-                `将质押 ${selectedNFTs.length} 个NFT进行挖矿。\n普通NFT: ${selectedNFTsRarity.filter(r => !r).length}个\n稀有NFT: ${selectedNFTsRarity.filter(r => r).length}个`
+                `将质押 ${selectedNFTs.length} 个NFT进行挖矿。（稀有度由合约自动识别）`
             );
 
             if (!confirm) return;
@@ -678,8 +711,13 @@
             btn.textContent = '质押中...';
 
             try {
-                // 先approve所有NFT
                 for (const tokenId of selectedNFTs) {
+                    const isStaked = await checkAlreadyStaked(tokenId);
+                    if (isStaked) {
+                        console.warn(`NFT ${tokenId} 已被质押，跳过`);
+                        continue;
+                    }
+                    
                     const approveGas = await ZODIAC_WEB3.estimateGas(nftContract, 'approve', [stakingAddress, tokenId], account);
                     await nftContract.methods.approve(stakingAddress, tokenId).send({
                         from: account,
@@ -687,16 +725,14 @@
                     });
                 }
 
-                // 执行质押
-                const stakeGas = await ZODIAC_WEB3.estimateGas(stakingContract, 'stake', [selectedNFTs, selectedNFTsRarity], account);
-                await stakingContract.methods.stake(selectedNFTs, selectedNFTsRarity).send({
+                const stakeGas = await ZODIAC_WEB3.estimateGas(stakingContract, 'stake', [selectedNFTs], account);
+                await stakingContract.methods.stake(selectedNFTs).send({
                     from: account,
                     gas: stakeGas
                 });
 
                 ZODIAC_UI.showToast('质押成功！', 'success');
                 selectedNFTs = [];
-                selectedNFTsRarity = [];
                 await Promise.all([
                     loadEligibleNFTs(),
                     loadMyStakes(),
@@ -705,7 +741,7 @@
                 ]);
             } catch (error) {
                 console.error('质押失败:', error);
-                ZODIAC_UI.showToast('质押失败: ' + (error.message || '未知错误'), 'error');
+                ZODIAC_UI.handleContractError(error, '质押');
             } finally {
                 btn.disabled = false;
                 btn.textContent = '质押选中的NFT';
@@ -767,7 +803,7 @@
         }
 
         function getStars(level) {
-            return window.ZODIAC_UTILS.getStars(parseInt(level));
+            return window.ZODIAC_UTILS.getStars(parseInt(level, 10));
         }
 
         document.getElementById('refreshWallet').addEventListener('click', initWeb3);
@@ -796,18 +832,18 @@
                 document.getElementById('tokenBalance').textContent = web3.utils.fromWei(balance, 'ether').substring(0, 10);
 
                 const stakeInfo = await tokenStakingContract.methods.getUserStake(account).call();
-                const stakedAmount = stakeInfo.amount || stakeInfo[0];
+                const stakedAmount = stakeInfo.amount || stakeInfo[0]; // amount
                 document.getElementById('myTokenStakeAmount').textContent = web3.utils.fromWei(stakedAmount, 'ether').substring(0, 10);
                 
-                // 读取合约端累计奖励
-                const accumulatedRewards = stakeInfo.accumulatedRewards || stakeInfo[2] || '0';
+                // getUserStake 返回 StakeInfo{amount, lastRewardTime, accumulatedRewards, stakedAt}
+                const accumulatedRewards = stakeInfo.accumulatedRewards || stakeInfo[2] || '0'; // accumulatedRewards
                 const claimableBNB = web3.utils.fromWei(accumulatedRewards.toString(), 'ether').substring(0, 10);
                 
                 document.getElementById('tokenRewardsAmount').textContent = claimableBNB;
                 document.getElementById('claimableBNB').textContent = claimableBNB;
 
                 if (stakedAmount > 0) {
-                    const stakedTime = stakeInfo.stakedAt || stakeInfo[3];
+                    const stakedTime = stakeInfo.stakedAt || stakeInfo[3]; // stakedAt
                     if (stakedTime > 0) {
                         const date = new Date(stakedTime * 1000);
                         document.getElementById('tokenStakedAt').textContent = date.toLocaleString('zh-CN');
@@ -818,12 +854,13 @@
                     document.getElementById('tokenStakedAt').textContent = '-';
                 }
 
+                // 读取合约 BNB 余额（通过 web3.eth.getBalance）
                 let bnbBalance = '0';
                 try {
-                    const bnbBalanceWei = await tokenStakingContract.methods.getContractBNBBalance().call();
+                    const bnbBalanceWei = await web3.eth.getBalance(tokenStakingContract.options.address);
                     bnbBalance = web3.utils.fromWei(bnbBalanceWei, 'ether').substring(0, 10);
                 } catch (e) {
-                    // getContractBNBBalance 可能不存在
+                    // 余额读取失败
                 }
                 document.getElementById('tokenStakingBNBBalance').textContent = bnbBalance;
 
@@ -833,9 +870,16 @@
                 let releaseRatio = '0';
                 try {
                     const rate = await tokenStakingContract.methods.rewardRate().call();
-                    releaseRatio = (rate / 100).toFixed(2);
+                    const rateNum = parseInt(rate, 10);
+                    if (rateNum > 0) {
+                        if (rateNum > 1000) {
+                            releaseRatio = rateNum.toString();
+                        } else {
+                            releaseRatio = (rateNum / 100).toFixed(2);
+                        }
+                    }
                 } catch (e) {
-                    // rewardRate 可能不存在
+                    releaseRatio = '15';
                 }
                 document.getElementById('currentReleaseRatio').textContent = releaseRatio + '%';
 
@@ -888,7 +932,7 @@
                 const amountWei = web3.utils.toWei(amount, 'ether');
                 
                 const allowance = await tokenContract.methods.allowance(account, tokenStakingAddress).call();
-                if (parseInt(allowance) < parseInt(amountWei)) {
+                if (parseInt(allowance, 10) < parseInt(amountWei, 10)) {
                     const approveGas = await ZODIAC_WEB3.estimateGas(tokenContract, 'approve', [tokenStakingAddress, amountWei], account);
                     await tokenContract.methods.approve(tokenStakingAddress, amountWei).send({
                         from: account,

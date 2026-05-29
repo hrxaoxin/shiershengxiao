@@ -7,7 +7,12 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 
 /**
  * @title UpgradeModule
- * @dev NFT升级模块，提供多种升级方式
+ * @dev NFT升级模块（参考模块）
+ *
+ * NOTE: 此合约仅包含 view/pure 查询函数（费用计算等）。
+ * 实际的升级逻辑在 NFTUpdate.sol 中实现。
+ * 本模块保留作为前端 ABI 参考和费用查询的辅助合约。
+ * 如果前端不需要独立查询升级费用，可安全废弃此合约。
  *
  * 升级方式：
  * 1. NFT升级 - 消耗lv个同类型同等级NFT作为材料

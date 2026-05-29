@@ -81,6 +81,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         uint256 tokenId;         // NFT唯一ID
         uint256 zodiacType;       // 生肖类型（0-119）
         uint8 level;              // 等级（1-5）
+        uint8 growth;             // 成长值（10-100）
         uint256 mintTime;         // 铸造时间戳
     }
 
@@ -147,12 +148,14 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         uint256 tokenId,
         uint256 zodiacType,
         uint8 level,
+        uint8 growth,
         uint256 mintTime
     ) internal {
         _nftInfo[tokenId] = struct_NFTInfo({
             tokenId: tokenId,
             zodiacType: zodiacType,
             level: level,
+            growth: growth,
             mintTime: mintTime
         });
     }
@@ -161,11 +164,32 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @dev 获取NFT信息
      *
      * @param tokenId NFT ID
-     * @return tuple (zodiacType, level, mintTime)
+     * @return tuple (zodiacType, level, growth, mintTime)
      */
-    function _getNFTInfo(uint256 tokenId) internal view returns (uint256, uint8, uint256) {
+    function _getNFTInfo(uint256 tokenId) internal view returns (uint256, uint8, uint8, uint256) {
         struct_NFTInfo memory info = _nftInfo[tokenId];
-        return (info.zodiacType, info.level, info.mintTime);
+        return (info.zodiacType, info.level, info.growth, info.mintTime);
+    }
+
+    /**
+     * @dev 获取NFT成长值
+     *
+     * @param tokenId NFT ID
+     * @return uint8 成长值（10-100）
+     */
+    function _getNFTGrowth(uint256 tokenId) internal view returns (uint8) {
+        return _nftInfo[tokenId].growth;
+    }
+
+    /**
+     * @dev 设置NFT成长值
+     *
+     * @param tokenId NFT ID
+     * @param growth 成长值（10-100）
+     */
+    function _setNFTGrowth(uint256 tokenId, uint8 growth) internal {
+        require(growth >= 10 && growth <= 100, "NFTData: Invalid growth value");
+        _nftInfo[tokenId].growth = growth;
     }
 
     /**

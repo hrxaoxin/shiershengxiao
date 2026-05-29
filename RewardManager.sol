@@ -8,6 +8,15 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "./NFTInterface.sol";
 
 /**
+ * @dev PoolManager 接口，用于同步更新各资金池余额
+ */
+interface IPoolManager {
+    function addToNFTStakingPool(uint256 amount) external;
+    function addToTokenStakingPool(uint256 amount) external;
+    function addToArenaRewardPool(uint256 amount) external;
+}
+
+/**
  * @title RewardManager
  * @dev 奖励管理合约，统一管理所有游戏奖励的分发
  *
@@ -85,6 +94,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     address public arenaRewardPool;
 
     /**
+     * @dev 资金池管理合约地址（用于追踪各池余额）
+     */
+    address public poolManager;
+
+    /**
      * @dev 奖励分配比例（精度4位小数）
      */
     uint256 public dividendPercent = 5000;    // 50%
@@ -150,6 +164,33 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
+     * @dev 设置资金池管理合约地址
+     */
+    function setPoolManager(address _poolManager) external onlyAuthorized {
+        poolManager = _poolManager;
+    }
+
+    /**
+     * @dev 战斗类型对应的奖励金额映射
+     * battleType => rewardAmount
+     */
+    mapping(uint256 => uint256) public battleRewardAmounts;
+
+    /**
+     * @dev 默认战斗奖励金额
+     */
+    uint256 public defaultBattleReward = 100 * 10**18;
+
+    /**
+     * @dev 设置特定战斗类型的奖励金额
+     * @param battleType 战斗类型
+     * @param amount 奖励金额
+     */
+    function setBattleRewardAmount(uint256 battleType, uint256 amount) external onlyOwner {
+        battleRewardAmounts[battleType] = amount;
+    }
+
+    /**
      * @dev 分发战斗奖励
      */
     function distributeBattleReward(
@@ -157,8 +198,19 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         address loser,
         uint256 battleType
     ) external {
-        uint256 reward = 100 * 10**18;
+        // 根据 battleType 动态计算奖励，未配置时使用默认值
+        uint256 reward = battleRewardAmounts[battleType];
+        if (reward == 0) {
+            reward = defaultBattleReward;
+        }
         _distributeReward(reward);
+    }
+
+    /**
+     * @dev 设置默认战斗奖励金额
+     */
+    function setDefaultBattleReward(uint256 amount) external onlyOwner {
+        defaultBattleReward = amount;
     }
 
     /**
@@ -195,6 +247,10 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 领取分红
      */
     function claimDividend(address user) external returns (uint256) {
+        require(
+            msg.sender == user || msg.sender == owner() || msg.sender == authorizer,
+            "RewardManager: Not authorized to claim for other users"
+        );
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         
         uint256 dividend = pendingDividends[user];
@@ -220,8 +276,16 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     /**
      * @dev 计算用户可领取分红（前端调用）
      */
-    function calcUserDividend(address user) external view returns (uint256) {
-        return pendingDividends[user];
+    function calcUserDividend(address user) external view returns (uint256, uint256) {
+        return (pendingDividends[user], userWeights[user]);
+    }
+
+    /**
+     * @dev 获取分红池余额
+     */
+    function dividendPoolBalance() external view returns (uint256) {
+        require(tokenContract != address(0), "RewardManager: Token contract not set");
+        return IERC20(tokenContract).balanceOf(dividendPool);
     }
 
     /**
@@ -243,12 +307,22 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         }
         if (nftStakingPool != address(0) && nftStakingAmount > 0) {
             require(token.transfer(nftStakingPool, nftStakingAmount), "RewardManager: Transfer to NFT staking pool failed");
+            // 同步更新 PoolManager 余额
+            if (poolManager != address(0)) {
+                IPoolManager(poolManager).addToNFTStakingPool(nftStakingAmount);
+            }
         }
         if (tokenStakingPool != address(0) && tokenStakingAmount > 0) {
             require(token.transfer(tokenStakingPool, tokenStakingAmount), "RewardManager: Transfer to token staking pool failed");
+            if (poolManager != address(0)) {
+                IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount);
+            }
         }
         if (arenaRewardPool != address(0) && arenaRewardAmount > 0) {
             require(token.transfer(arenaRewardPool, arenaRewardAmount), "RewardManager: Transfer to arena pool failed");
+            if (poolManager != address(0)) {
+                IPoolManager(poolManager).addToArenaRewardPool(arenaRewardAmount);
+            }
         }
 
         emit RewardDistributed(

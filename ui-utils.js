@@ -1,484 +1,589 @@
 window.ZODIAC_UI = (function() {
-    const eventListeners = {};
+    const listeners = {};
+    let walletConnectedEmitted = false;
 
-    const ERROR_CONFIG = {
-        MAX_TOASTS: 5,
-        TOAST_TIMEOUT: 5000,
-        RETRY_DELAY: 3000,
-        MAX_RETRIES: 3
-    };
+    /**
+     * 显示 Loading 遮罩
+     */
+    function showLoading(message) {
+        // 移除已有的 loading
+        hideLoading();
 
-    const UI_ERROR_CODES = ZODIAC_CONFIG && ZODIAC_CONFIG.UI_ERROR_CODES || {
-        WEB3_NOT_INITIALIZED: '请先连接钱包',
-        WALLET_NOT_CONNECTED: '钱包未连接，请先连接钱包',
-        INSUFFICIENT_FUNDS: '余额不足，请确保钱包有足够的资金',
-        INVALID_ADDRESS: '无效的钱包地址',
-        CONTRACT_ERROR: '合约调用失败',
-        NETWORK_ERROR: '网络连接失败，请检查网络',
-        USER_REJECTED: '用户拒绝了操作',
-        TIMEOUT: '操作超时，请重试',
-        UNKNOWN_ERROR: '操作失败，请稍后重试'
-    };
-
-    const UI_ERROR_PATTERNS = [
-        { pattern: /insufficient funds/i, msg: UI_ERROR_CODES.INSUFFICIENT_FUNDS },
-        { pattern: /User rejected/i, msg: UI_ERROR_CODES.USER_REJECTED },
-        { pattern: /Wallet not connected/i, msg: UI_ERROR_CODES.WALLET_NOT_CONNECTED },
-        { pattern: /Web3 not initialized/i, msg: UI_ERROR_CODES.WEB3_NOT_INITIALIZED },
-        { pattern: /invalid address/i, msg: UI_ERROR_CODES.INVALID_ADDRESS },
-        { pattern: /Network error/i, msg: UI_ERROR_CODES.NETWORK_ERROR },
-        { pattern: /timeout/i, msg: UI_ERROR_CODES.TIMEOUT },
-        { pattern: /reverted/i, msg: '交易执行失败，合约调用被拒绝' },
-        { pattern: /out of gas/i, msg: 'Gas不足，交易失败' }
-    ];
-
-    let toastQueue = [];
-    let isShowingToast = false;
-
-    function showNextToast() {
-        if (isShowingToast || toastQueue.length === 0) return;
-        
-        isShowingToast = true;
-        const { message, type, duration } = toastQueue.shift();
-        const actualDuration = duration || ERROR_CONFIG.TOAST_TIMEOUT;
-        
-        let toast = document.getElementById('toastNotification');
-        if (!toast) {
-            toast = document.createElement('div');
-            toast.id = 'toastNotification';
-            toast.className = 'toast';
-            document.body.appendChild(toast);
-        }
-        
-        toast.textContent = message;
-        toast.className = `toast toast-${type} toast-active`;
-        
-        setTimeout(() => {
-            toast.classList.remove('toast-active');
-            isShowingToast = false;
-            setTimeout(showNextToast, 300);
-        }, actualDuration);
+        const overlay = document.createElement('div');
+        overlay.id = 'zodiac-loading-overlay';
+        overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]';
+        overlay.innerHTML = `
+            <div class="bg-white rounded-2xl p-8 shadow-2xl text-center max-w-sm w-full mx-4">
+                <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent mx-auto mb-4"></div>
+                <p class="text-gray-700 font-medium">${message || '加载中...'}</p>
+            </div>
+        `;
+        document.body.appendChild(overlay);
     }
 
-    function queueToast(message, type = 'info', duration = ERROR_CONFIG.TOAST_TIMEOUT) {
-        if (toastQueue.length >= ERROR_CONFIG.MAX_TOASTS) {
-            toastQueue.shift();
+    /**
+     * 隐藏 Loading 遮罩
+     */
+    function hideLoading() {
+        const overlay = document.getElementById('zodiac-loading-overlay');
+        if (overlay) {
+            overlay.remove();
         }
-        toastQueue.push({ message, type, duration });
-        showNextToast();
     }
 
-    function emitEvent(eventName, data) {
-        if (!eventListeners[eventName]) return;
-        eventListeners[eventName].forEach(callback => {
-            try {
-                callback(data);
-            } catch (error) {
-                console.error('UI Event listener error:', error);
-            }
+    /**
+     * 显示 Toast 消息
+     */
+    function showToast(message, type) {
+        const toast = document.createElement('div');
+        const id = 'toast-' + Date.now();
+
+        const bgColors = {
+            success: 'bg-green-500',
+            error: 'bg-red-500',
+            warning: 'bg-yellow-500',
+            info: 'bg-blue-500'
+        };
+
+        const icons = {
+            success: '✓',
+            error: '✕',
+            warning: '⚠',
+            info: 'ℹ'
+        };
+
+        const bgColor = bgColors[type] || bgColors.info;
+        const icon = icons[type] || icons.info;
+
+        // 确保有 toast 容器
+        let container = document.getElementById('zodiac-toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'zodiac-toast-container';
+            container.className = 'fixed top-4 right-4 z-[10000] flex flex-col gap-2 max-w-sm';
+            document.body.appendChild(container);
+        }
+
+        toast.id = id;
+        toast.className = `${bgColor} text-white px-5 py-3 rounded-xl shadow-lg flex items-center gap-3 transition-all duration-300 transform translate-x-full`;
+        toast.innerHTML = `
+            <span class="text-lg font-bold">${icon}</span>
+            <span class="text-sm">${message}</span>
+        `;
+        container.appendChild(toast);
+
+        // 动画入场
+        requestAnimationFrame(() => {
+            toast.style.transform = 'translateX(0)';
         });
+
+        // 自动消失
+        setTimeout(() => {
+            toast.style.transform = 'translateX(120%)';
+            toast.style.opacity = '0';
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
     }
 
-    function on(eventName, callback) {
-        if (!eventListeners[eventName]) {
-            eventListeners[eventName] = [];
-        }
-        eventListeners[eventName].push(callback);
-    }
-
-    function showToast(message, type = 'info', duration = 3000) {
-        queueToast(message, type, duration);
-    }
-
-    function handleError(error, context = '') {
-        console.error(`Error in ${context}:`, error);
-
-        let message;
-        if (ZODIAC_CONFIG && typeof ZODIAC_CONFIG.getErrorMessage === 'function') {
-            message = ZODIAC_CONFIG.getErrorMessage(error);
-        } else if (error.code && UI_ERROR_CODES[error.code]) {
-            message = UI_ERROR_CODES[error.code];
-        } else if (error.message) {
-            const patternMatch = UI_ERROR_PATTERNS.find(({ pattern }) => pattern.test(error.message));
-            if (patternMatch) {
-                message = patternMatch.msg;
-            } else {
-                message = error.message || error.error || '操作失败';
-            }
-        } else {
-            message = error.message || error.error || '操作失败';
-        }
-
-        showToast(message, 'error');
-        emitEvent('error', { error, context, userMessage: message });
-    }
-
-    async function withRetry(fn, options = {}) {
-        const { maxRetries = ERROR_CONFIG.MAX_RETRIES, delay = ERROR_CONFIG.RETRY_DELAY, context = '' } = options;
-        
-        let attempts = 0;
-        let lastError = null;
-        
-        while (attempts < maxRetries) {
-            try {
-                return await fn();
-            } catch (error) {
-                lastError = error;
-                attempts++;
-                
-                if (attempts < maxRetries) {
-                    showToast(`操作失败，正在重试 (${attempts}/${maxRetries})...`, 'warning');
-                    await new Promise(resolve => setTimeout(resolve, delay * attempts));
-                }
-            }
-        }
-        
-        handleError(lastError, context);
-        throw lastError;
-    }
-
-    function showLoading(message = '处理中...', subText = '') {
-        let loadingOverlay = document.getElementById('loadingOverlay');
-        if (!loadingOverlay) {
-            loadingOverlay = document.createElement('div');
-            loadingOverlay.id = 'loadingOverlay';
-            loadingOverlay.className = 'loading-overlay';
-            loadingOverlay.innerHTML = `
-                <div class="loading-container">
-                    <div class="loading-spinner"></div>
-                    <div class="loading-text">${message}</div>
-                    <div class="loading-subtext" style="${subText ? '' : 'display: none;'}">${subText}</div>
-                    <div class="loading-progress">
-                        <div class="loading-progress-bar"></div>
+    /**
+     * 显示错误弹窗
+     */
+    function showErrorModal(message) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.id = 'zodiac-error-overlay';
+            overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4">
+                    <div class="flex items-center mb-4">
+                        <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mr-3">
+                            <span class="text-red-500 text-xl">✕</span>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-800">操作失败</h3>
+                    </div>
+                    <p class="text-gray-600 mb-6 text-sm">${message}</p>
+                    <div class="flex justify-end">
+                        <button id="error-ok" class="px-5 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors">确定</button>
                     </div>
                 </div>
             `;
-            document.body.appendChild(loadingOverlay);
-        } else {
-            const textEl = loadingOverlay.querySelector('.loading-text');
-            const subTextEl = loadingOverlay.querySelector('.loading-subtext');
-            if (textEl) textEl.textContent = message;
-            if (subTextEl) {
-                subTextEl.textContent = subText;
-                subTextEl.style.display = subText ? '' : 'none';
-            }
-        }
-        loadingOverlay.classList.add('loading-active');
-    }
+            document.body.appendChild(overlay);
 
-    function hideLoading() {
-        const loadingOverlay = document.getElementById('loadingOverlay');
-        if (loadingOverlay) {
-            loadingOverlay.classList.remove('loading-active');
-        }
-    }
+            const cleanup = () => { overlay.remove(); resolve(); };
 
-    function showConfirmModal(title, message, confirmText = '确定', cancelText = '取消') {
-        return new Promise((resolve) => {
-            let modal = document.getElementById('confirmModal');
-            if (!modal) {
-                modal = document.createElement('div');
-                modal.id = 'confirmModal';
-                modal.className = 'modal-overlay';
-                modal.innerHTML = `
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h3 class="modal-title"></h3>
-                            <button class="modal-close">×</button>
-                        </div>
-                        <div class="modal-body">
-                            <p class="modal-message"></p>
-                        </div>
-                        <div class="modal-footer">
-                            <button class="btn-cancel">${cancelText}</button>
-                            <button class="btn-confirm">${confirmText}</button>
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-            }
-
-            modal.querySelector('.modal-title').textContent = title;
-            modal.querySelector('.modal-message').textContent = message;
-            modal.classList.add('modal-active');
-            
-            const confirmBtn = modal.querySelector('.btn-confirm');
-            const cancelBtn = modal.querySelector('.btn-cancel');
-            const closeBtn = modal.querySelector('.modal-close');
-            
-            const handleConfirm = () => {
-                resolve(true);
-                cleanup();
-            };
-            
-            const handleCancel = () => {
-                resolve(false);
-                cleanup();
-            };
-            
-            const cleanup = () => {
-                modal.classList.remove('modal-active');
-                confirmBtn.removeEventListener('click', handleConfirm);
-                cancelBtn.removeEventListener('click', handleCancel);
-                closeBtn.removeEventListener('click', handleCancel);
-            };
-            
-            confirmBtn.addEventListener('click', handleConfirm);
-            cancelBtn.addEventListener('click', handleCancel);
-            closeBtn.addEventListener('click', handleCancel);
+            overlay.querySelector('#error-ok').onclick = cleanup;
+            overlay.onclick = (e) => { if (e.target === overlay) cleanup(); };
         });
     }
 
-    function hideConfirmModal(result) {
-        const modal = document.getElementById('confirmModal');
-        if (modal) {
-            modal.classList.remove('modal-active');
+    /**
+     * 显示成功弹窗
+     */
+    function showSuccessModal(title, message) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.id = 'zodiac-success-overlay';
+            overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4">
+                    <div class="flex items-center mb-4">
+                        <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center mr-3">
+                            <span class="text-green-500 text-xl">✓</span>
+                        </div>
+                        <h3 class="text-lg font-bold text-gray-800">${title || '操作成功'}</h3>
+                    </div>
+                    <p class="text-gray-600 mb-6 text-sm">${message || ''}</p>
+                    <div class="flex justify-end">
+                        <button id="success-ok" class="px-5 py-2 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors">确定</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const cleanup = () => { overlay.remove(); resolve(); };
+
+            overlay.querySelector('#success-ok').onclick = cleanup;
+            overlay.onclick = (e) => { if (e.target === overlay) cleanup(); };
+        });
+    }
+
+    /**
+     * 显示确认弹窗
+     */
+    function showConfirmModal(title, message) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.id = 'zodiac-confirm-overlay';
+            overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3">${title || '确认操作'}</h3>
+                    <p class="text-gray-600 mb-6">${message || '确定要执行此操作吗？'}</p>
+                    <div class="flex gap-3 justify-end">
+                        <button id="confirm-cancel" class="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors">取消</button>
+                        <button id="confirm-ok" class="px-5 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors">确认</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            const cleanup = () => {
+                overlay.remove();
+            };
+
+            overlay.querySelector('#confirm-cancel').onclick = () => {
+                cleanup();
+                resolve(false);
+            };
+
+            overlay.querySelector('#confirm-ok').onclick = () => {
+                cleanup();
+                resolve(true);
+            };
+
+            // 点击遮罩关闭
+            overlay.onclick = (e) => {
+                if (e.target === overlay) {
+                    cleanup();
+                    resolve(false);
+                }
+            };
+        });
+    }
+
+    /**
+     * 事件系统
+     */
+    function on(event, callback) {
+        if (!listeners[event]) {
+            listeners[event] = [];
         }
-        if (typeof result === 'boolean') {
-            emitEvent('confirmModalClosed', { result });
+        listeners[event].push(callback);
+    }
+
+    function emitEvent(event, data) {
+        if (!listeners[event]) return;
+        listeners[event].forEach(cb => {
+            try {
+                cb(data);
+            } catch (e) {
+                console.error(`事件 ${event} 回调错误:`, e);
+            }
+        });
+    }
+
+    /**
+     * 更新钱包显示信息
+     */
+    function updateWalletInfo(address, balance) {
+        const walletAddressEl = document.getElementById('walletAddress');
+        const walletAddressDesktopEl = document.getElementById('walletAddressDesktop');
+        const connectionStatusEl = document.getElementById('connectionStatus');
+
+        if (walletAddressEl) {
+            walletAddressEl.textContent = address || '未连接钱包';
+        }
+        if (walletAddressDesktopEl) {
+            walletAddressDesktopEl.textContent = address
+                ? (address.substring(0, 6) + '...' + address.substring(address.length - 4))
+                : '未连接';
+        }
+        if (connectionStatusEl) {
+            connectionStatusEl.textContent = address ? '已连接' : '请点击连接钱包按钮';
         }
     }
 
-    const transactionHistory = [];
+    /**
+     * 初始化钱包连接按钮
+     * @param {string} btnId - 按钮元素 ID
+     * @param {string|null} addressElId - 显示地址的元素 ID（可选）
+     * @param {string|null} statusElId - 显示连接状态的元素 ID（可选）
+     */
+    function initWalletButton(btnId, addressElId, statusElId) {
+        const btn = document.getElementById(btnId);
+        if (!btn) return;
 
-    async function sendTransaction(txPromise, options = {}) {
-        const account = window.ZODIAC_WEB3 ? window.ZODIAC_WEB3.getAccount() : null;
-        const { 
-            successMessage = '交易成功', 
-            errorMessage = '交易失败',
-            onSuccess = null,
-            onError = null,
-            rollbackActions = [],
-            confirmMessage = null
+        // 更新按钮状态
+        function updateButtonState(account) {
+            if (account) {
+                btn.innerHTML = '<i class="fas fa-wallet mr-2"></i>' +
+                    account.substring(0, 6) + '...' + account.substring(account.length - 4);
+                btn.classList.add('bg-green-500');
+            } else {
+                btn.innerHTML = '<i class="fas fa-wallet mr-2"></i>连接钱包';
+                btn.classList.remove('bg-green-500');
+            }
+
+            // 更新地址显示
+            if (addressElId) {
+                const addrEl = document.getElementById(addressElId);
+                if (addrEl) {
+                    addrEl.textContent = account || '未连接钱包';
+                }
+            }
+
+            // 更新状态显示
+            if (statusElId) {
+                const statusEl = document.getElementById(statusElId);
+                if (statusEl) {
+                    statusEl.textContent = account ? '已连接' : '请点击连接钱包按钮';
+                }
+            }
+        }
+
+        // 点击按钮触发连接
+        btn.addEventListener('click', async () => {
+            if (!window.ZODIAC_WEB3) {
+                showToast('Web3 模块未加载', 'error');
+                return;
+            }
+
+            try {
+                if (ZODIAC_WEB3.isConnected()) {
+                    // 如果已连接，不重复连接
+                    return;
+                }
+                await ZODIAC_WEB3.initWeb3();
+                updateButtonState(ZODIAC_WEB3.getAccount());
+                // 触发 walletConnected 事件（确保只触发一次）
+                if (!walletConnectedEmitted) {
+                    walletConnectedEmitted = true;
+                    emitEvent('walletConnected', { account: ZODIAC_WEB3.getAccount() });
+                }
+            } catch (error) {
+                console.error('Wallet connection failed:', error);
+                showToast(ZODIAC_CONFIG.getErrorMessage(error), 'error');
+            }
+        });
+
+        // 监听连接/断开事件
+        if (window.ZODIAC_WEB3) {
+            ZODIAC_WEB3.on('connect', (data) => {
+                updateButtonState(data.account);
+                // 触发 walletConnected 事件（确保只触发一次）
+                if (!walletConnectedEmitted) {
+                    walletConnectedEmitted = true;
+                    emitEvent('walletConnected', data);
+                }
+            });
+
+            ZODIAC_WEB3.on('disconnect', () => {
+                updateButtonState(null);
+                walletConnectedEmitted = false;
+            });
+
+            ZODIAC_WEB3.on('accountsChanged', (data) => {
+                updateButtonState(data.account);
+            });
+        }
+
+        // 初始状态
+        if (window.ZODIAC_WEB3 && ZODIAC_WEB3.isConnected()) {
+            updateButtonState(ZODIAC_WEB3.getAccount());
+        }
+    }
+
+    /**
+     * 统一错误处理 - 显示错误 Toast
+     * @param {Error|string} error - 错误对象或消息
+     * @param {string} action - 操作名称（用于 Toast 文案）
+     */
+    function handleError(error, action) {
+        const message = error.message || error.toString();
+        const displayAction = action || '操作';
+        showToast(`${displayAction}失败: ${message}`, 'error');
+    }
+
+    /**
+     * 统一错误处理 - 显示确认弹窗
+     * @param {Error|string} error - 错误对象或消息
+     * @param {string} title - 弹窗标题
+     * @param {string} action - 操作名称
+     */
+    function handleErrorWithConfirm(error, title, action) {
+        const message = error.message || error.toString();
+        const displayTitle = title || '操作失败';
+        const displayAction = action || '操作';
+        
+        const overlay = document.createElement('div');
+        overlay.id = 'zodiac-error-confirm-overlay';
+        overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]';
+        overlay.innerHTML = `
+            <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full mx-4">
+                <div class="flex items-center mb-4">
+                    <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center mr-3">
+                        <span class="text-red-500 text-xl">✕</span>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-800">${displayTitle}</h3>
+                </div>
+                <p class="text-gray-600 mb-4 text-sm">${displayAction}失败</p>
+                <p class="text-gray-500 mb-6 text-xs bg-gray-50 p-2 rounded">${message}</p>
+                <div class="flex gap-3 justify-end">
+                    <button id="error-confirm-ok" class="px-5 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors">确定</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('#error-confirm-ok').onclick = () => overlay.remove();
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    }
+
+    /**
+     * 处理合约错误
+     * @param {Error} error - 错误对象
+     * @param {string} operation - 操作名称
+     */
+    function handleContractError(error, operation) {
+        const errorMessage = error.message || error.toString();
+        let userMessage = `${operation}失败`;
+        let errorCode = 'UNKNOWN';
+        
+        const errorPatterns = [
+            { pattern: /User rejected|4001/, message: '用户取消了交易', code: 'USER_REJECTED' },
+            { pattern: /insufficient funds|balance/, message: '余额不足，无法完成交易', code: 'INSUFFICIENT_FUNDS' },
+            { pattern: /nonce too low/, message: '交易冲突，请稍后重试', code: 'NONCE_TOO_LOW' },
+            { pattern: /gas required exceeds|out of gas/, message: 'Gas费用不足或估算失败', code: 'GAS_ERROR' },
+            { pattern: /execution reverted/, message: handleRevertError(errorMessage), code: 'EXECUTION_REVERTED' },
+            { pattern: /Not authorized|Unauthorized/, message: '未授权操作，请联系管理员', code: 'UNAUTHORIZED' },
+            { pattern: /Paused/, message: '合约已暂停，请稍后再试', code: 'CONTRACT_PAUSED' },
+            { pattern: /Invalid price/, message: '无效的价格设置', code: 'INVALID_PRICE' },
+            { pattern: /Not token owner|ownerOf/, message: '您不是该NFT的所有者', code: 'NOT_OWNER' },
+            { pattern: /Listing not found/, message: '商品不存在或已下架', code: 'LISTING_NOT_FOUND' },
+            { pattern: /Seller no longer owns NFT/, message: '卖家不再拥有该NFT', code: 'SELLER_NO_OWNER' },
+            { pattern: /Contract not approved|isApprovedForAll/, message: '合约未获得NFT授权', code: 'NOT_APPROVED' },
+            { pattern: /Lock period|cooldown/, message: '锁定期未结束', code: 'LOCKED' },
+            { pattern: /Already staked/, message: '该NFT已质押', code: 'ALREADY_STAKED' },
+            { pattern: /Empty tokenIds|Empty array/, message: '请选择要操作的NFT', code: 'EMPTY_INPUT' },
+            { pattern: /Chain ID|chainId/, message: '请切换到正确的网络', code: 'WRONG_NETWORK' },
+            { pattern: /MetaMask not detected|ethereum is undefined/, message: '未检测到MetaMask钱包，请安装后重试', code: 'NO_WALLET' },
+            { pattern: /Wallet not connected/, message: '钱包未连接，请先连接钱包', code: 'NOT_CONNECTED' },
+            { pattern: /Web3 not initialized/, message: 'Web3初始化失败，请刷新页面重试', code: 'WEB3_ERROR' },
+            { pattern: /Level < 5|level too low/, message: 'NFT等级不足，需要等级5', code: 'LEVEL_TOO_LOW' },
+            { pattern: /Different zodiac|zodiac mismatch/, message: '生肖不匹配', code: 'ZODIAC_MISMATCH' },
+            { pattern: /Same gender/, message: '性别相同，无法繁殖', code: 'SAME_GENDER' },
+            { pattern: /Father in cooldown|Mother in cooldown/, message: 'NFT正在冷却期', code: 'BREEDING_COOLDOWN' },
+            { pattern: /Cannot breed with self/, message: '不能与自己繁殖', code: 'SELF_BREEDING' },
+            { pattern: /Invalid zodiac/, message: '无效的生肖类型', code: 'INVALID_ZODIAC' },
+            { pattern: /Invalid token address|Invalid address/, message: '无效的合约地址', code: 'INVALID_ADDRESS' },
+            { pattern: /Token contract not set/, message: '代币合约未设置', code: 'TOKEN_CONTRACT_NOT_SET' },
+            { pattern: /NFT contract not set/, message: 'NFT合约未设置', code: 'NFT_CONTRACT_NOT_SET' },
+            { pattern: /transferFrom failed|transfer failed/, message: '转账失败', code: 'TRANSFER_FAILED' },
+            { pattern: /replacement transaction underpriced/, message: '替换交易价格过低', code: 'UNDERPRICED' },
+            { pattern: /block gas limit/, message: '区块Gas限制不足', code: 'BLOCK_GAS_LIMIT' },
+            { pattern: /max priority fee/, message: 'Gas费用设置不合理', code: 'GAS_FEE_ERROR' },
+            { pattern: /RPC error|network error/, message: '网络连接失败，请检查网络', code: 'NETWORK_ERROR' }
+        ];
+        
+        for (const { pattern, message, code } of errorPatterns) {
+            if (pattern.test(errorMessage)) {
+                userMessage = message;
+                errorCode = code;
+                break;
+            }
+        }
+        
+        showToast(userMessage, 'error');
+        logError(error, operation, errorCode);
+    }
+
+    function handleRevertError(errorMessage) {
+        const revertMatch = errorMessage.match(/reverted with reason string '([^']+)'/);
+        if (revertMatch) {
+            const reason = revertMatch[1];
+            const reasonMap = {
+                'NFTTrading: Paused': '交易市场已暂停',
+                'NFTTrading: Not token owner': '您不是该NFT的所有者',
+                'NFTTrading: Listing not found': '商品不存在',
+                'Staking: Paused': '质押合约已暂停',
+                'Staking: Already staked': '该NFT已质押',
+                'Staking: Lock period': '质押锁定期未结束',
+                'Breeding: Level < 5': 'NFT等级不足，需要等级5',
+                'Breeding: Different zodiac': '生肖不匹配',
+                'Breeding: Same gender': '性别相同'
+            };
+            return reasonMap[reason] || `合约执行失败: ${reason}`;
+        }
+        return '合约执行失败';
+    }
+
+    function logError(error, operation, code) {
+        const errorLog = {
+            timestamp: new Date().toISOString(),
+            operation: operation,
+            code: code,
+            message: error.message || error.toString(),
+            stack: error.stack,
+            account: window.ZODIAC_WEB3 ? ZODIAC_WEB3.getAccount() : null,
+            chainId: window.ZODIAC_WEB3 ? ZODIAC_WEB3.getChainIdDecimal() : null
+        };
+        
+        console.error('[ZODIAC_ERROR]', JSON.stringify(errorLog, null, 2));
+    }
+
+    /**
+     * 格式化地址（委托给 ZODIAC_UTILS）
+     */
+    function formatAddress(address) {
+        if (window.ZODIAC_UTILS && window.ZODIAC_UTILS.formatAddress) {
+            return window.ZODIAC_UTILS.formatAddress(address);
+        }
+        if (!address) return '未连接';
+        return address.substring(0, 6) + '...' + address.substring(address.length - 4);
+    }
+
+    /**
+     * 增强的交易处理函数 - 提供完整的交易反馈
+     * @param {Promise} transactionPromise - 交易Promise
+     * @param {Object} options - 配置选项
+     * @param {string} options.actionName - 操作名称
+     * @param {string} options.loadingMessage - 加载中消息
+     * @param {string} options.successMessage - 成功消息
+     * @param {Function} options.onHash - 交易哈希回调
+     * @param {Function} options.onConfirmation - 确认回调
+     * @returns {Promise<Object>} 交易结果
+     */
+    async function handleTransaction(transactionPromise, options = {}) {
+        const {
+            actionName = '操作',
+            loadingMessage = '交易处理中...',
+            successMessage = '交易成功！',
+            onHash,
+            onConfirmation,
+            showConfirmation = false
         } = options;
 
-        if (confirmMessage) {
-            const confirmed = await showConfirmModal('确认交易', confirmMessage);
-            if (!confirmed) {
-                return { success: false, error: '用户取消交易' };
-            }
-        }
+        showLoading(loadingMessage);
 
-        if (!txPromise || typeof txPromise.then !== 'function') {
-            showToast('无效的交易Promise', 'error');
-            console.error('Invalid txPromise:', txPromise);
-            return { success: false, error: '无效的交易Promise' };
-        }
-
-        showLoading();
-        
-        const startTime = Date.now();
-        const transactionId = `tx_${startTime}_${Math.random().toString(36).substr(2, 9)}`;
-        
         try {
-            const result = await txPromise;
-            const txHash = result.transactionHash || result.hash;
-            
-            transactionHistory.push({
-                id: transactionId,
-                txHash,
-                status: 'success',
-                timestamp: startTime,
-                duration: Date.now() - startTime
-            });
-            
+            const tx = await transactionPromise;
+
+            if (tx.hash) {
+                const shortHash = tx.hash.substring(0, 10) + '...' + tx.hash.substring(tx.hash.length - 8);
+                hideLoading();
+
+                if (onHash) {
+                    onHash(tx.hash, shortHash);
+                }
+
+                if (showConfirmation && tx.wait) {
+                    showLoading(`等待区块链确认 (${shortHash})...`);
+                    await tx.wait(1);
+                    if (onConfirmation) {
+                        onConfirmation(tx);
+                    }
+                }
+
+                showToast(`${successMessage} (${shortHash})`, 'success');
+                return tx;
+            }
+
             hideLoading();
             showToast(successMessage, 'success');
-            
-            if (typeof onSuccess === 'function') {
-                try {
-                    onSuccess(result);
-                } catch (callbackError) {
-                    console.error('onSuccess callback error:', callbackError);
-                }
-            }
-            
-            return { success: true, result, txHash, transactionId };
-            
+            return tx;
+
         } catch (error) {
-            const errorMsg = error.message || error.error || errorMessage;
-            
-            transactionHistory.push({
-                id: transactionId,
-                status: 'failed',
-                timestamp: startTime,
-                duration: Date.now() - startTime,
-                error: errorMsg
-            });
-            
             hideLoading();
-            showToast(errorMsg, 'error');
-            console.error('Transaction error:', error);
-            
-            for (const action of rollbackActions) {
-                try {
-                    await action();
-                    console.log('Rollback action executed:', action.name || 'anonymous');
-                } catch (rollbackError) {
-                    console.error('Rollback action failed:', rollbackError);
-                    showToast('回滚操作失败，请手动检查状态', 'warning');
-                }
-            }
-            
-            if (typeof onError === 'function') {
-                try {
-                    onError(error);
-                } catch (callbackError) {
-                    console.error('onError callback error:', callbackError);
-                }
-            }
-            
-            return { success: false, error: errorMsg, transactionId };
-        }
-    }
-
-    function getTransactionHistory() {
-        return [...transactionHistory];
-    }
-
-    function clearTransactionHistory() {
-        transactionHistory.length = 0;
-    }
-
-    async function initWalletButton(btnId, addrId, statusId) {
-        const btn = document.getElementById(btnId);
-        const addrEl = document.getElementById(addrId);
-        const statusEl = document.getElementById(statusId);
-
-        if (!btn) {
-            console.warn(`Wallet button with id "${btnId}" not found`);
-            return;
-        }
-
-        const updateUI = (isConnected, account) => {
-            if (isConnected && account) {
-                btn.innerHTML = '<i class="fas fa-check mr-1"></i> 已连接';
-                btn.classList.add('btn-connected');
-                btn.classList.remove('btn-primary');
-                if (addrEl) {
-                    addrEl.textContent = ZODIAC_UTILS.formatAddress(account);
-                }
-                if (statusEl) {
-                    statusEl.textContent = '钱包已连接';
-                }
-            } else {
-                btn.innerHTML = '<i class="fas fa-plug mr-1"></i> 连接钱包';
-                btn.classList.remove('btn-connected');
-                btn.classList.add('btn-primary');
-                if (addrEl) {
-                    addrEl.textContent = '未连接钱包';
-                }
-                if (statusEl) {
-                    statusEl.textContent = '请点击连接钱包';
-                }
-            }
-        };
-
-        btn.addEventListener('click', async () => {
-            if (ZODIAC_WEB3.isWalletConnected()) {
-                ZODIAC_WEB3.disconnectWallet();
-            } else {
-                const result = await ZODIAC_WEB3.connectWallet();
-                if (!result.success) {
-                    showToast(result.error || '连接失败', 'error');
-                }
-            }
-        });
-
-        ZODIAC_WEB3.on('connect', ({ account }) => {
-            updateUI(true, account);
-        });
-
-        ZODIAC_WEB3.on('disconnect', () => {
-            updateUI(false, null);
-        });
-
-        ZODIAC_WEB3.on('accountChange', ({ account }) => {
-            updateUI(true, account);
-        });
-
-        updateUI(ZODIAC_WEB3.isWalletConnected(), ZODIAC_WEB3.getAccount());
-    }
-
-    function initRefreshButton(btnId, refreshFn) {
-        const btn = document.getElementById(btnId);
-        if (btn) {
-            btn.addEventListener('click', async () => {
-                try {
-                    await refreshFn();
-                } catch (error) {
-                    showToast('刷新失败', 'error');
-                    console.error('Refresh error:', error);
-                }
-            });
-        }
-    }
-
-    function initNavigation(activePage) {
-        ZODIAC_COMPONENTS.initNavigation(activePage);
-    }
-
-    function renderNavigation(activePage) {
-        const mobileNavbar = ZODIAC_COMPONENTS.renderMobileNavbar(activePage);
-        const mobileMenu = ZODIAC_COMPONENTS.renderMobileMenu();
-        const desktopSidebar = ZODIAC_COMPONENTS.renderDesktopSidebar(activePage);
-        
-        return {
-            mobileNavbar,
-            mobileMenu,
-            desktopSidebar
-        };
-    }
-
-    function renderWalletInfo() {
-        return ZODIAC_COMPONENTS.renderWalletInfo();
-    }
-
-    function renderFooter() {
-        return ZODIAC_COMPONENTS.renderFooter();
-    }
-
-    function formatCurrency(value, decimals = 4) {
-        if (!value) return '0';
-        return parseFloat(value).toFixed(decimals);
-    }
-
-    function isValidAddress(address) {
-        if (!address) return false;
-        return /^0x[a-fA-F0-9]{40}$/.test(address);
-    }
-
-    async function withErrorHandling(fn, context = '') {
-        try {
-            return await fn();
-        } catch (error) {
-            handleError(error, context);
+            handleError(error, actionName);
             throw error;
         }
     }
 
+    /**
+     * 监听交易确认 - 用于长时间运行的交易
+     * @param {string} txHash - 交易哈希
+     * @param {Function} onUpdate - 更新回调
+     * @param {number} confirmations - 需要确认数
+     */
+    async function monitorTransaction(txHash, onUpdate, confirmations = 1) {
+        if (typeof window !== 'undefined' && window.web3) {
+            const web3 = window.web3;
+            let currentBlock = await web3.eth.getBlockNumber();
+            const txReceipt = await web3.eth.getTransactionReceipt(txHash);
+
+            if (!txReceipt) {
+                throw new Error('交易未找到');
+            }
+
+            if (txReceipt.blockNumber) {
+                const startBlock = txReceipt.blockNumber;
+                const checkConfirmation = async () => {
+                    const latestBlock = await web3.eth.getBlockNumber();
+                    const confirmationsCount = latestBlock - startBlock + 1;
+
+                    if (onUpdate) {
+                        onUpdate({
+                            confirmations: confirmationsCount,
+                            latestBlock: latestBlock,
+                            startBlock: startBlock,
+                            status: confirmationsCount >= confirmations ? 'confirmed' : 'pending'
+                        });
+                    }
+
+                    if (confirmationsCount < confirmations) {
+                        setTimeout(checkConfirmation, 3000);
+                    }
+                };
+
+                checkConfirmation();
+            }
+        }
+    }
+
     return {
-        showToast,
         showLoading,
         hideLoading,
+        showToast,
         showConfirmModal,
-        hideConfirmModal,
-        sendTransaction,
-        getTransactionHistory,
-        clearTransactionHistory,
-        initWalletButton,
-        initRefreshButton,
-        initNavigation,
-        renderNavigation,
-        renderWalletInfo,
-        renderFooter,
-        formatCurrency,
-        isValidAddress,
-        handleError,
-        withErrorHandling,
-        withRetry,
-        ERROR_CODES: UI_ERROR_CODES,
+        showErrorModal,
+        showSuccessModal,
         on,
-        emitEvent
+        emitEvent,
+        updateWalletInfo,
+        formatAddress,
+        initWalletButton,
+        handleError,
+        handleTransaction,
+        monitorTransaction
     };
 })();

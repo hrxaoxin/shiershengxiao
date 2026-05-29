@@ -6,6 +6,80 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "./NFTInterface.sol";
 
+// ============ 接口定义 ============
+
+interface ISetNFTContract {
+    function setNFTContract(address _nftContract) external;
+}
+
+interface ISetRewardTokenContract {
+    function setRewardTokenContract(address _tokenContract) external;
+}
+
+interface ISetDividendPool {
+    function setDividendPool(address _dividendManager) external;
+}
+
+interface ISetNFTStakingPool {
+    function setNFTStakingPool(address _stakingAddress) external;
+}
+
+interface ISetTokenStakingPool {
+    function setTokenStakingPool(address _tokenStakingAddress) external;
+}
+
+interface ISetTokenContract {
+    function setTokenContract(address _tokenContract) external;
+}
+
+interface ISetArenaRewardPool {
+    function setArenaRewardPool(address _arenaRankingAddress) external;
+}
+
+interface ISetTokenAddress {
+    function setTokenAddress(address _tokenContract) external;
+}
+
+interface ISetUSDTAddress {
+    function setUSDTAddress(address _usdtAddress) external;
+}
+
+interface ISetMetadataContract {
+    function setMetadataContract(address _metadataAddress) external;
+}
+
+interface ISetPancakeSwapPair {
+    function setPancakeSwapPair(address _pairAddress) external;
+}
+
+interface ISetAuthorizedNFTContract {
+    function setAuthorizedNFTContract(address _nftContract) external;
+}
+
+interface ISetTokenBurner {
+    function setTokenBurner(address _tokenBurner) external;
+}
+
+interface ISetNFTDataContract {
+    function setNFTDataContract(address _nftDataAddress) external;
+}
+
+interface ISetBattleContract {
+    function setBattleContract(address _battleAddress) external;
+}
+
+interface ISetFeeReceiver {
+    function setFeeReceiver(address _feeReceiver) external;
+}
+
+interface ISetRewardPool {
+    function setRewardPool(address _rewardPool) external;
+}
+
+interface ISetPoolManager {
+    function setPoolManager(address _poolManager) external;
+}
+
 contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     struct ContractAddresses {
         address tokenAddress;
@@ -90,7 +164,13 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     function revokePermission(address user) external onlyOwner {
-        totalWeight -= weights[user];
+        uint256 w = weights[user];
+        require(w > 0, "Authorizer: No permission to revoke");
+        if (w >= totalWeight) {
+            totalWeight = 0;
+        } else {
+            totalWeight -= w;
+        }
         weights[user] = 0;
         emit WeightRevoked(user);
     }
@@ -133,7 +213,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _setOtherAddresses(_addresses);
 
         _setupBattleAndBreeding(_addresses.battleAddress, _addresses.breedingAddress, _addresses.nftMintAddress);
-        _setupStakingAndReward(_addresses.stakingAddress, _addresses.rewardManagerAddress, _addresses.dividendManagerAddress, _addresses.tokenStakingAddress, _addresses.tokenAddress, _addresses.arenaRankingAddress);
+        _setupStakingAndReward(_addresses.stakingAddress, _addresses.rewardManagerAddress, _addresses.dividendManagerAddress, _addresses.tokenStakingAddress, _addresses.tokenAddress, _addresses.arenaRankingAddress, _addresses.nftMintAddress);
         _setupPriceAndUpgrade(_addresses.priceOracleAddress, _addresses.upgradeModuleAddress, _addresses.tokenAddress, _addresses.usdtAddress);
         _setupNFTContracts(_addresses.nftUpdateAddress, _addresses.tokenBurnerAddress, _addresses.nftMintAddress, _addresses.metadataContractAddress, _addresses.pancakeSwapPairAddress);
         _setupOtherContracts(_addresses.weightManagerAddress, _addresses.battleHistoryAddress, _addresses.nftTradingAddress, _addresses.feeReceiverAddress, _addresses.arenaRankingAddress, _addresses.rewardManagerAddress);
@@ -151,6 +231,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
         if (_breedingAddress != address(0)) {
             ISetNFTContract(_breedingAddress).setNFTContract(_nftMintAddress);
+            ISetTokenContract(_breedingAddress).setTokenContract(tokenAddress);
         }
     }
 
@@ -160,10 +241,12 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         address _dividendManagerAddress,
         address _tokenStakingAddress,
         address _tokenAddress,
-        address _arenaRankingAddress
+        address _arenaRankingAddress,
+        address _nftMintAddress
     ) internal {
         if (_stakingAddress != address(0)) {
             ISetRewardTokenContract(_stakingAddress).setRewardTokenContract(_tokenAddress);
+            ISetNFTContract(_stakingAddress).setNFTContract(_nftMintAddress);
         }
         if (_rewardManagerAddress != address(0)) {
             ISetDividendPool(_rewardManagerAddress).setDividendPool(_dividendManagerAddress);
@@ -171,6 +254,15 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             ISetTokenStakingPool(_rewardManagerAddress).setTokenStakingPool(_tokenStakingAddress);
             ISetTokenContract(_rewardManagerAddress).setTokenContract(_tokenAddress);
             ISetArenaRewardPool(_rewardManagerAddress).setArenaRewardPool(_arenaRankingAddress);
+        }
+        if (_dividendManagerAddress != address(0)) {
+            ISetTokenContract(_dividendManagerAddress).setTokenContract(_tokenAddress);
+        }
+        if (poolManagerAddress != address(0)) {
+            ISetPoolManager(_rewardManagerAddress).setPoolManager(poolManagerAddress);
+        }
+        if (_tokenStakingAddress != address(0)) {
+            ISetTokenAddress(_tokenStakingAddress).setTokenAddress(_tokenAddress);
         }
     }
 
@@ -227,11 +319,13 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             ISetBattleContract(_battleHistoryAddress).setBattleContract(battleAddress);
         }
         if (_nftTradingAddress != address(0)) {
+            ISetNFTContract(_nftTradingAddress).setNFTContract(nftMintAddress);
             ISetFeeReceiver(_nftTradingAddress).setFeeReceiver(_feeReceiverAddress);
         }
         if (_arenaRankingAddress != address(0)) {
             ISetTokenContract(_arenaRankingAddress).setTokenContract(tokenAddress);
             ISetRewardPool(_arenaRankingAddress).setRewardPool(_rewardManagerAddress);
+            ISetBattleContract(_arenaRankingAddress).setBattleContract(battleAddress);
         }
     }
 
@@ -311,7 +405,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
     function syncContractAddresses() external onlyOwner {
         _setupBattleAndBreeding(battleAddress, breedingAddress, nftMintAddress);
-        _setupStakingAndReward(stakingAddress, rewardManagerAddress, dividendManagerAddress, tokenStakingAddress, tokenAddress, arenaRankingAddress);
+        _setupStakingAndReward(stakingAddress, rewardManagerAddress, dividendManagerAddress, tokenStakingAddress, tokenAddress, arenaRankingAddress, nftMintAddress);
         _setupPriceAndUpgrade(priceOracleAddress, upgradeModuleAddress, tokenAddress, usdtAddress);
         _setupNFTContracts(nftUpdateAddress, tokenBurnerAddress, nftMintAddress, metadataContractAddress, pancakeSwapPairAddress);
         _setupOtherContracts(weightManagerAddress, battleHistoryAddress, nftTradingAddress, feeReceiverAddress, arenaRankingAddress, rewardManagerAddress);

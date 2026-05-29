@@ -231,13 +231,20 @@
     </main>
 
     <div id="cardModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-xl p-6 max-w-sm w-full mx-4">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
             <div class="text-center mb-4">
                 <img id="modalCardImage" src="" alt="生肖" class="w-32 h-32 mx-auto mb-4 rounded-lg shadow-md">
                 <h3 id="modalCardName" class="text-xl font-bold text-gray-800 mb-2">生肖名称</h3>
-                <p id="modalCardDesc" class="text-gray-600 text-sm mb-4">描述</p>
-                <p class="text-sm text-gray-500">Token ID: <span id="modalCardId"></span></p>
+                <div class="flex items-center justify-center gap-2 mb-2">
+                    <span id="modalCardRarity" class="text-xs font-bold px-2 py-1 rounded bg-gray-100 text-gray-600">普通</span>
+                </div>
+                <p id="modalCardDesc" class="text-gray-600 text-sm mb-2">描述</p>
+                <p class="text-sm text-gray-500 mb-4">Token ID: <span id="modalCardId"></span></p>
             </div>
+            
+            <div id="modalCardStats" class="mb-4">
+            </div>
+            
             <div class="flex space-x-4">
                 <button class="btn-secondary flex-1" id="closeModal">关闭</button>
                 <button class="btn-primary flex-1" id="listForSale">挂单出售</button>
@@ -255,9 +262,13 @@
         let currentFilter = 'all';
         let currentViewMode = 'collection';
 
-        const CONFIG = ZODIAC_UTILS.CONFIG;
+        // 安全获取 web3 实例（支持事件回调中的延迟调用）
+        function safeGetWeb3() {
+            if (web3) return web3;
+            return ZODIAC_WEB3.getWeb3();
+        }
 
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             particlesJS('particles-js', {
                 particles: {
                     number: { value: 80, density: { enable: true, value_area: 800 } },
@@ -276,9 +287,10 @@
                 retina_detect: true
             });
 
-            initWeb3();
+
             initWalletUI();
             ZODIAC_COMPONENTS.injectNavigation('collection');
+            await initWeb3();
         });
 
         function initWalletUI() {
@@ -330,7 +342,7 @@
                 const balance = await nftContract.methods.balanceOf(account).call();
                 const promises = [];
                 
-                for (let i = 0; i < parseInt(balance); i++) {
+                for (let i = 0; i < Number(balance); i++) {
                     promises.push(nftContract.methods.tokenOfOwnerByIndex(account, i).call());
                 }
                 
@@ -342,8 +354,8 @@
                         nftContract.methods.tokenLevel(tokenId).call()
                     ]).then(([typeId, level]) => ({
                         tokenId: tokenId,
-                        typeId: parseInt(typeId),
-                        level: parseInt(level)
+                        typeId: parseInt(typeId, 10),
+                        level: parseInt(level, 10)
                     }));
                 });
                 
@@ -416,7 +428,7 @@
                     return;
                 }
                 const unclaimed = await rewardManagerContract.methods.calcUserDividend(account).call();
-                const unclaimedBNB = web3.utils.fromWei(unclaimed.toString(), 'ether');
+                const unclaimedBNB = safeGetWeb3().utils.fromWei(unclaimed.toString(), 'ether');
                 document.getElementById('totalDividends').textContent = parseFloat(unclaimedBNB).toFixed(4);
             } catch (error) {
                 document.getElementById('totalDividends').textContent = '0';
@@ -480,7 +492,7 @@
                 const typeId = nftType.typeId;
                 const isOwned = ownedTypes.has(typeId);
                 const userToken = userTokens.find(t => t.typeId === typeId);
-                const nftInfo = getNFTInfo(typeId);
+                const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
                 const level = userToken ? userToken.level : 0;
                 const count = userToken ? userToken.count : 0;
                 
@@ -519,7 +531,7 @@
             for (const token of filteredTokens) {
                 const typeId = token.typeId;
                 const level = token.level || 1;
-                const nftInfo = getNFTInfo(typeId);
+                const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
 
                 html += `
                     <div class="zodiac-card" onclick="showCardModal(${typeId}, ${level})">
@@ -536,17 +548,73 @@
         }
 
         function showCardModal(typeId, level) {
-            const nftInfo = getNFTInfo(typeId);
+            const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
             const isOwned = ownedTypes.has(typeId);
             const userToken = userTokens.find(t => t.typeId === typeId);
             const count = userToken ? userToken.count : 0;
-            const desc = isOwned ? `${nftInfo.attrName}属性生肖·${nftInfo.zodiac}·${nftInfo.gender} · 持有可享受税收分红` : '尚未拥有此生肖';
+            
+            const element = nftInfo.elementKey;
+            const isRare = (element === 'light' || element === 'dark');
+            const rarityText = isRare ? '稀有' : '普通';
+            const rarityColor = isRare ? 'text-purple-600' : 'text-gray-600';
+            
+            const weight = isRare ? (ZODIAC_CONFIG.WEIGHTS.rare[level] || 76) : (ZODIAC_CONFIG.WEIGHTS.normal[level] || 1);
+            const canBreed = level >= 5;
+            const canBattle = level >= 1;
+            const canStake = level >= 1;
+            
+            const desc = isOwned 
+                ? `${nftInfo.attrName}属性生肖·${ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac]}·${nftInfo.genderName} · 持有可享受税收分红` 
+                : '尚未拥有此生肖';
 
             document.getElementById('modalCardImage').src = isOwned ? nftInfo.imagePath : 'images/fu-cards/shuishu_1.png';
             document.getElementById('modalCardImage').style.filter = isOwned ? 'none' : 'grayscale(100%)';
             document.getElementById('modalCardName').textContent = nftInfo.name;
             document.getElementById('modalCardDesc').textContent = desc;
             document.getElementById('modalCardId').textContent = typeId + 1;
+            
+            const rarityBadge = document.getElementById('modalCardRarity');
+            if (rarityBadge) {
+                rarityBadge.textContent = rarityText;
+                rarityBadge.className = `text-xs font-bold px-2 py-1 rounded ${isRare ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`;
+            }
+            
+            const statsDiv = document.getElementById('modalCardStats');
+            if (statsDiv) {
+                statsDiv.innerHTML = `
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-blue-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-600 mb-1">稀有度</div>
+                            <div class="${rarityColor} font-bold">${rarityText}</div>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-600 mb-1">分红权重</div>
+                            <div class="text-green-600 font-bold">${weight}x</div>
+                        </div>
+                        <div class="bg-yellow-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-600 mb-1">当前等级</div>
+                            <div class="text-yellow-600 font-bold">${'⭐'.repeat(level)}</div>
+                        </div>
+                        <div class="bg-red-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-600 mb-1">持有数量</div>
+                            <div class="text-red-600 font-bold">${count} 张</div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="text-xs text-gray-600 mb-2">可用功能</div>
+                        <div class="flex gap-2 flex-wrap">
+                            ${canBattle ? '<span class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs">⚔️ 战斗</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">⚔️ 战斗</span>'}
+                            ${canStake ? '<span class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs">💰 质押</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">💰 质押</span>'}
+                            ${canBreed ? '<span class="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs">🧬 孕育</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">🧬 孕育</span>'}
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-600 rounded text-xs">📊 分红</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 text-xs text-gray-500">
+                        <p>💡 ${isRare ? '稀有属性' : '普通属性'}NFT，${isRare ? '权重更高' : '基础权重'}，适合参与各类游戏玩法。</p>
+                    </div>
+                `;
+            }
+            
             document.getElementById('cardModal').classList.remove('hidden');
         }
 
@@ -613,7 +681,7 @@
         }
 
         function getStars(level) {
-            return window.ZODIAC_UTILS.getStars(parseInt(level));
+            return window.ZODIAC_UTILS.getStars(parseInt(level, 10));
         }
     </script>
 </body>
