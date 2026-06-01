@@ -417,7 +417,7 @@ window.ZODIAC_UI = (function() {
             { pattern: /Invalid amount/, message: '无效的数量', code: 'INVALID_AMOUNT' },
             { pattern: /Token.*not set|Contract not set/, message: '合约未正确设置', code: 'CONTRACT_NOT_SET' },
             { pattern: /Threshold not met/, message: '未达到阈值要求', code: 'THRESHOLD_NOT_MET' },
-            { pattern: /No pending action/, message: '没有待处理的操作', code: 'NO_PENDING_ACTION' }
+            { pattern: /No pending action/, message: '没有待处理的操作', code: 'NO_PENDING_ACTION' },
             { pattern: /Invalid token address|Invalid address/, message: '无效的合约地址', code: 'INVALID_ADDRESS' },
             { pattern: /Token contract not set/, message: '代币合约未设置', code: 'TOKEN_CONTRACT_NOT_SET' },
             { pattern: /NFT contract not set/, message: 'NFT合约未设置', code: 'NFT_CONTRACT_NOT_SET' },

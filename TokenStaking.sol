@@ -90,7 +90,9 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @param amount 接收BNB数量
      */
     event BNBReceived(uint256 amount);
-    event BNBWithdrawn(address indexed owner, uint256 amount);
+
+    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
     /** @dev 奖励比例更新事件 */
     event RewardRateUpdated(uint256 newRate);
@@ -429,19 +431,23 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     /**
-     * @dev 提取BNB（仅限管理员）
+     * @dev 紧急提取BNB（仅限管理员）
      * @param amount 提取金额
      */
-    function withdrawBNB(uint256 amount) external onlyOwner nonReentrant {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
+        require(amount > 0, "TokenStaking: Amount must be > 0");
         require(amount <= address(this).balance, "TokenStaking: Insufficient BNB balance");
         (bool success, ) = payable(owner()).call{value: amount}("");
         require(success, "TokenStaking: Failed to withdraw BNB");
-        emit BNBWithdrawn(owner(), amount);
+        emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    function withdrawTokens(uint256 amount) external onlyOwner nonReentrant {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
+        require(amount > 0, "TokenStaking: Amount must be > 0");
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        require(tokenContract != address(0), "TokenStaking: Token contract not set");
         require(amount <= token.balanceOf(address(this)), "TokenStaking: insufficient token balance");
         require(token.transfer(owner(), amount), "TokenStaking: transfer failed");
+        emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
 }
