@@ -40,7 +40,7 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     function getZodiacSpeed(uint256 zodiac) external pure returns (uint256) {
-        uint256[12] memory speeds = [uint256(95), uint256(40), uint256(70), uint256(90), uint256(80), uint256(85), uint256(100), uint256(35), uint256(110), uint256(55), uint256(60), uint256(30)];
+        uint256[12] memory speeds = [uint256(95), uint256(55), uint256(70), uint256(90), uint256(80), uint256(85), uint256(100), uint256(50), uint256(110), uint256(60), uint256(65), uint256(45)];
         return speeds[zodiac];
     }
 }

@@ -336,12 +336,7 @@
             btn.disabled = true;
 
             try {
-                const gas = await ZODIAC_WEB3.estimateGas(rewardManagerContract, 'claimDividend', [], account);
-                await rewardManagerContract.methods.claimDividend().send({ 
-                    from: account,
-                    gas: gas
-                });
-
+                await ZODIAC_WEB3.claimDividend();
                 ZODIAC_UI.showToast('领取成功！', 'success');
                 await loadBNBReward();
             } catch (error) {

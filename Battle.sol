@@ -4,15 +4,10 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "./NFTInterface.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 
-interface INFTMint {
-    function ownerOf(uint256 tokenId) external view returns (address);
-    function tokenType(uint256 tokenId) external view returns (uint256);
-    function tokenLevel(uint256 tokenId) external view returns (uint8);
-    function tokenGrowth(uint256 tokenId) external view returns (uint8);
-}
-
-contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     struct NFTTraits {
         uint256 tokenId;
         uint8 level;
@@ -42,23 +37,26 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
     BattleState[] public battleHistory;
 
-    uint256 public baseBattleReward;
-    uint256 public battleFeePercent;
     uint256 public constant MAX_ROUNDS = 50;
     uint256 public constant PRECISION = 10000;
 
     address public nftContract;
     address public authorizer;
 
+    bool public initialized;
+
     function initialize(address _authorizer) external initializer {
+        require(!initialized, "Battle: Already initialized");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         authorizer = _authorizer;
-        _initWaterSkills();
-        _initWindSkills();
-        _initFireSkills();
-        _initDarkSkills();
-        _initLightSkills();
+        _initSkills();
+        initialized = true;
+    }
+
+    function reinitializeSkills() external onlyOwner {
+        _initSkills();
     }
 
     function setAuthorizer(address a) external onlyOwner {
@@ -88,9 +86,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
     event BattleEnded(
         uint256 indexed battleId,
-        uint8 winner,
-        uint256 challengerReward,
-        uint256 challengedReward
+        uint8 winner
     );
 
     function setNFTContract(address _nftContract) external onlyAuthorized {
@@ -144,6 +140,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     function _calculatePower(uint256 level, uint256 growth) internal pure returns (uint8) {
+        if (level == 0) return 0;
         uint256 basePower = level * 20;
         uint256 growthBonus = (level - 1) * growth * 2 / 100;
         return uint8(basePower + growthBonus);
@@ -177,20 +174,35 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         uint256[6] calldata challengerTeam,
         uint256[6] calldata challengedTeam,
         address challengedAddress
-    ) external returns (bool, uint256, uint256[] memory) {
+    ) external nonReentrant returns (bool, uint256) {
+        bool isMockBattle = (challengedAddress == address(0));
+        
+        // 非模拟战斗必须设置NFT合约
+        if (!isMockBattle) {
+            require(nftContract != address(0), "Battle: NFT contract not set");
+        }
+        
         require(_validateTeam(challengerTeam), "Battle: Invalid challenger team");
         require(_validateTeam(challengedTeam), "Battle: Invalid challenged team");
-        require(challengedAddress != address(0), "Battle: Invalid challenged address");
+        
+        if (!isMockBattle) {
+            require(challengedAddress != address(0), "Battle: Invalid challenged address");
+        }
 
         _requireNFTOwnership(challengerTeam);
-        _requireNFTOwnershipForAddress(challengedTeam, challengedAddress);
+        
+        if (!isMockBattle) {
+            _requireNFTOwnershipForAddress(challengedTeam, challengedAddress);
+        }
 
         if (challengerId != 0) {
-            require(_isValidNFT(challengerId), "Battle: Invalid challenger NFT");
-            require(INFTMint(nftContract).ownerOf(challengerId) == msg.sender, "Battle: Not owner of challenger NFT");
+            require(_isValidNFT(challengerId, isMockBattle), "Battle: Invalid challenger NFT");
+            if (!isMockBattle) {
+                require(INFTMint(nftContract).ownerOf(challengerId) == msg.sender, "Battle: Not owner of challenger NFT");
+            }
         }
-        if (challengedId != 0) {
-            require(_isValidNFT(challengedId), "Battle: Invalid challenged NFT");
+        if (!isMockBattle && challengedId != 0) {
+            require(_isValidNFT(challengedId, false), "Battle: Invalid challenged NFT");
             require(INFTMint(nftContract).ownerOf(challengedId) == challengedAddress, "Battle: Not owner of challenged NFT");
         }
 
@@ -214,18 +226,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         battleHistory[battleId - 1].winner = winner;
         battleHistory[battleId - 1].status = 2;
 
-        uint256[] memory rewards = new uint256[](2);
-        if (winner == 1) {
-            rewards[0] = baseBattleReward;
-            rewards[1] = 0;
-        } else {
-            rewards[0] = 0;
-            rewards[1] = baseBattleReward;
-        }
+        emit BattleEnded(battleId, winner);
 
-        emit BattleEnded(battleId, winner, rewards[0], rewards[1]);
-
-        return (true, winner, rewards);
+        return (true, winner);
     }
 
     function _requireNFTOwnershipForAddress(uint256[6] memory team, address owner) internal view {
@@ -241,8 +244,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
     }
 
-    function _isValidNFT(uint256 tokenId) internal view returns (bool) {
-        if (nftContract == address(0)) return true;
+    function _isValidNFT(uint256 tokenId, bool isMockBattle) internal view returns (bool) {
+        if (isMockBattle) {
+            // 模拟战斗中接受任何tokenId
+            return true;
+        }
+        if (nftContract == address(0)) return false;
         (bool success, bytes memory data) = nftContract.staticcall(
             abi.encodeWithSignature("ownerOf(uint256)", tokenId)
         );
@@ -544,17 +551,14 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function battle(
         uint256[6] calldata attackerTeam,
         uint256[6] calldata defenderTeam
-    ) external view returns (bool, uint256, uint256) {
+    ) external view returns (bool, uint256) {
         require(_validateTeam(attackerTeam), "Battle: Invalid attacker team");
         require(_validateTeam(defenderTeam), "Battle: Invalid defender team");
         
         uint256 battleId = block.timestamp % 1000 + 1;
         uint8 winner = _executeBattleView(attackerTeam, defenderTeam, battleId);
         
-        uint256 attackerReward = winner == 1 ? baseBattleReward : 0;
-        uint256 defenderReward = winner == 2 ? baseBattleReward : 0;
-        
-        return (true, winner, attackerReward);
+        return (true, winner);
     }
 
     function getBattleLogCount() external view returns (uint256) {
@@ -585,14 +589,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         );
     }
 
-    function setBaseBattleReward(uint256 reward) external onlyOwner {
-        baseBattleReward = reward;
-    }
 
-    function setBattleFeePercent(uint256 feePercent) external onlyOwner {
-        require(feePercent <= 100, "Battle: Fee too high");
-        battleFeePercent = feePercent;
-    }
 
     function getBattleConstants() external pure returns (uint256, uint256) {
         return (MAX_ROUNDS, PRECISION);
@@ -610,6 +607,14 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     mapping(uint256 => Skill) public skills;
 
     function initSkills() external onlyOwner {
+        _initWaterSkills();
+        _initWindSkills();
+        _initFireSkills();
+        _initDarkSkills();
+        _initLightSkills();
+    }
+
+    function _initSkills() internal {
         _initWaterSkills();
         _initWindSkills();
         _initFireSkills();

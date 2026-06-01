@@ -10,11 +10,34 @@ error ZeroAddress();
 error InvalidAmount();
 error NotOperator();
 
-contract WeightManager is 
+contract WeightManager is
     Initializable,
     Ownable2StepUpgradeable,
     UUPSUpgradeable
 {
+    bool public paused;
+    string public pauseReason;
+
+    event Paused(address account, string reason);
+    event Unpaused(address account);
+
+    modifier whenNotPaused() {
+        require(!paused, "WeightManager: Paused");
+        _;
+    }
+
+    function pause(string memory reason) external onlyOwner {
+        paused = true;
+        pauseReason = reason;
+        emit Paused(msg.sender, reason);
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+        pauseReason = "";
+        emit Unpaused(msg.sender);
+    }
+
     address public nftDataContract;
     address public authorizer;
     uint256 public minOwnerWeight;
@@ -106,21 +129,24 @@ contract WeightManager is
         cachedWeightTimestamp[user] = block.timestamp;
     }
     
-    function batchRefreshUserWeightCache(address[] calldata users) external onlyOperator {
-        if (nftDataContract == address(0)) return;
-        if (users.length > 100) revert InvalidAmount();
-        
-        INFTDataInterface nftData = INFTDataInterface(nftDataContract);
+    function batchUpdateUserWeight(address[] calldata users) external onlyOperator whenNotPaused {
+        require(users.length <= 100, "WeightManager: Batch size too large");
+        uint256 count = 0;
         for (uint256 i = 0; i < users.length; i++) {
-            address user = users[i];
-            if (user == owner()) continue;
-            
-            uint256 weight = nftData.calcUserWeight(user);
-            cachedUserWeight[user] = weight;
-            cachedWeightTimestamp[user] = block.timestamp;
+            if (users[i] != address(0)) {
+                _updateUserWeight(users[i]);
+                count++;
+            }
         }
+        emit BatchWeightUpdateCompleted(msg.sender, count);
     }
-    
+
+    function getUserWeightHistory(address user) external view returns (WeightSnapshot[] memory) {
+        return weightSnapshots[user];
+    }
+
+    event BatchWeightUpdateCompleted(address indexed operator, uint256 count);
+
     function setWeightCacheDuration(uint256 duration) external onlyOwner {
         weightCacheDuration = duration;
     }
@@ -151,7 +177,7 @@ contract WeightManager is
         _manageEligibleList(user);
     }
     
-    function updateUserWeight(address user) external onlyOperator {
+    function updateUserWeight(address user) external onlyOperator whenNotPaused {
         _updateUserWeight(user);
     }
     
@@ -202,12 +228,12 @@ contract WeightManager is
         inEligibleList[user] = false;
     }
     
-    function addHolder(address user) external onlyOperator returns (bool) {
+    function addHolder(address user) external onlyOperator whenNotPaused returns (bool) {
         _updateUserWeight(user);
         return true;
     }
     
-    function removeHolder(address user) external onlyOperator {
+    function removeHolder(address user) external onlyOperator whenNotPaused {
         uint256 oldWeight = userWeight[user];
         if (oldWeight > 0) {
             userWeight[user] = 0;

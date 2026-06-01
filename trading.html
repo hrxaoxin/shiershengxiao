@@ -107,7 +107,7 @@
         <div id="browseSection" class="mb-12">
             <div class="flex justify-between items-center mb-6">
                 <h2 class="text-2xl font-bold text-gray-800">NFT市场</h2>
-                <div class="flex space-x-4">
+                <div class="flex flex-wrap gap-4">
                     <select id="filterType" class="input-field w-48">
                         <option value="all">全部类型</option>
                         <option value="water">水属性</option>
@@ -115,6 +115,11 @@
                         <option value="fire">火属性</option>
                         <option value="dark">暗属性</option>
                         <option value="light">光属性</option>
+                    </select>
+                    <select id="filterPrice" class="input-field w-48">
+                        <option value="all">全部价格</option>
+                        <option value="low">价格从低到高</option>
+                        <option value="high">价格从高到低</option>
                     </select>
                     <button id="refreshBtn" class="btn-secondary">
                         <i class="fa fa-refresh mr-2"></i>刷新
@@ -278,6 +283,8 @@
         let currentTokenIdToBuy;
         let selectedTokenId = null;
         let userNftCache = null;
+        let currentFeePercent = 5;
+        let currentBuyPrice = null;
         
         const PAGE_SIZE = 16;
         let currentPage = 1;
@@ -445,6 +452,22 @@
             try {
                 nftTradingContract = await window.ZODIAC_WEB3.getContract('nftTrading');
                 nftMintContract = await window.ZODIAC_WEB3.getContract('nftMint');
+                
+                // 从合约获取手续费率
+                try {
+                    const feePercent = await nftTradingContract.methods.feePercent().call();
+                    currentFeePercent = parseInt(feePercent, 10);
+                    // 更新显示文本
+                    const feeInfo = document.querySelector('.bg-gray-50 p');
+                    if (feeInfo) {
+                        feeInfo.innerHTML = `
+                            <i class="fa fa-info-circle text-blue-500 mr-2"></i>
+                            交易手续费：${currentFeePercent}%，将自动转入分红钱包
+                        `;
+                    }
+                } catch (e) {
+                    console.warn('获取手续费率失败，使用默认值:', e);
+                }
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
                 ZODIAC_UI.showToast('合约初始化失败: ' + error.message, 'warning');
@@ -691,46 +714,45 @@
         }
 
         function showBuyModal(tokenId, price, seller, type) {
+            if (seller === '0x0000000000000000000000000000000000000000') {
+                ZODIAC_UI.showToast('该NFT未在市场上架', 'warning');
+                return;
+            }
+
             currentTokenIdToBuy = tokenId;
+            currentBuyPrice = price;
             const nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
-            const fee = (parseFloat(price) * 0.05).toFixed(4);
+            const fee = (parseFloat(price) * (currentFeePercent / 100)).toFixed(4);
             
             document.getElementById('modalTokenId').textContent = tokenId;
             document.getElementById('modalTokenType').textContent = nftInfo.name;
             document.getElementById('modalSeller').textContent = seller.substring(0, 6) + '...' + seller.substring(seller.length - 4);
             document.getElementById('modalPrice').textContent = price;
-            document.getElementById('modalFee').textContent = fee + ' (卖方承担)';
+            document.getElementById('modalFee').textContent = fee + ' (卖方承担, ' + currentFeePercent + '%)';
             document.getElementById('modalTotal').textContent = price;
             
             document.getElementById('buyModal').classList.remove('hidden');
         }
 
-        async function buyNFT(tokenId, price) {
+        async function buyNFT(tokenId) {
             if (!account || !nftTradingContract) return;
-            
+
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认购买',
-                `将花费 ${price} BNB 购买此NFT，确定继续？`
+                `将花费 ${currentBuyPrice} BNB 购买此NFT，确定继续？`
             );
-            
+
             if (!confirm) {
                 document.getElementById('buyModal').classList.add('hidden');
                 return;
             }
-            
+
             const btn = document.getElementById('confirmBuy');
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 购买中...';
             btn.disabled = true;
-            
+
             try {
-                const priceWei = web3.utils.toWei(price, 'ether');
-                const gas = await ZODIAC_WEB3.estimateGas(nftTradingContract, 'buyNFT', [tokenId], account);
-                
-                await nftTradingContract.methods.buyNFT(tokenId).send({
-                    from: account,
-                    value: priceWei,
-                    gas: gas
-                });
+                await ZODIAC_WEB3.buyNFT(tokenId);
                 
                 ZODIAC_UI.showToast('购买成功！', 'success');
                 document.getElementById('buyModal').classList.add('hidden');
@@ -805,12 +827,7 @@
                 }
 
                 const priceWei = web3.utils.toWei(price, 'ether');
-                const gas = await ZODIAC_WEB3.estimateGas(nftTradingContract, 'listNFT', [tokenId, priceWei], account);
-
-                await nftTradingContract.methods.listNFT(tokenId, priceWei).send({
-                    from: account,
-                    gas: gas
-                });
+                await ZODIAC_WEB3.listNFT(tokenId, priceWei);
 
                 ZODIAC_UI.showToast('上架成功！', 'success');
 
@@ -853,11 +870,7 @@
             if (!confirm) return;
             
             try {
-                const gas = await ZODIAC_WEB3.estimateGas(nftMintContract, 'setApprovalForAll', [ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftTrading, true], account);
-                await nftMintContract.methods.setApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftTrading, true).send({
-                    from: account,
-                    gas: gas
-                });
+                await ZODIAC_WEB3.setNFTApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftTrading, true);
                 ZODIAC_UI.showToast('授权成功！', 'success');
             } catch (error) {
                 ZODIAC_UI.showToast('授权失败: ' + (error.message || '未知错误'), 'error');
@@ -931,11 +944,7 @@
             if (!confirm) return;
 
             try {
-                const gas = await ZODIAC_WEB3.estimateGas(nftTradingContract, 'delistNFT', [tokenId], account);
-                await nftTradingContract.methods.delistNFT(tokenId).send({
-                    from: account,
-                    gas: gas
-                });
+                await ZODIAC_WEB3.delistNFT(tokenId);
 
                 ZODIAC_UI.showToast('取消成功！', 'success');
                 marketplaceCache = null;

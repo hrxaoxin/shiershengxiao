@@ -6,6 +6,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 
 /**
  * @title TokenStaking
@@ -13,7 +14,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * 允许用户质押代币获取BNB奖励，支持弹性奖励释放机制
  * 基于OpenZeppelin UUPS可升级合约实现
  */
-contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     /** @dev 基础奖励比例（万分比，默认10 = 0.1%） */
     uint256 public rewardRate = 10;
     /** @dev 最大奖励比例（万分比，默认20 = 0.2%） */
@@ -89,6 +90,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @param amount 接收BNB数量
      */
     event BNBReceived(uint256 amount);
+    event BNBWithdrawn(address indexed owner, uint256 amount);
 
     /** @dev 奖励比例更新事件 */
     event RewardRateUpdated(uint256 newRate);
@@ -114,15 +116,26 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /**
      * @dev 初始化合约
      * @param _tokenContract 代币合约地址
+     * @param _authorizer 授权合约地址
      */
-    function initialize(address _tokenContract) external initializer {
+    function initialize(address _tokenContract, address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
 
         tokenContract = _tokenContract;
+        authorizer = _authorizer;
         lastRewardUpdate = block.timestamp;
         dailyRewardDistributed = 0;
+    }
+    
+    function pause() external onlyOwner {
+        _pause();
+    }
+    
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     /**
@@ -143,7 +156,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @dev 质押代币
      * @param amount 质押数量
      */
-    function stakeTokens(uint256 amount) external nonReentrant {
+    function stakeTokens(uint256 amount) external nonReentrant whenNotPaused {
         require(amount > 0, "TokenStaking: Amount must be > 0");
 
         _checkNewDay();
@@ -291,7 +304,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @dev 计算并分发每日奖励
      * dailyRewardPerToken 为累积值（持续递增），避免跨日覆盖导致奖励丢失
      */
-    function calculateDailyReward() external {
+    function calculateDailyReward() external onlyAuthorized {
         _checkNewDay();
 
         uint256 contractBalance = address(this).balance;
@@ -309,7 +322,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /**
      * @dev 领取奖励
      */
-    function claimRewards() external nonReentrant {
+    function claimRewards() external nonReentrant whenNotPaused {
         StakeInfo storage stake = userStakes[msg.sender];
         require(stake.amount > 0, "TokenStaking: No staked tokens");
 
@@ -320,10 +333,13 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(userReward > 0, "TokenStaking: No rewards to claim");
         require(address(this).balance >= userReward, "TokenStaking: Insufficient BNB in contract");
 
-        // 清零累积奖励（无论 dailyRewardPerToken 是否为0）
         stake.accumulatedRewards = 0;
 
-        totalPendingRewards -= userReward;
+        if (totalPendingRewards >= userReward) {
+            totalPendingRewards -= userReward;
+        } else {
+            totalPendingRewards = 0;
+        }
 
         (bool success, ) = payable(msg.sender).call{value: userReward}("");
         require(success, "TokenStaking: Failed to transfer BNB rewards");
@@ -420,11 +436,12 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(amount <= address(this).balance, "TokenStaking: Insufficient BNB balance");
         (bool success, ) = payable(owner()).call{value: amount}("");
         require(success, "TokenStaking: Failed to withdraw BNB");
+        emit BNBWithdrawn(owner(), amount);
     }
 
     function withdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         require(amount <= token.balanceOf(address(this)), "TokenStaking: insufficient token balance");
-        token.transfer(owner(), amount);
+        require(token.transfer(owner(), amount), "TokenStaking: transfer failed");
     }
 }

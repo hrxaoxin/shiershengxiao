@@ -204,6 +204,19 @@
                     <span class="text-lg font-medium text-gray-800">可领取代币</span>
                     <span class="text-lg font-bold text-gray-800" id="rewardsAmount">0.00</span>
                 </div>
+                <div id="rewardEstimate" class="p-4 bg-blue-50 rounded-lg mb-4">
+                    <div class="text-sm text-blue-600 font-medium mb-2">📈 收益预估</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <span class="text-xs text-gray-500">每日预估收益</span>
+                            <p class="text-lg font-bold text-blue-600" id="dailyReward">0.00</p>
+                        </div>
+                        <div>
+                            <span class="text-xs text-gray-500">年化收益率</span>
+                            <p class="text-lg font-bold text-green-600" id="annualRate">0.00%</p>
+                        </div>
+                    </div>
+                </div>
                 <button id="claimBtn" class="btn-primary w-full" disabled>
                     领取奖励
                 </button>
@@ -486,7 +499,8 @@
         }
 
         function isNFTLevelEligible(level) {
-            return parseInt(level, 10) >= 5;
+            const MIN_LEVEL = 5;
+            return parseInt(level) >= MIN_LEVEL;
         }
 
         function isNFTRare(tokenType) {
@@ -711,25 +725,33 @@
             btn.textContent = '质押中...';
 
             try {
-                for (const tokenId of selectedNFTs) {
-                    const isStaked = await checkAlreadyStaked(tokenId);
-                    if (isStaked) {
-                        console.warn(`NFT ${tokenId} 已被质押，跳过`);
-                        continue;
-                    }
+                const stakingAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.staking;
+                
+                const batchSize = 10;
+                for (let i = 0; i < selectedNFTs.length; i += batchSize) {
+                    const batch = selectedNFTs.slice(i, i + batchSize);
                     
-                    const approveGas = await ZODIAC_WEB3.estimateGas(nftContract, 'approve', [stakingAddress, tokenId], account);
-                    await nftContract.methods.approve(stakingAddress, tokenId).send({
-                        from: account,
-                        gas: approveGas
-                    });
+                    for (const tokenId of batch) {
+                        const isStaked = await checkAlreadyStaked(tokenId);
+                        if (isStaked) {
+                            console.warn(`NFT ${tokenId} 已被质押，跳过`);
+                            continue;
+                        }
+                        
+                        const stakeInfo = await stakingContract.methods.stakingInfo(tokenId).call();
+                        if (stakeInfo.owner !== '0x0000000000000000000000000000000000000000') {
+                            continue;
+                        }
+                        
+                        const approveGas = await ZODIAC_WEB3.estimateGas(nftContract, 'approve', [stakingAddress, tokenId], account);
+                        await nftContract.methods.approve(stakingAddress, tokenId).send({
+                            from: account,
+                            gas: approveGas
+                        });
+                    }
                 }
 
-                const stakeGas = await ZODIAC_WEB3.estimateGas(stakingContract, 'stake', [selectedNFTs], account);
-                await stakingContract.methods.stake(selectedNFTs).send({
-                    from: account,
-                    gas: stakeGas
-                });
+                await ZODIAC_WEB3.stake(selectedNFTs);
 
                 ZODIAC_UI.showToast('质押成功！', 'success');
                 selectedNFTs = [];
@@ -757,11 +779,7 @@
             if (!confirm) return;
 
             try {
-                const gas = await ZODIAC_WEB3.estimateGas(stakingContract, 'unstake', [[tokenId]], account);
-                await stakingContract.methods.unstake([tokenId]).send({
-                    from: account,
-                    gas: gas
-                });
+                await ZODIAC_WEB3.unstake([tokenId]);
                 
                 ZODIAC_UI.showToast('赎回成功！', 'success');
                 loadEligibleNFTs();
@@ -780,11 +798,7 @@
             btn.textContent = '领取中...';
 
             try {
-                const gas = await ZODIAC_WEB3.estimateGas(stakingContract, 'claimReward', [], account);
-                await stakingContract.methods.claimReward().send({
-                    from: account,
-                    gas: gas
-                });
+                await ZODIAC_WEB3.claimReward();
                 
                 ZODIAC_UI.showToast('领取成功！', 'success');
                 loadRewards();
@@ -933,18 +947,10 @@
                 
                 const allowance = await tokenContract.methods.allowance(account, tokenStakingAddress).call();
                 if (parseInt(allowance, 10) < parseInt(amountWei, 10)) {
-                    const approveGas = await ZODIAC_WEB3.estimateGas(tokenContract, 'approve', [tokenStakingAddress, amountWei], account);
-                    await tokenContract.methods.approve(tokenStakingAddress, amountWei).send({
-                        from: account,
-                        gas: approveGas
-                    });
+                    await ZODIAC_WEB3.approveToken(tokenStakingAddress, amountWei);
                 }
 
-                const stakeGas = await ZODIAC_WEB3.estimateGas(tokenStakingContract, 'stakeTokens', [amountWei], account);
-                await tokenStakingContract.methods.stakeTokens(amountWei).send({
-                    from: account,
-                    gas: stakeGas
-                });
+                await ZODIAC_WEB3.stakeTokens(amountWei);
 
                 ZODIAC_UI.showToast('代币质押成功！', 'success');
                 document.getElementById('tokenStakeAmount').value = '';
@@ -978,12 +984,7 @@
 
             try {
                 const amountWei = web3.utils.toWei(amount, 'ether');
-                
-                const gas = await ZODIAC_WEB3.estimateGas(tokenStakingContract, 'unstakeTokens', [amountWei], account);
-                await tokenStakingContract.methods.unstakeTokens(amountWei).send({
-                    from: account,
-                    gas: gas
-                });
+                await ZODIAC_WEB3.unstakeTokens(amountWei);
 
                 ZODIAC_UI.showToast('代币赎回成功！', 'success');
                 document.getElementById('tokenUnstakeAmount').value = '';
@@ -1003,11 +1004,7 @@
             btn.textContent = '领取中...';
 
             try {
-                const gas = await ZODIAC_WEB3.estimateGas(tokenStakingContract, 'claimRewards', [], account);
-                await tokenStakingContract.methods.claimRewards().send({
-                    from: account,
-                    gas: gas
-                });
+                await ZODIAC_WEB3.claimTokenRewards();
 
                 ZODIAC_UI.showToast('BNB奖励领取成功！', 'success');
                 await loadTokenStakingInfo();

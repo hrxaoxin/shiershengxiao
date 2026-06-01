@@ -280,6 +280,7 @@ library NFTDataTypes {
         uint256 tokenId;         // NFT唯一ID
         ZodiacType zodiacType;    // 生肖类型（属性+生肖+性别）
         uint8 level;              // 等级（1-5）
+        uint8 growth;             // 成长值（10-100）
         uint256 mintTime;         // 铸造时间戳
     }
 

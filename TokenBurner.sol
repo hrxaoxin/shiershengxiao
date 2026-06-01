@@ -2,14 +2,37 @@
 pragma solidity ^0.8.20;
 
 import "./NFTInterface.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 
-contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
 
+    bool public paused;
+    string public pauseReason;
+
+    event Paused(address account, string reason);
+    event Unpaused(address account);
+
+    modifier whenNotPaused() {
+        require(!paused, "TokenBurner: Paused");
+        _;
+    }
+
+    function pause(string memory reason) external onlyOwner {
+        paused = true;
+        pauseReason = reason;
+        emit Paused(msg.sender, reason);
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+        pauseReason = "";
+        emit Unpaused(msg.sender);
+    }
     uint256 public normalMintCost = 8888 * 10**18;
     uint256 public rareMintCost = 88888 * 10**18;
 
@@ -40,6 +63,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     function initialize(address _tokenContract, address _nftMint, address _authorizer) external initializer {
         __UUPSUpgradeable_init();
         __Ownable2Step_init();
+        __ReentrancyGuard_init();
         tokenContract = _tokenContract;
         nftMintContract = _nftMint;
         authorizer = _authorizer;
@@ -93,13 +117,12 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
         rarePart = rareMintCost * 4;
     }
 
-    function burnAndMint(address user, bool isRare) external returns (bool) {
+    function burnAndMint(address user, bool isRare) external onlyAuthorized nonReentrant whenNotPaused returns (bool) {
         require(tokenContract != address(0), "TokenBurner: tokenContract not set");
         require(nftMintContract != address(0), "TokenBurner: nftMintContract not set");
         require(user != address(0), "TokenBurner: Zero user address");
-        require(msg.sender == user || msg.sender == owner(), "TokenBurner: Caller must be user or owner");
 
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        IERC20 token = IERC20(tokenContract);
         uint256 cost = isRare ? rareMintCost : normalMintCost;
         require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
@@ -108,24 +131,26 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
         emit TokenBurned(user, cost, block.timestamp);
 
         INFTMint nftMint = INFTMint(nftMintContract);
+        uint256 tokenId;
         if (isRare) {
-            uint256 tokenId = nftMint.mintRare(user);
-            emit NFTMinted(user, tokenId, 0, true);
+            tokenId = nftMint.mintRare(user);
         } else {
-            uint256 tokenId = nftMint.mintNormal(user);
-            emit NFTMinted(user, tokenId, 0, false);
+            tokenId = nftMint.mintNormal(user);
         }
+        require(tokenId > 0, "TokenBurner: NFT mint failed");
+
+        uint256 zodiacType = nftMint.tokenType(tokenId);
+        emit NFTMinted(user, tokenId, zodiacType, isRare);
 
         return true;
     }
 
-    function burnAndMintTen(address user, bool isRare) external returns (bool) {
+    function burnAndMintTen(address user, bool isRare) external onlyAuthorized nonReentrant whenNotPaused returns (bool) {
         require(tokenContract != address(0), "TokenBurner: tokenContract not set");
         require(nftMintContract != address(0), "TokenBurner: nftMintContract not set");
         require(user != address(0), "TokenBurner: Zero user address");
-        require(msg.sender == user || msg.sender == owner(), "TokenBurner: Caller must be user or owner");
 
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        IERC20 token = IERC20(tokenContract);
         uint256 cost = isRare ? rareMintCost * 10 : normalMintCost * 10;
         require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
@@ -143,13 +168,13 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
         return true;
     }
 
-    function burnAndMintTargeted(address user, uint8 zodiac) external returns (bool) {
+    function burnAndMintTargeted(address user, uint8 zodiac) external onlyAuthorized nonReentrant whenNotPaused returns (bool) {
         require(tokenContract != address(0), "TokenBurner: tokenContract not set");
         require(nftMintContract != address(0), "TokenBurner: nftMintContract not set");
         require(user != address(0), "TokenBurner: Zero user address");
-        require(msg.sender == user || msg.sender == owner(), "TokenBurner: Caller must be user or owner");
+        require(zodiac < 12, "TokenBurner: Invalid zodiac type");
 
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        IERC20 token = IERC20(tokenContract);
         uint256 normalPart = normalMintCost * 6;
         uint256 rarePart = rareMintCost * 4;
         uint256 totalCost = normalPart + rarePart;
@@ -163,5 +188,38 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
         nftMint.mintTargeted(user, zodiac);
 
         return true;
+    }
+
+    /**
+     * @dev 获取铸造费用
+     * @param isRare 是否稀有
+     * @param count 数量
+     * @return 总费用
+     */
+    function getMintCost(bool isRare, uint256 count) external view returns (uint256) {
+        require(count > 0, "TokenBurner: Invalid count");
+        uint256 singleCost = isRare ? rareMintCost : normalMintCost;
+        return singleCost * count;
+    }
+
+    /**
+     * @dev 获取定向铸造费用
+     * @return 普通部分费用
+     * @return 稀有部分费用
+     * @return 总费用
+     */
+    function getTargetedMintCost() external view returns (uint256, uint256, uint256) {
+        uint256 normalPart = normalMintCost * 6;
+        uint256 rarePart = rareMintCost * 4;
+        return (normalPart, rarePart, normalPart + rarePart);
+    }
+
+    /**
+     * @dev 获取所有费用配置
+     * @return 普通铸造费用
+     * @return 稀有铸造费用
+     */
+    function getAllCosts() external view returns (uint256, uint256) {
+        return (normalMintCost, rareMintCost);
     }
 }

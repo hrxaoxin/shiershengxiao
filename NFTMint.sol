@@ -5,13 +5,10 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/Strings.sol";
 
-contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUpgradeable {
-    uint256 public constant MINT_COST = 8888 * 10**18;
-    uint256 public constant RARE_MINT_COST = 88888 * 10**18;
-    uint256 public constant BATCH_MINT_COST = 88880 * 10**18;
-    uint256 public constant RARE_BATCH_MINT_COST = 888880 * 10**18;
-    uint256 public constant ZODIAC_MINT_COST = 88880 * 10**18;
+contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
     uint256[5] public elementProbabilities = [32, 32, 32, 2, 2];
     uint256[2] public rareElementProbabilities = [50, 50];
@@ -22,6 +19,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
 
     address public tokenBurnerContract;
     address public authorizer;
+    address public nftDataContract;
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
     
     bool public paused;
@@ -34,6 +32,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     mapping(uint256 => uint8) public tokenGrowth;
 
     event Mint(address indexed to, uint256 indexed tokenId, uint256 zodiacType, uint8 growth);
+    event NFTDataSyncFailed(uint256 indexed tokenId, uint256 zodiacType);
     event BatchMint(address indexed to, uint256[] tokenIds);
     event Upgrade(address indexed owner, uint256 indexed tokenId, uint8 oldLevel, uint8 newLevel);
     event Paused(address account, string reason);
@@ -45,6 +44,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         __ERC721Enumerable_init();
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         _nextCardId = 1;
         authorizer = _authorizer;
     }
@@ -64,6 +64,35 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         require(_tokenBurner != address(0), "NFTMint: Invalid token burner address");
         tokenBurnerContract = _tokenBurner;
     }
+    
+    function setNFTDataContract(address _nftData) external onlyAuthorized {
+        nftDataContract = _nftData;
+    }
+    
+    function _syncNFTData(address to, uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth) internal {
+        if (nftDataContract != address(0)) {
+            (bool success, ) = nftDataContract.call(
+                abi.encodeWithSignature(
+                    "setNFTInfo(uint256,uint256,uint8,uint8,uint256,address)",
+                    tokenId, zodiacType, level, growth, block.timestamp, to
+                )
+            );
+            if (!success) {
+                emit NFTDataSyncFailed(tokenId, zodiacType);
+            }
+        }
+    }
+    
+    function _updateNFTDataLevel(uint256 tokenId, uint8 newLevel) internal {
+        if (nftDataContract != address(0)) {
+            (bool success, ) = nftDataContract.call(
+                abi.encodeWithSignature("setTokenLevel(uint256,uint8)", tokenId, newLevel)
+            );
+            if (!success) {
+                emit NFTDataSyncFailed(tokenId, tokenType[tokenId]);
+            }
+        }
+    }
 
     function _generateSecureRandom() internal returns (uint256) {
         lastMintBlock = block.number;
@@ -75,7 +104,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
                 block.timestamp,
                 mintCounter,
                 gasleft(),
-                tx.origin,
+                address(this),
                 block.coinbase,
                 block.prevrandao
             )
@@ -134,34 +163,43 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         _;
     }
 
-    function mint(address to, uint256 zodiacType) external whenNotPaused whenPublicMintingAllowed returns (uint256) {
+    function mint(address to, uint256 zodiacType) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256) {
+        require(to != address(0), "NFTMint: Cannot mint to zero address");
+        require(zodiacType < 120, "NFTMint: Invalid zodiac type");
         uint256 tokenId = _nextCardId++;
         uint8 growth = _generateGrowthValue(_generateSecureRandom());
         _safeMint(to, tokenId);
         tokenType[tokenId] = zodiacType;
         tokenLevel[tokenId] = 1;
         tokenGrowth[tokenId] = growth;
+        _syncNFTData(to, tokenId, zodiacType, 1, growth);
         emit Mint(to, tokenId, zodiacType, growth);
         return tokenId;
     }
 
-    function mintBatch(address to, uint256[] calldata zodiacTypes) external whenNotPaused whenPublicMintingAllowed returns (uint256[] memory) {
+    function mintBatch(address to, uint256[] calldata zodiacTypes) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
+        require(to != address(0), "NFTMint: Cannot mint to zero address");
+        require(zodiacTypes.length > 0, "NFTMint: No zodiac types provided");
+        require(zodiacTypes.length <= 100, "NFTMint: Too many tokens to mint");
         uint256[] memory tokenIds = new uint256[](zodiacTypes.length);
         uint256 baseSeed = _generateSecureRandom();
         for (uint256 i = 0; i < zodiacTypes.length; i++) {
+            require(zodiacTypes[i] < 120, "NFTMint: Invalid zodiac type");
             uint256 tokenId = _nextCardId++;
             uint8 growth = _generateGrowthValue(baseSeed + i * 1000003);
             _safeMint(to, tokenId);
             tokenType[tokenId] = zodiacTypes[i];
             tokenLevel[tokenId] = 1;
             tokenGrowth[tokenId] = growth;
+            _syncNFTData(to, tokenId, zodiacTypes[i], 1, growth);
             tokenIds[i] = tokenId;
         }
         emit BatchMint(to, tokenIds);
         return tokenIds;
     }
 
-    function mintNormal(address to) external whenNotPaused whenPublicMintingAllowed returns (uint256) {
+    function mintNormal(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256) {
+        require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256 randomSeed = _generateSecureRandom();
         uint256 zodiacType = _mintNormal(randomSeed);
         uint8 growth = _generateGrowthValue(randomSeed);
@@ -170,11 +208,13 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         tokenType[tokenId] = zodiacType;
         tokenLevel[tokenId] = 1;
         tokenGrowth[tokenId] = growth;
+        _syncNFTData(to, tokenId, zodiacType, 1, growth);
         emit Mint(to, tokenId, zodiacType, growth);
         return tokenId;
     }
 
-    function mintRare(address to) external whenNotPaused whenPublicMintingAllowed returns (uint256) {
+    function mintRare(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256) {
+        require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256 randomSeed = _generateSecureRandom();
         uint256 zodiacType = _mintRare(randomSeed);
         uint8 growth = _generateGrowthValue(randomSeed);
@@ -183,11 +223,13 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         tokenType[tokenId] = zodiacType;
         tokenLevel[tokenId] = 1;
         tokenGrowth[tokenId] = growth;
+        _syncNFTData(to, tokenId, zodiacType, 1, growth);
         emit Mint(to, tokenId, zodiacType, growth);
         return tokenId;
     }
 
-    function mintNormalTen(address to) external whenNotPaused whenPublicMintingAllowed returns (uint256[] memory) {
+    function mintNormalTen(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
+        require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256[] memory tokenIds = new uint256[](10);
         uint256 baseSeed = _generateSecureRandom();
         for (uint256 i = 0; i < 10; i++) {
@@ -199,13 +241,15 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             tokenType[tokenId] = zodiacType;
             tokenLevel[tokenId] = 1;
             tokenGrowth[tokenId] = growth;
+            _syncNFTData(to, tokenId, zodiacType, 1, growth);
             tokenIds[i] = tokenId;
         }
         emit BatchMint(to, tokenIds);
         return tokenIds;
     }
 
-    function mintRareTen(address to) external whenNotPaused whenPublicMintingAllowed returns (uint256[] memory) {
+    function mintRareTen(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
+        require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256[] memory tokenIds = new uint256[](10);
         uint256 baseSeed = _generateSecureRandom();
         for (uint256 i = 0; i < 10; i++) {
@@ -217,13 +261,15 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             tokenType[tokenId] = zodiacType;
             tokenLevel[tokenId] = 1;
             tokenGrowth[tokenId] = growth;
+            _syncNFTData(to, tokenId, zodiacType, 1, growth);
             tokenIds[i] = tokenId;
         }
         emit BatchMint(to, tokenIds);
         return tokenIds;
     }
 
-    function mintTargeted(address to, uint8 baseZodiac) external whenNotPaused whenPublicMintingAllowed returns (uint256[] memory) {
+    function mintTargeted(address to, uint8 baseZodiac) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
+        require(to != address(0), "NFTMint: Cannot mint to zero address");
         require(baseZodiac < 12, "NFTMint: Invalid zodiac");
         uint256[] memory tokenIds = new uint256[](10);
         uint256 index = 0;
@@ -238,6 +284,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
                     tokenType[tokenId] = zodiacType;
                     tokenLevel[tokenId] = 1;
                     tokenGrowth[tokenId] = growth;
+                    _syncNFTData(to, tokenId, zodiacType, 1, growth);
                     tokenIds[index] = tokenId;
                     index++;
                 }
@@ -305,7 +352,26 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             uint256(65), 45, 75, 85, 78, 82, 90, 40, 95, 55, 60, 38
         ];
         uint256 zodiacSpeedBonus = zodiacSpeedBase[zodiac] - 60;
-        
+
+        uint256 element = t / 24;
+        uint8 gender = uint8(t % 2);
+
+        string memory elementName;
+        string memory zodiacName;
+        if (element == 0) elementName = "水";
+        else if (element == 1) elementName = "风";
+        else if (element == 2) elementName = "火";
+        else if (element == 3) elementName = "暗";
+        else elementName = "光";
+
+        string[12] memory zodiacNames = ["鼠", "牛", "虎", "兔", "龙", "蛇", "马", "羊", "猴", "鸡", "狗", "猪"};
+        zodiacName = zodiacNames[zodiac];
+
+        string memory genderName = gender == 0 ? "公" : "母";
+        string memory name = string(abi.encodePacked(elementName, "·", zodiacName, "·", genderName));
+
+        string memory imageUrl = string(abi.encodePacked("ipfs://metadata/", Strings.toString(t), ".json"));
+
         return (
             t,
             baseAttack + attackIncrement,
@@ -314,8 +380,8 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             baseSpeed + speedIncrement + zodiacSpeedBonus,
             uint256(l),
             l,
-            "",
-            ""
+            name,
+            imageUrl
         );
     }
 
@@ -337,18 +403,11 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenLevel[tokenId];
     }
 
-    function setNFTLevel(uint256 tokenId, uint256 newLevel) external whenNotPaused {
-        require(ownerOf(tokenId) == msg.sender, "NFTMint: Not owner");
-        require(newLevel <= 5 && newLevel >= tokenLevel[tokenId], "NFTMint: Invalid level");
-        uint8 oldLevel = tokenLevel[tokenId];
-        tokenLevel[tokenId] = uint8(newLevel);
-        emit Upgrade(ownerOf(tokenId), tokenId, oldLevel, uint8(newLevel));
-    }
-
-    function adminSetNFTLevel(uint256 tokenId, uint256 newLevel) external whenNotPaused onlyOwner {
+    function adminSetNFTLevel(uint256 tokenId, uint256 newLevel) external whenNotPaused onlyAuthorized {
         require(newLevel <= 5 && newLevel >= 1, "NFTMint: Invalid level");
         uint8 oldLevel = tokenLevel[tokenId];
         tokenLevel[tokenId] = uint8(newLevel);
+        _updateNFTDataLevel(tokenId, uint8(newLevel));
         emit Upgrade(ownerOf(tokenId), tokenId, oldLevel, uint8(newLevel));
     }
 
@@ -371,6 +430,28 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         uint256 batchSize
     ) internal virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
         super._beforeTokenTransfer(from, to, firstTokenId, batchSize);
+
+        if (nftDataContract != address(0)) {
+            for (uint256 i = 0; i < batchSize; i++) {
+                uint256 tokenId = firstTokenId + i;
+                if (from != address(0)) {
+                    (bool success1, ) = nftDataContract.call(
+                        abi.encodeWithSignature("removeUserNFT(address,uint256)", from, tokenId)
+                    );
+                    if (!success1) {
+                        emit NFTDataSyncFailed(tokenId, tokenType[tokenId]);
+                    }
+                }
+                if (to != address(0)) {
+                    (bool success2, ) = nftDataContract.call(
+                        abi.encodeWithSignature("addUserNFT(address,uint256)", to, tokenId)
+                    );
+                    if (!success2) {
+                        emit NFTDataSyncFailed(tokenId, tokenType[tokenId]);
+                    }
+                }
+            }
+        }
     }
 
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (bool) {
@@ -397,8 +478,13 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return _nextCardId;
     }
 
-    function totalSupply() external view returns (uint256) {
-        return _nextCardId - 1;
+    function getTokenIdsByOwner(address owner) external view returns (uint256[] memory) {
+        uint256 balance = balanceOf(owner);
+        uint256[] memory tokenIds = new uint256[](balance);
+        for (uint256 i = 0; i < balance; i++) {
+            tokenIds[i] = tokenOfOwnerByIndex(owner, i);
+        }
+        return tokenIds;
     }
 
     modifier whenNotPaused() {

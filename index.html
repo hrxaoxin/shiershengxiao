@@ -225,7 +225,8 @@
             try {
                 ZODIAC_UI.showLoading('领取中...');
                 const account = ZODIAC_WEB3.getAccount();
-                const tx = await rewardManager.methods.claimDividend().send({ from: account });
+                const dividendManager = ZODIAC_WEB3.getContract('dividendManager');
+                const tx = await dividendManager.methods.claim().send({ from: account });
                 ZODIAC_UI.hideLoading();
                 ZODIAC_UI.showToast('领取成功', 'success');
                 await loadDividendData();

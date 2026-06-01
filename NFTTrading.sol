@@ -52,6 +52,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 紧急暂停
      */
     bool public paused;
+    string public pauseReason;
 
     /**
      * @dev 授权合约地址（Authorizer）
@@ -87,6 +88,18 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         authorizer = a;
     }
 
+    function pause(string memory reason) external onlyOwner {
+        paused = true;
+        pauseReason = reason;
+        emit Paused(msg.sender, reason);
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+        pauseReason = "";
+        emit Unpaused(msg.sender);
+    }
+
     /**
      * @dev 检查是否为授权调用者（owner或authorizer）
      */
@@ -115,14 +128,23 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 priceWei,
         uint256 fee
     );
+    event Paused(address account, string reason);
+    event Unpaused(address account);
+
+    modifier whenNotPaused() {
+        require(!paused, "NFTTrading: Paused");
+        _;
+    }
 
     /**
      * @dev 上架NFT
      */
-    function listNFT(uint256 tokenId, uint256 priceWei) external whenNotPaused {
+    function listNFT(uint256 tokenId, uint256 priceWei) external whenNotPaused nonReentrant {
         require(priceWei > 0, "NFTTrading: Invalid price");
+        require(priceWei <= 1000 ether, "NFTTrading: Price too high");
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(INFTMint(nftContract).ownerOf(tokenId) == msg.sender, "NFTTrading: Not token owner");
+        require(INFTMint(nftContract).isApprovedForAll(msg.sender, address(this)), "NFTTrading: Contract not approved");
 
         listings[tokenId] = Listing({
             seller: msg.sender,
@@ -137,7 +159,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     /**
      * @dev 下架NFT
      */
-    function delistNFT(uint256 tokenId) external whenNotPaused {
+    function delistNFT(uint256 tokenId) external whenNotPaused nonReentrant {
+        require(listings[tokenId].seller != address(0), "NFTTrading: Listing not found");
         require(listings[tokenId].seller == msg.sender, "NFTTrading: Not owner");
 
         delete listings[tokenId];
@@ -154,28 +177,30 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
 
         Listing memory listing = listings[tokenId];
-        
-        require(INFTMint(nftContract).ownerOf(tokenId) == listing.seller, "NFTTrading: Seller no longer owns NFT");
-        require(INFTMint(nftContract).isApprovedForAll(listing.seller, address(this)), "NFTTrading: Contract not approved");
-
+        address seller = listing.seller;
         uint256 price = listing.priceWei;
         uint256 fee = price * feePercent / 100;
         uint256 sellerAmount = price - fee;
 
+        require(INFTMint(nftContract).ownerOf(tokenId) == seller, "NFTTrading: Seller no longer owns NFT");
+        require(INFTMint(nftContract).isApprovedForAll(seller, address(this)), "NFTTrading: Contract not approved");
+
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
 
-        emit NFTBought(tokenId, msg.sender, listing.seller, price, fee);
+        INFTMint(nftContract).transferFrom(seller, msg.sender, tokenId);
 
-        INFTMint(nftContract).transferFrom(listing.seller, msg.sender, tokenId);
-
-        if (feeReceiver != address(0) && fee > 0) {
+        if (fee > 0) {
             (bool feeSuccess, ) = payable(feeReceiver).call{value: fee}("");
-            require(feeSuccess, "NFTTrading: Fee transfer failed");
+            if (!feeSuccess) {
+                sellerAmount += fee;
+            }
         }
-        
-        (bool sellerSuccess, ) = payable(listing.seller).call{value: sellerAmount}("");
+
+        (bool sellerSuccess, ) = payable(seller).call{value: sellerAmount}("");
         require(sellerSuccess, "NFTTrading: Seller payment failed");
+
+        emit NFTBought(tokenId, msg.sender, seller, price, fee);
     }
 
     /**
@@ -197,7 +222,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     /**
      * @dev 更新价格
      */
-    function updatePrice(uint256 tokenId, uint256 newPriceWei) external {
+    function updatePrice(uint256 tokenId, uint256 newPriceWei) external whenNotPaused nonReentrant {
         require(listings[tokenId].seller == msg.sender, "NFTTrading: Not owner");
         require(newPriceWei > 0, "NFTTrading: Invalid price");
 
@@ -221,7 +246,23 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 获取在售NFT列表
      */
     function getListedNFTs() external view returns (uint256[] memory) {
-        return listedNFTs;
+        uint256 count = 0;
+        for (uint256 i = 0; i < listedNFTs.length; i++) {
+            uint256 tokenId = listedNFTs[i];
+            if (listings[tokenId].seller != address(0)) {
+                count++;
+            }
+        }
+        
+        uint256[] memory result = new uint256[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < listedNFTs.length; i++) {
+            uint256 tokenId = listedNFTs[i];
+            if (listings[tokenId].seller != address(0)) {
+                result[index++] = tokenId;
+            }
+        }
+        return result;
     }
 
     /**
@@ -245,4 +286,120 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             }
         }
     }
+
+    /**
+     * @dev 获取用户的挂牌数量
+     * @param user 用户地址
+     * @return count 挂牌数量
+     */
+    function getUserListedCount(address user) external view returns (uint256 count) {
+        for (uint256 i = 0; i < listedNFTs.length; i++) {
+            uint256 tokenId = listedNFTs[i];
+            if (listings[tokenId].seller == user) {
+                count++;
+            }
+        }
+    }
+
+    /**
+     * @dev 获取用户的挂牌列表
+     * @param user 用户地址
+     * @return tokenIds 用户挂牌的NFT ID列表
+     */
+    function getUserListings(address user) external view returns (uint256[] memory tokenIds) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < listedNFTs.length; i++) {
+            uint256 tokenId = listedNFTs[i];
+            if (listings[tokenId].seller == user) {
+                count++;
+            }
+        }
+
+        tokenIds = new uint256[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < listedNFTs.length; i++) {
+            uint256 tokenId = listedNFTs[i];
+            if (listings[tokenId].seller == user) {
+                tokenIds[index++] = tokenId;
+            }
+        }
+    }
+
+    /**
+     * @dev 获取市场统计信息
+     * @return totalListings 总挂牌数
+     * @return activeListings 有效挂牌数
+     * @return floorPrice 最低价
+     * @return totalVolume 总交易额
+     */
+    function getMarketStats() external view returns (
+        uint256 totalListings,
+        uint256 activeListings,
+        uint256 floorPrice,
+        uint256 totalVolume
+    ) {
+        totalListings = listedNFTs.length;
+        activeListings = 0;
+        floorPrice = type(uint256).max;
+
+        for (uint256 i = 0; i < listedNFTs.length; i++) {
+            uint256 tokenId = listedNFTs[i];
+            if (listings[tokenId].seller != address(0)) {
+                activeListings++;
+                if (listings[tokenId].priceWei < floorPrice) {
+                    floorPrice = listings[tokenId].priceWei;
+                }
+            }
+        }
+
+        if (floorPrice == type(uint256).max) {
+            floorPrice = 0;
+        }
+    }
+
+    /**
+     * @dev 获取指定价格范围的挂牌
+     * @param minPrice 最低价格
+     * @param maxPrice 最高价格
+     * @return tokenIds 符合条件的NFT ID列表
+     */
+    function getListingsByPriceRange(uint256 minPrice, uint256 maxPrice) external view returns (uint256[] memory tokenIds) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < listedNFTs.length; i++) {
+            uint256 tokenId = listedNFTs[i];
+            if (listings[tokenId].seller != address(0)) {
+                if (listings[tokenId].priceWei >= minPrice && listings[tokenId].priceWei <= maxPrice) {
+                    count++;
+                }
+            }
+        }
+
+        tokenIds = new uint256[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < listedNFTs.length; i++) {
+            uint256 tokenId = listedNFTs[i];
+            if (listings[tokenId].seller != address(0)) {
+                if (listings[tokenId].priceWei >= minPrice && listings[tokenId].priceWei <= maxPrice) {
+                    tokenIds[index++] = tokenId;
+                }
+            }
+        }
+    }
+
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+        require(amount > 0, "NFTTrading: Amount must be > 0");
+        require(amount <= address(this).balance, "NFTTrading: Insufficient balance");
+        payable(owner()).transfer(amount);
+        emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
+    }
+
+    function emergencyWithdrawNFT(uint256 tokenId) external onlyOwner {
+        require(nftContract != address(0), "NFTTrading: NFT contract not set");
+        INFTMint nft = INFTMint(nftContract);
+        nft.safeTransferFrom(address(this), owner(), tokenId);
+        emit EmergencyNFTWithdrawn(msg.sender, owner(), tokenId);
+    }
+
+    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    event EmergencyNFTWithdrawn(address indexed operator, address indexed to, uint256 tokenId);
 }

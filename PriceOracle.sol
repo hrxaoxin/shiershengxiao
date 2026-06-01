@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 
 /**
  * @title PriceOracle
@@ -24,7 +25,28 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * - 铸造费用验证
  * - NFT定价参考
  */
-contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    /**
+     * @dev 价格历史记录结构体
+     */
+    struct PriceRecord {
+        uint256 tokenPriceUSD;
+        uint256 ethPriceUSD;
+        uint256 timestamp;
+        address updater;
+    }
+
+    /**
+     * @dev 价格历史记录数组
+     */
+    PriceRecord[] public priceHistory;
+    uint256 public priceHistoryStartIndex;
+
+    /**
+     * @dev 价格历史记录最大长度
+     */
+    uint256 public constant MAX_HISTORY_LENGTH = 100;
+
     /**
      * @dev 代币地址
      */
@@ -44,10 +66,34 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      * @dev 初始化函数
      * @param _authorizer 授权合约地址
      */
+    bool public paused;
+    string public pauseReason;
+    
+    event Paused(address account, string reason);
+    event Unpaused(address account);
+    
     function initialize(address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         authorizer = _authorizer;
+    }
+    
+    function pause(string memory reason) external onlyOwner {
+        paused = true;
+        pauseReason = reason;
+        emit Paused(msg.sender, reason);
+    }
+    
+    function unpause() external onlyOwner {
+        paused = false;
+        pauseReason = "";
+        emit Unpaused(msg.sender);
+    }
+    
+    modifier whenNotPaused() {
+        require(!paused, "PriceOracle: Paused");
+        _;
     }
 
     /**
@@ -79,11 +125,26 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     uint256 public tokenPriceUSD;
 
     /**
+     * @dev 代币价格更新时间（秒）
+     */
+    uint256 public tokenPriceUpdatedAt;
+
+    /**
      * @dev ETH的USD价格（精度18位）
      *
      * 例如：$2000 = 2000 * 10^18
      */
     uint256 public ethPriceUSD;
+
+    /**
+     * @dev ETH价格更新时间（秒）
+     */
+    uint256 public ethPriceUpdatedAt;
+
+    /**
+     * @dev 价格有效时间（秒，默认24小时）
+     */
+    uint256 public priceValidityPeriod = 86400;
 
     /**
      * @dev 代币精度
@@ -103,6 +164,110 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      * @param updater 更新者地址
      */
     event PriceUpdated(uint256 tokenPrice, uint256 ethPrice, address updater);
+
+    uint256 public constant MAX_PRICE_CHANGE_PERCENT = 5000;
+    uint256 public constant PRICE_UPDATE_COOLDOWN = 5 minutes;
+    uint256 public lastTokenPriceUpdateTime;
+    uint256 public lastETHPriceUpdateTime;
+    uint256 public pendingTokenPrice;
+    uint256 public pendingETHPrice;
+    uint256 public pendingPriceEffectiveTime;
+    bool public hasPendingTokenPrice;
+    bool public hasPendingETHPrice;
+
+    event PriceChangeProposed(uint256 oldPrice, uint256 newPrice, uint256 executeTime, address proposer);
+    event PendingPriceCancelled(uint256 price, bool isTokenPrice);
+
+    modifier onlyAfterCooldown(uint256 lastUpdateTime) {
+        require(block.timestamp >= lastUpdateTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Price update cooldown");
+        _;
+    }
+
+    function setPriceChangeLimit(uint256 percent) external onlyOwner {
+        require(percent >= 1000 && percent <= 10000, "PriceOracle: Invalid percent");
+        MAX_PRICE_CHANGE_PERCENT = percent;
+    }
+
+    function setPriceUpdateCooldown(uint256 cooldown) external onlyOwner {
+        require(cooldown >= 1 minutes && cooldown <= 1 hours, "PriceOracle: Invalid cooldown");
+        PRICE_UPDATE_COOLDOWN = cooldown;
+    }
+
+    function proposeTokenPrice(uint256 _newPrice) external onlyOwner whenNotPaused {
+        require(_newPrice > 0, "PriceOracle: Invalid price");
+        require(_newPrice <= 10**27, "PriceOracle: Price too high");
+        require(block.timestamp >= lastTokenPriceUpdateTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Cooldown not elapsed");
+
+        if (tokenPriceUSD > 0) {
+            uint256 maxNewPrice = tokenPriceUSD * MAX_PRICE_CHANGE_PERCENT / 10000;
+            uint256 minNewPrice = tokenPriceUSD * (10000 - MAX_PRICE_CHANGE_PERCENT) / 10000;
+            require(_newPrice >= minNewPrice && _newPrice <= maxNewPrice, "PriceOracle: Price change too large");
+        }
+
+        pendingTokenPrice = _newPrice;
+        hasPendingTokenPrice = true;
+        pendingPriceEffectiveTime = block.timestamp + PRICE_UPDATE_COOLDOWN;
+
+        emit PriceChangeProposed(tokenPriceUSD, _newPrice, pendingPriceEffectiveTime, msg.sender);
+    }
+
+    function executePendingTokenPrice() external onlyOwner {
+        require(hasPendingTokenPrice, "PriceOracle: No pending price");
+        require(block.timestamp >= pendingPriceEffectiveTime, "PriceOracle: Not yet executable");
+        require(block.timestamp <= pendingPriceEffectiveTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Pending price expired");
+
+        uint256 oldPrice = tokenPriceUSD;
+        tokenPriceUSD = pendingTokenPrice;
+        lastTokenPriceUpdateTime = block.timestamp;
+        hasPendingTokenPrice = false;
+
+        emit PriceUpdated(tokenPriceUSD, ethPriceUSD, msg.sender);
+    }
+
+    function cancelPendingTokenPrice() external onlyOwner {
+        require(hasPendingTokenPrice, "PriceOracle: No pending price to cancel");
+        uint256 cancelledPrice = pendingTokenPrice;
+        hasPendingTokenPrice = false;
+        emit PendingPriceCancelled(cancelledPrice, true);
+    }
+
+    function proposeETHPrice(uint256 _newPrice) external onlyOwner whenNotPaused {
+        require(_newPrice > 0, "PriceOracle: Invalid price");
+        require(_newPrice <= 10**24, "PriceOracle: Price too high");
+        require(block.timestamp >= lastETHPriceUpdateTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Cooldown not elapsed");
+
+        if (ethPriceUSD > 0) {
+            uint256 maxNewPrice = ethPriceUSD * MAX_PRICE_CHANGE_PERCENT / 10000;
+            uint256 minNewPrice = ethPriceUSD * (10000 - MAX_PRICE_CHANGE_PERCENT) / 10000;
+            require(_newPrice >= minNewPrice && _newPrice <= maxNewPrice, "PriceOracle: Price change too large");
+        }
+
+        pendingETHPrice = _newPrice;
+        hasPendingETHPrice = true;
+        pendingPriceEffectiveTime = block.timestamp + PRICE_UPDATE_COOLDOWN;
+
+        emit PriceChangeProposed(ethPriceUSD, _newPrice, pendingPriceEffectiveTime, msg.sender);
+    }
+
+    function executePendingETHPrice() external onlyOwner {
+        require(hasPendingETHPrice, "PriceOracle: No pending price");
+        require(block.timestamp >= pendingPriceEffectiveTime, "PriceOracle: Not yet executable");
+        require(block.timestamp <= pendingPriceEffectiveTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Pending price expired");
+
+        uint256 oldPrice = ethPriceUSD;
+        ethPriceUSD = pendingETHPrice;
+        lastETHPriceUpdateTime = block.timestamp;
+        hasPendingETHPrice = false;
+
+        emit PriceUpdated(tokenPriceUSD, ethPriceUSD, msg.sender);
+    }
+
+    function cancelPendingETHPrice() external onlyOwner {
+        require(hasPendingETHPrice, "PriceOracle: No pending price to cancel");
+        uint256 cancelledPrice = pendingETHPrice;
+        hasPendingETHPrice = false;
+        emit PendingPriceCancelled(cancelledPrice, false);
+    }
 
     /**
      * @dev 设置代币地址
@@ -129,9 +294,11 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      *
      * @param _tokenPriceUSD 新的代币价格（USD，精度18位）
      */
-    function updateTokenPrice(uint256 _tokenPriceUSD) external onlyOwner {
+    function updateTokenPrice(uint256 _tokenPriceUSD) external onlyOwner whenNotPaused {
         require(_tokenPriceUSD > 0, "PriceOracle: Invalid token price");
+        require(_tokenPriceUSD <= 10**27, "PriceOracle: Token price too high");
         tokenPriceUSD = _tokenPriceUSD;
+        tokenPriceUpdatedAt = block.timestamp;
         emit PriceUpdated(_tokenPriceUSD, ethPriceUSD, msg.sender);
     }
 
@@ -140,9 +307,11 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      *
      * @param _ethPriceUSD 新的ETH价格（USD，精度18位）
      */
-    function updateETHPrice(uint256 _ethPriceUSD) external onlyOwner {
+    function updateETHPrice(uint256 _ethPriceUSD) external onlyOwner whenNotPaused {
         require(_ethPriceUSD > 0, "PriceOracle: Invalid ETH price");
+        require(_ethPriceUSD <= 10**24, "PriceOracle: ETH price too high");
         ethPriceUSD = _ethPriceUSD;
+        ethPriceUpdatedAt = block.timestamp;
         emit PriceUpdated(tokenPriceUSD, _ethPriceUSD, msg.sender);
     }
 
@@ -152,12 +321,117 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      * @param _tokenPriceUSD 代币价格
      * @param _ethPriceUSD ETH价格
      */
-    function updatePrices(uint256 _tokenPriceUSD, uint256 _ethPriceUSD) external onlyOwner {
+    function updatePrices(uint256 _tokenPriceUSD, uint256 _ethPriceUSD) external onlyOwner whenNotPaused {
         require(_tokenPriceUSD > 0, "PriceOracle: Invalid token price");
         require(_ethPriceUSD > 0, "PriceOracle: Invalid ETH price");
+        require(_tokenPriceUSD <= 10**27, "PriceOracle: Token price too high");
+        require(_ethPriceUSD <= 10**24, "PriceOracle: ETH price too high");
+
+        require(block.timestamp >= lastTokenPriceUpdateTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Token price update cooldown");
+        require(block.timestamp >= lastETHPriceUpdateTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: ETH price update cooldown");
+
+        if (tokenPriceUSD > 0) {
+            uint256 maxTokenNewPrice = tokenPriceUSD * MAX_PRICE_CHANGE_PERCENT / 10000;
+            uint256 minTokenNewPrice = tokenPriceUSD * (10000 - MAX_PRICE_CHANGE_PERCENT) / 10000;
+            require(_tokenPriceUSD >= minTokenNewPrice && _tokenPriceUSD <= maxTokenNewPrice, "PriceOracle: Token price change too large");
+        }
+
+        if (ethPriceUSD > 0) {
+            uint256 maxETHNewPrice = ethPriceUSD * MAX_PRICE_CHANGE_PERCENT / 10000;
+            uint256 minETHNewPrice = ethPriceUSD * (10000 - MAX_PRICE_CHANGE_PERCENT) / 10000;
+            require(_ethPriceUSD >= minETHNewPrice && _ethPriceUSD <= maxETHNewPrice, "PriceOracle: ETH price change too large");
+        }
+
         tokenPriceUSD = _tokenPriceUSD;
         ethPriceUSD = _ethPriceUSD;
+        tokenPriceUpdatedAt = block.timestamp;
+        ethPriceUpdatedAt = block.timestamp;
+        lastTokenPriceUpdateTime = block.timestamp;
+        lastETHPriceUpdateTime = block.timestamp;
+        
+        // 记录价格历史（使用环形缓冲区）
+        if (priceHistory.length < MAX_HISTORY_LENGTH) {
+            priceHistory.push(PriceRecord({
+                tokenPriceUSD: _tokenPriceUSD,
+                ethPriceUSD: _ethPriceUSD,
+                timestamp: block.timestamp,
+                updater: msg.sender
+            }));
+        } else {
+            priceHistory[priceHistoryStartIndex] = PriceRecord({
+                tokenPriceUSD: _tokenPriceUSD,
+                ethPriceUSD: _ethPriceUSD,
+                timestamp: block.timestamp,
+                updater: msg.sender
+            });
+            priceHistoryStartIndex = (priceHistoryStartIndex + 1) % MAX_HISTORY_LENGTH;
+        }
+        
         emit PriceUpdated(_tokenPriceUSD, _ethPriceUSD, msg.sender);
+    }
+
+    /**
+     * @dev 获取价格历史记录长度
+     */
+    function getPriceHistoryLength() external view returns (uint256) {
+        return priceHistory.length;
+    }
+
+    /**
+     * @dev 获取价格历史记录（分页，支持环形缓冲区）
+     */
+    function getPriceHistory(uint256 startIndex, uint256 count) external view returns (PriceRecord[] memory) {
+        require(startIndex < priceHistory.length, "PriceOracle: Invalid start index");
+        require(count > 0, "PriceOracle: Invalid count");
+        
+        uint256 endIndex = startIndex + count;
+        if (endIndex > priceHistory.length) {
+            endIndex = priceHistory.length;
+        }
+        
+        PriceRecord[] memory records = new PriceRecord[](endIndex - startIndex);
+        for (uint256 i = startIndex; i < endIndex; i++) {
+            uint256 actualIndex = (priceHistoryStartIndex + i) % priceHistory.length;
+            records[i - startIndex] = priceHistory[actualIndex];
+        }
+        
+        return records;
+    }
+
+    /**
+     * @dev 获取最新价格记录
+     */
+    function getLatestPriceRecord() external view returns (PriceRecord memory) {
+        require(priceHistory.length > 0, "PriceOracle: No history");
+        uint256 latestIndex = (priceHistoryStartIndex + priceHistory.length - 1) % priceHistory.length;
+        return priceHistory[latestIndex];
+    }
+
+    /**
+     * @dev 设置价格有效时间
+     *
+     * @param duration 有效时间（秒）
+     */
+    function setPriceValidityPeriod(uint256 duration) external onlyOwner {
+        priceValidityPeriod = duration;
+    }
+
+    /**
+     * @dev 检查代币价格是否过期
+     *
+     * @return bool 价格是否有效
+     */
+    function isTokenPriceValid() public view returns (bool) {
+        return tokenPriceUSD > 0 && (block.timestamp - tokenPriceUpdatedAt) <= priceValidityPeriod;
+    }
+
+    /**
+     * @dev 检查ETH价格是否过期
+     *
+     * @return bool 价格是否有效
+     */
+    function isETHPriceValid() public view returns (bool) {
+        return ethPriceUSD > 0 && (block.timestamp - ethPriceUpdatedAt) <= priceValidityPeriod;
     }
 
     /**
@@ -196,7 +470,8 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      */
     function calculateUSDTEquivalent(uint256 tokenAmount) external view returns (uint256) {
         if (tokenPriceUSD == 0 || tokenAmount == 0) return 0;
-        return tokenAmount * tokenPriceUSD / TOKEN_PRECISION * USDT_PRECISION / (1 * TOKEN_PRECISION);
+        // 使用更安全的精度计算：先乘后除，使用更大的中间结果
+        return (tokenAmount * tokenPriceUSD) / (10**30);
     }
 
     /**
@@ -217,7 +492,9 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      */
     function calculateTokenEquivalent(uint256 usdtAmount) external view returns (uint256) {
         if (tokenPriceUSD == 0 || usdtAmount == 0) return 0;
-        return usdtAmount * (1 * TOKEN_PRECISION) / tokenPriceUSD / USDT_PRECISION * TOKEN_PRECISION;
+        // 安全计算：先除后乘，避免溢出
+        uint256 usdtInWei = usdtAmount * 10**12;
+        return (usdtInWei * 10**18) / tokenPriceUSD;
     }
 
     /**
@@ -228,7 +505,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      */
     function calculateETHUSDTEquivalent(uint256 ethAmount) external view returns (uint256) {
         if (ethPriceUSD == 0 || ethAmount == 0) return 0;
-        return ethAmount * ethPriceUSD / TOKEN_PRECISION * USDT_PRECISION / (1 * TOKEN_PRECISION);
+        return (ethAmount * ethPriceUSD) / (10**30);
     }
 
     /**
@@ -242,11 +519,11 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     }
 
     /**
-     * @dev 验证价格是否有效
+     * @dev 验证价格是否有效（未过期且非零）
      *
-     * @return bool 价格是否有效（非零）
+     * @return bool 价格是否有效
      */
     function isPriceValid() external view returns (bool) {
-        return tokenPriceUSD > 0 && ethPriceUSD > 0;
+        return isTokenPriceValid() && isETHPriceValid();
     }
 }

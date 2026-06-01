@@ -24,6 +24,29 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using NFTLib for uint256;
 
+    bool public paused;
+    string public pauseReason;
+
+    event Paused(address account, string reason);
+    event Unpaused(address account);
+
+    modifier whenNotPaused() {
+        require(!paused, "NFTUpdate: Paused");
+        _;
+    }
+
+    function pause(string memory reason) external onlyOwner {
+        paused = true;
+        pauseReason = reason;
+        emit Paused(msg.sender, reason);
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+        pauseReason = "";
+        emit Unpaused(msg.sender);
+    }
+
     /** @dev 黑洞地址，用于销毁NFT和代币 */
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
     
@@ -209,6 +232,35 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
+     * @dev 批量设置所有等级的升级费用
+     * @param costs 所有等级的升级费用数组（长度4，索引0到3对应等级1到4）
+     */
+    function setAllLevelUpgradeCosts(uint256[4] calldata costs) external onlyOwner {
+        require(costs[0] > 0, "NFTUpdate: Invalid level 1 cost");
+        require(costs[1] > 0, "NFTUpdate: Invalid level 2 cost");
+        require(costs[2] > 0, "NFTUpdate: Invalid level 3 cost");
+        require(costs[3] > 0, "NFTUpdate: Invalid level 4 cost");
+        
+        level1UpgradeCost = costs[0];
+        level2UpgradeCost = costs[1];
+        level3UpgradeCost = costs[2];
+        level4UpgradeCost = costs[3];
+    }
+
+    /**
+     * @dev 获取所有等级的升级费用
+     * @return 所有等级的升级费用数组
+     */
+    function getAllLevelUpgradeCosts() external view returns (uint256[4] memory) {
+        return [
+            level1UpgradeCost,
+            level2UpgradeCost,
+            level3UpgradeCost,
+            level4UpgradeCost
+        ];
+    }
+
+    /**
      * @dev 从PancakeSwap获取代币价格（USD）
      * @return uint256 代币价格（精度18位）
      */
@@ -231,16 +283,26 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             } catch {}
             
             uint256 price = (uint256(reserve1) * 10**18) / uint256(reserve0);
-            return adjustDecimals(price, 18, decimals1);
+            return _adjustPriceDecimals(price, decimals1);
         } else if (token1 == tokenContract) {
             try IBEP20(token0).decimals() returns (uint8 d) {
                 decimals0 = d;
             } catch {}
             
             uint256 price = (uint256(reserve0) * 10**18) / uint256(reserve1);
-            return adjustDecimals(price, decimals0, 18);
+            return _adjustPriceDecimals(price, decimals0);
         } else {
             revert("E26: Token not found in pair");
+        }
+    }
+    
+    function _adjustPriceDecimals(uint256 price, uint8 tokenDecimals) internal pure returns (uint256) {
+        if (tokenDecimals == 18) {
+            return price;
+        } else if (tokenDecimals < 18) {
+            return price * 10**(18 - tokenDecimals);
+        } else {
+            return price / 10**(tokenDecimals - 18);
         }
     }
 
@@ -266,7 +328,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param tokenId 要升级的NFT ID
      * @return uint8 新等级
      */
-    function upgradeWithNFT(uint256 tokenId) external nonReentrant returns (uint8) {
+    function upgradeWithNFT(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
         require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
         INFTMint nft = INFTMint(nftContract);
         require(nft.ownerOf(tokenId) == msg.sender, "E15");
@@ -275,31 +337,37 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
         uint8 lv = m.tokenLevel(tokenId);
         require(lv < 5, "E16");
-        uint req = lv;
         
-        uint256[] memory arr = m.userTokens(msg.sender, t);
+        uint256[] memory allUserTokens = nft.getTokenIdsByOwner(msg.sender);
+        uint256[] memory arr = new uint256[](allUserTokens.length);
+        uint256 arrLength = 0;
         uint256 count = 0;
         
-        for (uint i = 0; i < arr.length; i++) {
-            if (m.tokenLevel(arr[i]) == lv) {
-                count++;
+        for (uint i = 0; i < allUserTokens.length; i++) {
+            uint256 tid = allUserTokens[i];
+            if (nft.tokenType(tid) == uint256(t)) {
+                arr[arrLength] = tid;
+                arrLength++;
+                if (nft.tokenLevel(tid) == lv) {
+                    count++;
+                }
             }
         }
-        require(count >= req + 1, "E17");
+        require(count >= lv + 1, "E17");
         
-        uint256[] memory burnCandidates = new uint256[](req);
+        uint256[] memory burnCandidates = new uint256[](lv);
         uint256 candidateIdx = 0;
         
-        for (uint i = 0; i < arr.length && candidateIdx < req; i++) {
+        for (uint i = 0; i < arrLength && candidateIdx < lv; i++) {
             uint256 currentId = arr[i];
-            if (currentId != tokenId && m.tokenLevel(currentId) == lv) {
+            if (currentId != tokenId && nft.tokenLevel(currentId) == lv) {
                 burnCandidates[candidateIdx++] = currentId;
             }
         }
         
-        require(candidateIdx == req, "E28: Insufficient burn candidates");
+        require(candidateIdx == lv, "E28: Insufficient burn candidates");
         
-        for (uint i = 0; i < req; i++) {
+        for (uint i = 0; i < lv; i++) {
             uint burnId = burnCandidates[i];
             nft.safeTransferFrom(msg.sender, BLACK_HOLE, burnId);
             emit CardBurned(burnId, t, msg.sender);
@@ -307,6 +375,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         
         uint8 newLv = lv + 1;
         m.setTokenLevel(tokenId, newLv);
+        nft.adminSetNFTLevel(tokenId, newLv); // 同时更新 NFTMint
         NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         
         // 更新用户权重：先减去旧等级的权重，再加上新等级的权重
@@ -341,7 +410,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param tokenId 要升级的NFT ID
      * @return uint8 新等级
      */
-    function upgradeWithToken(uint256 tokenId) external nonReentrant returns (uint8) {
+    function upgradeWithToken(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
         require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
         INFTMint nft = INFTMint(nftContract);
         require(nft.ownerOf(tokenId) == msg.sender, "E15: Not owner");
@@ -372,7 +441,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param tokenId 要升级的NFT ID
      * @return uint8 新等级
      */
-    function upgradeWithUSDValue(uint256 tokenId) external nonReentrant returns (uint8) {
+    function upgradeWithUSDValue(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
         require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
         INFTMint nft = INFTMint(nftContract);
         require(nft.ownerOf(tokenId) == msg.sender, "E15: Not owner");
@@ -395,13 +464,12 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         // 防御同一区块内的价格操纵：要求至少间隔 minPriceUpdateBlocks 个区块
         require(block.number >= lastPriceUpdateBlock + minPriceUpdateBlocks, "E31: Price update too frequent");
         
-        // 首次价格获取：仅缓存，不允许立即用于交易（要求至少二次确认）
+        // 首次价格获取：直接使用，同时缓存
         if (lastPrice == 0) {
             lastPrice = price;
             lastPriceUpdateTime = block.timestamp;
             lastPriceUpdateBlock = block.number;
             emit PriceUpdated(price, block.timestamp);
-            revert("E32: Price initializing, please retry in next block");
         }
         
         require(block.timestamp <= lastPriceUpdateTime + priceExpirySeconds, "E30: Price expired");
@@ -439,9 +507,11 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     function _upgradeLevel(uint id, uint8 oldLv) internal returns (uint8) {
         INFTDataInterface m = INFTDataInterface(metadataContract);
+        INFTMint nft = INFTMint(nftContract);
         NFTDataTypes.ZodiacType t = m.tokenType(id);
         uint8 newLv = oldLv + 1;
         m.setTokenLevel(id, newLv);
+        nft.adminSetNFTLevel(id, newLv); // 同时更新 NFTMint
         NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         
         // 更新用户权重：先减去旧等级的权重，再加上新等级的权重

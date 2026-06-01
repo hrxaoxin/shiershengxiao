@@ -138,18 +138,18 @@ window.ZODIAC_COMPONENTS = (function() {
     }
 
     function injectNavigation(activeId, options = {}) {
-        const { 
+        const {
             mobileNavbarContainer = 'mobileNavbarContainer',
             mobileMenuContainer = 'mobileMenuContainer',
             desktopSidebarContainer = 'desktopSidebarContainer'
         } = options;
 
         const nav = renderNavigation(activeId);
-        
+
         const mobileNavbarEl = document.getElementById(mobileNavbarContainer);
         const mobileMenuEl = document.getElementById(mobileMenuContainer);
         const desktopSidebarEl = document.getElementById(desktopSidebarContainer);
-        
+
         if (mobileNavbarEl) {
             mobileNavbarEl.innerHTML = nav.mobileNavbar;
         }
@@ -159,8 +159,15 @@ window.ZODIAC_COMPONENTS = (function() {
         if (desktopSidebarEl) {
             desktopSidebarEl.innerHTML = nav.desktopSidebar;
         }
-        
+
+        const containersFound = (mobileNavbarEl || mobileMenuEl || desktopSidebarEl);
+        if (!containersFound) {
+            console.warn('No navigation containers found in the page');
+            return false;
+        }
+
         initNavigation(activeId);
+        return true;
     }
 
     function openMobileMenu() {

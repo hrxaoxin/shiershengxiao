@@ -188,6 +188,7 @@
                     <li>• 质押后需等待 <span class="text-yellow-600 font-bold" id="selfBreedingCooldown">12小时</span> 即可完成孕育</li>
                     <li>• 完成后可赎回原NFT，并免费铸造获得1张相同生肖的1阶NFT</li>
                     <li>• 新NFT的属性从孕育的两张中随机继承一张（50%概率），性别随机</li>
+                    <li>• 费用：<span class="text-yellow-600 font-bold" id="selfBreedingFee">100</span> 代币，繁殖时直接销毁，取消不退还</li>
                 </ul>
             </div>
 
@@ -237,12 +238,19 @@
                         <div id="selfCountdown" class="countdown">12:00:00</div>
                         <p class="text-gray-500 mt-2">剩余时间</p>
                     </div>
+                    <div class="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 mb-4">
+                        <h4 class="font-bold text-gray-800 mb-2">🎁 孕育完成可获得</h4>
+                        <ul class="text-gray-600 text-sm mt-2 space-y-1">
+                            <li>• 返还父母双方 NFT</li>
+                            <li>• 免费铸造获得 1 张 1 阶新 NFT（相同生肖）</li>
+                        </ul>
+                    </div>
                     <div class="flex justify-center gap-4">
                         <button id="completeSelfBreedingBtn" class="btn-primary text-white px-8 py-3 rounded-lg font-bold" onclick="completeSelfBreeding()" disabled>
                             完成孕育（等待中）
                         </button>
                         <button id="cancelSelfBreedingBtn" class="btn-secondary px-8 py-3 rounded-lg font-bold" onclick="cancelSelfBreeding()">
-                            取消孕育
+                            取消孕育（费用不退还）
                         </button>
                     </div>
                 </div>
@@ -256,9 +264,10 @@
                     <li>• 可以将自己的5阶或以上NFT上架到孕育市场</li>
                     <li>• 其他人可以查看并使用自己相同生肖、5阶以上的NFT参与孕育</li>
                     <li>• 质押后需等待 <span class="text-yellow-600 font-bold" id="marketBreedingCooldown">24小时</span> 即可完成</li>
-                    <li>• 完成后双方各自赎回原NFT，并免费铸造获得1张相同生肖的1阶NFT</li>
+                    <li>• 完成后双方各自赎回原NFT</li>
+                    <li>• 父母双方各免费铸造获得1张相同生肖的1阶NFT</li>
                     <li>• 新NFT的属性从孕育的两张中随机继承一张（50%概率），性别随机</li>
-                    <li>• 收益分配：母方80%，父方15%，共有人5%</li>
+                    <li>• 费用：<span class="text-yellow-600 font-bold" id="marketBreedingFee">500</span> 代币，繁殖时直接销毁，取消不退还</li>
                 </ul>
             </div>
 
@@ -402,7 +411,107 @@
             initWalletUI();
             ZODIAC_COMPONENTS.injectNavigation('breeding');
             await initWeb3();
+            await setupEventListeners();
         });
+
+        let eventCleanupFn = null;
+
+        async function setupEventListeners() {
+            if (typeof window.ZODIAC_WEB3 !== 'undefined') {
+                if (eventCleanupFn) {
+                    eventCleanupFn();
+                }
+
+                const cleanupFns = [];
+
+                try {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'BreedingCompleted', async (event) => {
+                        console.log('BreedingCompleted event:', event.returnValues);
+                        ZODIAC_UI.showToast('恭喜！NFT孕育完成！', 'success');
+                        await loadNFTs();
+                        await checkActiveSelfOrder();
+                        await checkActivePairOrders();
+                    }));
+                } catch (e) {
+                    console.warn('Failed to subscribe to BreedingCompleted event:', e);
+                }
+
+                try {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'BreedingCancelled', async (event) => {
+                        console.log('BreedingCancelled event:', event.returnValues);
+                        ZODIAC_UI.showToast('繁殖已取消', 'info');
+                        await loadNFTs();
+                        await checkActiveSelfOrder();
+                        await checkActivePairOrders();
+                    }));
+                } catch (e) {
+                    console.warn('Failed to subscribe to BreedingCancelled event:', e);
+                }
+
+                try {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'MaleChildGenerated', async (event) => {
+                        console.log('MaleChildGenerated event:', event.returnValues);
+                        const childId = event.returnValues.childId;
+                        ZODIAC_UI.showToast(`🎉 父方获得新NFT #${childId}！`, 'success');
+                        await loadNFTs();
+                    }));
+                } catch (e) {
+                    console.warn('Failed to subscribe to MaleChildGenerated event:', e);
+                }
+
+                try {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'MarketListingCreated', async (event) => {
+                        console.log('MarketListingCreated event:', event.returnValues);
+                        await loadMarketOrders();
+                        await loadMyMarketOrders();
+                    }));
+                } catch (e) {
+                    console.warn('Failed to subscribe to MarketListingCreated event:', e);
+                }
+
+                try {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'MarketListingRemoved', async (event) => {
+                        console.log('MarketListingRemoved event:', event.returnValues);
+                        await loadMarketOrders();
+                        await loadMyMarketOrders();
+                    }));
+                } catch (e) {
+                    console.warn('Failed to subscribe to MarketListingRemoved event:', e);
+                }
+
+                eventCleanupFn = () => cleanupFns.forEach(fn => fn && fn());
+            }
+        }
+
+        function handleAccountsChanged(account) {
+            if (account) {
+                updateWalletDisplay(account);
+                refreshAllData();
+            }
+        }
+
+        function updateWalletDisplay(account) {
+            const displayAddress = account.slice(0, 6) + '...' + account.slice(-4);
+            document.getElementById('walletBtn').textContent = displayAddress;
+            document.getElementById('walletAddress').textContent = displayAddress;
+            document.getElementById('connectWalletBtn').style.display = 'none';
+            document.getElementById('mobileConnectBtn').style.display = 'none';
+        }
+
+        async function refreshAllData() {
+            try {
+                await initContracts();
+                await loadBreedingConstants();
+                await loadNFTs();
+                await loadMarketOrders();
+                await loadMyMarketOrders();
+                await checkActiveSelfOrder();
+                await checkActivePairOrders();
+            } catch (error) {
+                console.error('刷新数据失败:', error);
+                ZODIAC_UI.showToast('刷新数据失败，请刷新页面', 'error');
+            }
+        }
 
         function initWalletUI() {
             ZODIAC_UI.initWalletButton('connectWalletBtn', 'walletAddress', null);
@@ -427,24 +536,28 @@
         }
 
         async function initWeb3() {
-            const connected = await window.ZODIAC_WEB3.initWeb3();
-            if (connected) {
-                const account = getAccount();
-                document.getElementById('walletBtn').textContent = account.slice(0, 6) + '...' + account.slice(-4);
-                document.getElementById('walletAddress').textContent = account.slice(0, 6) + '...' + account.slice(-4);
-                document.getElementById('connectWalletBtn').style.display = 'none';
-                document.getElementById('mobileConnectBtn').style.display = 'none';
-                try {
-                    await initContracts();
-                } catch (e) {
-                    return;
+            try {
+                const connected = await window.ZODIAC_WEB3.initWeb3();
+                if (connected) {
+                    const account = getAccount();
+                    document.getElementById('walletBtn').textContent = account.slice(0, 6) + '...' + account.slice(-4);
+                    document.getElementById('walletAddress').textContent = account.slice(0, 6) + '...' + account.slice(-4);
+                    document.getElementById('connectWalletBtn').style.display = 'none';
+                    document.getElementById('mobileConnectBtn').style.display = 'none';
+                    try {
+                        await initContracts();
+                    } catch (e) {
+                        return;
+                    }
+                    await loadBreedingConstants();
+                    await loadNFTs();
+                    await loadMarketOrders();
+                    await loadMyMarketOrders();
+                    await checkActiveSelfOrder();
+                    await checkActivePairOrders();
                 }
-                await loadBreedingConstants();
-                await loadNFTs();
-                await loadMarketOrders();
-                await loadMyMarketOrders();
-                await checkActiveSelfOrder();
-                await checkActivePairOrders();
+            } catch (error) {
+                console.warn('Web3初始化失败:', error.message);
             }
         }
 
@@ -505,7 +618,7 @@
                             name: getNFTName(tokenType)
                         };
                         breedableNFTs.push(nftData);
-                        if (gender === 0) {
+                        if (gender === 1) {
                             maleNFTs.push(nftData);
                         } else {
                             femaleNFTs.push(nftData);
@@ -574,7 +687,7 @@
             let html = '';
             breedableNFTs.forEach(nft => {
                 const selected = selectedListNFT && selectedListNFT.id === nft.id ? 'selected' : '';
-                const genderIcon = nft.gender === 0 ? '♂' : '♀';
+                const genderIcon = nft.gender === 1 ? '♂' : '♀';
                 html += `
                     <div class="nft-card ${selected}" onclick="selectListNFT(${nft.id})"><img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
                         <p class="text-gray-800 text-sm truncate">${nft.name} ${genderIcon}</p>
@@ -619,6 +732,18 @@
                     return;
                 }
 
+                const maleLevel = parseInt(selectedMaleNFT.level, 10);
+                const femaleLevel = parseInt(selectedFemaleNFT.level, 10);
+                if (maleLevel < 5 || femaleLevel < 5) {
+                    ZODIAC_UI.showToast('必须选择5阶或以上的NFT！', 'warning');
+                    selectedMaleNFT = null;
+                    selectedFemaleNFT = null;
+                    renderMaleNFTs();
+                    renderFemaleNFTs();
+                    pairSection.classList.add('hidden');
+                    return;
+                }
+
                 pairSection.classList.remove('hidden');
                 document.getElementById('selectedMale').src = selectedMaleNFT.image;
                 document.getElementById('selectedMaleName').textContent = selectedMaleNFT.name;
@@ -632,49 +757,39 @@
         }
 
         async function startSelfBreeding() {
-            if (!selectedMaleNFT || !selectedFemaleNFT) {
-                ZODIAC_UI.showToast('请选择两张NFT', 'warning');
-                return;
-            }
-
-            const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认开始自我孕育',
-                `将消耗 ${selectedMaleNFT.name} 和 ${selectedFemaleNFT.name} 进行孕育，需要等待${formatDuration(selfBreedingCooldown)}完成。`
-            );
-
-            if (!confirm) return;
-
-            const btn = document.getElementById('startSelfBreedingBtn');
-            btn.disabled = true;
-            btn.textContent = '处理中...';
-
-            try {
-                const account = getAccount();
-                const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'createSelfBreedingPair', [selectedMaleNFT.id, selectedFemaleNFT.id, 0], account);
-                
-                const tx = await breedingContract.methods.createSelfBreedingPair(
-                    selectedMaleNFT.id,
-                    selectedFemaleNFT.id,
-                    0
-                ).send({
-                    from: account,
-                    gas: gas
-                });
-                
-                ZODIAC_UI.showToast('自我孕育已开始！等待完成。', 'success');
-                await loadNFTs();
-                await checkActiveSelfOrder();
-                selectedMaleNFT = null;
-                selectedFemaleNFT = null;
-                updateSelectedPair();
-            } catch (error) {
-                console.error('开始自我孕育失败:', error);
-                ZODIAC_UI.handleError(error, '开始自我孕育');
-            }
-
-            btn.disabled = false;
-            btn.textContent = '开始自我孕育';
+        if (!selectedMaleNFT || !selectedFemaleNFT) {
+            ZODIAC_UI.showToast('请选择两张NFT', 'warning');
+            return;
         }
+
+        const confirm = await ZODIAC_UI.showConfirmModal(
+            '确认开始自我孕育',
+            `将消耗 ${selectedMaleNFT.name} 和 ${selectedFemaleNFT.name} 进行孕育，需要等待${formatDuration(selfBreedingCooldown)}完成。`
+        );
+
+        if (!confirm) return;
+
+        const btn = document.getElementById('startSelfBreedingBtn');
+        btn.disabled = true;
+        btn.textContent = '处理中...';
+
+        try {
+            await ZODIAC_WEB3.createSelfBreedingPair(selectedMaleNFT.id, selectedFemaleNFT.id, 0);
+            
+            ZODIAC_UI.showToast('自我孕育已开始！等待完成。', 'success');
+            await loadNFTs();
+            await checkActiveSelfOrder();
+            selectedMaleNFT = null;
+            selectedFemaleNFT = null;
+            updateSelectedPair();
+        } catch (error) {
+            console.error('开始自我孕育失败:', error);
+            ZODIAC_UI.handleError(error, '开始自我孕育');
+        }
+
+        btn.disabled = false;
+        btn.textContent = '开始自我孕育';
+    }
 
         async function checkActiveSelfOrder() {
             try {
@@ -757,73 +872,62 @@
         }
 
         async function completeSelfBreeding() {
-            if (!activeSelfOrder) return;
+        if (!activeSelfOrder) return;
 
-            const btn = document.getElementById('completeSelfBreedingBtn');
-            btn.disabled = true;
-            btn.textContent = '处理中...';
+        const btn = document.getElementById('completeSelfBreedingBtn');
+        btn.disabled = true;
+        btn.textContent = '处理中...';
 
-            try {
-                const account = getAccount();
-                const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'completeBreeding', [activeSelfOrder.id], account);
-                
-                const tx = await breedingContract.methods.completeBreeding(activeSelfOrder.id).send({
-                    from: account,
-                    gas: gas
-                });
-                
-                ZODIAC_UI.showToast('恭喜！孕育完成！', 'success');
-                
-                if (countdownIntervals['self']) {
-                    clearInterval(countdownIntervals['self']);
-                    delete countdownIntervals['self'];
-                }
-                
-                activeSelfOrder = null;
-                document.getElementById('selfBreedingStatus').classList.add('hidden');
-                await loadNFTs();
-            } catch (error) {
-                console.error('完成自我孕育失败:', error);
-                ZODIAC_UI.handleError(error, '完成自我孕育');
-                btn.disabled = false;
-                btn.textContent = '完成孕育';
+        try {
+            const result = await ZODIAC_WEB3.completeBreeding(activeSelfOrder.id);
+            const femaleChildId = result.events.BreedingCompleted.returnValues.childId;
+            
+            ZODIAC_UI.showToast(`🎉 恭喜！孕育完成！获得新NFT #${femaleChildId}！`, 'success');
+            
+            if (countdownIntervals['self']) {
+                clearInterval(countdownIntervals['self']);
+                delete countdownIntervals['self'];
             }
+            
+            activeSelfOrder = null;
+            document.getElementById('selfBreedingStatus').classList.add('hidden');
+            await loadNFTs();
+        } catch (error) {
+            console.error('完成自我孕育失败:', error);
+            ZODIAC_UI.handleError(error, '完成自我孕育');
+            btn.disabled = false;
+            btn.textContent = '完成孕育';
         }
+    }
 
         async function cancelSelfBreeding() {
-            if (!activeSelfOrder) return;
+        if (!activeSelfOrder) return;
 
-            const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认取消孕育',
-                '确定要取消这个孕育配对吗？'
-            );
+        const confirm = await ZODIAC_UI.showConfirmModal(
+            '确认取消孕育',
+            '确定要取消这个孕育配对吗？注意：费用将不会退还！'
+        );
 
-            if (!confirm) return;
+        if (!confirm) return;
 
-            try {
-                const account = getAccount();
-                const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'cancelBreeding', [activeSelfOrder.id], account);
-                
-                await breedingContract.methods.cancelBreeding(activeSelfOrder.id).send({
-                    from: account,
-                    gas: gas
-                });
-                
-                ZODIAC_UI.showToast('已取消孕育', 'success');
-                
-                if (countdownIntervals['self']) {
-                    clearInterval(countdownIntervals['self']);
-                    delete countdownIntervals['self'];
-                }
-                
-                activeSelfOrder = null;
-                document.getElementById('selfBreedingStatus').classList.add('hidden');
-                await loadNFTs();
-            } catch (error) {
-                console.error('取消孕育失败:', error);
-                ZODIAC_UI.handleError(error, '取消孕育');
+        try {
+            await ZODIAC_WEB3.cancelBreeding(activeSelfOrder.id);
+            
+            ZODIAC_UI.showToast('已取消孕育', 'success');
+            
+            if (countdownIntervals['self']) {
+                clearInterval(countdownIntervals['self']);
+                delete countdownIntervals['self'];
             }
+            
+            activeSelfOrder = null;
+            document.getElementById('selfBreedingStatus').classList.add('hidden');
+            await loadNFTs();
+        } catch (error) {
+            console.error('取消孕育失败:', error);
+            ZODIAC_UI.handleError(error, '取消孕育');
         }
+    }
 
         async function listForBreeding() {
             if (!selectedListNFT) {
@@ -850,37 +954,29 @@
         }
 
         async function confirmListBreeding() {
-            if (!selectedListNFT) return;
+        if (!selectedListNFT) return;
 
-            const btn = document.getElementById('confirmListBtn');
-            btn.disabled = true;
-            btn.textContent = '处理中...';
+        const btn = document.getElementById('confirmListBtn');
+        btn.disabled = true;
+        btn.textContent = '处理中...';
 
-            try {
-                const account = getAccount();
-                const tokenId = selectedListNFT.id;
+        try {
+            await ZODIAC_WEB3.listForMarketBreeding(selectedListNFT.id);
 
-                // 调用链上合约上架到孕育市场
-                const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'listForMarketBreeding', [tokenId], account);
-                await breedingContract.methods.listForMarketBreeding(tokenId).send({
-                    from: account,
-                    gas: gas
-                });
-
-                ZODIAC_UI.showToast('NFT已上架到孕育市场！', 'success');
-                closeListModal();
-                selectedListNFT = null;
-                renderBreedableNFTs();
-                document.getElementById('listForBreedingBtn').disabled = true;
-                await loadMarketOrders();
-            } catch (error) {
-                console.error('上架失败:', error);
-                ZODIAC_UI.showToast('上架失败: ' + error.message, 'error');
-            }
-
-            btn.disabled = false;
-            btn.textContent = '确认上架';
+            ZODIAC_UI.showToast('NFT已上架到孕育市场！', 'success');
+            closeListModal();
+            selectedListNFT = null;
+            renderBreedableNFTs();
+            document.getElementById('listForBreedingBtn').disabled = true;
+            await loadMarketOrders();
+        } catch (error) {
+            console.error('上架失败:', error);
+            ZODIAC_UI.showToast('上架失败: ' + error.message, 'error');
         }
+
+        btn.disabled = false;
+        btn.textContent = '确认上架';
+    }
 
         async function loadMarketOrders() {
             try {
@@ -979,8 +1075,8 @@
             let html = '';
             marketOrders.forEach(order => {
                 const nftInfo = window.ZODIAC_UTILS.getNFTInfo(order.type);
-                const genderText = order.gender === 0 ? '公' : '母';
-                const genderIcon = order.gender === 0 ? '♂' : '♀';
+                const genderText = order.gender === 1 ? '公' : '母';
+                const genderIcon = order.gender === 1 ? '♂' : '♀';
                 
                 html += `
                     <div class="breeding-order-card">
@@ -1055,7 +1151,7 @@
             let html = '';
             myMarketOrders.forEach(order => {
                 const nftInfo = window.ZODIAC_UTILS.getNFTInfo(order.type);
-                const genderText = order.gender === 0 ? '公' : '母';
+                const genderText = order.gender === 0 ? '母' : '公';
                 
                 html += `
                     <div class="breeding-order-card">
@@ -1197,7 +1293,7 @@
             };
             
             const nftInfo = window.ZODIAC_UTILS.getNFTInfo(orderData.type);
-            const genderText = orderData.gender === 0 ? '公' : '母';
+            const genderText = orderData.gender === 0 ? '母' : '公';
             
             document.getElementById('joinOrderInfo').innerHTML = `
                 <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
@@ -1263,168 +1359,144 @@
         }
 
         async function confirmJoinBreeding() {
-            if (!selectedJoinOrderId || !selectedJoinNFT) return;
+        if (!selectedJoinOrderId || !selectedJoinNFT) return;
 
-            // 从链上获取挂单信息
-            const listing = await breedingContract.methods.getMarketListing(selectedJoinOrderId).call();
-            if (!listing.isActive) {
-                ZODIAC_UI.showToast('订单已失效', 'error');
+        // 从链上获取挂单信息
+        const listing = await breedingContract.methods.getMarketListing(selectedJoinOrderId).call();
+        if (!listing.isActive) {
+            ZODIAC_UI.showToast('订单已失效', 'error');
+            closeJoinModal();
+            await loadMarketOrders();
+            return;
+        }
+        
+        // 检查对方NFT是否在冷却期
+        try {
+            const isInCooldown = await breedingContract.methods.isInCooldown(selectedJoinOrderId).call();
+            if (isInCooldown) {
+                ZODIAC_UI.showToast('对方NFT正在冷却中，无法参与孕育', 'warning');
                 closeJoinModal();
                 await loadMarketOrders();
                 return;
             }
-            
-            // 检查对方NFT是否在冷却期
-            try {
-                const isInCooldown = await breedingContract.methods.isInCooldown(selectedJoinOrderId).call();
-                if (isInCooldown) {
-                    ZODIAC_UI.showToast('对方NFT正在冷却中，无法参与孕育', 'warning');
-                    closeJoinModal();
-                    await loadMarketOrders();
-                    return;
-                }
-            } catch (error) {
-                console.warn('检查冷却期失败:', error);
-            }
-            
-            // 检查用户选择的NFT是否也在冷却期
-            try {
-                const userNftInCooldown = await breedingContract.methods.isInCooldown(selectedJoinNFT.id).call();
-                if (userNftInCooldown) {
-                    ZODIAC_UI.showToast('您选择的NFT正在冷却中', 'warning');
-                    closeJoinModal();
-                    await loadNFTs();
-                    return;
-                }
-            } catch (error) {
-                console.warn('检查用户NFT冷却期失败:', error);
-            }
-            
-            const nftType = await nftContract.methods.tokenType(selectedJoinOrderId).call();
-            const orderGender = parseInt(nftType, 10) % 2;
-
-            const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认加入孕育',
-                `您将使用 ${selectedJoinNFT.name} 与对方的 NFT 进行孕育。\n\n等待时间: ${formatDuration(marketBreedingCooldown)}\n完成后双方各获得一只新生NFT。`
-            );
-
-            if (!confirm) return;
-
-            const btn = document.getElementById('joinBreedingBtn');
-            btn.disabled = true;
-            btn.textContent = '处理中...';
-
-            try {
-                const account = getAccount();
-                const fatherId = orderGender === 0 ? selectedJoinOrderId : selectedJoinNFT.id;
-                const motherId = orderGender === 0 ? selectedJoinNFT.id : selectedJoinOrderId;
-                const maleOwner = orderGender === 0 ? listing.owner : account;
-                const femaleOwner = orderGender === 0 ? account : listing.owner;
-                
-                const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'createMarketBreedingPair', 
-                    [fatherId, motherId, maleOwner, femaleOwner, 0, 0], account);
-                
-                const tx = await breedingContract.methods.createMarketBreedingPair(
-                    fatherId,
-                    motherId,
-                    maleOwner,
-                    femaleOwner,
-                    0,
-                    0
-                ).send({
-                    from: account,
-                    gas: gas
-                });
-                
-                ZODIAC_UI.showToast('已加入孕育！等待完成。', 'success');
-                closeJoinModal();
-                selectedJoinNFT = null;
-                await loadMarketOrders();
-                await loadNFTs();
-                await checkActivePairOrders();
-            } catch (error) {
-                console.error('加入孕育失败:', error);
-                ZODIAC_UI.handleError(error, '加入孕育');
-            }
-
-            btn.disabled = false;
-            btn.textContent = '确认加入';
+        } catch (error) {
+            console.warn('检查冷却期失败:', error);
         }
+        
+        // 检查用户选择的NFT是否也在冷却期
+        try {
+            const userNftInCooldown = await breedingContract.methods.isInCooldown(selectedJoinNFT.id).call();
+            if (userNftInCooldown) {
+                ZODIAC_UI.showToast('您选择的NFT正在冷却中', 'warning');
+                closeJoinModal();
+                await loadNFTs();
+                return;
+            }
+        } catch (error) {
+            console.warn('检查用户NFT冷却期失败:', error);
+        }
+        
+        const nftType = await nftContract.methods.tokenType(selectedJoinOrderId).call();
+        const orderGender = parseInt(nftType, 10) % 2;
+
+        const confirm = await ZODIAC_UI.showConfirmModal(
+            '确认加入孕育',
+            `您将使用 ${selectedJoinNFT.name} 与对方的 NFT 进行孕育。\n\n等待时间: ${formatDuration(marketBreedingCooldown)}\n完成后双方各获得一只新生NFT。`
+        );
+
+        if (!confirm) return;
+
+        const btn = document.getElementById('joinBreedingBtn');
+        btn.disabled = true;
+        btn.textContent = '处理中...';
+
+        try {
+            const fatherId = orderGender === 0 ? selectedJoinOrderId : selectedJoinNFT.id;
+            const motherId = orderGender === 0 ? selectedJoinNFT.id : selectedJoinOrderId;
+            
+            await ZODIAC_WEB3.createMarketBreedingPairPublic(fatherId, motherId);
+            
+            ZODIAC_UI.showToast('已加入孕育！等待完成。', 'success');
+            closeJoinModal();
+            selectedJoinNFT = null;
+            await loadMarketOrders();
+            await loadNFTs();
+            await checkActivePairOrders();
+        } catch (error) {
+            console.error('加入孕育失败:', error);
+            ZODIAC_UI.handleError(error, '加入孕育');
+        }
+
+        btn.disabled = false;
+        btn.textContent = '确认加入';
+    }
 
         async function cancelMyListing(orderId) {
-            const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认取消上架',
-                '确定要取消这个NFT的上架吗？'
-            );
+        const confirm = await ZODIAC_UI.showConfirmModal(
+            '确认取消上架',
+            '确定要取消这个NFT的上架吗？'
+        );
 
-            if (!confirm) return;
+        if (!confirm) return;
 
-            try {
-                const account = getAccount();
-                const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'delistFromMarketBreeding', [orderId], account);
-                await breedingContract.methods.delistFromMarketBreeding(orderId).send({
-                    from: account,
-                    gas: gas
-                });
-                ZODIAC_UI.showToast('已取消上架', 'success');
-                await loadMyMarketOrders();
-                await loadMarketOrders();
-            } catch (error) {
-                console.error('取消上架失败:', error);
-                ZODIAC_UI.showToast('取消失败: ' + error.message, 'error');
-            }
+        try {
+            await ZODIAC_WEB3.delistFromMarketBreeding(orderId);
+            ZODIAC_UI.showToast('已取消上架', 'success');
+            await loadMyMarketOrders();
+            await loadMarketOrders();
+        } catch (error) {
+            console.error('取消上架失败:', error);
+            ZODIAC_UI.showToast('取消失败: ' + error.message, 'error');
         }
+    }
 
         async function completeMarketBreeding(orderId) {
-            const btn = document.querySelector(`button[onclick="completeMarketBreeding(${orderId})"]`);
-            btn.disabled = true;
-            btn.textContent = '处理中...';
+        const btn = document.querySelector(`button[onclick="completeMarketBreeding(${orderId})"]`);
+        btn.disabled = true;
+        btn.textContent = '处理中...';
 
-            try {
-                const account = getAccount();
-                const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'completeBreeding', [orderId], account);
-                
-                const tx = await breedingContract.methods.completeBreeding(orderId).send({
-                    from: account,
-                    gas: gas
-                });
-                
-                ZODIAC_UI.showToast('恭喜！市场孕育完成！', 'success');
-                await loadNFTs();
-                await checkActivePairOrders();
-            } catch (error) {
-                console.error('完成市场孕育失败:', error);
-                ZODIAC_UI.handleError(error, '完成市场孕育');
-                btn.disabled = false;
-                btn.textContent = '完成孕育';
+        try {
+            const result = await ZODIAC_WEB3.completeBreeding(orderId);
+            const femaleChildId = result.events.BreedingCompleted.returnValues.childId;
+            let maleChildId = null;
+            if (result.events.MaleChildGenerated) {
+                maleChildId = result.events.MaleChildGenerated.returnValues.childId;
             }
+            
+            if (maleChildId) {
+                ZODIAC_UI.showToast(`🎉 恭喜！市场孕育完成！母方获得 NFT #${femaleChildId}，父方获得 NFT #${maleChildId}！`, 'success');
+            } else {
+                ZODIAC_UI.showToast(`🎉 恭喜！市场孕育完成！获得新NFT #${femaleChildId}！`, 'success');
+            }
+            await loadNFTs();
+            await checkActivePairOrders();
+        } catch (error) {
+            console.error('完成市场孕育失败:', error);
+            ZODIAC_UI.handleError(error, '完成市场孕育');
+            btn.disabled = false;
+            btn.textContent = '完成孕育';
         }
+    }
 
         async function cancelMarketBreeding(orderId) {
-            const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认取消孕育',
-                '确定要取消这个市场孕育配对吗？'
-            );
+        const confirm = await ZODIAC_UI.showConfirmModal(
+            '确认取消孕育',
+            '确定要取消这个市场孕育配对吗？注意：费用将不会退还！'
+        );
 
-            if (!confirm) return;
+        if (!confirm) return;
 
-            try {
-                const account = getAccount();
-                const gas = await ZODIAC_WEB3.estimateGas(breedingContract, 'cancelBreeding', [orderId], account);
-                
-                await breedingContract.methods.cancelBreeding(orderId).send({
-                    from: account,
-                    gas: gas
-                });
-                
-                ZODIAC_UI.showToast('已取消孕育', 'success');
-                await loadNFTs();
-                await checkActivePairOrders();
-            } catch (error) {
-                console.error('取消市场孕育失败:', error);
-                ZODIAC_UI.handleError(error, '取消市场孕育');
-            }
+        try {
+            await ZODIAC_WEB3.cancelBreeding(orderId);
+            
+            ZODIAC_UI.showToast('已取消孕育', 'success');
+            await loadNFTs();
+            await checkActivePairOrders();
+        } catch (error) {
+            console.error('取消市场孕育失败:', error);
+            ZODIAC_UI.handleError(error, '取消市场孕育');
         }
+    }
 
         function switchTab(tab) {
             currentTab = tab;

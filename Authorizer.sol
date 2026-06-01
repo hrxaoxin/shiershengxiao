@@ -81,6 +81,12 @@ interface ISetPoolManager {
 }
 
 contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+    bool public paused;
+    string public pauseReason;
+    uint256 public constant SET_DELAY = 2 days;
+    mapping(bytes32 => uint256) public pendingActions;
+    mapping(address => uint256) public lastSetAllContractsTime;
+
     struct ContractAddresses {
         address tokenAddress;
         address usdtAddress;
@@ -107,6 +113,28 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         address feeReceiverAddress;
         address pancakeSwapPairAddress;
         address metadataContractAddress;
+    }
+
+    event Paused(address account, string reason);
+    event Unpaused(address account);
+    event ContractAddressChangeScheduled(bytes32 indexed actionHash, uint256 executeTime);
+    event ContractAddressChangeCancelled(bytes32 indexed actionHash);
+
+    modifier whenNotPaused() {
+        require(!paused, "Authorizer: Paused");
+        _;
+    }
+
+    function pause(string memory reason) external onlyOwner {
+        paused = true;
+        pauseReason = reason;
+        emit Paused(msg.sender, reason);
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+        pauseReason = "";
+        emit Unpaused(msg.sender);
     }
 
     mapping(address => uint256) public weights;
@@ -207,7 +235,27 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         admin = _admin;
     }
 
-    function setAllContracts(ContractAddresses calldata _addresses) external onlyOwner {
+    function setAllContracts(ContractAddresses calldata _addresses) external onlyOwner whenNotPaused {
+        require(
+            block.timestamp >= lastSetAllContractsTime[address(this)] + SET_DELAY,
+            "Authorizer: Must wait SET_DELAY between calls"
+        );
+
+        bytes32 actionHash = keccak256(abi.encode(_addresses));
+        pendingActions[actionHash] = block.timestamp + SET_DELAY;
+        lastSetAllContractsTime[address(this)] = block.timestamp;
+
+        emit ContractAddressChangeScheduled(actionHash, block.timestamp + SET_DELAY);
+    }
+
+    function executeContractAddresses(ContractAddresses calldata _addresses) external onlyOwner whenNotPaused {
+        bytes32 actionHash = keccak256(abi.encode(_addresses));
+        require(pendingActions[actionHash] != 0, "Authorizer: No pending action");
+        require(block.timestamp >= pendingActions[actionHash], "Authorizer: Time lock not expired");
+        require(block.timestamp <= pendingActions[actionHash] + SET_DELAY, "Authorizer: Action expired");
+
+        delete pendingActions[actionHash];
+
         _setCoreAddresses(_addresses);
         _setNFTAddresses(_addresses);
         _setOtherAddresses(_addresses);
@@ -219,6 +267,13 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _setupOtherContracts(_addresses.weightManagerAddress, _addresses.battleHistoryAddress, _addresses.nftTradingAddress, _addresses.feeReceiverAddress, _addresses.arenaRankingAddress, _addresses.rewardManagerAddress);
 
         _emitContractAddressesUpdated();
+    }
+
+    function cancelContractAddressChange(ContractAddresses calldata _addresses) external onlyOwner {
+        bytes32 actionHash = keccak256(abi.encode(_addresses));
+        require(pendingActions[actionHash] != 0, "Authorizer: No pending action to cancel");
+        delete pendingActions[actionHash];
+        emit ContractAddressChangeCancelled(actionHash);
     }
 
     function _setupBattleAndBreeding(
@@ -277,7 +332,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             ISetUSDTAddress(_priceOracleAddress).setUSDTAddress(_usdtAddress);
         }
         if (_upgradeModuleAddress != address(0)) {
-            ISetUSDTAddress(_upgradeModuleAddress).setUSDTAddress(_usdtAddress);
         }
     }
 
@@ -329,12 +383,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
     }
 
-    function setContractAddresses(ContractAddresses calldata _addresses) external onlyOwner {
-        _setCoreAddresses(_addresses);
-        _setNFTAddresses(_addresses);
-        _setOtherAddresses(_addresses);
-        _emitContractAddressesUpdated();
-    }
+
 
     function _setCoreAddresses(ContractAddresses calldata _addresses) internal {
         tokenAddress = _addresses.tokenAddress;
@@ -403,7 +452,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         addrs[19] = metadataContractAddress;
     }
 
-    function syncContractAddresses() external onlyOwner {
+    function syncContractAddresses() external onlyOwner whenNotPaused {
         _setupBattleAndBreeding(battleAddress, breedingAddress, nftMintAddress);
         _setupStakingAndReward(stakingAddress, rewardManagerAddress, dividendManagerAddress, tokenStakingAddress, tokenAddress, arenaRankingAddress, nftMintAddress);
         _setupPriceAndUpgrade(priceOracleAddress, upgradeModuleAddress, tokenAddress, usdtAddress);

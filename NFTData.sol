@@ -4,6 +4,8 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "./NFTDataType.sol";
+import "./NFTInterface.sol";
 
 /**
  * @title NFTData
@@ -32,6 +34,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * - 支持UUPS代理升级模式
  */
 contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+    using NFTDataTypes for uint256;
+    
     /**
      * @dev NFT信息映射
      *
@@ -43,6 +47,11 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * - 写入：仅NFT主合约
      */
     mapping(uint256 => struct_NFTInfo) internal _nftInfo;
+    
+    /**
+     * @dev 用户拥有的NFT映射（用于权重计算）
+     */
+    mapping(address => mapping(uint256 => uint256[])) internal _userNFTsByType; // user => zodiacType => tokenIds
 
     /**
      * @dev 每种NFT类型的持有者列表
@@ -300,12 +309,15 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      */
     function _removeFromTypeOwners(uint256 nftType, address owner) internal {
         address[] storage owners = _nftTypeOwners[nftType];
+        uint256 writeIndex = 0;
         for (uint256 i = 0; i < owners.length; i++) {
-            if (owners[i] == owner) {
-                owners[i] = owners[owners.length - 1];
-                owners.pop();
-                break;
+            if (owners[i] != owner) {
+                owners[writeIndex] = owners[i];
+                writeIndex++;
             }
+        }
+        while (owners.length > writeIndex) {
+            owners.pop();
         }
     }
 
@@ -365,5 +377,101 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
 
         return (types, levels, mintTimes);
+    }
+    
+    // ========== 外部可见函数 ==========
+    
+    /**
+     * @dev 获取NFT类型
+     */
+    function tokenType(uint256 tokenId) external view returns (uint256) {
+        return _nftInfo[tokenId].zodiacType;
+    }
+    
+    /**
+     * @dev 获取NFT等级
+     */
+    function tokenLevel(uint256 tokenId) external view returns (uint8) {
+        return _nftInfo[tokenId].level;
+    }
+    
+    /**
+     * @dev 设置NFT等级（仅授权调用者）
+     */
+    function setTokenLevel(uint256 tokenId, uint8 level) external onlyAuthorized {
+        require(level >= 1 && level <= 5, "NFTData: Invalid level");
+        _setNFTLevel(tokenId, level);
+    }
+    
+    /**
+     * @dev 计算用户权重
+     * 权重计算基于用户拥有的NFT数量、等级和稀有度
+     */
+    function calcUserWeight(address user) external view returns (uint256) {
+        uint256[] memory userTokens = _getUserNFTs(user);
+        uint256 totalWeight = 0;
+        
+        for (uint256 i = 0; i < userTokens.length; i++) {
+            uint256 tokenId = userTokens[i];
+            struct_NFTInfo memory info = _nftInfo[tokenId];
+            
+            // 基础权重基于等级
+            uint256 levelWeight;
+            if (info.level == 1) levelWeight = 1;
+            else if (info.level == 2) levelWeight = 2;
+            else if (info.level == 3) levelWeight = 6;
+            else if (info.level == 4) levelWeight = 18;
+            else if (info.level == 5) levelWeight = 66;
+            
+            // 稀有度乘数（稀有类型 >= 72）
+            if (info.zodiacType >= 72) {
+                levelWeight *= 10;
+            }
+            
+            totalWeight += levelWeight;
+        }
+        
+        return totalWeight;
+    }
+    
+    /**
+     * @dev 设置NFT信息（用于初始化）
+     */
+    function setNFTInfo(
+        uint256 tokenId,
+        uint256 zodiacType,
+        uint8 level,
+        uint8 growth,
+        uint256 mintTime,
+        address owner
+    ) external onlyAuthorized {
+        _setNFTInfo(tokenId, zodiacType, level, growth, mintTime);
+        _addUserNFT(owner, tokenId);
+        _addToTypeOwners(zodiacType, owner);
+    }
+    
+    /**
+     * @dev 添加用户NFT（外部调用）
+     */
+    function addUserNFT(address user, uint256 tokenId) external onlyAuthorized {
+        _addUserNFT(user, tokenId);
+        uint256 zodiacType = _getNFTType(tokenId);
+        _addToTypeOwners(zodiacType, user);
+    }
+    
+    /**
+     * @dev 移除用户NFT（外部调用）
+     */
+    function removeUserNFT(address user, uint256 tokenId) external onlyAuthorized {
+        _removeUserNFT(user, tokenId);
+        uint256 zodiacType = _getNFTType(tokenId);
+        _removeFromTypeOwners(zodiacType, user);
+    }
+
+    /**
+     * @dev 获取用户NFT列表（外部调用）
+     */
+    function getUserNFTs(address user) external view returns (uint256[] memory) {
+        return _getUserNFTs(user);
     }
 }

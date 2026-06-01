@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 import "./NFTInterface.sol";
 
@@ -11,7 +12,7 @@ import "./NFTInterface.sol";
  * @title Staking
  * @dev NFT质押合约（优化版：支持大规模用户，实时奖励计算）
  */
-contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     uint256 public minStakingDuration = 30 minutes;
     uint256 public rewardRate = 10; // 万分比 (0.1%)
     uint256 public maxRewardRate = 20;
@@ -39,14 +40,16 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
     mapping(uint256 => StakingInfo) public stakingInfo;
     mapping(address => uint256[]) public userStakedNFTs;
-    address[] public stakingUsers;
     mapping(address => bool) public isStakingUser;
+    mapping(address => uint256) public stakingUserIndex;
+    address[] public stakingUsers;
 
     uint256 public normalNFTWeight = 66;
     uint256 public rareNFTWeight = 76;
     address public rewardTokenContract;
     address public nftContract;
     address public authorizer;
+    uint256 public globalPendingRewards;
     
     bool public paused;
     string public pauseReason;
@@ -54,6 +57,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function initialize(address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         authorizer = _authorizer;
     }
 
@@ -85,7 +89,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _;
     }
 
-    function stake(uint256[] calldata tokenIds) external whenNotPaused {
+    function stake(uint256[] calldata tokenIds) external whenNotPaused nonReentrant {
         require(tokenIds.length > 0, "Staking: Empty tokenIds");
         require(nftContract != address(0), "Staking: NFT contract not set");
         
@@ -94,13 +98,17 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
         if (!isStakingUser[msg.sender] && userStakedNFTs[msg.sender].length == 0) {
             isStakingUser[msg.sender] = true;
+            stakingUserIndex[msg.sender] = stakingUsers.length;
             stakingUsers.push(msg.sender);
         }
 
         INFT nft = INFT(nftContract);
+        require(nft.isApprovedForAll(msg.sender, address(this)), "Staking: Contract not approved for transfer");
+        
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(stakingInfo[tokenId].owner == address(0), "Staking: Already staked");
+            require(nft.ownerOf(tokenId) == msg.sender, "Staking: Not owner of token");
 
             bool isRareToken = nft.isRare(tokenId);
             nft.transferFrom(msg.sender, address(this), tokenId);
@@ -120,7 +128,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         emit Staked(msg.sender, tokenIds);
     }
 
-    function unstake(uint256[] calldata tokenIds) external whenNotPaused {
+    function unstake(uint256[] calldata tokenIds) external whenNotPaused nonReentrant {
         require(nftContract != address(0), "Staking: NFT contract not set");
         INFT nft = INFT(nftContract);
         
@@ -152,7 +160,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 领取奖励（优化：实时计算，无 Gas 瓶颈）
      */
-    function claimReward() external whenNotPaused {
+    function claimReward() external whenNotPaused nonReentrant {
         uint256[] storage nfts = userStakedNFTs[msg.sender];
         require(nfts.length > 0, "Staking: No staked NFTs");
         require(rewardTokenContract != address(0), "Staking: Reward token not set");
@@ -200,7 +208,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 每日奖励计算（仅增加全局增量，不遍历用户）
      */
-    function calculateDailyReward() external whenNotPaused {
+    function calculateDailyReward() external whenNotPaused onlyAuthorized {
         _checkNewDay();
         
         if (_shouldCalculateDailyReward()) {
@@ -223,8 +231,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      */
     function _shouldCalculateDailyReward() internal view returns (bool) {
         return rewardTokenContract != address(0) && 
-               totalWeightedNFTs > 0 && 
-               todayRewardAmount == 0;
+               totalWeightedNFTs > 0;
     }
 
     /**
@@ -249,23 +256,33 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
     function _removeFromUserStakedNFTs(address user, uint256 tokenId) internal {
         uint256[] storage nfts = userStakedNFTs[user];
+        bool found = false;
+        uint256 removeIndex = 0;
         for (uint256 i = 0; i < nfts.length; i++) {
             if (nfts[i] == tokenId) {
-                nfts[i] = nfts[nfts.length - 1];
-                nfts.pop();
+                found = true;
+                removeIndex = i;
                 break;
             }
         }
+        require(found, "Staking: Token not in user's staked list");
+        nfts[removeIndex] = nfts[nfts.length - 1];
+        nfts.pop();
     }
 
     function _removeFromStakingUsers(address user) internal {
-        for (uint256 i = 0; i < stakingUsers.length; i++) {
-            if (stakingUsers[i] == user) {
-                stakingUsers[i] = stakingUsers[stakingUsers.length - 1];
-                stakingUsers.pop();
-                break;
-            }
+        uint256 index = stakingUserIndex[user];
+        uint256 lastIndex = stakingUsers.length - 1;
+        
+        if (index != lastIndex) {
+            address lastUser = stakingUsers[lastIndex];
+            stakingUsers[index] = lastUser;
+            stakingUserIndex[lastUser] = index;
         }
+        
+        stakingUsers.pop();
+        delete stakingUserIndex[user];
+        delete isStakingUser[user];
     }
 
     function setRewardRate(uint256 _rewardRate) external onlyOwner {
@@ -338,4 +355,83 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         pauseReason = "";
         emit Unpaused(msg.sender);
     }
+
+    /**
+     * @dev 获取用户质押统计
+     * @param user 用户地址
+     * @return totalStaked NFT总数
+     * @return totalPendingReward 待领取奖励
+     * @return rareCount 稀有NFT数量
+     * @return normalCount 普通NFT数量
+     */
+    function getUserStakingStats(address user) external view returns (
+        uint256 totalStaked,
+        uint256 totalPendingReward,
+        uint256 rareCount,
+        uint256 normalCount
+    ) {
+        uint256[] storage nfts = userStakedNFTs[user];
+        totalStaked = nfts.length;
+        totalPendingReward = 0;
+        rareCount = 0;
+        normalCount = 0;
+        
+        for (uint256 i = 0; i < nfts.length; i++) {
+            StakingInfo memory info = stakingInfo[nfts[i]];
+            totalPendingReward += _calculatePendingForNFT(info);
+            if (info.isRare) {
+                rareCount++;
+            } else {
+                normalCount++;
+            }
+        }
+    }
+
+    /**
+     * @dev 获取质押池统计
+     * @return totalStakers 质押者总数
+     * @return totalNFTs 质押NFT总数
+     * @return todayIncoming 今日流入
+     */
+    function getPoolStats() external view returns (
+        uint256 totalStakers,
+        uint256 totalNFTs,
+        uint256 todayIncoming
+    ) {
+        totalStakers = stakingUsers.length;
+        totalNFTs = totalStakedNFTs;
+        todayIncoming = todayIncomingTokens;
+    }
+
+    /**
+     * @dev 获取用户在质押池中的排名（按质押时间）
+     * @param user 用户地址
+     * @return rank 排名（1开始），0表示未质押
+     */
+    function getUserStakingRank(address user) external view returns (uint256 rank) {
+        if (!isStakingUser[user]) {
+            return 0;
+        }
+        uint256 index = stakingUserIndex[user];
+        return index + 1;
+    }
+
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+        require(amount > 0, "Staking: Amount must be > 0");
+        require(amount <= address(this).balance, "Staking: Insufficient balance");
+        payable(owner()).transfer(amount);
+        emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
+    }
+
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+        require(amount > 0, "Staking: Amount must be > 0");
+        require(rewardTokenContract != address(0), "Staking: Token contract not set");
+        IERC20 token = IERC20(rewardTokenContract);
+        require(token.balanceOf(address(this)) >= amount, "Staking: Insufficient token balance");
+        require(token.transfer(owner(), amount), "Staking: Token transfer failed");
+        emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
+    }
+
+    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 }

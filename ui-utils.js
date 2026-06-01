@@ -405,6 +405,19 @@ window.ZODIAC_UI = (function() {
             { pattern: /Father in cooldown|Mother in cooldown/, message: 'NFT正在冷却期', code: 'BREEDING_COOLDOWN' },
             { pattern: /Cannot breed with self/, message: '不能与自己繁殖', code: 'SELF_BREEDING' },
             { pattern: /Invalid zodiac/, message: '无效的生肖类型', code: 'INVALID_ZODIAC' },
+            { pattern: /No attempts left/, message: '剩余挑战次数不足', code: 'NO_ATTEMPTS' },
+            { pattern: /Battle cooldown/, message: '战斗冷却中，请稍后再试', code: 'BATTLE_COOLDOWN' },
+            { pattern: /Time lock not expired/, message: '时间锁未到期，请稍后重试', code: 'TIME_LOCK' },
+            { pattern: /Max recharge limit/, message: '已达到最大充值次数限制', code: 'MAX_RECHARGE' },
+            { pattern: /Exceeds.*limit/, message: '超过限制，请检查您的操作', code: 'EXCEEDS_LIMIT' },
+            { pattern: /Insufficient.*allowance/, message: '代币授权额度不足', code: 'INSUFFICIENT_ALLOWANCE' },
+            { pattern: /Transfer failed|transfer failed/, message: '转账失败，请稍后重试', code: 'TRANSFER_FAILED' },
+            { pattern: /Already initialized/, message: '合约已初始化，不能重复操作', code: 'ALREADY_INITIALIZED' },
+            { pattern: /Zero address/, message: '地址不能为零', code: 'ZERO_ADDRESS' },
+            { pattern: /Invalid amount/, message: '无效的数量', code: 'INVALID_AMOUNT' },
+            { pattern: /Token.*not set|Contract not set/, message: '合约未正确设置', code: 'CONTRACT_NOT_SET' },
+            { pattern: /Threshold not met/, message: '未达到阈值要求', code: 'THRESHOLD_NOT_MET' },
+            { pattern: /No pending action/, message: '没有待处理的操作', code: 'NO_PENDING_ACTION' }
             { pattern: /Invalid token address|Invalid address/, message: '无效的合约地址', code: 'INVALID_ADDRESS' },
             { pattern: /Token contract not set/, message: '代币合约未设置', code: 'TOKEN_CONTRACT_NOT_SET' },
             { pattern: /NFT contract not set/, message: 'NFT合约未设置', code: 'NFT_CONTRACT_NOT_SET' },
@@ -490,15 +503,26 @@ window.ZODIAC_UI = (function() {
             successMessage = '交易成功！',
             onHash,
             onConfirmation,
-            showConfirmation = false
+            showConfirmation = false,
+            confirmations = 1,
+            timeout = 300000
         } = options;
 
         showLoading(loadingMessage);
 
-        try {
-            const tx = await transactionPromise;
+        let timeoutId;
+        const timeoutPromise = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+                reject(new Error('Transaction timeout'));
+            }, timeout);
+        });
 
-            if (tx.hash) {
+        try {
+            const tx = await Promise.race([transactionPromise, timeoutPromise]);
+
+            clearTimeout(timeoutId);
+
+            if (tx && tx.hash) {
                 const shortHash = tx.hash.substring(0, 10) + '...' + tx.hash.substring(tx.hash.length - 8);
                 hideLoading();
 
@@ -506,12 +530,13 @@ window.ZODIAC_UI = (function() {
                     onHash(tx.hash, shortHash);
                 }
 
-                if (showConfirmation && tx.wait) {
+                if (showConfirmation && typeof tx.wait === 'function') {
                     showLoading(`等待区块链确认 (${shortHash})...`);
-                    await tx.wait(1);
+                    const receipt = await tx.wait(confirmations);
                     if (onConfirmation) {
-                        onConfirmation(tx);
+                        onConfirmation(receipt);
                     }
+                    hideLoading();
                 }
 
                 showToast(`${successMessage} (${shortHash})`, 'success');
@@ -523,8 +548,14 @@ window.ZODIAC_UI = (function() {
             return tx;
 
         } catch (error) {
+            clearTimeout(timeoutId);
             hideLoading();
-            handleError(error, actionName);
+
+            if (error.message.includes('Transaction timeout')) {
+                showToast(`${actionName}超时，请检查交易状态后重试`, 'warning');
+            } else {
+                handleError(error, actionName);
+            }
             throw error;
         }
     }

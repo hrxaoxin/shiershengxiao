@@ -69,9 +69,11 @@ library BattleSkills {
         _setS(skills, 0, 1, 0, 145, 5, false); _setS(skills, 0, 1, 1, 95, 4, true);
         _setS(skills, 0, 2, 0, 165, 5, false); _setS(skills, 0, 2, 1, 85, 4, true);
         _setS(skills, 0, 3, 0, 130, 3, false); _setS(skills, 0, 3, 1, 80, 3, false);
-        _setS(skills, 0, 4, 0, 220, 6, true); _setS(skills, 0, 4, 1, 120, 5, true);
+        _setS(skills, 0, 4, 0, 185, 5, true); _setS(skills, 0, 4, 1, 100, 4, true);
         _setS(skills, 0, 5, 0, 115, 4, false); _setS(skills, 0, 5, 1, 125, 4, false);
         _copy6To11(skills, 0);
+        _setS(skills, 0, 7, 0, 145, 5, false); _setS(skills, 0, 7, 1, 115, 4, true);
+        _setS(skills, 0, 11, 0, 140, 5, false); _setS(skills, 0, 11, 1, 150, 4, true);
     }
     
     /**
@@ -83,9 +85,11 @@ library BattleSkills {
         _setS(skills, 1, 1, 0, 130, 5, false); _setS(skills, 1, 1, 1, 105, 4, true);
         _setS(skills, 1, 2, 0, 155, 5, false); _setS(skills, 1, 2, 1, 90, 4, true);
         _setS(skills, 1, 3, 0, 140, 3, false); _setS(skills, 1, 3, 1, 100, 3, false);
-        _setS(skills, 1, 4, 0, 210, 6, true); _setS(skills, 1, 4, 1, 115, 5, true);
+        _setS(skills, 1, 4, 0, 180, 5, true); _setS(skills, 1, 4, 1, 95, 4, true);
         _setS(skills, 1, 5, 0, 125, 4, false); _setS(skills, 1, 5, 1, 120, 4, false);
         _copy6To11(skills, 1);
+        _setS(skills, 1, 7, 0, 150, 5, false); _setS(skills, 1, 7, 1, 125, 4, true);
+        _setS(skills, 1, 11, 0, 145, 5, false); _setS(skills, 1, 11, 1, 140, 4, true);
     }
     
     /**
@@ -97,9 +101,11 @@ library BattleSkills {
         _setS(skills, 2, 1, 0, 140, 5, false); _setS(skills, 2, 1, 1, 110, 4, true);
         _setS(skills, 2, 2, 0, 160, 5, false); _setS(skills, 2, 2, 1, 85, 4, true);
         _setS(skills, 2, 3, 0, 145, 3, false); _setS(skills, 2, 3, 1, 95, 3, false);
-        _setS(skills, 2, 4, 0, 200, 6, true); _setS(skills, 2, 4, 1, 110, 5, true);
+        _setS(skills, 2, 4, 0, 170, 5, true); _setS(skills, 2, 4, 1, 95, 4, true);
         _setS(skills, 2, 5, 0, 120, 4, false); _setS(skills, 2, 5, 1, 115, 4, false);
         _copy6To11(skills, 2);
+        _setS(skills, 2, 7, 0, 145, 5, false); _setS(skills, 2, 7, 1, 130, 4, true);
+        _setS(skills, 2, 11, 0, 140, 5, false); _setS(skills, 2, 11, 1, 135, 4, true);
     }
     
     /**
@@ -111,9 +117,11 @@ library BattleSkills {
         _setS(skills, 3, 1, 0, 150, 5, false); _setS(skills, 3, 1, 1, 115, 4, true);
         _setS(skills, 3, 2, 0, 165, 5, false); _setS(skills, 3, 2, 1, 90, 4, true);
         _setS(skills, 3, 3, 0, 160, 3, false); _setS(skills, 3, 3, 1, 100, 3, false);
-        _setS(skills, 3, 4, 0, 245, 6, true); _setS(skills, 3, 4, 1, 140, 5, true);
+        _setS(skills, 3, 4, 0, 220, 5, true); _setS(skills, 3, 4, 1, 125, 4, true);
         _setS(skills, 3, 5, 0, 145, 4, false); _setS(skills, 3, 5, 1, 130, 4, false);
         _copy6To11(skills, 3);
+        _setS(skills, 3, 7, 0, 160, 5, false); _setS(skills, 3, 7, 1, 135, 4, true);
+        _setS(skills, 3, 11, 0, 155, 5, false); _setS(skills, 3, 11, 1, 150, 4, true);
     }
     
     /**
@@ -125,9 +133,11 @@ library BattleSkills {
         _setS(skills, 4, 1, 0, 155, 5, false); _setS(skills, 4, 1, 1, 110, 4, true);
         _setS(skills, 4, 2, 0, 170, 5, false); _setS(skills, 4, 2, 1, 100, 4, true);
         _setS(skills, 4, 3, 0, 165, 3, false); _setS(skills, 4, 3, 1, 105, 3, false);
-        _setS(skills, 4, 4, 0, 255, 6, true); _setS(skills, 4, 4, 1, 130, 5, true);
+        _setS(skills, 4, 4, 0, 230, 5, true); _setS(skills, 4, 4, 1, 120, 4, true);
         _setS(skills, 4, 5, 0, 150, 4, false); _setS(skills, 4, 5, 1, 135, 4, false);
         _copy6To11(skills, 4);
+        _setS(skills, 4, 7, 0, 165, 5, false); _setS(skills, 4, 7, 1, 130, 4, true);
+        _setS(skills, 4, 11, 0, 160, 5, false); _setS(skills, 4, 11, 1, 155, 4, true);
     }
     
     /**

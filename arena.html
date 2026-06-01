@@ -288,12 +288,16 @@
                         <div class="flex items-center justify-between mb-6">
                             <div>
                                 <h1 class="text-3xl font-bold text-white mb-2">🏆 竞技场战队配置</h1>
-                                <p class="text-gray-300">设置你的战队（6张NFT，战队NFT将被质押进合约）</p>
+                                <p class="text-gray-300">设置你的战队（6张NFT，战队NFT将被质押进合约，战斗期间不可转移）</p>
                             </div>
                             <div class="flex gap-3">
                                 <div class="text-center bg-white/5 rounded-lg px-4 py-2">
                                     <div class="text-white font-bold" id="remainingAttempts">0</div>
                                     <div class="text-gray-400 text-xs">剩余挑战次数</div>
+                                </div>
+                                <div class="text-center bg-blue-500/10 rounded-lg px-4 py-2">
+                                    <div class="text-blue-400 font-bold" id="cooldownTimer">--</div>
+                                    <div class="text-gray-400 text-xs">下次挑战</div>
                                 </div>
                                 <button id="rechargeBtn" class="btn-success text-white font-semibold py-2 px-4 rounded-lg transition-colors">
                                     <i class="fas fa-plus-circle mr-1"></i> 充值次数
@@ -334,10 +338,10 @@
                             </div>
                             <div class="mt-3 flex gap-2">
                                 <button id="saveBattleTeamBtn" class="flex-1 btn-primary text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                                    保存战队（质押NFT）
+                                    保存战队并质押NFT
                                 </button>
                                 <button id="clearBattleTeamBtn" class="btn-danger text-white font-semibold py-2 px-4 rounded-lg transition-colors">
-                                    清空战队（赎回NFT）
+                                    清空战队并解除质押
                                 </button>
                             </div>
                         </div>
@@ -360,6 +364,15 @@
                             <div class="text-yellow-400 text-2xl font-bold" id="rewardPoolAmount">--</div>
                             <div class="text-gray-400 text-sm mt-1">BNB 总奖励</div>
                             <div class="text-gray-500 text-xs mt-2" id="rewardRateInfo">奖励比例: --</div>
+                        </div>
+                        <div id="rewardRules" class="mt-4 p-3 bg-blue-500/10 rounded-lg">
+                            <div class="text-blue-400 text-xs font-medium mb-2">📖 奖励规则</div>
+                            <ul class="text-gray-400 text-xs space-y-1">
+                                <li>• 赛季结束时根据排名发放奖励</li>
+                                <li>• 排名越高，奖励越多</li>
+                                <li>• 奖励自动发放至钱包</li>
+                                <li>• 需完成至少1次挑战才能获得奖励</li>
+                            </ul>
                         </div>
                     </div>
 
@@ -446,6 +459,8 @@
                             <div>• 排名挑战：3局2胜换排名</div>
                             <div>• 每天5次挑战机会</div>
                             <div>• 可销毁代币充值次数</div>
+                            <div>• <span class="text-yellow-400">战队NFT需质押，战斗期间不可转移</span></div>
+                            <div>• 清空战队后NFT自动解除质押</div>
                         </div>
                     </div>
                 </div>
@@ -792,35 +807,81 @@
             setupEventListeners();
         }
 
+        let arenaUnsubscribeFunctions = [];
+
         async function setupEventListeners() {
             try {
-                await ZODIAC_WEB3.listenToEvent('arena', 'ScoreUpdated', async (event) => {
+                const unsubScoreUpdated = await ZODIAC_WEB3.listenToEvent('arena', 'ScoreUpdated', async (event) => {
                     console.log('Score updated:', event.returnValues);
                     await loadMyStats();
                     await loadLeaderboard();
                 });
-                
-                await ZODIAC_WEB3.listenToEvent('arena', 'ChallengeResult', async (event) => {
+                arenaUnsubscribeFunctions.push(unsubScoreUpdated);
+
+                const unsubChallengeResult = await ZODIAC_WEB3.listenToEvent('arena', 'ChallengeResult', async (event) => {
                     console.log('Challenge result:', event.returnValues);
                     await loadRemainingAttempts();
                     await loadMyStats();
                 });
-                
-                await ZODIAC_WEB3.listenToEvent('arena', 'RewardClaimed', async (event) => {
+                arenaUnsubscribeFunctions.push(unsubChallengeResult);
+
+                const unsubRewardClaimed = await ZODIAC_WEB3.listenToEvent('arena', 'RewardClaimed', async (event) => {
                     console.log('Reward claimed:', event.returnValues);
                     await loadRewards();
                 });
-                
-                await ZODIAC_WEB3.listenToEvent('arena', 'SeasonStarted', async (event) => {
+                arenaUnsubscribeFunctions.push(unsubRewardClaimed);
+
+                const unsubSeasonStarted = await ZODIAC_WEB3.listenToEvent('arena', 'SeasonStarted', async (event) => {
                     console.log('New season started:', event.returnValues);
                     await loadLeaderboard();
                     await loadMyStats();
                 });
-                
+                arenaUnsubscribeFunctions.push(unsubSeasonStarted);
+
+                const unsubNFTsStaked = await ZODIAC_WEB3.listenToEvent('arena', 'NFTsStaked', async (event) => {
+                    console.log('NFTs staked:', event.returnValues);
+                    await loadMyNfts();
+                    await loadMyTeam();
+                });
+                arenaUnsubscribeFunctions.push(unsubNFTsStaked);
+
+                const unsubNFTsUnstaked = await ZODIAC_WEB3.listenToEvent('arena', 'NFTsUnstaked', async (event) => {
+                    console.log('NFTs unstaked:', event.returnValues);
+                    await loadMyNfts();
+                    await loadMyTeam();
+                });
+                arenaUnsubscribeFunctions.push(unsubNFTsUnstaked);
+
+                const unsubBattleTeamSet = await ZODIAC_WEB3.listenToEvent('arena', 'BattleTeamSet', async (event) => {
+                    console.log('Battle team set:', event.returnValues);
+                    await loadMyTeam();
+                });
+                arenaUnsubscribeFunctions.push(unsubBattleTeamSet);
+
+                const unsubBattleTeamCleared = await ZODIAC_WEB3.listenToEvent('arena', 'BattleTeamCleared', async (event) => {
+                    console.log('Battle team cleared:', event.returnValues);
+                    await loadMyTeam();
+                });
+                arenaUnsubscribeFunctions.push(unsubBattleTeamCleared);
+
                 console.log('Arena event listeners setup complete');
             } catch (error) {
                 console.error('Failed to setup event listeners:', error);
             }
+        }
+
+        function cleanupEventListeners() {
+            arenaUnsubscribeFunctions.forEach(async (unsub) => {
+                if (typeof unsub === 'function') {
+                    unsub();
+                } else if (unsub && typeof unsub.then === 'function') {
+                    const fn = await unsub;
+                    if (typeof fn === 'function') {
+                        fn();
+                    }
+                }
+            });
+            arenaUnsubscribeFunctions = [];
         }
 
         function updateCurrentModeDisplay(mode) {
@@ -891,6 +952,9 @@
                         isAoe: skillData.isAoe || skillData[5]
                     };
                     
+                    const stakedOwner = await arenaContract.methods.nftStakedOwner(tokenId).call();
+                    const isStaked = stakedOwner !== '0x0000000000000000000000000000000000000000';
+                    
                     myNfts.push({
                         tokenId: tokenId,
                         tokenType: tokenType,
@@ -903,7 +967,8 @@
                         name: name,
                         imagePath: imagePath,
                         skill: skill,
-                        inBattleTeam: false
+                        inBattleTeam: false,
+                        isStaked: isStaked
                     });
                 }
             } catch (error) {
@@ -1008,18 +1073,22 @@
             
             nftList.innerHTML = sortedNfts.map((nft, index) => {
                 const isInTeam = team.some(t => t && t.tokenId === nft.tokenId && team.indexOf(t) !== selectedSlot.index);
-                const isDisabled = isInTeam;
+                const isDisabled = isInTeam || nft.isStaked;
                 const isCurrent = team[selectedSlot.index] && team[selectedSlot.index].tokenId === nft.tokenId;
                 
                 return `
                     <div class="nft-card bg-white/5 rounded-lg p-3 border-2 cursor-pointer transition-all ${isDisabled ? 'opacity-50 cursor-not-allowed border-gray-600 grayscale' : isCurrent ? 'border-green-500' : 'hover:border-blue-500'}" 
                          onclick="${isDisabled ? '' : `selectNftForSlot(${index})`}">
                         <div class="flex flex-col items-center text-center">
-                            <img src="${nft.imagePath}" alt="${nft.name}" class="w-12 h-12 rounded-lg object-cover mb-2 ${isDisabled ? 'grayscale' : ''}">
+                            <div class="relative">
+                                <img src="${nft.imagePath}" alt="${nft.name}" class="w-12 h-12 rounded-lg object-cover mb-2 ${isDisabled ? 'grayscale' : ''}">
+                                ${nft.isStaked ? '<div class="absolute -top-1 -right-1 w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center text-xs">🔒</div>' : ''}
+                            </div>
                             <div class="text-white text-sm font-medium">${nft.name}</div>
                             <div class="text-gray-400 text-xs">Lv.${nft.level} ${ELEMENT_EMOJIS[nft.attr]}</div>
                             ${isCurrent ? '<div class="text-xs text-green-400 mt-1">✓ 当前选中</div>' : ''}
                             ${isInTeam ? '<div class="text-xs text-red-400 mt-1">已在队伍中</div>' : ''}
+                            ${nft.isStaked ? '<div class="text-xs text-yellow-400 mt-1">已质押</div>' : ''}
                         </div>
                     </div>
                 `;
@@ -1087,28 +1156,73 @@
             }
         }
 
-        async function clearBattleTeam() {
+        async function stakeNftForArena() {
+            const selectedNfts = battleTeam.filter(n => n).map(n => n.tokenId);
+            if (selectedNfts.length === 0) {
+                ZODIAC_UI.showToast('请先选择要质押的NFT', 'warning');
+                return;
+            }
+            
             try {
-                ZODIAC_UI.showLoading('正在赎回NFT...');
-                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'clearBattleTeam', [], accounts[0], 'arena');
-                await arenaContract.methods.clearBattleTeam().send({ from: accounts[0], gas: gas });
+                ZODIAC_UI.showLoading('正在质押NFT...');
+                await ZODIAC_WEB3.stakeArenaNFTs(selectedNfts);
                 ZODIAC_UI.hideLoading();
-                battleTeam.forEach(nft => {
-                    if (nft) {
-                        const myNft = myNfts.find(n => n.tokenId === nft.tokenId);
-                        if (myNft) myNft.inBattleTeam = false;
-                    }
-                });
-                battleTeam = [];
-                renderTeamSlots();
-                updateSaveButtons();
-                updateChallengeBtn();
-                updateBattleTeamDisplay();
-                ZODIAC_UI.showToast('战队已清空，NFT已赎回！', 'success');
+                ZODIAC_UI.showToast('NFT质押成功！', 'success');
+                await loadMyTeam();
             } catch (error) {
                 ZODIAC_UI.hideLoading();
-                console.error('清空战队失败:', error);
-                ZODIAC_UI.handleError(error, '清空战队');
+                console.error('质押NFT失败:', error);
+                ZODIAC_UI.handleError(error, '质押NFT');
+            }
+        }
+
+        async function unstakeNftFromArena(tokenId) {
+            try {
+                ZODIAC_UI.showLoading('正在解除质押...');
+                await ZODIAC_WEB3.unstakeArenaNFTs([tokenId]);
+                ZODIAC_UI.hideLoading();
+                ZODIAC_UI.showToast('NFT解除质押成功！', 'success');
+                await loadMyTeam();
+            } catch (error) {
+                ZODIAC_UI.hideLoading();
+                console.error('解除质押失败:', error);
+                ZODIAC_UI.handleError(error, '解除质押');
+            }
+        }
+
+        async function clearBattleTeam() {
+            try {
+                ZODIAC_UI.showLoading('正在获取当前战队...');
+                const playerRecord = await arenaContract.methods.players(accounts[0]).call();
+                
+                if (!playerRecord.hasTeam) {
+                    ZODIAC_UI.hideLoading();
+                    ZODIAC_UI.showToast('您还没有设置战队', 'warning');
+                    return;
+                }
+                
+                const currentTeam = await arenaContract.methods.getPlayerBattleTeam(accounts[0]).call();
+                const tokenIds = currentTeam.filter(id => id !== '0' && id !== 0);
+                
+                if (tokenIds.length === 0) {
+                    ZODIAC_UI.hideLoading();
+                    ZODIAC_UI.showToast('战队为空', 'warning');
+                    return;
+                }
+                
+                ZODIAC_UI.showLoading('正在清除战队...');
+                await ZODIAC_WEB3.clearArenaTeam();
+                
+                ZODIAC_UI.showLoading('正在解除NFT质押...');
+                await ZODIAC_WEB3.unstakeArenaNFTs(tokenIds);
+                
+                ZODIAC_UI.hideLoading();
+                ZODIAC_UI.showToast('战队已清除，NFT已解除质押', 'success');
+                await loadMyTeam();
+            } catch (error) {
+                ZODIAC_UI.hideLoading();
+                console.error('清除战队失败:', error);
+                ZODIAC_UI.handleError(error, '清除战队');
             }
         }
 
@@ -1116,22 +1230,42 @@
             if (battleTeam.filter(n => n).length !== TEAM_SIZE) return;
             
             try {
-                const tokenIds = battleTeam.map(nft => nft.tokenId);
-                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'setBattleTeam', [tokenIds], accounts[0], 'arena');
+                const validNfts = battleTeam.filter(nft => nft && nft.tokenId > 0);
+                if (validNfts.length !== 6) {
+                    ZODIAC_UI.showToast('请选择6个NFT组成战队', 'warning');
+                    return;
+                }
                 
-                await ZODIAC_UI.handleTransaction(
-                    arenaContract.methods.setBattleTeam(tokenIds).send({ from: accounts[0], gas: gas }),
-                    {
-                        actionName: '设置战队',
-                        loadingMessage: '正在设置战队...',
-                        successMessage: '战队设置成功！NFT已质押进合约',
-                        showConfirmation: true,
-                        onConfirmation: () => {
-                            updateBattleTeamDisplay();
-                        }
-                    }
-                );
+                const playerRecord = await arenaContract.methods.players(accounts[0]).call();
+                if (playerRecord.hasTeam) {
+                    ZODIAC_UI.showToast('您已经设置了战队，请先清除后再重新设置', 'warning');
+                    return;
+                }
+                
+                const tokenIds = battleTeam.map(nft => nft.tokenId);
+                
+                ZODIAC_UI.showLoading('正在检查NFT授权状态...');
+                
+                const isApproved = await nftContract.methods.isApprovedForAll(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena).call();
+                
+                if (!isApproved) {
+                    ZODIAC_UI.showLoading('正在授权NFT...');
+                    await nftContract.methods.setApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena, true).send({ from: accounts[0] });
+                }
+                
+                ZODIAC_UI.showLoading('正在质押NFT...');
+                await ZODIAC_WEB3.stakeArenaNFTs(tokenIds);
+                
+                ZODIAC_UI.showLoading('正在设置战队...');
+                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'setBattleTeam', [tokenIds], accounts[0]);
+                await arenaContract.methods.setBattleTeam(tokenIds).send({ from: accounts[0], gas: gas });
+                
+                ZODIAC_UI.hideLoading();
+                ZODIAC_UI.showToast('战队设置成功！NFT已质押进合约', 'success');
+                updateBattleTeamDisplay();
+                await loadMyTeam();
             } catch (error) {
+                ZODIAC_UI.hideLoading();
                 console.error('设置战队失败:', error);
                 ZODIAC_UI.handleError(error, '设置战队');
             }
@@ -1139,10 +1273,11 @@
 
         async function rechargeAttempts() {
             try {
-                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'rechargeChallengeAttempts', [], accounts[0], 'arena');
+                const rechargeCost = await arenaContract.methods.rechargeCost().call();
+                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'rechargeChallengeAttempts', [], accounts[0]);
                 
                 await ZODIAC_UI.handleTransaction(
-                    arenaContract.methods.rechargeChallengeAttempts().send({ from: accounts[0], gas: gas }),
+                    arenaContract.methods.rechargeChallengeAttempts().send({ from: accounts[0], gas: gas, value: rechargeCost }),
                     {
                         actionName: '充值挑战次数',
                         loadingMessage: '正在充值...',
@@ -1339,17 +1474,16 @@
                         unclaimedDiv.innerHTML = '<div class="text-center text-gray-500 py-2">赛季进行中，结束后可领取</div>';
                     }
                 } else {
-                    // 赛季已结束：检查是否有可领取的奖励
+                    // 赛季已结束：检查是否已领取奖励
                     const claimed = await arenaContract.methods.seasonRewardsClaimed(accounts[0]).call();
-                    const claimedAmount = web3.utils.fromWei(claimed, 'ether');
 
-                    if (parseFloat(claimedAmount) > 0) {
+                    if (claimed) {
                         // 已领取
                         unclaimedDiv.innerHTML = '<div class="text-center text-gray-500 py-2">暂无待领取奖励</div>';
                         claimedDiv.innerHTML = `
                             <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
                                 <div class="text-green-400 text-sm font-medium">已领取</div>
-                                <div class="text-gray-300 text-xs mt-1">赛季奖励: ${claimedAmount} Token</div>
+                                <div class="text-gray-300 text-xs mt-1">赛季奖励已发放</div>
                             </div>
                         `;
                     } else {
@@ -1390,23 +1524,9 @@
 
         async function claimSeasonRewardHandler() {
             try {
-                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'claimSeasonReward', [], accounts[0], 'arena');
-                
-                await ZODIAC_UI.handleTransaction(
-                    arenaContract.methods.claimSeasonReward().send({ from: accounts[0], gas: gas }),
-                    {
-                        actionName: '领取赛季奖励',
-                        loadingMessage: '正在领取奖励...',
-                        successMessage: '奖励领取成功！',
-                        showConfirmation: true,
-                        onHash: (hash, shortHash) => {
-                            console.log('Transaction hash:', shortHash);
-                        },
-                        onConfirmation: () => {
-                            loadRewards();
-                        }
-                    }
-                );
+                await ZODIAC_WEB3.claimSeasonReward();
+                ZODIAC_UI.showToast('奖励领取成功！', 'success');
+                loadRewards();
             } catch (error) {
                 console.error('领取奖励失败:', error);
                 ZODIAC_UI.handleError(error, '领取奖励');
@@ -1421,6 +1541,15 @@
                 const topPlayers = [];
                 let players = [];
                 let scores = [];
+                
+                // 获取当前赛季ID
+                let currentSeasonId;
+                try {
+                    currentSeasonId = await arenaContract.methods.currentSeasonId().call();
+                } catch (e) {
+                    console.log('获取赛季ID失败:', e);
+                    currentSeasonId = 1;
+                }
                 
                 try {
                     const result = await arenaContract.methods.getTopPlayers(currentSeasonId, 20).call();
@@ -1776,26 +1905,27 @@
                     return;
                 }
 
+                for (const tokenId of playerTeam) {
+                    const stakedOwner = await arenaContract.methods.nftStakedOwner(tokenId).call();
+                    if (stakedOwner.toLowerCase() !== accounts[0].toLowerCase()) {
+                        ZODIAC_UI.showToast(`NFT ${tokenId} 未质押或不属于您`, 'warning');
+                        ZODIAC_UI.hideLoading();
+                        return;
+                    }
+                }
+
                 let victory = null;
                 let challengeTx = null;
                 if (selectedOpponent.isMock) {
                     const mockIndex = selectedOpponent.mockIndex !== undefined ? selectedOpponent.mockIndex : 0;
-                    const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'challengeMockPlayer', [playerTeam, mockIndex], accounts[0], 'arena');
-                    challengeTx = await arenaContract.methods.challengeMockPlayer(playerTeam, mockIndex).send({
-                        from: accounts[0],
-                        gas: gas
-                    });
+                    challengeTx = await ZODIAC_WEB3.challengeMockPlayer(playerTeam, mockIndex);
                     victory = challengeTx.events?.ChallengeResult?.returnValues?.isVictory;
                     if (victory === undefined) {
                         victory = selectedOpponent.points < getPlayerPoints();
                     }
                 } else {
                     const defenderAddress = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
-                    const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'challengeRealPlayer', [defenderAddress, playerTeam], accounts[0], 'arena');
-                    challengeTx = await arenaContract.methods.challengeRealPlayer(defenderAddress, playerTeam).send({
-                        from: accounts[0],
-                        gas: gas
-                    });
+                    challengeTx = await ZODIAC_WEB3.challengeRealPlayer(playerTeam, defenderAddress);
                     victory = challengeTx.events?.ChallengeResult?.returnValues?.isVictory;
                     if (victory === undefined) {
                         victory = selectedOpponent.points < getPlayerPoints();
@@ -2451,6 +2581,7 @@
         function cleanup() {
             battleDomCache = {};
             hpBarCache = {};
+            cleanupEventListeners();
         }
 
         document.addEventListener('DOMContentLoaded', function() {

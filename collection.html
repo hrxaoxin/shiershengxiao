@@ -437,12 +437,15 @@
 
         async function loadProgress() {
             const progress = { water: 0, wind: 0, fire: 0, dark: 0, light: 0 };
+            const seenTypes = new Set();
             for (const token of userTokens) {
+                if (seenTypes.has(token.typeId)) continue;
+                seenTypes.add(token.typeId);
                 const typeId = token.typeId;
                 const attrIndex = Math.floor(typeId / 24);
                 const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
                 if (attrIndex >= 0 && attrIndex < 5) {
-                    progress[attrs[attrIndex]] += token.count;
+                    progress[attrs[attrIndex]] += 1;
                 }
             }
             document.getElementById('waterProgress').textContent = progress.water;

@@ -419,8 +419,11 @@
             const selectedNftInfo = document.getElementById('selectedNftInfo');
             const upgradeSection = document.getElementById('upgradeSection');
 
+            const requiredTokens = level < 5 ? getRequiredTokens(level) : 0;
+            const requiredNFTs = level < 5 ? parseInt(level, 10) : 0;
+            
             selectedNftInfo.innerHTML = `
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-4 mb-4">
                     <img src="${image}" alt="${name}" class="w-20 h-20 object-contain">
                     <div>
                         <h4 class="text-lg font-bold">${name}</h4>
@@ -429,6 +432,21 @@
                         ${level < 5 ? `<p class="text-green-600 font-medium">可升级到 ${getStars(level + 1)}</p>` : `<p class="text-red-600 font-medium">已达到最高等级</p>`}
                     </div>
                 </div>
+                ${level < 5 ? `
+                <div id="upgradeCostPreview" class="p-4 bg-blue-50 rounded-lg">
+                    <div class="text-sm text-blue-600 font-medium mb-2">📈 升级费用预览</div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <span class="text-xs text-gray-500">使用NFT升级</span>
+                            <p class="text-lg font-bold text-gray-800">${requiredNFTs} 张相同类型NFT</p>
+                        </div>
+                        <div>
+                            <span class="text-xs text-gray-500">使用代币升级</span>
+                            <p class="text-lg font-bold text-gray-800">${requiredTokens.toLocaleString()} Token</p>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
             `;
 
             const upgradeWithNftBtn = document.getElementById('upgradeWithNftBtn');
@@ -472,8 +490,7 @@
 
             try {
                 ZODIAC_UI.showLoading('升级中...');
-                const upgradeGas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithNFT', [selectedNft.id], account);
-                const result = await nftUpdateContract.methods.upgradeWithNFT(selectedNft.id).send({ from: account, gas: upgradeGas });
+                const result = await ZODIAC_WEB3.upgradeWithNFT(selectedNft.id);
                 ZODIAC_UI.hideLoading();
                 await ZODIAC_UI.showSuccessModal('升级成功！', `NFT ID ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 级`);
                 await loadUserNFTs();
@@ -506,12 +523,10 @@
                 const requiredTokensWei = web3.utils.toWei(requiredTokens.toString(), 'ether');
                 const allowance = await tokenContract.methods.allowance(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
                 if (BigInt(allowance) < BigInt(requiredTokensWei)) {
-                    const approveGas = await ZODIAC_WEB3.estimateGas(tokenContract, 'approve', [ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, requiredTokensWei], account);
-                    await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, requiredTokensWei).send({ from: account, gas: approveGas });
+                    await ZODIAC_WEB3.approveToken(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, requiredTokensWei);
                 }
 
-                const upgradeGas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithToken', [selectedNft.id], account);
-                const result = await nftUpdateContract.methods.upgradeWithToken(selectedNft.id).send({ from: account, gas: upgradeGas });
+                const result = await ZODIAC_WEB3.upgradeWithToken(selectedNft.id);
                 ZODIAC_UI.hideLoading();
                 await ZODIAC_UI.showSuccessModal('升级成功！', `NFT ID ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 级`);
                 await loadUserNFTs();
@@ -540,8 +555,7 @@
 
             try {
                 ZODIAC_UI.showLoading('升级中...');
-                const upgradeGas = await ZODIAC_WEB3.estimateGas(nftUpdateContract, 'upgradeWithUSDValue', [selectedNft.id], account);
-                const result = await nftUpdateContract.methods.upgradeWithUSDValue(selectedNft.id).send({ from: account, gas: upgradeGas });
+                const result = await ZODIAC_WEB3.upgradeWithUSDValue(selectedNft.id);
                 ZODIAC_UI.hideLoading();
                 await ZODIAC_UI.showSuccessModal('升级成功！', `NFT ID ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 级`);
                 await loadUserNFTs();
