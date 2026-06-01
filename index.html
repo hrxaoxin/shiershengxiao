@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>十二生肖 - Twelve Zodiacs Collection</title>
+    <title>十二生肖NFT - 首页</title>
     <meta name="description" content="使用代币铸造生肖NFT，收集十二生肖享受分红">
     <link rel="icon" href="images/fu-cards/shuishu_1.png" type="image/png">
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,8 +17,7 @@
     <script src="ui-utils.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
-        @import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&display=swap');
-
+        
         body {
             font-family: 'Noto Sans SC', sans-serif;
             background-color: #f5f5f5;
@@ -65,17 +64,13 @@
 
         .hero-section {
             background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            padding: 60px 20px;
             border-radius: 20px;
             color: white;
             box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3);
             animation: heroFadeIn 1s ease-out;
             position: relative;
             overflow: hidden;
-        }
-
-        @keyframes heroFadeIn {
-            from { transform: translateY(50px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
         }
 
         .hero-section::before {
@@ -89,25 +84,28 @@
             animation: heroRotate 20s linear infinite;
         }
 
+        @keyframes heroFadeIn {
+            from { transform: translateY(50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
         @keyframes heroRotate {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
 
         .btn-primary {
-            background-color: #3b82f6;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
             color: white;
+            border: none;
+            padding: 12px 32px;
             border-radius: 8px;
-            padding: 12px 24px;
-            font-weight: 500;
+            font-weight: 600;
+            cursor: pointer;
             transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-            z-index: 1;
         }
 
         .btn-primary:hover {
-            background-color: #2563eb;
             transform: translateY(-3px);
             box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
         }
@@ -117,13 +115,14 @@
             color: #3b82f6;
             border: 1px solid #3b82f6;
             border-radius: 8px;
-            padding: 12px 24px;
-            font-weight: 500;
+            padding: 12px 32px;
+            font-weight: 600;
+            cursor: pointer;
             transition: all 0.3s ease;
         }
 
         .btn-secondary:hover {
-            background-color: #f8f9fa;
+            background-color: #f0f9ff;
             transform: translateY(-3px);
             box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
         }
@@ -131,11 +130,18 @@
         .stats-card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 16px;
             padding: 20px;
+            text-align: center;
             transition: all 0.3s ease;
-            border: 1px solid rgba(255, 255, 255, 0.2);
             animation: statsCardFadeIn 1.2s ease-out;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+            border-color: rgba(255, 255, 255, 0.5);
         }
 
         @keyframes statsCardFadeIn {
@@ -143,10 +149,19 @@
             to { transform: scale(1); opacity: 1; }
         }
 
-        .stats-card:hover {
-            transform: translateY(-8px) scale(1.02);
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
-            border-color: rgba(255, 255, 255, 0.5);
+        .feature-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
         }
 
         .zodiac-card {
@@ -235,66 +250,6 @@
             to { opacity: 1; }
         }
 
-        .loading-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.6);
-            z-index: 9999;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .loading-overlay.loading-active {
-            display: flex;
-        }
-
-        .loading-content {
-            text-align: center;
-        }
-
-        .loading-spinner {
-            width: 50px;
-            height: 50px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-top-color: #3b82f6;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 16px;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .loading-text {
-            color: white;
-            font-size: 16px;
-        }
-
-        .toast {
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            padding: 12px 24px;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            z-index: 9998;
-            opacity: 0;
-            transition: all 0.3s ease;
-        }
-
-        .toast-active {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-
-        .toast-success { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
-        .toast-error { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
-        .toast-info { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
-
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 10px; }
@@ -307,10 +262,13 @@
         <header class="container mx-auto px-4 py-6 title-section">
             <div class="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div class="flex items-center">
-                    <div class="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center mr-3">
-                        <span class="text-white text-2xl font-bold">生肖</span>
+                    <div class="w-12 h-12 rounded-full bg-blue-500 flex items-center justify-center mr-4">
+                        <span class="text-white text-2xl font-bold">🐾</span>
                     </div>
-                    <h1 class="text-2xl font-bold text-gray-800">十二生肖</h1>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">十二生肖</h1>
+                        <p class="text-sm text-gray-500">Twelve Zodiacs Collection</p>
+                    </div>
                 </div>
                 <div class="flex items-center gap-3">
                     <button id="menuBtn" class="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors">
@@ -324,51 +282,86 @@
         <div id="desktopSidebarContainer"></div>
         <div id="mobileNavbarContainer"></div>
         <div id="mobileMenuContainer"></div>
-        <main class="container mx-auto px-4 pt-4 pb-36 md:pt-0 md:pb-0 md:ml-72">
-            <div class="hero-section p-8 mb-12">
-                <h2 class="text-3xl font-bold mb-4">使用代币铸造生肖NFT，收集十二生肖享受分红</h2>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                    <div class="stats-card">
-                        <div class="text-blue-300 text-sm mb-1">总分红池</div>
-                        <div class="text-black font-bold text-2xl" id="totalPool">0.0000</div>
-                        <div class="text-black/60 text-xs">代币</div>
-                    </div>
-                    <div class="stats-card">
-                        <div class="text-green-300 text-sm mb-1">已领取分红</div>
-                        <div class="text-black font-bold text-2xl" id="distributed">0.0000</div>
-                        <div class="text-black/60 text-xs">代币</div>
-                    </div>
-                    <div class="stats-card">
-                        <div class="text-yellow-300 text-sm mb-1">未领取分红</div>
-                        <div class="text-black font-bold text-2xl" id="unclaimedDividend">0.0000</div>
-                        <div class="text-black/60 text-xs">代币</div>
-                    </div>
-                    <div class="stats-card">
-                        <div class="text-purple-300 text-sm mb-1">持有者</div>
-                        <div class="text-black font-bold text-2xl" id="holders">0</div>
-                        <div class="text-black/60 text-xs">生肖NFT</div>
-                    </div>
-                </div>
-                <div class="text-center text-black/70 text-sm">
-                    💡 总分红池 = 已领取分红 + 未领取分红 · 按持有数量比例分配
-                </div>
-            </div>
 
-            <div class="flex flex-col items-center gap-4 mb-12 button-section">
-                <p class="text-xl text-black/80 text-center">点击下方按钮开始你的集生肖之旅</p>
+        <main class="container mx-auto px-4 pt-4 pb-36 md:pt-0 md:pb-0 md:ml-72">
+            <section class="hero-section mb-12">
+                <div class="text-center mb-8 relative z-10">
+                    <h1 class="text-4xl md:text-5xl font-bold mb-4">十二生肖NFT</h1>
+                    <p class="text-xl text-white/90">探索东方神秘力量，开启你的生肖传奇</p>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 relative z-10">
+                    <div class="stats-card">
+                        <div class="text-3xl font-bold text-yellow-300" id="totalPool">--</div>
+                        <div class="text-sm text-white/80 mt-2">总分红池</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="text-3xl font-bold text-green-300" id="holders">--</div>
+                        <div class="text-sm text-white/80 mt-2">生肖NFT</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="text-3xl font-bold text-blue-300" id="distributed">--</div>
+                        <div class="text-sm text-white/80 mt-2">已领取</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="text-3xl font-bold text-purple-300" id="unclaimedDividend">--</div>
+                        <div class="text-sm text-white/80 mt-2">待领取</div>
+                    </div>
+                </div>
+                
+                <div class="text-center relative z-10">
+                    <button class="btn-primary mr-4" onclick="window.location.href='mint.html'">立即铸造</button>
+                    <button class="btn-secondary" onclick="window.location.href='collection.html'">我的生肖</button>
+                </div>
+            </section>
+
+            <section class="py-8 px-4 mb-12">
+                <h2 class="text-2xl font-bold text-center mb-8 text-gray-800">游戏特色</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="feature-card" onclick="window.location.href='arena.html'">
+                        <div class="text-5xl mb-4">⚔️</div>
+                        <h3 class="text-lg font-semibold mb-2 text-gray-800">竞技场</h3>
+                        <p class="text-gray-600 text-sm">组建你的战队，挑战其他玩家，争夺赛季冠军</p>
+                    </div>
+                    <div class="feature-card" onclick="window.location.href='staking.html'">
+                        <div class="text-5xl mb-4">💰</div>
+                        <h3 class="text-lg font-semibold mb-2 text-gray-800">质押挖矿</h3>
+                        <p class="text-gray-600 text-sm">质押NFT和代币，获取丰厚的被动收益</p>
+                    </div>
+                    <div class="feature-card" onclick="window.location.href='breeding.html'">
+                        <div class="text-5xl mb-4">🐾</div>
+                        <h3 class="text-lg font-semibold mb-2 text-gray-800">孕育系统</h3>
+                        <p class="text-gray-600 text-sm">让你的生肖NFT孕育新一代，传承强大血脉</p>
+                    </div>
+                    <div class="feature-card" onclick="window.location.href='trading.html'">
+                        <div class="text-5xl mb-4">📈</div>
+                        <h3 class="text-lg font-semibold mb-2 text-gray-800">NFT交易</h3>
+                        <p class="text-gray-600 text-sm">自由买卖生肖NFT，发现珍稀藏品</p>
+                    </div>
+                    <div class="feature-card" onclick="window.location.href='upgrade.html'">
+                        <div class="text-5xl mb-4">⭐</div>
+                        <h3 class="text-lg font-semibold mb-2 text-gray-800">NFT升阶</h3>
+                        <p class="text-gray-600 text-sm">提升NFT等级，解锁更强属性和技能</p>
+                    </div>
+                    <div class="feature-card" onclick="window.location.href='rewards.html'">
+                        <div class="text-5xl mb-4">🏆</div>
+                        <h3 class="text-lg font-semibold mb-2 text-gray-800">分红奖励</h3>
+                        <p class="text-gray-600 text-sm">持有NFT即可参与分红，享受平台收益</p>
+                    </div>
+                </div>
+            </section>
+
+            <div class="flex flex-col items-center gap-4 mb-12">
+                <p class="text-xl text-gray-800 text-center">点击下方按钮开始你的集生肖之旅</p>
                 <div class="flex flex-col sm:flex-row gap-4 w-full max-w-md">
                     <button class="btn-primary w-full" onclick="window.location.href='mint.html'">开始铸造生肖</button>
-                    <button class="btn-secondary w-full" onclick="window.location.href='collection.html'">我的生肖</button>
-                </div>
-                <div class="flex flex-col sm:flex-row gap-4 w-full max-w-md">
                     <button class="btn-secondary w-full" onclick="window.location.href='rewards.html'">税收奖励</button>
-                    <button class="btn-secondary w-full" onclick="window.location.href='trading.html'">NFT交易</button>
                 </div>
             </div>
 
-            <div class="mb-8">
-                <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">选择属性</h3>
-                <div class="flex flex-wrap justify-center gap-3">
+            <div class="mb-12">
+                <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">选择属性</h3>
+                <div class="flex flex-wrap justify-center gap-3 mb-8">
                     <button class="attribute-tab tab-water active" onclick="switchAttribute('water')">
                         💧 水
                     </button>
@@ -385,26 +378,24 @@
                         ☀️ 光
                     </button>
                 </div>
+                <div id="zodiacGrid" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"></div>
             </div>
 
-            <div id="zodiacGrid" class="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-16">
-            </div>
-
-            <div class="grid md:grid-cols-2 gap-8 mb-16">
-                <div class="bg-gradient-to-br from-blue-400 to-blue-600 p-8 rounded-2xl text-center">
+            <div class="grid md:grid-cols-2 gap-8 mb-12">
+                <div class="bg-gradient-to-br from-blue-400 to-blue-600 p-8 rounded-2xl text-center shadow-lg">
                     <div class="text-5xl mb-4">🃏</div>
                     <h3 class="text-2xl font-bold text-white mb-3">铸造生肖</h3>
-                    <p class="text-white/80">使用代币铸造随机生肖NFT</p>
+                    <p class="text-white/90">使用代币铸造随机生肖NFT</p>
                 </div>
-                <div class="bg-gradient-to-br from-green-400 to-green-600 p-8 rounded-2xl text-center">
+                <div class="bg-gradient-to-br from-green-400 to-green-600 p-8 rounded-2xl text-center shadow-lg">
                     <div class="text-5xl mb-4">🏆</div>
                     <h3 class="text-2xl font-bold text-white mb-3">税收分红</h3>
-                    <p class="text-white/80">持有生肖NFT享受对应比例税收分红</p>
+                    <p class="text-white/90">持有生肖NFT享受对应比例税收分红</p>
                 </div>
             </div>
 
-            <div class="bg-gradient-to-br from-blue-400 to-blue-600 p-8 rounded-2xl mb-16">
-                <h3 class="text-3xl font-bold text-white mb-6 text-center">🎯 税收分红机制</h3>
+            <div class="bg-gradient-to-br from-blue-400 to-blue-600 p-8 rounded-2xl mb-12 shadow-lg">
+                <h3 class="text-3xl font-bold text-white mb-8 text-center">🎯 税收分红机制</h3>
                 <div class="grid md:grid-cols-2 gap-6">
                     <div class="bg-white/10 p-6 rounded-xl backdrop-blur-md">
                         <h4 class="text-xl font-bold text-blue-200 mb-3">3% 代币交易税</h4>
@@ -440,9 +431,8 @@
                 </div>
             </div>
 
-            <div class="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-2xl mb-16 border border-slate-700/50 shadow-xl">
+            <div class="bg-gradient-to-br from-slate-800 to-slate-900 p-8 rounded-2xl mb-12 border border-slate-700/50 shadow-xl">
                 <h3 class="text-2xl font-bold text-white mb-8 text-center">属性克制</h3>
-
                 <div class="grid md:grid-cols-2 gap-8">
                     <div class="flex flex-col items-center">
                         <div class="flex items-center gap-3 mb-4">
@@ -451,64 +441,55 @@
                             <span class="w-3 h-3 rounded-full bg-green-500"></span>
                         </div>
                         <p class="text-slate-400 text-sm mb-6">火 · 水 · 风 循环</p>
-
                         <div class="flex flex-wrap items-center justify-center gap-2">
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-2xl shadow-lg shadow-orange-500/30 ring-2 ring-orange-400/50">
-                                    &#128293;
+                                    🔥
                                 </div>
                                 <span class="mt-2 text-orange-400 font-medium">火</span>
                                 <span class="text-xs text-slate-500">克风</span>
                             </div>
-
                             <div class="flex flex-col items-center px-2">
                                 <span class="text-orange-400/60">→</span>
                                 <span class="text-xs text-slate-500 mt-1">风</span>
                             </div>
-
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center text-2xl shadow-lg shadow-green-500/30 ring-2 ring-green-400/50">
-                                    &#127788;
+                                    🌬️
                                 </div>
                                 <span class="mt-2 text-green-400 font-medium">风</span>
                                 <span class="text-xs text-slate-500">克水</span>
                             </div>
-
                             <div class="flex flex-col items-center px-2">
                                 <span class="text-orange-400/60">→</span>
                                 <span class="text-xs text-slate-500 mt-1">水</span>
                             </div>
-
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-2xl shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400/50">
-                                    &#128167;
+                                    💧
                                 </div>
                                 <span class="mt-2 text-cyan-400 font-medium">水</span>
                                 <span class="text-xs text-slate-500">克火</span>
                             </div>
                         </div>
-
                         <div class="mt-6 px-4 py-2 bg-slate-700/50 rounded-full">
                             <p class="text-slate-300 text-sm">火 → 风 → 水 → 火</p>
                         </div>
                     </div>
-
                     <div class="flex flex-col items-center">
                         <div class="flex items-center gap-3 mb-4">
                             <span class="w-3 h-3 rounded-full bg-yellow-400"></span>
                             <span class="w-3 h-3 rounded-full bg-purple-600"></span>
                         </div>
                         <p class="text-slate-400 text-sm mb-6">光 · 暗 对立</p>
-
                         <div class="flex items-center gap-6">
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-300 to-amber-500 flex items-center justify-center text-2xl shadow-lg shadow-yellow-500/30 ring-2 ring-yellow-400/50">
-                                    &#9728;
+                                    ☀️
                                 </div>
                                 <span class="mt-2 text-yellow-400 font-medium">光</span>
                                 <span class="text-xs text-slate-500">克暗</span>
                             </div>
-
                             <div class="flex flex-col items-center px-4">
                                 <div class="flex items-center gap-2">
                                     <span class="text-yellow-400">→</span>
@@ -517,39 +498,36 @@
                                 <div class="w-12 h-0.5 bg-gradient-to-r from-yellow-400 via-white to-purple-400 my-2 rounded-full"></div>
                                 <span class="text-xs text-slate-500">互克</span>
                             </div>
-
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-600 to-purple-800 flex items-center justify-center text-2xl shadow-lg shadow-purple-500/30 ring-2 ring-purple-400/50">
-                                    &#127769;
+                                    🌙
                                 </div>
                                 <span class="mt-2 text-purple-400 font-medium">暗</span>
                                 <span class="text-xs text-slate-500">克光</span>
                             </div>
                         </div>
-
                         <div class="mt-6 px-4 py-2 bg-slate-700/50 rounded-full">
                             <p class="text-slate-300 text-sm">光 ⟷ 暗</p>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <footer class="text-center py-8 text-gray-700 footer">
+                <p>© 2026 十二生肖NFT系列 · Twelve Zodiacs Collection</p>
+                <p class="mt-2">祝你心想事成，生肖大旺 🐾✨</p>
+                <div class="mt-6 flex flex-col md:flex-row justify-center items-center gap-6">
+                    <a href="https://x.com/UPNRt3WZ2A11248" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:bg-white hover:scale-105">
+                        <i class="fab fa-twitter text-blue-500 text-xl"></i>
+                        <span class="font-medium">X</span>
+                    </a>
+                    <a href="https://t.me/wufulinmen_bsc" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:bg-white hover:scale-105">
+                        <i class="fab fa-telegram-plane text-blue-400 text-xl"></i>
+                        <span class="font-medium">Telegram</span>
+                    </a>
+                </div>
+            </footer>
         </main>
-
-        <footer class="text-center py-8 text-black/70 footer">
-            <p>© 2026 十二生肖NFT系列 · Twelve Zodiacs Collection</p>
-            <p class="mt-2">祝你心想事成，生肖大旺 🐾✨</p>
-
-            <div class="mt-6 flex flex-col md:flex-row justify-center items-center gap-6">
-                <a href="https://x.com/UPNRt3WZ2A11248" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:bg-white hover:scale-105">
-                    <i class="fab fa-twitter text-blue-500 text-xl"></i>
-                    <span class="font-medium">X</span>
-                </a>
-                <a href="https://t.me/wufulinmen_bsc" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-4 py-2 bg-white/80 rounded-full shadow-md hover:shadow-lg transition-all duration-300 hover:bg-white hover:scale-105">
-                    <i class="fab fa-telegram-plane text-blue-400 text-xl"></i>
-                    <span class="font-medium">Telegram</span>
-                </a>
-            </div>
-        </footer>
     </div>
 
     <script>
@@ -610,67 +588,36 @@
             const account = ZODIAC_WEB3.getAccount();
             
             if (!account) {
-                document.getElementById('totalPool').textContent = '0.0000';
-                document.getElementById('distributed').textContent = '0.0000';
-                document.getElementById('unclaimedDividend').textContent = '0.0000';
-                document.getElementById('holders').textContent = '0';
+                document.getElementById('totalPool').textContent = '--';
+                document.getElementById('distributed').textContent = '--';
+                document.getElementById('unclaimedDividend').textContent = '--';
+                document.getElementById('holders').textContent = '--';
                 return;
             }
 
             try {
-                ZODIAC_UI.showLoading('加载分红数据...');
                 const rewardManager = await ZODIAC_WEB3.getContract('rewardManager');
 
-                // dividendPool() 返回 address 类型，需获取该地址的代币余额
                 const dividendPoolAddr = await rewardManager.methods.dividendPool().call();
                 const tokenContractObj = await ZODIAC_WEB3.getContract('tokenContract');
                 const totalPoolWei = await tokenContractObj.methods.balanceOf(dividendPoolAddr).call();
                 const totalPool = web3.utils.fromWei(totalPoolWei, 'ether');
-
                 document.getElementById('totalPool').textContent = parseFloat(totalPool).toFixed(4);
 
-                // totalDistributed 和 holdersCount 在合约中不存在，使用替代方案
                 let distributed = '0.0000';
                 try {
                     const distributedWei = await rewardManager.methods.dividendPoolBalance().call();
                     distributed = web3.utils.fromWei(distributedWei, 'ether');
-                } catch (e) {
-                    // dividendPoolBalance 可能不存在，使用 0
-                }
+                } catch (e) {}
                 document.getElementById('distributed').textContent = parseFloat(distributed).toFixed(4);
 
-                // holdersCount 未在合约中追踪，显示为 --
                 document.getElementById('holders').textContent = '--';
 
-                // calcUserDividend 返回 ERC20 代币数量
                 const userDivWei = await rewardManager.methods.calcUserDividend(account).call();
                 const userDiv = web3.utils.fromWei(userDivWei, 'ether');
                 document.getElementById('unclaimedDividend').textContent = parseFloat(userDiv).toFixed(4);
             } catch (error) {
                 console.error('Load dividend data failed:', error);
-                ZODIAC_UI.showToast('加载分红数据失败', 'error');
-            } finally {
-                ZODIAC_UI.hideLoading();
-            }
-        }
-
-        function initCountdown() {
-            updateCountdown();
-            setInterval(updateCountdown, 1000);
-        }
-
-        function updateCountdown() {
-            const now = new Date();
-            const minutes = now.getMinutes();
-            const seconds = now.getSeconds();
-            let targetMinutes = minutes < 30 ? 30 : 60;
-            let minutesLeft = targetMinutes - minutes - 1;
-            let secondsLeft = 60 - seconds;
-            const formattedMinutes = String(minutesLeft).padStart(2, '0');
-            const formattedSeconds = String(secondsLeft).padStart(2, '0');
-            const countdownElement = document.getElementById('countdown');
-            if (countdownElement) {
-                countdownElement.textContent = `下次分红: ${formattedMinutes}:${formattedSeconds}`;
             }
         }
 
@@ -709,14 +656,13 @@
             });
 
             ZODIAC_WEB3.on('disconnect', () => {
-                document.getElementById('totalPool').textContent = '0.0000';
-                document.getElementById('distributed').textContent = '0.0000';
-                document.getElementById('unclaimedDividend').textContent = '0.0000';
-                document.getElementById('holders').textContent = '0';
+                document.getElementById('totalPool').textContent = '--';
+                document.getElementById('distributed').textContent = '--';
+                document.getElementById('unclaimedDividend').textContent = '--';
+                document.getElementById('holders').textContent = '--';
             });
 
             loadFenHongData();
-            initCountdown();
 
             document.getElementById('menuBtn').addEventListener('click', openMobileMenu);
         });
