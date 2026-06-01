@@ -258,7 +258,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /**
      * @dev 领取分红
      */
-    function claim() external nonReentrant returns (uint256) {
+    function claim() external nonReentrant whenNotPaused returns (uint256) {
         uint256 userWeight = userWeights[msg.sender];
         require(userWeight > 0, "DividendManager: No weight");
 
@@ -284,7 +284,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /**
      * @dev 领取分红并转账（供前端直接调用）
      */
-    function claimDividend() external nonReentrant {
+    function claimDividend() external nonReentrant whenNotPaused {
         uint256 userWeight = userWeights[msg.sender];
         require(userWeight > 0, "DividendManager: No weight");
 
@@ -292,7 +292,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[msg.sender];
         uint256 newDividend = userWeight * cumulativeDiff / 1e18;
         uint256 totalDividend = pendingDividends[msg.sender] + newDividend;
-        
+
         require(totalDividend > 0, "DividendManager: No dividend");
 
         pendingDividends[msg.sender] = 0;
@@ -312,7 +312,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @return 可领取分红金额和用户权重
      */
     function calcUserDividend(address user) external view returns (uint256, uint256) {
-        return (pendingDividends[user], userWeights[user]);
+        uint256 claimable = getClaimableDividend(user);
+        return (claimable, userWeights[user]);
     }
 
     /**

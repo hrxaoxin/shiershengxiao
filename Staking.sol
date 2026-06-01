@@ -176,8 +176,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         }
 
         require(totalClaimable > 0, "Staking: No pending reward");
-        require(rewardTokenContract != address(0), "Staking: Reward token not set");
-        
+
         IERC20 rewardToken = IERC20(rewardTokenContract);
         require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance");
         

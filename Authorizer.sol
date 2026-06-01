@@ -313,8 +313,8 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         if (_dividendManagerAddress != address(0)) {
             ISetTokenContract(_dividendManagerAddress).setTokenContract(_tokenAddress);
         }
-        if (poolManagerAddress != address(0)) {
-            ISetPoolManager(_rewardManagerAddress).setPoolManager(poolManagerAddress);
+        if (_poolManagerAddress != address(0)) {
+            ISetPoolManager(_rewardManagerAddress).setPoolManager(_poolManagerAddress);
         }
         if (_tokenStakingAddress != address(0)) {
             ISetTokenAddress(_tokenStakingAddress).setTokenAddress(_tokenAddress);

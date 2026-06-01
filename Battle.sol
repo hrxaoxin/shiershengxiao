@@ -176,22 +176,22 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         address challengedAddress
     ) external nonReentrant returns (bool, uint256) {
         bool isMockBattle = (challengedAddress == address(0));
-        
+
         // 非模拟战斗必须设置NFT合约
         if (!isMockBattle) {
             require(nftContract != address(0), "Battle: NFT contract not set");
         }
-        
+
         require(_validateTeam(challengerTeam), "Battle: Invalid challenger team");
         require(_validateTeam(challengedTeam), "Battle: Invalid challenged team");
-        
+
         if (!isMockBattle) {
             require(challengedAddress != address(0), "Battle: Invalid challenged address");
         }
 
-        _requireNFTOwnership(challengerTeam);
-        
+        // 模拟战斗时跳过所有权检查
         if (!isMockBattle) {
+            _requireNFTOwnership(challengerTeam);
             _requireNFTOwnershipForAddress(challengedTeam, challengedAddress);
         }
 
