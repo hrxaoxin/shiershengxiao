@@ -62,28 +62,23 @@ window.ZODIAC_COMPONENTS = (function() {
 
     function renderDesktopSidebar(activeId) {
         return `
-            <div class="hidden md:block fixed left-0 top-0 bottom-0 w-64 bg-white shadow-lg z-20 overflow-y-auto">
-                <div class="p-6">
-                    <div class="text-center mb-8">
-                        <div class="text-4xl mb-2">🐾</div>
-                        <h1 class="text-xl font-bold text-gray-800">十二生肖</h1>
-                        <p class="text-sm text-gray-500">Twelve Zodiacs</p>
+            <div class="hidden md:block fixed left-0 top-0 bottom-0 w-20 bg-white shadow-lg z-20 overflow-y-auto">
+                <div class="p-3">
+                    <div class="text-center mb-4">
+                        <div class="text-3xl mb-1">🐾</div>
+                        <h1 class="text-sm font-bold text-gray-800">生肖</h1>
                     </div>
-                    <div class="space-y-2">
+                    <div class="space-y-1">
                         ${NAV_ITEMS.map(item => `
-                            <a href="${item.url}" class="flex flex-col items-center justify-center w-16 h-16 mx-auto rounded-xl transition-all duration-300 hover:bg-gray-100 ${activeId === item.id ? 'bg-blue-50 text-blue-600' : ''}" title="${item.name}">
-                                <div class="text-3xl">${item.icon}</div>
-                                <span class="text-xs font-bold mt-1 text-gray-700">${item.name}</span>
+                            <a href="${item.url}" class="flex flex-col items-center justify-center w-full py-2 px-1 rounded-lg transition-all duration-300 hover:bg-gray-100 ${activeId === item.id ? 'bg-blue-50 text-blue-600' : ''}" title="${item.name}">
+                                <div class="text-2xl">${item.icon}</div>
+                                <span class="text-[10px] font-medium mt-1 text-gray-700">${item.name}</span>
                             </a>
                         `).join('')}
                     </div>
-                    <div class="mt-8 pt-6 border-t border-gray-200">
-                        <div class="flex items-center justify-between mb-4">
-                            <span class="text-sm text-gray-500">钱包</span>
-                            <span id="walletAddressDesktop" class="text-sm font-medium text-gray-700">未连接</span>
-                        </div>
-                        <button id="connectWalletBtnDesktop" class="w-full wallet-button py-2 rounded-lg text-white font-medium" onclick="ZODIAC_COMPONENTS.handleConnectWallet()">
-                            <i class="fas fa-plug mr-2"></i> 连接钱包
+                    <div class="mt-4 pt-3 border-t border-gray-200">
+                        <button id="connectWalletBtnDesktop" class="w-full wallet-button py-2 rounded-lg text-white font-medium text-xs" onclick="ZODIAC_COMPONENTS.handleConnectWallet()">
+                            <i class="fas fa-plug mr-1"></i> 连接
                         </button>
                     </div>
                 </div>
