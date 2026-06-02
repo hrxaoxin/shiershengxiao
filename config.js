@@ -270,7 +270,8 @@ window.ZODIAC_CONFIG = (function() {
         normal: 8888,
         rare: 88888,
         normalTen: 88880,
-        rareTen: 888880
+        rareTen: 888880,
+        targeted: 8888 * 6 * 10 + 88888 * 4 * 10
     };
 
     const UPGRADE_COSTS = {

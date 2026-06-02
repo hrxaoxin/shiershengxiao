@@ -166,7 +166,7 @@
                     <i class="fas fa-crosshairs mr-2 text-purple-500"></i> 指定铸造
                 </h3>
                 <p class="text-sm text-gray-600 mb-4">选择一个生肖，铸造该生肖所有属性和性别的NFT（10张）</p>
-                <p class="text-sm text-gray-600 mb-4">消耗：6x普通铸造代币 + 4x光暗铸造代币</p>
+                <p class="text-sm text-gray-600 mb-4">消耗：10倍 × (6x普通铸造代币 + 4x光暗铸造代币)</p>
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 mb-2">选择生肖：</label>
                     <select id="targetedZodiacSelect" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
@@ -208,7 +208,7 @@
                 <li>• <strong>光暗铸造</strong>：消耗88888枚代币，必定获得光/暗属性NFT</li>
                 <li>• <strong>普通十连</strong>：消耗88880枚代币，随机获得10张生肖NFT（普通铸造概率）</li>
                 <li>• <strong>光暗十连</strong>：消耗888880枚代币，随机获得10张光/暗属性NFT</li>
-                <li>• <strong>指定铸造</strong>：消耗6x普通+4x光暗代币，获得指定生肖所有属性NFT（10张）</li>
+                <li>• <strong>指定铸造</strong>：消耗10倍×(6x普通+4x光暗)代币，获得指定生肖所有属性NFT（10张）</li>
                 <li>• 普通铸造概率：水/风/火属性各约32%，暗/光属性各2%</li>
                 <li>• 持有生肖NFT即可享受对应的税收分红</li>
                 <li>• 首次铸造需要授权代币，之后无需重复授权</li>
@@ -250,8 +250,8 @@
         let LIGHT_DARK_COST = ZODIAC_CONFIG.MINT_COSTS.rare;
         let NORMAL_TEN_COST = ZODIAC_CONFIG.MINT_COSTS.normalTen;
         let RARE_TEN_COST = ZODIAC_CONFIG.MINT_COSTS.rareTen;
-        let TARGETED_NORMAL_PART = MINT_PRICE * 6;
-        let TARGETED_RARE_PART = LIGHT_DARK_COST * 4;
+        let TARGETED_NORMAL_PART = MINT_PRICE * 6 * 10;
+        let TARGETED_RARE_PART = LIGHT_DARK_COST * 4 * 10;
 
         document.addEventListener('DOMContentLoaded', async function() {
             particlesJS('particles-js', {
@@ -348,13 +348,13 @@
                     NORMAL_TEN_COST = (await tokenBurnerContract.methods.normalMintTenCost().call()).toString();
                     RARE_TEN_COST = (await tokenBurnerContract.methods.rareMintTenCost().call()).toString();
                     const targetedCosts = await tokenBurnerContract.methods.targetedMintCost().call();
-                    TARGETED_NORMAL_PART = (targetedCosts.normalPart || targetedCosts[0]).toString();
-                    TARGETED_RARE_PART = (targetedCosts.rarePart || targetedCosts[1]).toString();
+                    TARGETED_NORMAL_PART = (BigInt(targetedCosts.normalPart || targetedCosts[0]) * BigInt(10)).toString();
+                    TARGETED_RARE_PART = (BigInt(targetedCosts.rarePart || targetedCosts[1]) * BigInt(10)).toString();
                 } catch (e) {
                     NORMAL_TEN_COST = (BigInt(MINT_PRICE) * BigInt(10)).toString();
                     RARE_TEN_COST = (BigInt(LIGHT_DARK_COST) * BigInt(10)).toString();
-                    TARGETED_NORMAL_PART = (BigInt(MINT_PRICE) * BigInt(6)).toString();
-                    TARGETED_RARE_PART = (BigInt(LIGHT_DARK_COST) * BigInt(4)).toString();
+                    TARGETED_NORMAL_PART = (BigInt(MINT_PRICE) * BigInt(6) * BigInt(10)).toString();
+                    TARGETED_RARE_PART = (BigInt(LIGHT_DARK_COST) * BigInt(4) * BigInt(10)).toString();
                 }
 
                 const web3 = ZODIAC_WEB3.getWeb3();
