@@ -44,6 +44,16 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     address public authorizer;
 
     bool public initialized;
+    bool public paused;
+    string public pauseReason;
+
+    event Paused(address account, string reason);
+    event Unpaused(address account);
+
+    modifier whenNotPaused() {
+        require(!paused, "Battle: Paused");
+        _;
+    }
 
     function initialize(address _authorizer) external initializer {
         require(!initialized, "Battle: Already initialized");
@@ -57,6 +67,18 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
     function reinitializeSkills() external onlyOwner {
         _initSkills();
+    }
+
+    function pause(string memory reason) external onlyOwner {
+        paused = true;
+        pauseReason = reason;
+        emit Paused(msg.sender, reason);
+    }
+
+    function unpause() external onlyOwner {
+        paused = false;
+        pauseReason = "";
+        emit Unpaused(msg.sender);
     }
 
     function setAuthorizer(address a) external onlyOwner {

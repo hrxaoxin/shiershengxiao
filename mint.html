@@ -348,8 +348,8 @@
                     NORMAL_TEN_COST = (await tokenBurnerContract.methods.normalMintTenCost().call()).toString();
                     RARE_TEN_COST = (await tokenBurnerContract.methods.rareMintTenCost().call()).toString();
                     const targetedCosts = await tokenBurnerContract.methods.targetedMintCost().call();
-                    TARGETED_NORMAL_PART = (BigInt(targetedCosts.normalPart || targetedCosts[0]) * BigInt(10)).toString();
-                    TARGETED_RARE_PART = (BigInt(targetedCosts.rarePart || targetedCosts[1]) * BigInt(10)).toString();
+                    TARGETED_NORMAL_PART = (targetedCosts.normalPart || targetedCosts[0]).toString();
+                    TARGETED_RARE_PART = (targetedCosts.rarePart || targetedCosts[1]).toString();
                 } catch (e) {
                     NORMAL_TEN_COST = (BigInt(MINT_PRICE) * BigInt(10)).toString();
                     RARE_TEN_COST = (BigInt(LIGHT_DARK_COST) * BigInt(10)).toString();

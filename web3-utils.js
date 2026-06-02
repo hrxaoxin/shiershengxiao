@@ -58,6 +58,15 @@ window.ZODIAC_WEB3 = (function() {
                 chainId = id;
                 contracts = {};
                 emit('chainChanged', { chainId: id });
+                
+                const chainHex = typeof id === 'number' ? `0x${id.toString(16)}` : id;
+                const expectedChain = getConfig()?.CHAIN_ID || '0x61';
+                
+                if (chainHex !== expectedChain) {
+                    if (typeof window !== 'undefined') {
+                        ZODIAC_UI?.showToast?.('请切换到正确的网络', 'warning');
+                    }
+                }
             });
 
             emit('connect', { account: currentAccount, chainId: chainId });
@@ -545,6 +554,14 @@ window.ZODIAC_WEB3 = (function() {
      */
     async function listenToAllEvents(callbacks = {}) {
         const events = [
+            { contractName: 'nftMint', eventName: 'Transfer', callback: callbacks.onNFTTransfer || defaultEventCallback },
+            { contractName: 'nftMint', eventName: 'Approval', callback: callbacks.onNFTApproval || defaultEventCallback },
+            { contractName: 'nftMint', eventName: 'ApprovalForAll', callback: callbacks.onNFTApprovalForAll || defaultEventCallback },
+            { contractName: 'nftMint', eventName: 'Mint', callback: callbacks.onNFTMinted || defaultEventCallback },
+            { contractName: 'nftMint', eventName: 'BatchMint', callback: callbacks.onNFTBatchMinted || defaultEventCallback },
+            { contractName: 'nftMint', eventName: 'Upgrade', callback: callbacks.onNFTUpgraded || defaultEventCallback },
+            { contractName: 'tokenContract', eventName: 'Transfer', callback: callbacks.onTokenTransfer || defaultEventCallback },
+            { contractName: 'tokenContract', eventName: 'Approval', callback: callbacks.onTokenApproval || defaultEventCallback },
             { contractName: 'nftTrading', eventName: 'NFTListed', callback: callbacks.onNFTListed || defaultEventCallback },
             { contractName: 'nftTrading', eventName: 'NFTDelisted', callback: callbacks.onNFTDelisted || defaultEventCallback },
             { contractName: 'nftTrading', eventName: 'NFTBought', callback: callbacks.onNFTBought || defaultEventCallback },
@@ -577,11 +594,18 @@ window.ZODIAC_WEB3 = (function() {
             { contractName: 'arena', eventName: 'SeasonSettled', callback: callbacks.onSeasonSettled || defaultEventCallback },
             { contractName: 'arena', eventName: 'RewardClaimed', callback: callbacks.onArenaRewardClaimed || defaultEventCallback },
             { contractName: 'arena', eventName: 'SeasonRewardClaimed', callback: callbacks.onSeasonRewardClaimed || defaultEventCallback },
+            { contractName: 'arena', eventName: 'NFTsStaked', callback: callbacks.onArenaStaked || defaultEventCallback },
+            { contractName: 'arena', eventName: 'NFTsUnstaked', callback: callbacks.onArenaUnstaked || defaultEventCallback },
+            { contractName: 'arena', eventName: 'BattleTeamSet', callback: callbacks.onBattleTeamSet || defaultEventCallback },
+            { contractName: 'arena', eventName: 'BattleTeamCleared', callback: callbacks.onBattleTeamCleared || defaultEventCallback },
             { contractName: 'priceOracle', eventName: 'PriceUpdated', callback: callbacks.onPriceUpdated || defaultEventCallback },
             { contractName: 'priceOracle', eventName: 'PriceChangeProposed', callback: callbacks.onPriceChangeProposed || defaultEventCallback },
             { contractName: 'poolManager', eventName: 'EmergencyWithdraw', callback: callbacks.onEmergencyWithdraw || defaultEventCallback },
             { contractName: 'poolManager', eventName: 'PoolDeposited', callback: callbacks.onPoolDeposited || defaultEventCallback },
-            { contractName: 'poolManager', eventName: 'PoolWithdrawn', callback: callbacks.onPoolWithdrawn || defaultEventCallback }
+            { contractName: 'poolManager', eventName: 'PoolWithdrawn', callback: callbacks.onPoolWithdrawn || defaultEventCallback },
+            { contractName: 'tokenBurner', eventName: 'TokenBurned', callback: callbacks.onTokenBurned || defaultEventCallback },
+            { contractName: 'tokenBurner', eventName: 'NFTMinted', callback: callbacks.onBurnerNFTMinted || defaultEventCallback },
+            { contractName: 'tokenBurner', eventName: 'MintCostUpdated', callback: callbacks.onMintCostUpdated || defaultEventCallback }
         ];
         return await listenToEvents(events);
     }

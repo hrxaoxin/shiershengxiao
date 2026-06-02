@@ -17,6 +17,10 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
     address public authorizer;
     address public tokenContract;
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
+    
+    uint256 public maxDailyPublicBreedings = 5;
+    mapping(address => uint256) public dailyPublicBreedings;
+    mapping(address => uint256) public lastBreedingDay;
 
     bool public paused;
     string public pauseReason;
@@ -184,6 +188,8 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         require(maleOwner != femaleOwner, "Breeding: Must use NFTs from different owners");
         require(msg.sender == maleOwner || msg.sender == femaleOwner, "Breeding: Must be owner of one NFT");
         require(nft.tokenLevel(fatherId) >= 5 && nft.tokenLevel(motherId) >= 5, "Breeding: Level < 5");
+        
+        _checkDailyBreedingLimit(msg.sender);
 
         uint256 fatherType = nft.tokenType(fatherId);
         uint256 motherType = nft.tokenType(motherId);
@@ -214,8 +220,32 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         
         breedingCooldowns[fatherId] = block.timestamp + marketBreedingCooldown;
         breedingCooldowns[motherId] = block.timestamp + marketBreedingCooldown;
+        _updateDailyBreedingCount(msg.sender);
         emit BreedingPairCreated(pairId, fatherId, motherId, 1);
         return pairId;
+    }
+
+    function _checkDailyBreedingLimit(address user) internal {
+        uint256 currentDay = block.timestamp / 1 days;
+        if (lastBreedingDay[user] != currentDay) {
+            dailyPublicBreedings[user] = 0;
+            lastBreedingDay[user] = currentDay;
+        }
+        require(dailyPublicBreedings[user] < maxDailyPublicBreedings, "Breeding: Daily breeding limit exceeded");
+    }
+
+    function _updateDailyBreedingCount(address user) internal {
+        uint256 currentDay = block.timestamp / 1 days;
+        if (lastBreedingDay[user] != currentDay) {
+            dailyPublicBreedings[user] = 1;
+            lastBreedingDay[user] = currentDay;
+        } else {
+            dailyPublicBreedings[user]++;
+        }
+    }
+
+    function setMaxDailyPublicBreedings(uint256 limit) external onlyOwner {
+        maxDailyPublicBreedings = limit;
     }
 
     function completeBreeding(uint256 pairId) external nonReentrant whenNotPaused returns (uint256, uint256) {

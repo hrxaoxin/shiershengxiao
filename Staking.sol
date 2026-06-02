@@ -54,6 +54,16 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     bool public paused;
     string public pauseReason;
 
+    event Staked(address indexed user, uint256[] tokenIds);
+    event Unstaked(address indexed user, uint256[] tokenIds);
+    event RewardClaimed(address indexed user, uint256 amount);
+    event RewardRateUpdated(uint256 newRate);
+    event DailyRewardCalculated(uint256 totalReward, uint256 incrementPerWeight);
+    event Paused(address account, string reason);
+    event Unpaused(address account);
+    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
+
     function initialize(address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
@@ -75,14 +85,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    event Staked(address indexed user, uint256[] tokenIds);
-    event Unstaked(address indexed user, uint256[] tokenIds);
-    event RewardClaimed(address indexed user, uint256 amount);
-    event RewardRateUpdated(uint256 newRate);
-    event DailyRewardCalculated(uint256 totalReward, uint256 incrementPerWeight);
-    event Paused(address account, string reason);
-    event Unpaused(address account);
 
     modifier whenNotPaused() {
         require(!paused, "Staking: Paused");
@@ -415,14 +417,14 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         return index + 1;
     }
 
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner whenNotPaused {
         require(amount > 0, "Staking: Amount must be > 0");
         require(amount <= address(this).balance, "Staking: Insufficient balance");
         payable(owner()).transfer(amount);
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner whenNotPaused {
         require(amount > 0, "Staking: Amount must be > 0");
         require(rewardTokenContract != address(0), "Staking: Token contract not set");
         IERC20 token = IERC20(rewardTokenContract);
@@ -430,7 +432,4 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         require(token.transfer(owner(), amount), "Staking: Token transfer failed");
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
-
-    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
-    event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 }

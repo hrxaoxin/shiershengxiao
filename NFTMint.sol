@@ -69,15 +69,26 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         nftDataContract = _nftData;
     }
     
+    struct FailedSync {
+        uint256 tokenId;
+        uint256 zodiacType;
+        uint8 level;
+        uint8 growth;
+        address to;
+        uint256 timestamp;
+        uint8 syncType; // 0: setNFTInfo, 1: setTokenLevel
+    }
+    
+    mapping(uint256 => FailedSync) public failedSyncs;
+    uint256 public failedSyncCount;
+    
+    event SyncRetryAttempted(uint256 syncId, uint256 tokenId, bool success);
+    
     function _syncNFTData(address to, uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth) internal {
         if (nftDataContract != address(0)) {
-            (bool success, ) = nftDataContract.call(
-                abi.encodeWithSignature(
-                    "setNFTInfo(uint256,uint256,uint8,uint8,uint256,address)",
-                    tokenId, zodiacType, level, growth, block.timestamp, to
-                )
-            );
+            bool success = _trySyncNFTInfo(tokenId, zodiacType, level, growth, to);
             if (!success) {
+                _queueFailedSync(tokenId, zodiacType, level, growth, to, 0);
                 emit NFTDataSyncFailed(tokenId, zodiacType);
             }
         }
@@ -85,11 +96,72 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     
     function _updateNFTDataLevel(uint256 tokenId, uint8 newLevel) internal {
         if (nftDataContract != address(0)) {
+            bool success = _trySetTokenLevel(tokenId, newLevel);
+            if (!success) {
+                _queueFailedSync(tokenId, tokenType[tokenId], newLevel, 0, address(0), 1);
+                emit NFTDataSyncFailed(tokenId, tokenType[tokenId]);
+            }
+        }
+    }
+    
+    function _trySyncNFTInfo(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to) internal returns (bool) {
+        for (uint8 i = 0; i < 3; i++) {
+            (bool success, ) = nftDataContract.call(
+                abi.encodeWithSignature(
+                    "setNFTInfo(uint256,uint256,uint8,uint8,uint256,address)",
+                    tokenId, zodiacType, level, growth, block.timestamp, to
+                )
+            );
+            if (success) return true;
+        }
+        return false;
+    }
+    
+    function _trySetTokenLevel(uint256 tokenId, uint8 newLevel) internal returns (bool) {
+        for (uint8 i = 0; i < 3; i++) {
             (bool success, ) = nftDataContract.call(
                 abi.encodeWithSignature("setTokenLevel(uint256,uint8)", tokenId, newLevel)
             );
-            if (!success) {
-                emit NFTDataSyncFailed(tokenId, tokenType[tokenId]);
+            if (success) return true;
+        }
+        return false;
+    }
+    
+    function _queueFailedSync(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to, uint8 syncType) internal {
+        failedSyncCount++;
+        failedSyncs[failedSyncCount] = FailedSync({
+            tokenId: tokenId,
+            zodiacType: zodiacType,
+            level: level,
+            growth: growth,
+            to: to,
+            timestamp: block.timestamp,
+            syncType: syncType
+        });
+    }
+    
+    function retryFailedSync(uint256 syncId) external onlyAuthorized {
+        FailedSync storage sync = failedSyncs[syncId];
+        require(sync.tokenId != 0, "NFTMint: Invalid sync ID");
+        
+        bool success;
+        if (sync.syncType == 0) {
+            success = _trySyncNFTInfo(sync.tokenId, sync.zodiacType, sync.level, sync.growth, sync.to);
+        } else {
+            success = _trySetTokenLevel(sync.tokenId, sync.level);
+        }
+        
+        if (success) {
+            delete failedSyncs[syncId];
+        }
+        
+        emit SyncRetryAttempted(syncId, sync.tokenId, success);
+    }
+    
+    function retryAllFailedSyncs() external onlyAuthorized {
+        for (uint256 i = 1; i <= failedSyncCount; i++) {
+            if (failedSyncs[i].tokenId != 0) {
+                retryFailedSync(i);
             }
         }
     }

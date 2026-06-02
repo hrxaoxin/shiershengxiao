@@ -324,9 +324,38 @@
             try {
                 nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
                 rewardManagerContract = await window.ZODIAC_WEB3.getContract('rewardManager');
+                setupEventListeners();
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
             }
+        }
+
+        function setupEventListeners() {
+            if (!nftContract) return;
+
+            nftContract.events.Transfer({
+                filter: { to: account },
+                fromBlock: 'latest'
+            }, async (error, event) => {
+                if (!error && event) {
+                    console.log('NFT received:', event.returnValues);
+                    await loadUserTokens();
+                    await loadProgress();
+                    ZODIAC_UI.showToast('已获得新的生肖NFT！', 'success');
+                }
+            });
+
+            nftContract.events.Transfer({
+                filter: { from: account },
+                fromBlock: 'latest'
+            }, async (error, event) => {
+                if (!error && event) {
+                    console.log('NFT transferred:', event.returnValues);
+                    await loadUserTokens();
+                    await loadProgress();
+                    ZODIAC_UI.showToast('NFT已转出', 'info');
+                }
+            });
         }
 
         async function loadUserTokens() {

@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 import "./NFTInterface.sol";
 
@@ -31,7 +32,7 @@ interface IPoolManager {
  * - 15% 进入代币质押池
  * - 10% 进入竞技场奖励池
  */
-contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     bool public paused;
     string public pauseReason;
 

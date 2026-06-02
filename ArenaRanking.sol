@@ -388,7 +388,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return userStakedNFTs[user];
     }
 
-    function rechargeChallengeAttempts() external payable {
+    function rechargeChallengeAttempts() external payable whenNotPaused {
         require(msg.value >= rechargeCost, "ArenaRanking: Insufficient payment");
         require(rechargeCount[msg.sender] < maxRechargeAttempts, "ArenaRanking: Max recharge limit reached");
 

@@ -23,6 +23,10 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public rateStep = 1;
     /** @dev 最小质押锁定时间（30分钟） */
     uint256 public constant MIN_STAKING_DURATION = 30 minutes;
+    /** @dev 最大总质押数量 */
+    uint256 public maxTotalStaked = 1000000 * 1e18;
+    /** @dev 单个用户最大质押数量 */
+    uint256 public maxUserStaked = 100000 * 1e18;
     /** @dev 今日已进入合约的BNB数量 */
     uint256 public todayIncomingBNB;
     /** @dev 今日奖励总量 */
@@ -165,13 +169,16 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         
         _accumulateRewards(msg.sender);
         
+        StakeInfo storage stake = userStakes[msg.sender];
+        
+        require(stake.amount + amount <= maxUserStaked, "TokenStaking: User stake limit exceeded");
+        require(totalStakedTokens + amount <= maxTotalStaked, "TokenStaking: Total stake limit exceeded");
+        
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         require(token.balanceOf(msg.sender) >= amount, "TokenStaking: Insufficient balance");
         require(token.allowance(msg.sender, address(this)) >= amount, "TokenStaking: Insufficient allowance");
         
         require(token.transferFrom(msg.sender, address(this), amount), "TokenStaking: Token transfer failed");
-        
-        StakeInfo storage stake = userStakes[msg.sender];
         
         if (stake.amount == 0) {
             stake.stakedAt = block.timestamp;
@@ -181,6 +188,14 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         totalStakedTokens += amount;
         
         emit TokensStaked(msg.sender, amount);
+    }
+    
+    function setMaxTotalStaked(uint256 _maxTotalStaked) external onlyOwner {
+        maxTotalStaked = _maxTotalStaked;
+    }
+    
+    function setMaxUserStaked(uint256 _maxUserStaked) external onlyOwner {
+        maxUserStaked = _maxUserStaked;
     }
 
     /**
