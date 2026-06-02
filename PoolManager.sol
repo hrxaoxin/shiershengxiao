@@ -6,6 +6,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title PoolManager
@@ -28,6 +29,30 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * - 支持UUPS升级
  */
 contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
+
+    /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @dev 池子类型常量
+     */
+    uint256 public constant POOL_NFT_STAKING = 0;
+    uint256 public constant POOL_TOKEN_STAKING = 1;
+    uint256 public constant POOL_ARENA_REWARD = 2;
+
+    /**
+     * @dev 资金流动类型常量
+     */
+    uint256 public constant FLOW_DEPOSIT = 1;
+    uint256 public constant FLOW_WITHDRAW = 2;
+    
+    uint256 public constant MAX_FLOW_RECORDS = 1000;
+
     /**
      * @dev 授权合约地址（Authorizer）
      */
@@ -87,9 +112,9 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function addToNFTStakingPool(uint256 amount) external onlyAuthorized whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        poolBalances[0] += amount;
-        _recordFlow(0, amount, msg.sender, address(this), 1);
-        emit PoolDeposited(0, amount);
+        poolBalances[POOL_NFT_STAKING] += amount;
+        _recordFlow(POOL_NFT_STAKING, amount, msg.sender, address(this), FLOW_DEPOSIT);
+        emit PoolDeposited(POOL_NFT_STAKING, amount);
     }
 
     /**
@@ -97,9 +122,9 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function addToTokenStakingPool(uint256 amount) external onlyAuthorized whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        poolBalances[1] += amount;
-        _recordFlow(1, amount, msg.sender, address(this), 1);
-        emit PoolDeposited(1, amount);
+        poolBalances[POOL_TOKEN_STAKING] += amount;
+        _recordFlow(POOL_TOKEN_STAKING, amount, msg.sender, address(this), FLOW_DEPOSIT);
+        emit PoolDeposited(POOL_TOKEN_STAKING, amount);
     }
 
     /**
@@ -107,9 +132,9 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function addToArenaRewardPool(uint256 amount) external onlyAuthorized whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        poolBalances[2] += amount;
-        _recordFlow(2, amount, msg.sender, address(this), 1);
-        emit PoolDeposited(2, amount);
+        poolBalances[POOL_ARENA_REWARD] += amount;
+        _recordFlow(POOL_ARENA_REWARD, amount, msg.sender, address(this), FLOW_DEPOSIT);
+        emit PoolDeposited(POOL_ARENA_REWARD, amount);
     }
 
     event PoolDeposited(uint256 indexed poolType, uint256 amount);
@@ -119,10 +144,10 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param amount 提取数量
      */
     function withdrawFromNFTStakingPool(uint256 amount) external onlyOwner whenNotPaused {
-        require(poolBalances[0] >= amount, "PoolManager: Insufficient balance");
-        poolBalances[0] -= amount;
-        _recordFlow(0, amount, address(this), msg.sender, 2);
-        emit PoolWithdrawn(0, amount);
+        require(poolBalances[POOL_NFT_STAKING] >= amount, "PoolManager: Insufficient balance");
+        poolBalances[POOL_NFT_STAKING] -= amount;
+        _recordFlow(POOL_NFT_STAKING, amount, address(this), msg.sender, FLOW_WITHDRAW);
+        emit PoolWithdrawn(POOL_NFT_STAKING, amount);
     }
 
     /**
@@ -130,10 +155,10 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param amount 提取数量
      */
     function withdrawFromTokenStakingPool(uint256 amount) external onlyOwner whenNotPaused {
-        require(poolBalances[1] >= amount, "PoolManager: Insufficient balance");
-        poolBalances[1] -= amount;
-        _recordFlow(1, amount, address(this), msg.sender, 2);
-        emit PoolWithdrawn(1, amount);
+        require(poolBalances[POOL_TOKEN_STAKING] >= amount, "PoolManager: Insufficient balance");
+        poolBalances[POOL_TOKEN_STAKING] -= amount;
+        _recordFlow(POOL_TOKEN_STAKING, amount, address(this), msg.sender, FLOW_WITHDRAW);
+        emit PoolWithdrawn(POOL_TOKEN_STAKING, amount);
     }
 
     event PoolWithdrawn(uint256 indexed poolType, uint256 amount);
@@ -210,7 +235,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             (bool success, ) = payable(to).call{value: amount}("");
             require(success, "PoolManager: BNB transfer failed");
         } else {
-            require(IERC20(token).transfer(to, amount), "PoolManager: Transfer failed");
+            IERC20(token).safeTransfer(to, amount);
         }
 
         emit EmergencyWithdraw(token, to, amount, block.timestamp);
@@ -245,6 +270,13 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 记录资金流动
      */
     function _recordFlow(uint256 poolType, uint256 amount, address from, address to, uint8 flowType) internal {
+        if (flowRecords.length >= MAX_FLOW_RECORDS) {
+            for (uint256 i = 0; i < flowRecords.length - 1; i++) {
+                flowRecords[i] = flowRecords[i + 1];
+            }
+            flowRecords.pop();
+        }
+        
         flowRecords.push(FlowRecord({
             timestamp: block.timestamp,
             poolType: poolType,
@@ -363,9 +395,9 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         totalWithdrawn = 0;
 
         for (uint256 i = 0; i < flowRecords.length; i++) {
-            if (flowRecords[i].flowType == 0) {
+            if (flowRecords[i].flowType == FLOW_DEPOSIT) {
                 totalDeposited += flowRecords[i].amount;
-            } else if (flowRecords[i].flowType == 1) {
+            } else if (flowRecords[i].flowType == FLOW_WITHDRAW) {
                 totalWithdrawn += flowRecords[i].amount;
             }
         }

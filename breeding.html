@@ -529,6 +529,18 @@
                 await checkActiveSelfOrder();
                 await checkActivePairOrders();
             });
+            // 监听 MetaMask 账户切换事件，自动刷新数据
+            ZODIAC_WEB3.on('connect', (data) => {
+                if (data && data.account) {
+                    handleAccountsChanged(data.account);
+                }
+            });
+            ZODIAC_WEB3.on('disconnect', () => {
+                document.getElementById('walletBtn').textContent = '连接钱包';
+                document.getElementById('walletAddress').textContent = '未连接钱包';
+                document.getElementById('connectWalletBtn').style.display = '';
+                document.getElementById('mobileConnectBtn').style.display = '';
+            });
         }
 
         function handleConnectWallet() {

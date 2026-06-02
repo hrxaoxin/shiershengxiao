@@ -18,6 +18,14 @@ import "./NFTInterface.sol";
  * 4. 5%手续费全部进入手续费接收地址
  */
 contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+
+    /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
      * @dev 挂牌信息结构体
      */
@@ -42,6 +50,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 手续费率（百分比）
      */
     uint256 public feePercent = 5;
+    uint256 public totalVolume;
 
     /**
      * @dev 手续费接收地址
@@ -109,27 +118,27 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 上架事件
+     * @dev NFT 上架事件
      */
-    event NFTListed(uint256 indexed tokenId, address seller, uint256 priceWei);
+    event NFTListed(uint256 indexed tokenId, address indexed seller, uint256 priceWei);
 
     /**
-     * @dev 下架事件
+     * @dev NFT 下架事件
      */
-    event NFTDelisted(uint256 indexed tokenId);
+    event NFTDelisted(uint256 indexed tokenId, address indexed seller);
 
     /**
      * @dev 购买事件
      */
     event NFTBought(
         uint256 indexed tokenId,
-        address buyer,
-        address seller,
+        address indexed buyer,
+        address indexed seller,
         uint256 priceWei,
         uint256 fee
     );
-    event Paused(address account, string reason);
-    event Unpaused(address account);
+    event Paused(address indexed account, string reason);
+    event Unpaused(address indexed account);
 
     modifier whenNotPaused() {
         require(!paused, "NFTTrading: Paused");
@@ -173,37 +182,44 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function buyNFT(uint256 tokenId) external payable whenNotPaused nonReentrant {
         require(listings[tokenId].seller != address(0), "NFTTrading: Listing not found");
-        require(msg.value >= listings[tokenId].priceWei, "NFTTrading: Insufficient payment");
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
+        require(feeReceiver != address(0), "NFTTrading: Fee receiver not set");
 
         Listing memory listing = listings[tokenId];
         address seller = listing.seller;
         uint256 price = listing.priceWei;
+        
+        require(msg.value >= price, "NFTTrading: Insufficient payment");
+        require(msg.sender.balance >= msg.value, "NFTTrading: Insufficient balance");
+
         uint256 fee = price * feePercent / 100;
         uint256 sellerAmount = price - fee;
 
         require(INFTMint(nftContract).ownerOf(tokenId) == seller, "NFTTrading: Seller no longer owns NFT");
         require(INFTMint(nftContract).isApprovedForAll(seller, address(this)), "NFTTrading: Contract not approved");
 
+        // 先删除挂牌信息，防止重入
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
 
+        // 然后执行 NFT 转移，这是最重要的操作
         try INFTMint(nftContract).safeTransferFrom(seller, msg.sender, tokenId) {
-            // 转账成功
+            // 转账成功后再处理资金
         } catch {
             revert("NFTTrading: NFT transfer failed");
         }
 
+        // 先处理费用
         if (fee > 0) {
             (bool feeSuccess, ) = payable(feeReceiver).call{value: fee}("");
-            if (!feeSuccess) {
-                sellerAmount += fee;
-            }
+            require(feeSuccess, "NFTTrading: Fee payment failed");
         }
 
+        // 最后处理卖家收款
         (bool sellerSuccess, ) = payable(seller).call{value: sellerAmount}("");
         require(sellerSuccess, "NFTTrading: Seller payment failed");
 
+        totalVolume += price;
         emit NFTBought(tokenId, msg.sender, seller, price, fee);
     }
 

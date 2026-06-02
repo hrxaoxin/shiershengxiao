@@ -451,17 +451,17 @@
                             <span class="mr-2">💡</span> 战斗规则
                         </h3>
                         <div class="space-y-2 text-sm text-gray-300">
-                            <div>• 战斗为6v6对战</div>
-                            <div>• 前排3张，后排3张</div>
-                            <div>• 优先攻击同排对手</div>
-                            <div>• 前排全阵亡后攻击后排</div>
-                            <div>• 积分模式：战斗增减积分</div>
-                            <div>• 排名挑战：3局2胜换排名</div>
-                            <div>• 每天5次挑战机会</div>
-                            <div>• 可销毁代币充值次数</div>
-                            <div>• <span class="text-yellow-400">战队NFT需质押，战斗期间不可转移</span></div>
-                            <div>• 清空战队后NFT自动解除质押</div>
-                        </div>
+                        <div>• 战斗为6v6对战</div>
+                        <div>• 前排3张，后排3张</div>
+                        <div>• 优先攻击同排对手</div>
+                        <div>• 前排全阵亡后攻击后排</div>
+                        <div>• 积分模式：战斗增减积分</div>
+                        <div>• 排名挑战：3局2胜换排名</div>
+                        <div>• <span class="text-green-400">每天免费3次挑战机会</span></div>
+                        <div>• <span class="text-orange-400">销毁888代币可充值3次挑战机会</span></div>
+                        <div>• <span class="text-yellow-400">战队NFT需质押，战斗期间不可转移</span></div>
+                        <div>• 清空战队后NFT自动解除质押</div>
+                    </div>
                     </div>
                 </div>
             </div>
@@ -1273,18 +1273,70 @@
 
         async function rechargeAttempts() {
             try {
-                const rechargeCost = await arenaContract.methods.rechargeCost().call();
-                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'rechargeChallengeAttempts', [], accounts[0]);
+                const config = ZODIAC_CONFIG.ARENA_CONFIG;
+                const rechargeCost = config.rechargeCost;
+                
+                if (!ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract || ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract === '0x0000000000000000000000000000000000000000') {
+                    ZODIAC_UI.showToast('代币合约地址未配置', 'error');
+                    return;
+                }
+                
+                const tokenContract = new web3.eth.Contract(ZODIAC_CONFIG.ABIS.tokenABI, ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract);
+                
+                let allowance;
+                try {
+                    allowance = await tokenContract.methods.allowance(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena).call();
+                } catch (allowanceError) {
+                    console.error('查询授权失败:', allowanceError);
+                    ZODIAC_UI.showToast('查询代币授权失败，请稍后重试', 'error');
+                    return;
+                }
+                
+                const requiredAmount = web3.utils.toWei(String(rechargeCost), 'ether');
+                
+                if (allowance < requiredAmount) {
+                    try {
+                        ZODIAC_UI.showLoading('正在授权代币...');
+                        const approveTx = await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena, requiredAmount).send({ from: accounts[0] });
+                        if (!approveTx.status) {
+                            throw new Error('代币授权失败');
+                        }
+                        ZODIAC_UI.hideLoading();
+                        ZODIAC_UI.showToast('代币授权成功', 'success');
+                    } catch (approveError) {
+                        ZODIAC_UI.hideLoading();
+                        console.error('授权失败:', approveError);
+                        ZODIAC_UI.showToast('代币授权失败: ' + (approveError.message || '未知错误'), 'error');
+                        return;
+                    }
+                }
+                
+                let gas;
+                try {
+                    gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'rechargeChallengeAttempts', [], accounts[0]);
+                } catch (gasError) {
+                    console.error('估算Gas失败:', gasError);
+                    gas = 200000;
+                }
                 
                 await ZODIAC_UI.handleTransaction(
-                    arenaContract.methods.rechargeChallengeAttempts().send({ from: accounts[0], gas: gas, value: rechargeCost }),
+                    arenaContract.methods.rechargeChallengeAttempts().send({ from: accounts[0], gas: gas }),
                     {
                         actionName: '充值挑战次数',
-                        loadingMessage: '正在充值...',
-                        successMessage: '充值成功！已获得挑战机会',
+                        loadingMessage: '正在销毁代币获取挑战次数...',
+                        successMessage: `充值成功！销毁 ${rechargeCost} 代币，获得 ${config.rechargeAttempts} 次挑战机会`,
                         showConfirmation: true,
+                        confirmationMessage: `确定要销毁 ${rechargeCost} 代币来获取 ${config.rechargeAttempts} 次挑战机会吗？`,
                         onConfirmation: () => {
                             loadRemainingAttempts();
+                        },
+                        onError: (error) => {
+                            console.error('交易失败:', error);
+                            if (error.message && error.message.includes('Insufficient token allowance')) {
+                                ZODIAC_UI.showToast('代币授权不足，请重新授权', 'error');
+                            } else if (error.message && error.message.includes('Max recharge limit reached')) {
+                                ZODIAC_UI.showToast('已达到最大充值次数限制', 'error');
+                            }
                         }
                     }
                 );

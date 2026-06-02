@@ -205,7 +205,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @dev 解除质押代币
      * @param amount 解除质押数量
      */
-    function unstakeTokens(uint256 amount) external nonReentrant {
+    function unstakeTokens(uint256 amount) external nonReentrant whenNotPaused {
         StakeInfo storage stake = userStakes[msg.sender];
         require(stake.amount >= amount, "TokenStaking: Insufficient staked amount");
         require(stake.stakedAt > 0, "TokenStaking: No stake found");
@@ -326,6 +326,8 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     function calculateDailyReward() external onlyAuthorized {
         _checkNewDay();
+        
+        require(todayRewardAmount == 0, "TokenStaking: Daily reward already calculated");
 
         uint256 contractBalance = address(this).balance;
         uint256 availableBalance = contractBalance - totalPendingRewards;
@@ -452,7 +454,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @dev 紧急提取BNB（仅限管理员）
      * @param amount 提取金额
      */
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner whenNotPaused nonReentrant {
         require(amount > 0, "TokenStaking: Amount must be > 0");
         require(amount <= address(this).balance, "TokenStaking: Insufficient BNB balance");
         (bool success, ) = payable(owner()).call{value: amount}("");
@@ -460,7 +462,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner whenNotPaused nonReentrant {
         require(amount > 0, "TokenStaking: Amount must be > 0");
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         require(tokenContract != address(0), "TokenStaking: Token contract not set");

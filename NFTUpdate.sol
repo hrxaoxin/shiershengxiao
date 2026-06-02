@@ -24,6 +24,13 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using NFTLib for uint256;
 
+    /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
     bool public paused;
     string public pauseReason;
 

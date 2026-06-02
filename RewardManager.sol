@@ -18,6 +18,13 @@ interface IPoolManager {
 }
 
 /**
+ * @dev DividendManager 接口，用于同步分红池
+ */
+interface IDividendManager {
+    function syncDividendPool() external;
+}
+
+/**
  * @title RewardManager
  * @dev 奖励管理合约，统一管理所有游戏奖励的分发
  *
@@ -33,6 +40,13 @@ interface IPoolManager {
  * - 10% 进入竞技场奖励池
  */
 contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
     bool public paused;
     string public pauseReason;
 
@@ -73,6 +87,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     function initialize(address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         authorizer = _authorizer;
     }
 
@@ -201,9 +216,10 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     mapping(uint256 => uint256) public battleRewardAmounts;
 
     /**
-     * @dev 默认战斗奖励金额
+     * @dev 默认战斗奖励金额（100个代币）
      */
-    uint256 public defaultBattleReward = 100 * 10**18;
+    uint256 public constant DEFAULT_BATTLE_REWARD_AMOUNT = 100;
+    uint256 public defaultBattleReward = DEFAULT_BATTLE_REWARD_AMOUNT * 10**18;
 
     /**
      * @dev 设置特定战斗类型的奖励金额
@@ -215,7 +231,12 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 分发战斗奖励
+     * @dev 分发战斗奖励到各资金池（分红池、质押池、竞技场奖励池）
+     * 注意：此函数不直接给赢家发奖励。竞技场积分模式胜利增加积分，排名模式通过排名替换。
+     * winner/loser 参数保留用于未来扩展，当前仅用于日志记录目的。
+     * @param winner 获胜者地址（当前未使用，预留扩展）
+     * @param loser 失败者地址（当前未使用，预留扩展）
+     * @param battleType 战斗类型
      */
     function distributeBattleReward(
         address winner,
@@ -339,7 +360,10 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
         if (dividendPool != address(0) && dividendAmount > 0) {
             dividendSuccess = token.transfer(dividendPool, dividendAmount);
-            if (!dividendSuccess) {
+            if (dividendSuccess) {
+                // 同步 DividendManager 分红池，使转账的代币被正确计入分红计算
+                try IDividendManager(dividendPool).syncDividendPool() {} catch {}
+            } else {
                 emit RewardTransferFailed(0, dividendPool, dividendAmount);
             }
         }
@@ -522,13 +546,14 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         }
     }
 
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner whenNotPaused {
         require(amount > 0, "RewardManager: Amount must be > 0");
         require(amount <= address(this).balance, "RewardManager: Insufficient balance");
         payable(owner()).transfer(amount);
+        emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner whenNotPaused {
         require(amount > 0, "RewardManager: Amount must be > 0");
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
@@ -537,5 +562,6 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
 
+    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 }

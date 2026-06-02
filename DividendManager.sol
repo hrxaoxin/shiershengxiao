@@ -35,11 +35,21 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * - 5级: 76
  */
 contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+
+    /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
     bool public paused;
     string public pauseReason;
 
-    event Paused(address account, string reason);
-    event Unpaused(address account);
+    event Paused(address indexed account, string reason);
+    event Unpaused(address indexed account);
+    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
     modifier whenNotPaused() {
         require(!paused, "DividendManager: Paused");
@@ -247,7 +257,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 获取指定索引的快照（处理环形缓冲区）
+     * @dev 获取指定逻辑索引的快照（处理环形缓冲区）
+     * 逻辑索引 0 为最旧的快照
      */
     function getSnapshot(uint256 index) external view returns (uint256, uint256, uint256, uint256) {
         require(index < snapshots.length, "DividendManager: Invalid snapshot index");
@@ -283,28 +294,10 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 领取分红并转账（供前端直接调用）
+     * @dev 领取分红并转账（供前端直接调用，委托给 claim() 以消除代码重复）
      */
     function claimDividend() external nonReentrant whenNotPaused {
-        uint256 userWeight = userWeights[msg.sender];
-        require(userWeight > 0, "DividendManager: No weight");
-
-        // 计算用户应得的增量分红
-        uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[msg.sender];
-        uint256 newDividend = userWeight * cumulativeDiff / 1e18;
-        uint256 totalDividend = pendingDividends[msg.sender] + newDividend;
-
-        require(totalDividend > 0, "DividendManager: No dividend");
-
-        pendingDividends[msg.sender] = 0;
-        userCumulativeSnapshots[msg.sender] = cumulativePerWeightDividend;
-
-        require(tokenContract != address(0), "DividendManager: Token contract not set");
-        IERC20 token = IERC20(tokenContract);
-        require(token.balanceOf(address(this)) >= totalDividend, "DividendManager: Insufficient contract balance");
-        require(token.transfer(msg.sender, totalDividend), "DividendManager: Transfer failed");
-
-        emit DividendClaimed(msg.sender, totalDividend);
+        claim();
     }
 
     /**
@@ -477,13 +470,16 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 获取当前快照
+     * @dev 获取最新快照（正确处理环形缓冲区）
      */
     function getCurrentSnapshot() external view returns (uint256, uint256, uint256) {
         if (snapshots.length == 0) {
             return (0, 0, 0);
         }
-        DividendSnapshot memory snapshot = snapshots[snapshots.length - 1];
+        uint256 latestIndex = snapshots.length < MAX_SNAPSHOTS 
+            ? snapshots.length - 1 
+            : (snapshotStartIndex + MAX_SNAPSHOTS - 1) % MAX_SNAPSHOTS;
+        DividendSnapshot memory snapshot = snapshots[latestIndex];
         return (snapshot.totalWeight, snapshot.totalDividend, snapshot.perWeightDividend);
     }
 
@@ -495,29 +491,31 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 获取指定范围的快照
-     * @param startIndex 起始索引
+     * @dev 获取指定范围的快照（正确处理环形缓冲区）
+     * @param startIndex 起始逻辑索引
      * @param count 获取数量
      */
     function getSnapshotHistory(uint256 startIndex, uint256 count) external view returns (DividendSnapshot[] memory) {
-        require(startIndex < snapshots.length, "DividendManager: Invalid start index");
+        uint256 totalCount = snapshots.length;
+        require(startIndex < totalCount, "DividendManager: Invalid start index");
         require(count > 0, "DividendManager: Invalid count");
 
         uint256 endIndex = startIndex + count;
-        if (endIndex > snapshots.length) {
-            endIndex = snapshots.length;
+        if (endIndex > totalCount) {
+            endIndex = totalCount;
         }
 
         DividendSnapshot[] memory result = new DividendSnapshot[](endIndex - startIndex);
         for (uint256 i = startIndex; i < endIndex; i++) {
-            result[i - startIndex] = snapshots[i];
+            uint256 actualIndex = (snapshotStartIndex + i) % totalCount;
+            result[i - startIndex] = snapshots[actualIndex];
         }
 
         return result;
     }
 
     /**
-     * @dev 获取最新N条快照记录
+     * @dev 获取最新N条快照记录（正确处理环形缓冲区）
      * @param count 记录数量
      */
     function getRecentSnapshots(uint256 count) external view returns (DividendSnapshot[] memory) {
@@ -525,30 +523,39 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
             return new DividendSnapshot[](0);
         }
 
-        if (count > snapshots.length) {
-            count = snapshots.length;
+        uint256 totalCount = snapshots.length;
+        if (count > totalCount) {
+            count = totalCount;
         }
 
         DividendSnapshot[] memory result = new DividendSnapshot[](count);
-        uint256 startIndex = snapshots.length - count;
         for (uint256 i = 0; i < count; i++) {
-            result[i] = snapshots[startIndex + i];
+            uint256 logicalIndex = totalCount - count + i;
+            uint256 actualIndex = (snapshotStartIndex + logicalIndex) % totalCount;
+            result[i] = snapshots[actualIndex];
         }
 
         return result;
     }
 
     /**
-     * @dev [DEPRECATED] 此功能暂未实现
+     * @dev [DEPRECATED] 此功能未被完整实现，始终返回 0。
+     * 如需按快照查询用户权重，需在合约中维护 user => snapshotIndex => weight 的映射。
+     * @param user 用户地址
+     * @param snapshotIndex 快照索引
      */
     function getUserWeightAtSnapshot(address user, uint256 snapshotIndex) external pure returns (uint256) {
+        user; snapshotIndex; // 消除未使用变量警告
         return 0;
     }
 
     /**
-     * @dev [DEPRECATED] 此功能暂未实现
+     * @dev [DEPRECATED] 此功能未被完整实现，始终返回 0。
+     * 如需统计用户相关快照数量，需在合约中维护 user => snapshotCount 的映射。
+     * @param user 用户地址
      */
     function getUserSnapshotCount(address user) external pure returns (uint256) {
+        user; // 消除未使用变量警告
         return 0;
     }
 
@@ -571,7 +578,10 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         totalWeight = this.totalWeight;
         snapshotCount = snapshots.length;
         if (snapshots.length > 0) {
-            lastSnapshotTime = snapshots[snapshots.length - 1].timestamp;
+            uint256 latestIndex = snapshots.length < MAX_SNAPSHOTS 
+                ? snapshots.length - 1 
+                : (snapshotStartIndex + MAX_SNAPSHOTS - 1) % MAX_SNAPSHOTS;
+            lastSnapshotTime = snapshots[latestIndex].timestamp;
         }
     }
 
@@ -591,6 +601,4 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
 
-    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
-    event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 }

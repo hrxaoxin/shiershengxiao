@@ -22,6 +22,13 @@ import "./BattleSkills.sol";
  */
 contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
      * @dev 技能数据映射
      * elementIndex (0-4) => zodiacIndex (0-11) => gender (0-1) => FullSkill
      */

@@ -25,6 +25,13 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  */
 contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
      * @dev 战斗合约地址
      * 只有战斗合约可以添加战斗记录
      */

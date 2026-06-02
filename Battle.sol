@@ -8,6 +8,13 @@ import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 
 contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
     struct NFTTraits {
         uint256 tokenId;
         uint8 level;
@@ -52,8 +59,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     uint256 public constant ELEMENT_COUNT = 5;
     uint256 public constant ZODIAC_TYPE_COUNT = ZODIAC_COUNT * GENDER_COUNT;
     uint256 public constant TOTAL_TYPE_COUNT = ELEMENT_COUNT * ZODIAC_TYPE_COUNT;
+    uint256 public constant MAX_BATTLE_HISTORY = 1000;
     uint256 public constant MIN_GROWTH = 50;
     uint256 public constant GROWTH_RANGE = 51;
+    uint256 public constant TEAM_SIZE = 6;
+    uint256 public constant SKILL_USE_CHANCE_DENOMINATOR = 5;
 
     address public nftContract;
     address public authorizer;
@@ -102,12 +112,15 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     /**
      * @dev 初始化合约
      * @param _authorizer 授权器合约地址
+     * @param _battleCaller 战斗调用者地址（通常是ArenaRanking合约）
      */
-    function initialize(address _authorizer) external initializer {
+    function initialize(address _authorizer, address _battleCaller) external initializer {
+        require(_authorizer != address(0), "Battle: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizer;
+        battleCaller = _battleCaller;
         _initSkills();
     }
 
@@ -286,7 +299,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint256[6] calldata challengerTeam,
         uint256[6] calldata challengedTeam,
         address challengedAddress
-    ) external nonReentrant onlyBattleCaller returns (bool, uint256) {
+    ) external nonReentrant onlyBattleCaller whenNotPaused returns (bool, uint256) {
         bool isMockBattle = (challengedAddress == address(0));
 
         if (!isMockBattle) {
@@ -316,6 +329,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             require(INFTMint(nftContract).ownerOf(challengedId) == challengedAddress, "Battle: Not owner of challenged NFT");
         }
 
+        if (battleHistory.length >= MAX_BATTLE_HISTORY) {
+            for (uint256 i = 0; i < battleHistory.length - 1; i++) {
+                battleHistory[i] = battleHistory[i + 1];
+            }
+            battleHistory.pop();
+        }
+        
         battleHistory.push(BattleState({
             battleId: battleHistory.length + 1,
             startTime: block.timestamp,
@@ -402,8 +422,8 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             state2.alive[i] = true;
         }
 
-        uint256[6] memory skillCooldown1;
-        uint256[6] memory skillCooldown2;
+        uint256[TEAM_SIZE] memory skillCooldown1;
+        uint256[TEAM_SIZE] memory skillCooldown2;
 
         bool team1Alive = true;
         bool team2Alive = true;
@@ -424,9 +444,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 if (!state1.alive[attackerIndex] || !team1Alive) continue;
                 
                 NFTTraits memory attackerTrait = state1.traits[attackerIndex];
-                uint256 skillKey = attackerTrait.element * 24 + attackerTrait.zodiac;
+                uint256 skillKey = attackerTrait.element * ZODIAC_TYPE_COUNT + attackerTrait.zodiac;
                 Skill memory skill = skills[skillKey];
-                bool useSkill = skillCooldown1[attackerIndex] == 0 && (randomSeed % 5 == 0 || _shouldUseSkill(state1, attackerIndex));
+                bool useSkill = skillCooldown1[attackerIndex] == 0 && (randomSeed % SKILL_USE_CHANCE_DENOMINATOR == 0 || _shouldUseSkill(state1, attackerIndex));
                 
                 if (useSkill && skill.skillId > 0) {
                     state2 = _applySkill(attackerTrait, state2, attackerIndex, skill);
@@ -455,7 +475,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 if (!state2.alive[attackerIndex] || !team2Alive) continue;
                 
                 NFTTraits memory attackerTrait = state2.traits[attackerIndex];
-                uint256 skillKey = attackerTrait.element * 24 + attackerTrait.zodiac;
+                uint256 skillKey = attackerTrait.element * ZODIAC_TYPE_COUNT + attackerTrait.zodiac;
                 Skill memory skill = skills[skillKey];
                 bool useSkill = skillCooldown2[attackerIndex] == 0 && (randomSeed % 5 == 0 || _shouldUseSkill(state2, attackerIndex));
                 
@@ -607,7 +627,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @return 随机种子
      */
     function _generateRandomSeed(uint256 battleId) internal view returns (uint256) {
-        return uint256(keccak256(abi.encodePacked(
+        bytes32 entropy = keccak256(abi.encodePacked(
             battleId,
             block.timestamp,
             block.number,
@@ -616,8 +636,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             address(this),
             block.coinbase,
             block.prevrandao,
-            gasleft()
-        )));
+            gasleft(),
+            tx.gasprice,
+            block.basefee,
+            uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, battleId)))
+        ));
+        
+        return uint256(entropy);
     }
 
     /**

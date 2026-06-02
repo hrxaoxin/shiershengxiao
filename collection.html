@@ -456,7 +456,8 @@
                     document.getElementById('totalDividends').textContent = '0';
                     return;
                 }
-                const unclaimed = await rewardManagerContract.methods.calcUserDividend(account).call();
+                const divResult = await rewardManagerContract.methods.calcUserDividend(account).call();
+                const unclaimed = divResult['0'];
                 const unclaimedBNB = safeGetWeb3().utils.fromWei(unclaimed.toString(), 'ether');
                 document.getElementById('totalDividends').textContent = parseFloat(unclaimedBNB).toFixed(4);
             } catch (error) {

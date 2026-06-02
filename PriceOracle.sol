@@ -27,6 +27,13 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  */
 contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
      * @dev 价格历史记录结构体
      */
     struct PriceRecord {

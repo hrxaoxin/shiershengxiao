@@ -642,8 +642,9 @@
                 // holdersCount 未在合约中追踪，显示为 --
                 document.getElementById('holders').textContent = '--';
 
-                // calcUserDividend 返回 ERC20 代币数量
-                const userDivWei = await rewardManager.methods.calcUserDividend(account).call();
+                // calcUserDividend 返回 (uint256 claimable, uint256 weight) 元组
+                const userDivResult = await rewardManager.methods.calcUserDividend(account).call();
+                const userDivWei = userDivResult['0'];
                 const userDiv = web3.utils.fromWei(userDivWei, 'ether');
                 document.getElementById('unclaimedDividend').textContent = parseFloat(userDiv).toFixed(4);
             } catch (error) {

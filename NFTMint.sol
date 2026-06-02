@@ -25,6 +25,13 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  */
 contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
+    /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
     // ============ 状态变量 ============
     
     /**
@@ -240,7 +247,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
 
     function _generateGrowthValue(uint256 randomSeed) internal pure returns (uint8) {
         uint256 roll = randomSeed % 91;
-        return uint8(roll + 10);
+        return uint8(roll + 10); // 范围 [10, 100]
     }
 
     function _chooseElement(uint256 randomVal) internal view returns (uint256) {
@@ -397,23 +404,23 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     function mintTargeted(address to, uint8 baseZodiac) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         require(baseZodiac < 12, "NFTMint: Invalid zodiac");
-        uint256[] memory tokenIds = new uint256[](10);
-        uint256 index = 0;
+        
+        uint256 totalNFTs = 10; // 5 elements * 2 genders
+        uint256[] memory tokenIds = new uint256[](totalNFTs);
         uint256 baseSeed = _generateSecureRandom();
+        
         for (uint256 element = 0; element < 5; element++) {
             for (uint256 gender = 0; gender < 2; gender++) {
-                if (index < 10) {
-                    uint256 zodiacType = _calculateZodiacType(element, baseZodiac, gender);
-                    uint8 growth = _generateGrowthValue(baseSeed + index * 9973);
-                    uint256 tokenId = _nextCardId++;
-                    _safeMint(to, tokenId);
-                    tokenType[tokenId] = zodiacType;
-                    tokenLevel[tokenId] = 1;
-                    tokenGrowth[tokenId] = growth;
-                    _syncNFTData(to, tokenId, zodiacType, 1, growth);
-                    tokenIds[index] = tokenId;
-                    index++;
-                }
+                uint256 index = element * 2 + gender;
+                uint256 zodiacType = _calculateZodiacType(element, baseZodiac, gender);
+                uint8 growth = _generateGrowthValue(baseSeed + index * 9973);
+                uint256 tokenId = _nextCardId++;
+                _safeMint(to, tokenId);
+                tokenType[tokenId] = zodiacType;
+                tokenLevel[tokenId] = 1;
+                tokenGrowth[tokenId] = growth;
+                _syncNFTData(to, tokenId, zodiacType, 1, growth);
+                tokenIds[index] = tokenId;
             }
         }
         emit BatchMint(to, tokenIds);

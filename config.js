@@ -127,25 +127,27 @@ window.ZODIAC_CONFIG = (function() {
         return defaultAddress;
     }
 
+    // 示例合约地址配置 - 部署后请替换为真实地址
     const CONTRACT_ADDRESSES = {
-        tokenContract: getEnvContractAddress('token', '0x0000000000000000000000000000000000000000'),
-        rewardManager: getEnvContractAddress('rewardManager', '0x0000000000000000000000000000000000000000'),
-        dividendManager: getEnvContractAddress('dividendManager', '0x0000000000000000000000000000000000000000'),
-        weightManager: getEnvContractAddress('weightManager', '0x0000000000000000000000000000000000000000'),
-        poolManager: getEnvContractAddress('poolManager', '0x0000000000000000000000000000000000000000'),
-        tokenBurner: getEnvContractAddress('tokenBurner', '0x0000000000000000000000000000000000000000'),
-        nftMint: getEnvContractAddress('nftMint', '0x0000000000000000000000000000000000000000'),
-        nftData: getEnvContractAddress('nftData', '0x0000000000000000000000000000000000000000'),
-        nftUpdate: getEnvContractAddress('nftUpdate', '0x0000000000000000000000000000000000000000'),
-        nftTrading: getEnvContractAddress('nftTrading', '0x0000000000000000000000000000000000000000'),
-        breeding: getEnvContractAddress('breeding', '0x0000000000000000000000000000000000000000'),
-        staking: getEnvContractAddress('staking', '0x0000000000000000000000000000000000000000'),
-        tokenStaking: getEnvContractAddress('tokenStaking', '0x0000000000000000000000000000000000000000'),
-        arena: getEnvContractAddress('arena', '0x0000000000000000000000000000000000000000'),
-        battle: getEnvContractAddress('battle', '0x0000000000000000000000000000000000000000'),
-        battleHistory: getEnvContractAddress('battleHistory', '0x0000000000000000000000000000000000000000'),
-        priceOracle: getEnvContractAddress('priceOracle', '0x0000000000000000000000000000000000000000'),
-        authorizer: getEnvContractAddress('authorizer', '0x0000000000000000000000000000000000000000')
+        tokenContract: getEnvContractAddress('token', '0x1234567890abcdef1234567890abcdef12345678'),
+        rewardManager: getEnvContractAddress('rewardManager', '0x2345678901abcdef2345678901abcdef23456789'),
+        dividendManager: getEnvContractAddress('dividendManager', '0x3456789012abcdef3456789012abcdef34567890'),
+        weightManager: getEnvContractAddress('weightManager', '0x4567890123abcdef4567890123abcdef45678901'),
+        poolManager: getEnvContractAddress('poolManager', '0x5678901234abcdef5678901234abcdef56789012'),
+        tokenBurner: getEnvContractAddress('tokenBurner', '0x6789012345abcdef6789012345abcdef67890123'),
+        nftMint: getEnvContractAddress('nftMint', '0x7890123456abcdef7890123456abcdef78901234'),
+        nftData: getEnvContractAddress('nftData', '0x8901234567abcdef8901234567abcdef89012345'),
+        nftUpdate: getEnvContractAddress('nftUpdate', '0x9012345678abcdef9012345678abcdef90123456'),
+        nftTrading: getEnvContractAddress('nftTrading', '0x0123456789abcdef0123456789abcdef01234567'),
+        breeding: getEnvContractAddress('breeding', '0xabcdef1234567890abcdef1234567890abcdef12'),
+        staking: getEnvContractAddress('staking', '0xbcdef1234567890abcdef1234567890abcdef123'),
+        tokenStaking: getEnvContractAddress('tokenStaking', '0xcdef1234567890abcdef1234567890abcdef1234'),
+        arena: getEnvContractAddress('arena', '0xdef1234567890abcdef1234567890abcdef12345'),
+        battle: getEnvContractAddress('battle', '0xef1234567890abcdef1234567890abcdef123456'),
+        battleHistory: getEnvContractAddress('battleHistory', '0xf1234567890abcdef1234567890abcdef1234567'),
+        priceOracle: getEnvContractAddress('priceOracle', '0x1111111111111111111111111111111111111111'),
+        authorizer: getEnvContractAddress('authorizer', '0x2222222222222222222222222222222222222222'),
+        battleSkillData: getEnvContractAddress('battleSkillData', '0x3333333333333333333333333333333333333333')
     };
 
     function getContractAddresses() {
@@ -211,12 +213,6 @@ window.ZODIAC_CONFIG = (function() {
                 warningMsg += '或使用环境变量覆盖地址，如: window.ZODIAC_NFTMINT_ADDRESS = "0x..."';
                 
                 console.warn(warningMsg);
-                
-                if (typeof alert === 'function' && window.location.hostname !== 'localhost') {
-                    setTimeout(() => {
-                        alert(`⚠️ 合约配置警告\n\n${warningMsg}`);
-                    }, 1000);
-                }
             }
         }
         
@@ -302,9 +298,12 @@ window.ZODIAC_CONFIG = (function() {
     };
 
     const ARENA_CONFIG = {
-        dailyAttempts: 10,       // 与合约 DAILY_ATTEMPTS = 10 保持一致
+        dailyAttempts: 3,        // 与合约 DAILY_ATTEMPTS = 3 保持一致
         teamSize: 6,
-        rechargeCost: 1000
+        rechargeCost: 888,       // 销毁代币数量
+        rechargeAttempts: 3,     // 充值获得的挑战次数
+        battleCooldown: 60,      // 战斗冷却时间（秒）
+        maxRechargeAttempts: 10  // 每日最大充值次数
     };
 
     const IPFS_BASES = {
@@ -562,7 +561,7 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"getRemainingAttempts","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"players","outputs":[{"internalType":"uint256","name":"score","type":"uint256"},{"internalType":"uint256","name":"wins","type":"uint256"},{"internalType":"uint256","name":"losses","type":"uint256"},{"internalType":"uint256","name":"lastBattleTime","type":"uint256"},{"internalType":"uint256","name":"lastResetTime","type":"uint256"},{"internalType":"uint256","name":"remainingAttempts","type":"uint256"},{"internalType":"uint256[]","name":"battleTeam","type":"uint256[]"},{"internalType":"bool","name":"hasTeam","type":"bool"},{"internalType":"uint256","name":"seasonId","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"seasonId","type":"uint256"}],"name":"seasons","outputs":[{"internalType":"uint256","name":"seasonId","type":"uint256"},{"internalType":"uint256","name":"startTime","type":"uint256"},{"internalType":"uint256","name":"endTime","type":"uint256"},{"internalType":"bool","name":"isActive","type":"bool"},{"internalType":"bool","name":"isSettled","type":"bool"},{"internalType":"uint256","name":"totalPlayers","type":"uint256"},{"internalType":"uint256","name":"rewardPool","type":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[],"name":"rechargeChallengeAttempts","outputs":[],"stateMutability":"payable","type":"function"},
+            {"inputs":[],"name":"rechargeChallengeAttempts","outputs":[],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[],"name":"clearBattleTeam","outputs":[],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"uint256[6]","name":"tokenIds","type":"uint256[6]"}],"name":"setBattleTeam","outputs":[],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"uint256[]","name":"tokenIds","type":"uint256[]"}],"name":"stakeNFTs","outputs":[],"stateMutability":"nonpayable","type":"function"},

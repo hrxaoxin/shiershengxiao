@@ -8,13 +8,25 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 import "./NFTInterface.sol";
 
+interface IBreeding {
+    function isNFTInActiveBreeding(uint256 tokenId) external view returns (bool);
+}
+
 /**
  * @title Staking
  * @dev NFT质押合约（优化版：支持大规模用户，实时奖励计算）
  */
 contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+
+    /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
     uint256 public minStakingDuration = 30 minutes;
-    uint256 public rewardRate = 10; // 万分比 (0.1%)
+    uint256 public rewardRate = 10; // 万分比 (0.1% = 10/10000)
     uint256 public maxRewardRate = 20;
     uint256 public rateStep = 1;
 
@@ -29,6 +41,10 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     uint256 public todayIncomingTokens;
     uint256 public todayRewardAmount;
     uint256 public todayStart;
+
+    // 用户级别累计权重跟踪（优化 getPendingReward / claimReward 的 Gas 消耗）
+    mapping(address => uint256) public userStakedWeight;      // 用户质押的NFT总权重
+    mapping(address => uint256) private _userSnapshotWeight;   // Σ(accumulatedReward * weight) 每用户
 
     struct StakingInfo {
         address owner;
@@ -49,6 +65,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     address public rewardTokenContract;
     address public nftContract;
     address public authorizer;
+    address public breedingContract;
     uint256 public globalPendingRewards;
     
     bool public paused;
@@ -79,6 +96,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function setNFTContract(address _nftContract) external onlyAuthorized {
         require(_nftContract != address(0), "Staking: Invalid NFT contract address");
         nftContract = _nftContract;
+    }
+
+    function setBreedingContract(address _breedingContract) external onlyAuthorized {
+        require(_breedingContract != address(0), "Staking: Invalid breeding contract address");
+        breedingContract = _breedingContract;
     }
 
     modifier onlyAuthorized() {
@@ -113,6 +135,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             uint256 tokenId = tokenIds[i];
             require(stakingInfo[tokenId].owner == address(0), "Staking: Already staked");
             require(nft.ownerOf(tokenId) == msg.sender, "Staking: Not owner of token");
+            
+            // 检查 NFT 是否正在繁殖中
+            if (breedingContract != address(0)) {
+                require(!IBreeding(breedingContract).isNFTInActiveBreeding(tokenId), "Staking: NFT is in breeding");
+            }
 
             bool isRareToken = nft.isRare(tokenId);
             nft.safeTransferFrom(msg.sender, address(this), tokenId);
@@ -127,7 +154,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
 
             userStakedNFTs[msg.sender].push(tokenId);
             totalStakedNFTs++;
-            totalWeightedNFTs += isRareToken ? rareNFTWeight : normalNFTWeight;
+            uint256 weight = isRareToken ? rareNFTWeight : normalNFTWeight;
+            totalWeightedNFTs += weight;
+            // 更新用户级别累计跟踪
+            userStakedWeight[msg.sender] += weight;
+            _userSnapshotWeight[msg.sender] += globalRewardPerWeight * weight;
         }
         emit Staked(msg.sender, tokenIds);
     }
@@ -146,10 +177,14 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             _settleNFTReward(info);
 
             bool wasRare = info.isRare;
+            uint256 weight = wasRare ? rareNFTWeight : normalNFTWeight;
             delete stakingInfo[tokenId];
             _removeFromUserStakedNFTs(msg.sender, tokenId);
             totalStakedNFTs--;
-            totalWeightedNFTs -= wasRare ? rareNFTWeight : normalNFTWeight;
+            totalWeightedNFTs -= weight;
+            // 更新用户级别累计跟踪
+            userStakedWeight[msg.sender] -= weight;
+            _userSnapshotWeight[msg.sender] -= globalRewardPerWeight * weight;
 
             nft.safeTransferFrom(address(this), msg.sender, tokenId);
         }
@@ -162,28 +197,31 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     /**
-     * @dev 领取奖励（优化：实时计算，无 Gas 瓶颈）
+     * @dev 领取奖励（Gas优化：用户级别累计公式计算总量，避免逐NFT计算）
      */
     function claimReward() external whenNotPaused nonReentrant {
         uint256[] storage nfts = userStakedNFTs[msg.sender];
         require(nfts.length > 0, "Staking: No staked NFTs");
         require(rewardTokenContract != address(0), "Staking: Reward token not set");
 
-        uint256 totalClaimable = 0;
-        for (uint256 i = 0; i < nfts.length; i++) {
-            StakingInfo storage info = stakingInfo[nfts[i]];
-            if (info.owner == msg.sender) {
-                totalClaimable += _calculatePendingForNFT(info);
-                info.accumulatedReward = globalRewardPerWeight;
-                info.lastClaimTime = block.timestamp;
-            }
-        }
-
+        // O(1) 用户级别公式计算总量
+        uint256 totalClaimable = _calcUserPending(msg.sender);
         require(totalClaimable > 0, "Staking: No pending reward");
 
         IERC20 rewardToken = IERC20(rewardTokenContract);
         require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance");
         
+        // 重置所有 NFT 的快照为当前全局值（必须遍历以更新 storage）
+        for (uint256 i = 0; i < nfts.length; i++) {
+            StakingInfo storage info = stakingInfo[nfts[i]];
+            if (info.owner == msg.sender) {
+                info.accumulatedReward = globalRewardPerWeight;
+                info.lastClaimTime = block.timestamp;
+            }
+        }
+        
+        // 重置用户级别累计快照
+        _userSnapshotWeight[msg.sender] = globalRewardPerWeight * userStakedWeight[msg.sender];
         pendingRewards[msg.sender] = 0;
         
         require(rewardToken.transfer(msg.sender, totalClaimable), "Staking: Transfer failed");
@@ -197,7 +235,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         uint256 weight = info.isRare ? rareNFTWeight : normalNFTWeight;
         // 奖励 = (当前全局值 - 上次快照) * 权重 / 精度
         if (globalRewardPerWeight <= info.accumulatedReward) return 0;
-        return (globalRewardPerWeight - info.accumulatedReward) * weight / REWARD_PRECISION;
+        return (globalRewardPerWeight - info.accumulatedReward) * weight / STAKING_REWARD_PRECISION;
     }
 
     function _settleNFTReward(StakingInfo storage info) internal {
@@ -208,27 +246,15 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         }
     }
 
-    uint256 public constant REWARD_PRECISION = 1e18;
+    uint256 public constant STAKING_REWARD_PRECISION = 1e18;
 
     /**
      * @dev 每日奖励计算（仅增加全局增量，不遍历用户）
      */
     function calculateDailyReward() external whenNotPaused onlyAuthorized {
         _checkNewDay();
-        
-        if (_shouldCalculateDailyReward()) {
-            IERC20 rewardToken = IERC20(rewardTokenContract);
-            uint256 contractBalance = rewardToken.balanceOf(address(this));
-            
-            uint256 dailyReward = contractBalance * rewardRate / 10000;
-            
-            if (totalWeightedNFTs > 0 && dailyReward > 0) {
-                uint256 increment = dailyReward * REWARD_PRECISION / totalWeightedNFTs;
-                globalRewardPerWeight += increment;
-                todayRewardAmount = dailyReward;
-                emit DailyRewardCalculated(dailyReward, increment);
-            }
-        }
+        require(todayRewardAmount == 0, "Staking: Daily reward already calculated");
+        _doCalculateDailyReward();
     }
 
     /**
@@ -240,23 +266,34 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     /**
+     * @dev 核心每日奖励计算逻辑（消除代码重复）
+     */
+    function _doCalculateDailyReward() internal {
+        if (!_shouldCalculateDailyReward()) return;
+        
+        IERC20 rewardToken = IERC20(rewardTokenContract);
+        uint256 contractBalance = rewardToken.balanceOf(address(this));
+        
+        uint256 dailyReward = contractBalance * rewardRate / 10000;
+        uint256 maxDailyReward = contractBalance / 10;
+        if (dailyReward > maxDailyReward) {
+            dailyReward = maxDailyReward;
+        }
+        
+        if (totalWeightedNFTs > 0 && dailyReward > 0) {
+            uint256 increment = dailyReward * STAKING_REWARD_PRECISION / totalWeightedNFTs;
+            globalRewardPerWeight += increment;
+            todayRewardAmount = dailyReward;
+            emit DailyRewardCalculated(dailyReward, increment);
+        }
+    }
+
+    /**
      * @dev 在用户操作时自动触发每日奖励计算
      */
     function _autoCalculateDailyReward() internal {
         _checkNewDay();
-        if (_shouldCalculateDailyReward()) {
-            IERC20 rewardToken = IERC20(rewardTokenContract);
-            uint256 contractBalance = rewardToken.balanceOf(address(this));
-            
-            uint256 dailyReward = contractBalance * rewardRate / 10000;
-            
-            if (totalWeightedNFTs > 0 && dailyReward > 0) {
-                uint256 increment = dailyReward * REWARD_PRECISION / totalWeightedNFTs;
-                globalRewardPerWeight += increment;
-                todayRewardAmount = dailyReward;
-                emit DailyRewardCalculated(dailyReward, increment);
-            }
-        }
+        _doCalculateDailyReward();
     }
 
     function _removeFromUserStakedNFTs(address user, uint256 tokenId) internal {
@@ -335,13 +372,38 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         return userStakedNFTs[user];
     }
 
+    /**
+     * @dev 查询待领取奖励（Gas 优化：O(1) 用户级别累计公式，不遍历 NFT 列表）
+     */
     function getPendingReward(address user) external view returns (uint256) {
-        uint256[] storage nfts = userStakedNFTs[user];
-        uint256 total = 0;
-        for (uint256 i = 0; i < nfts.length; i++) {
-            total += _calculatePendingForNFT(stakingInfo[nfts[i]]);
+        return _calcUserPending(user);
+    }
+
+    /**
+     * @dev 内部函数：O(1) 计算用户总待领取奖励
+     * 公式：Σ(G - Ai) * Wi / P = (G * ΣWi - Σ(Ai * Wi)) / PRECISION
+     */
+    function _calcUserPending(address user) internal view returns (uint256) {
+        uint256 totalWeight = userStakedWeight[user];
+        if (totalWeight == 0) return 0;
+        
+        uint256 snapshotBase = _userSnapshotWeight[user];
+        
+        // 使用 Solidity 0.8+ 的内置溢出检查，安全计算
+        uint256 rewardBase;
+        if (globalRewardPerWeight > type(uint256).max / totalWeight) {
+            // 溢出保护：使用精度因子先除后乘，避免中间值溢出
+            uint256 globalDivided = globalRewardPerWeight / STAKING_REWARD_PRECISION;
+            rewardBase = globalDivided * totalWeight;
+            rewardBase = rewardBase * STAKING_REWARD_PRECISION;
+        } else {
+            rewardBase = globalRewardPerWeight * totalWeight;
         }
-        return total;
+        
+        if (rewardBase <= snapshotBase) return 0;
+        
+        uint256 pending = rewardBase - snapshotBase;
+        return pending / STAKING_REWARD_PRECISION;
     }
 
     function setRewardTokenContract(address _tokenContract) external onlyAuthorized {
@@ -362,7 +424,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     /**
-     * @dev 获取用户质押统计
+     * @dev 获取用户质押统计（Gas 优化：使用用户级别 O(1) 公式计算待领取奖励）
      * @param user 用户地址
      * @return totalStaked NFT总数
      * @return totalPendingReward 待领取奖励
@@ -377,13 +439,12 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     ) {
         uint256[] storage nfts = userStakedNFTs[user];
         totalStaked = nfts.length;
-        totalPendingReward = 0;
+        totalPendingReward = _calcUserPending(user);
         rareCount = 0;
         normalCount = 0;
         
         for (uint256 i = 0; i < nfts.length; i++) {
             StakingInfo memory info = stakingInfo[nfts[i]];
-            totalPendingReward += _calculatePendingForNFT(info);
             if (info.isRare) {
                 rareCount++;
             } else {

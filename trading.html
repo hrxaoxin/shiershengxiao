@@ -431,6 +431,12 @@
                 await updateWalletStatus();
                 await loadMarketplace();
             });
+            // 监听 MetaMask 账户切换事件，自动刷新数据
+            ZODIAC_WEB3.on('connect', async () => {
+                await initContracts();
+                await updateWalletStatus();
+                await loadMarketplace();
+            });
         }
 
         function handleConnectWallet() {

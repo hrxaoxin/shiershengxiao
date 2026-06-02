@@ -13,6 +13,13 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * @dev 竞技场排名与赛季管理合约（优化版：支持自动化结算）
  */
 contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    /**
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
     struct PlayerRecord {
         uint256 score;
         uint256 wins;
@@ -77,11 +84,13 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     address public nftContract;
     address public tokenContract;
     
-    uint256 public constant DAILY_ATTEMPTS = 10;
+    uint256 public constant DAILY_ATTEMPTS = 3;
     uint256 public constant MAX_RECHARGE_ATTEMPTS = 50;
     uint256 public constant BATTLE_COOLDOWN = 60 seconds;
+    uint256 public constant TEAM_SIZE = 6;
+    uint256 public constant RECHARGE_COST = 888;
+    uint256 public constant RECHARGE_ATTEMPTS = 3;
     uint256 public maxRechargeAttempts = 10;
-    uint256 public rechargeCost;
     uint256 public seasonRewardRate;
     mapping(address => uint256) public lastBattleTime;
     mapping(address => uint256) public rechargeCount;
@@ -130,9 +139,6 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function setTokenContract(address a) external onlyOwner { 
         tokenContract = a; 
     }
-    function setRechargeCost(uint256 cost) external onlyOwner { 
-        rechargeCost = cost; 
-    }
     function setSeasonRewardRate(uint256 rate) external onlyOwner { 
         seasonRewardRate = rate; 
     }
@@ -165,7 +171,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         }
     }
 
-    function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external returns (bool success) {
+    function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external whenNotPaused returns (bool success) {
         require(nftContract != address(0), "ArenaRanking: NFT contract not set");
         require(block.timestamp >= lastBattleTime[msg.sender] + BATTLE_COOLDOWN, "ArenaRanking: Battle cooldown");
 
@@ -190,12 +196,13 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return success_;
     }
 
-    function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external returns (bool success) {
+    function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external whenNotPaused returns (bool success) {
         require(nftContract != address(0), "ArenaRanking: NFT contract not set");
         require(challengedPlayer != msg.sender, "ArenaRanking: Cannot challenge self");
 
         SeasonInfo storage currentSeason = seasons[currentSeasonId];
         require(currentSeason.isActive, "ArenaRanking: Season not active");
+        require(block.timestamp < currentSeason.endTime, "ArenaRanking: Season ended");
 
         PlayerRecord storage challengerRecord = players[msg.sender];
         PlayerRecord storage challengedRecord = players[challengedPlayer];
@@ -207,6 +214,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(challengerRecord.remainingAttempts > 0, "ArenaRanking: No attempts left");
         require(challengedRecord.remainingAttempts > 0, "ArenaRanking: Target has no attempts left");
         require(block.timestamp >= lastBattleTime[msg.sender] + BATTLE_COOLDOWN, "ArenaRanking: Battle cooldown");
+        require(block.timestamp >= lastBattleTime[challengedPlayer] + BATTLE_COOLDOWN, "ArenaRanking: Target in battle cooldown");
         challengerRecord.remainingAttempts--;
         lastBattleTime[msg.sender] = block.timestamp;
 
@@ -306,11 +314,15 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         }
     }
 
-    function _generateMockTeam(uint256 mockIndex) internal pure returns (uint256[6] memory) {
-        require(mockIndex < 1000, "ArenaRanking: Invalid mock index");
-        uint256[6] memory team;
-        uint256 baseId = (mockIndex + 10000) * 1000;
-        for (uint256 i = 0; i < 6; i++) {
+    uint256 public constant MAX_MOCK_PLAYERS = 1000;
+    uint256 public constant MOCK_ID_OFFSET = 10000;
+    uint256 public constant MOCK_ID_MULTIPLIER = 1000;
+
+    function _generateMockTeam(uint256 mockIndex) internal pure returns (uint256[TEAM_SIZE] memory) {
+        require(mockIndex < MAX_MOCK_PLAYERS, "ArenaRanking: Invalid mock index");
+        uint256[TEAM_SIZE] memory team;
+        uint256 baseId = (mockIndex + MOCK_ID_OFFSET) * MOCK_ID_MULTIPLIER;
+        for (uint256 i = 0; i < TEAM_SIZE; i++) {
             team[i] = baseId + i + 1;
         }
         return team;
@@ -411,13 +423,21 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return userStakedNFTs[user];
     }
 
-    function rechargeChallengeAttempts() external payable whenNotPaused {
-        require(msg.value >= rechargeCost, "ArenaRanking: Insufficient payment");
+    function rechargeChallengeAttempts() external whenNotPaused {
+        require(tokenContract != address(0), "ArenaRanking: Token contract not set");
         require(rechargeCount[msg.sender] < maxRechargeAttempts, "ArenaRanking: Max recharge limit reached");
 
         PlayerRecord storage record = players[msg.sender];
-        uint256 newAttempts = DAILY_ATTEMPTS;
+        uint256 newAttempts = RECHARGE_ATTEMPTS;
         require(record.remainingAttempts + newAttempts <= MAX_RECHARGE_ATTEMPTS, "ArenaRanking: Would exceed max attempts");
+
+        uint256 burnAmount = RECHARGE_COST * 1e18;
+        IERC20 token = IERC20(tokenContract);
+        
+        uint256 currentAllowance = token.allowance(msg.sender, address(this));
+        require(currentAllowance >= burnAmount, "ArenaRanking: Insufficient token allowance");
+
+        token.burnFrom(msg.sender, burnAmount);
 
         rechargeCount[msg.sender]++;
         record.remainingAttempts += newAttempts;
@@ -445,6 +465,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             endTime: block.timestamp + seasonDuration,
             isActive: true,
             isSettled: false,
+            rewardCalculated: false,
             totalPlayers: 0,
             rewardPool: 0
         });
@@ -498,10 +519,13 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         PlayerRecord storage record = players[msg.sender];
         require(record.seasonId == seasonNumber, "ArenaRanking: No record in this season");
 
-        uint256 rank = playerRankIndex[seasonNumber][msg.sender] + 1;
-        require(rank > 0, "ArenaRanking: Player not found in rankings");
+        require(playerRankIndex[seasonNumber][msg.sender] > 0 || 
+                seasonRankings[seasonNumber].length > 0 && seasonRankings[seasonNumber][0] == msg.sender,
+                "ArenaRanking: Player not found in rankings");
 
-        uint256 reward = _calculateRankReward(rank, seasons[seasonNumber].rewardPool);
+        // 使用赛季节算时预计算的奖励值，避免因 rewardPool 变化导致奖励错误
+        uint256 reward = playerSeasonRewards[seasonNumber][msg.sender];
+        require(seasons[seasonNumber].rewardCalculated, "ArenaRanking: Season rewards not calculated");
         
         seasonRewardsClaimed[seasonNumber][msg.sender] = true;
         
@@ -532,7 +556,6 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function getPendingRewardsByPlayer(address player) external view returns (uint256) {
         PlayerRecord storage record = players[player];
         if (!seasons[record.seasonId].isSettled) return 0;
-        if (record.seasonId != currentSeasonId) return 0;
         
         uint256 rank = playerRankIndex[record.seasonId][player] + 1;
         
@@ -634,7 +657,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     function getSeasonReward(address player) external view returns (uint256) {
-        return getPendingRewards(player);
+        return getPendingRewardsByPlayer(player);
     }
 
     function isSeasonRewardClaimed(address player) external view returns (bool) {
@@ -868,4 +891,12 @@ interface IBattle {
 
 interface INFT {
     function ownerOf(uint256 tokenId) external view returns (address);
+    function safeTransferFrom(address from, address to, uint256 tokenId) external;
+    function isApprovedForAll(address owner, address operator) external view returns (bool);
+}
+
+interface IERC20 {
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+    function burnFrom(address account, uint256 amount) external;
+    function allowance(address owner, address spender) external view returns (uint256);
 }

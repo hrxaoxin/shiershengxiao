@@ -251,6 +251,14 @@
                 await initContracts();
                 await loadBNBReward();
             });
+            // 监听 MetaMask 账户切换事件，自动刷新数据
+            ZODIAC_WEB3.on('connect', async () => {
+                await initContracts();
+                await loadBNBReward();
+            });
+            ZODIAC_WEB3.on('disconnect', () => {
+                document.getElementById('bnbReward').textContent = '0.0000 代币';
+            });
         }
 
         function handleConnectWallet() {
@@ -301,7 +309,7 @@
                 }
                 
                 const dividendData = await rewardManagerContract.methods.calcUserDividend(account).call();
-                const baseAmount = dividendData;
+                const baseAmount = dividendData['0'];
                 const bnbAmount = web3.utils.fromWei(baseAmount, 'ether');
                 document.getElementById('bnbReward').textContent = bnbAmount.substring(0, 6) + ' 代币';
             } catch (error) {

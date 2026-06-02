@@ -618,7 +618,8 @@
 
                 document.getElementById('holders').textContent = '--';
 
-                const userDivWei = await rewardManager.methods.calcUserDividend(account).call();
+                const userDivResult = await rewardManager.methods.calcUserDividend(account).call();
+                const userDivWei = userDivResult['0'];
                 const userDiv = web3.utils.fromWei(userDivWei, 'ether');
                 document.getElementById('unclaimedDividend').textContent = parseFloat(userDiv).toFixed(4);
                 
