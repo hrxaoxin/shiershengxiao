@@ -6,43 +6,104 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 
+/**
+ * @title BattleHistory
+ * @dev 战斗历史记录合约，记录所有战斗的结果和详情
+ *
+ * 功能：
+ * 1. 存储战斗记录（战斗ID => 战斗结果）
+ * 2. 仅允许战斗合约写入记录
+ * 3. 提供战斗记录查询接口
+ *
+ * 战斗记录包含：
+ * - 战斗ID
+ * - 战斗时间戳
+ * - 双方玩家地址
+ * - 双方NFT队伍
+ * - 战斗结果
+ * - 双方得分
+ */
 contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+    /**
+     * @dev 战斗合约地址
+     * 只有战斗合约可以添加战斗记录
+     */
     address public battleContract;
+
+    /**
+     * @dev 授权合约地址（Authorizer）
+     */
     address public authorizer;
 
+    /**
+     * @dev 战斗历史映射
+     * battleId => SingleBattleResult
+     */
     mapping(uint256 => BattleLib.SingleBattleResult) public battleHistory;
 
+    /**
+     * @dev 仅允许战斗合约调用的修饰器
+     */
     modifier onlyBattleContract() {
-        require(msg.sender == battleContract, "Only battle contract");
+        require(msg.sender == battleContract, "BattleHistory: Only battle contract");
         _;
     }
 
+    /**
+     * @dev 初始化函数
+     * @param _authorizer 授权合约地址
+     */
     function initialize(address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         authorizer = _authorizer;
     }
 
+    /**
+     * @dev UUPS升级授权
+     * @param newImplementation 新实现合约地址
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
     function setAuthorizer(address a) external onlyOwner {
         authorizer = a;
     }
 
+    /**
+     * @dev 检查是否为授权调用者（owner或authorizer）
+     */
     modifier onlyAuthorized() {
         require(msg.sender == owner() || msg.sender == authorizer, "BattleHistory: Not authorized");
         _;
     }
 
+    /**
+     * @dev 设置战斗合约地址
+     * @param _battleContract 战斗合约地址
+     */
     function setBattleContract(address _battleContract) external onlyAuthorized {
         require(_battleContract != address(0), "BattleHistory: Invalid battle contract address");
         battleContract = _battleContract;
     }
 
+    /**
+     * @dev 添加战斗记录
+     * @param battleId 战斗ID
+     * @param result 战斗结果
+     */
     function addBattle(uint256 battleId, BattleLib.SingleBattleResult calldata result) external onlyBattleContract {
         battleHistory[battleId] = result;
     }
 
+    /**
+     * @dev 根据战斗ID获取战斗记录
+     * @param battleId 战斗ID
+     * @return SingleBattleResult 战斗结果
+     */
     function getBattleHistoryById(uint256 battleId) external view returns (BattleLib.SingleBattleResult memory) {
         return battleHistory[battleId];
     }

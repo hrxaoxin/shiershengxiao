@@ -93,7 +93,12 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     event BattleTeamSet(address indexed player, uint256[] tokenIds);
     event BattleTeamCleared(address indexed player);
 
-    function initialize(address _battleContract, address _nftContract, address _tokenContract) external initializer {
+    function initialize(address _battleContract, address _nftContract, address _tokenContract, address _authorizer) external initializer {
+        require(_battleContract != address(0), "ArenaRanking: Invalid battle contract address");
+        require(_nftContract != address(0), "ArenaRanking: Invalid NFT contract address");
+        require(_tokenContract != address(0), "ArenaRanking: Invalid token contract address");
+        require(_authorizer != address(0), "ArenaRanking: Invalid authorizer address");
+        
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -101,6 +106,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         battleContract = _battleContract;
         nftContract = _nftContract;
         tokenContract = _tokenContract;
+        authorizer = _authorizer;
         _startNewSeason();
     }
 
@@ -112,12 +118,24 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _unpause();
     }
 
-    function setAuthorizer(address a) external onlyOwner { authorizer = a; }
-    function setBattleContract(address a) external onlyOwner { battleContract = a; }
-    function setNFTContract(address a) external onlyOwner { nftContract = a; }
-    function setTokenContract(address a) external onlyOwner { tokenContract = a; }
-    function setRechargeCost(uint256 cost) external onlyOwner { rechargeCost = cost; }
-    function setSeasonRewardRate(uint256 rate) external onlyOwner { seasonRewardRate = rate; }
+    function setAuthorizer(address a) external onlyOwner { 
+        authorizer = a; 
+    }
+    function setBattleContract(address a) external onlyOwner { 
+        battleContract = a; 
+    }
+    function setNFTContract(address a) external onlyOwner { 
+        nftContract = a; 
+    }
+    function setTokenContract(address a) external onlyOwner { 
+        tokenContract = a; 
+    }
+    function setRechargeCost(uint256 cost) external onlyOwner { 
+        rechargeCost = cost; 
+    }
+    function setSeasonRewardRate(uint256 rate) external onlyOwner { 
+        seasonRewardRate = rate; 
+    }
 
     modifier onlyAuthorized() {
         require(msg.sender == owner() || msg.sender == authorizer, "ArenaRanking: Not authorized");
@@ -479,13 +497,14 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(rank > 0, "ArenaRanking: Player not found in rankings");
 
         uint256 reward = _calculateRankReward(rank, seasons[seasonNumber].rewardPool);
-        require(reward > 0, "ArenaRanking: No reward for this rank");
-        require(address(this).balance >= reward, "ArenaRanking: Insufficient BNB balance");
-
+        
         seasonRewardsClaimed[seasonNumber][msg.sender] = true;
         
-        (bool success, ) = payable(msg.sender).call{value: reward}("");
-        require(success, "ArenaRanking: BNB transfer failed");
+        if (reward > 0) {
+            require(address(this).balance >= reward, "ArenaRanking: Insufficient BNB balance");
+            (bool success, ) = payable(msg.sender).call{value: reward}("");
+            require(success, "ArenaRanking: BNB transfer failed");
+        }
         
         emit RewardClaimed(msg.sender, reward, seasonNumber);
     }
@@ -494,7 +513,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         claimReward(currentSeasonId);
     }
 
-    function getPendingRewards(uint256 seasonNumber) external view returns (uint256) {
+    function getPendingRewardsBySeason(uint256 seasonNumber) external view returns (uint256) {
         if (!seasons[seasonNumber].isSettled) return 0;
         
         PlayerRecord storage record = players[msg.sender];
@@ -505,7 +524,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return _calculateRankReward(rank, seasons[seasonNumber].rewardPool);
     }
 
-    function getPendingRewards(address player) external view returns (uint256) {
+    function getPendingRewardsByPlayer(address player) external view returns (uint256) {
         PlayerRecord storage record = players[player];
         if (!seasons[record.seasonId].isSettled) return 0;
         if (record.seasonId != currentSeasonId) return 0;
@@ -808,7 +827,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function getPlayerChallengeStatus(address player) external view returns (
         uint256 remainingAttempts,
         uint256 nextResetTime,
-        uint256 lastBattleTime,
+        uint256 playerLastBattleTime,
         uint256 cooldownRemaining
     ) {
         PlayerRecord storage record = players[player];
@@ -821,13 +840,13 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             nextResetTime = record.lastResetTime + 24 hours;
         }
 
-        lastBattleTime = lastBattleTime[player];
-        if (lastBattleTime == 0) {
+        playerLastBattleTime = lastBattleTime[player];
+        if (playerLastBattleTime == 0) {
             cooldownRemaining = 0;
-        } else if (block.timestamp >= lastBattleTime + BATTLE_COOLDOWN) {
+        } else if (block.timestamp >= playerLastBattleTime + BATTLE_COOLDOWN) {
             cooldownRemaining = 0;
         } else {
-            cooldownRemaining = lastBattleTime + BATTLE_COOLDOWN - block.timestamp;
+            cooldownRemaining = playerLastBattleTime + BATTLE_COOLDOWN - block.timestamp;
         }
     }
 }

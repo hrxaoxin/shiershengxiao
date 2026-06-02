@@ -65,6 +65,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
     function initialize(address _authorizer) external initializer {
+        require(_authorizer != address(0), "Staking: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -113,7 +114,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             require(nft.ownerOf(tokenId) == msg.sender, "Staking: Not owner of token");
 
             bool isRareToken = nft.isRare(tokenId);
-            nft.transferFrom(msg.sender, address(this), tokenId);
+            nft.safeTransferFrom(msg.sender, address(this), tokenId);
 
             stakingInfo[tokenId] = StakingInfo({
                 owner: msg.sender,
@@ -149,7 +150,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             totalStakedNFTs--;
             totalWeightedNFTs -= wasRare ? rareNFTWeight : normalNFTWeight;
 
-            nft.transferFrom(address(this), msg.sender, tokenId);
+            nft.safeTransferFrom(address(this), msg.sender, tokenId);
         }
 
         if (userStakedNFTs[msg.sender].length == 0) {
@@ -193,9 +194,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
 
     function _calculatePendingForNFT(StakingInfo storage info) internal view returns (uint256) {
         uint256 weight = info.isRare ? rareNFTWeight : normalNFTWeight;
-        // 奖励 = (当前全局值 - 上次快照) * 权重
+        // 奖励 = (当前全局值 - 上次快照) * 权重 / 精度
         if (globalRewardPerWeight <= info.accumulatedReward) return 0;
-        return (globalRewardPerWeight - info.accumulatedReward) * weight;
+        return (globalRewardPerWeight - info.accumulatedReward) * weight / REWARD_PRECISION;
     }
 
     function _settleNFTReward(StakingInfo storage info) internal {
@@ -205,6 +206,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             info.accumulatedReward = globalRewardPerWeight;
         }
     }
+
+    uint256 public constant REWARD_PRECISION = 1e18;
 
     /**
      * @dev 每日奖励计算（仅增加全局增量，不遍历用户）
@@ -219,7 +222,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             uint256 dailyReward = contractBalance * rewardRate / 10000;
             
             if (totalWeightedNFTs > 0 && dailyReward > 0) {
-                uint256 increment = dailyReward / totalWeightedNFTs;
+                uint256 increment = dailyReward * REWARD_PRECISION / totalWeightedNFTs;
                 globalRewardPerWeight += increment;
                 todayRewardAmount = dailyReward;
                 emit DailyRewardCalculated(dailyReward, increment);
@@ -247,7 +250,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             uint256 dailyReward = contractBalance * rewardRate / 10000;
             
             if (totalWeightedNFTs > 0 && dailyReward > 0) {
-                uint256 increment = dailyReward / totalWeightedNFTs;
+                uint256 increment = dailyReward * REWARD_PRECISION / totalWeightedNFTs;
                 globalRewardPerWeight += increment;
                 todayRewardAmount = dailyReward;
                 emit DailyRewardCalculated(dailyReward, increment);

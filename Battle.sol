@@ -35,62 +35,24 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint256[6] maxHp;
     }
 
+    struct Skill {
+        uint256 skillId;
+        uint8 skillType;
+        uint256 damage;
+        uint256 cooldown;
+        uint256 duration;
+        bool isAoe;
+    }
+
     BattleState[] public battleHistory;
 
     uint256 public constant MAX_ROUNDS = 50;
-    uint256 public constant PRECISION = 10000;
 
     address public nftContract;
     address public authorizer;
 
-    bool public initialized;
     bool public paused;
     string public pauseReason;
-
-    event Paused(address account, string reason);
-    event Unpaused(address account);
-
-    modifier whenNotPaused() {
-        require(!paused, "Battle: Paused");
-        _;
-    }
-
-    function initialize(address _authorizer) external initializer {
-        require(!initialized, "Battle: Already initialized");
-        __Ownable2Step_init();
-        __UUPSUpgradeable_init();
-        __ReentrancyGuard_init();
-        authorizer = _authorizer;
-        _initSkills();
-        initialized = true;
-    }
-
-    function reinitializeSkills() external onlyOwner {
-        _initSkills();
-    }
-
-    function pause(string memory reason) external onlyOwner {
-        paused = true;
-        pauseReason = reason;
-        emit Paused(msg.sender, reason);
-    }
-
-    function unpause() external onlyOwner {
-        paused = false;
-        pauseReason = "";
-        emit Unpaused(msg.sender);
-    }
-
-    function setAuthorizer(address a) external onlyOwner {
-        authorizer = a;
-    }
-
-    modifier onlyAuthorized() {
-        require(msg.sender == owner() || msg.sender == authorizer, "Battle: Not authorized");
-        _;
-    }
-
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     uint8 public constant ELEMENT_WATER = 0;
     uint8 public constant ELEMENT_WIND = 1;
@@ -98,6 +60,10 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     uint8 public constant ELEMENT_DARK = 3;
     uint8 public constant ELEMENT_LIGHT = 4;
 
+    mapping(uint256 => Skill) public skills;
+
+    event Paused(address account, string reason);
+    event Unpaused(address account);
     event BattleStarted(
         uint256 indexed battleId,
         address indexed challenger,
@@ -105,17 +71,87 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint256[6] challengerTeam,
         uint256[6] challengedTeam
     );
-
     event BattleEnded(
         uint256 indexed battleId,
         uint8 winner
     );
 
+    modifier whenNotPaused() {
+        require(!paused, "Battle: Paused");
+        _;
+    }
+
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "Battle: Not authorized");
+        _;
+    }
+
+    /**
+     * @dev 初始化合约
+     * @param _authorizer 授权器合约地址
+     */
+    function initialize(address _authorizer) external initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
+        authorizer = _authorizer;
+        _initSkills();
+    }
+
+    /**
+     * @dev 重新初始化技能（仅所有者调用）
+     */
+    function reinitializeSkills() external onlyOwner {
+        _initSkills();
+    }
+
+    /**
+     * @dev 暂停合约
+     * @param reason 暂停原因
+     */
+    function pause(string memory reason) external onlyOwner {
+        paused = true;
+        pauseReason = reason;
+        emit Paused(msg.sender, reason);
+    }
+
+    /**
+     * @dev 取消暂停
+     */
+    function unpause() external onlyOwner {
+        paused = false;
+        pauseReason = "";
+        emit Unpaused(msg.sender);
+    }
+
+    /**
+     * @dev 设置授权器地址
+     * @param a 新的授权器地址
+     */
+    function setAuthorizer(address a) external onlyOwner {
+        authorizer = a;
+    }
+
+    /**
+     * @dev 授权升级
+     * @param newImplementation 新实现合约地址
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @dev 设置NFT合约地址
+     * @param _nftContract NFT合约地址
+     */
     function setNFTContract(address _nftContract) external onlyAuthorized {
         require(_nftContract != address(0), "Battle: Invalid NFT contract address");
         nftContract = _nftContract;
     }
 
+    /**
+     * @dev 获取NFT属性
+     * @param tokenId NFT ID
+     * @return NFT属性结构体
+     */
     function _getNFTTraits(uint256 tokenId) internal view returns (NFTTraits memory) {
         NFTTraits memory traits;
         traits.tokenId = tokenId;
@@ -137,6 +173,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return traits;
     }
 
+    /**
+     * @dev 获取NFT数据（类型、等级、成长值）
+     * @param tokenId NFT ID
+     * @return tokenType 生肖类型
+     * @return level 等级
+     * @return growth 成长值
+     */
     function _getNFTData(uint256 tokenId) internal view returns (uint256 tokenType, uint256 level, uint256 growth) {
         if (nftContract == address(0)) {
             return (0, 1, 50);
@@ -161,6 +204,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
     }
 
+    /**
+     * @dev 计算NFT战力
+     * @param level 等级
+     * @param growth 成长值
+     * @return 战力值
+     */
     function _calculatePower(uint256 level, uint256 growth) internal pure returns (uint8) {
         if (level == 0) return 0;
         uint256 basePower = level * 20;
@@ -168,6 +217,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return uint8(basePower + growthBonus);
     }
 
+    /**
+     * @dev 检查元素克制关系
+     * @param attackerElement 攻击方元素
+     * @param defenderElement 防御方元素
+     * @return 是否克制
+     */
     function _checkAdvantage(uint8 attackerElement, uint8 defenderElement) internal pure returns (bool) {
         if (attackerElement == ELEMENT_FIRE && defenderElement == ELEMENT_WIND) return true;
         if (attackerElement == ELEMENT_WIND && defenderElement == ELEMENT_WATER) return true;
@@ -177,6 +232,10 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return false;
     }
 
+    /**
+     * @dev 验证队伍所有权（调用者必须拥有所有NFT）
+     * @param team 队伍NFT数组（6个）
+     */
     function _requireNFTOwnership(uint256[6] memory team) internal view {
         require(nftContract != address(0), "Battle: NFT contract not set");
         for (uint256 i = 0; i < 6; i++) {
@@ -190,6 +249,16 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
     }
 
+    /**
+     * @dev 发起挑战
+     * @param challengerId 挑战者代表NFT ID
+     * @param challengedId 被挑战者代表NFT ID
+     * @param challengerTeam 挑战者队伍（6个NFT）
+     * @param challengedTeam 被挑战者队伍（6个NFT）
+     * @param challengedAddress 被挑战者地址（address(0)表示模拟战斗）
+     * @return success 是否成功
+     * @return winner 获胜方（1=挑战者，2=被挑战者，0=平局）
+     */
     function challenge(
         uint256 challengerId,
         uint256 challengedId,
@@ -199,7 +268,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     ) external nonReentrant returns (bool, uint256) {
         bool isMockBattle = (challengedAddress == address(0));
 
-        // 非模拟战斗必须设置NFT合约
         if (!isMockBattle) {
             require(nftContract != address(0), "Battle: NFT contract not set");
         }
@@ -211,7 +279,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             require(challengedAddress != address(0), "Battle: Invalid challenged address");
         }
 
-        // 模拟战斗时跳过所有权检查
         if (!isMockBattle) {
             _requireNFTOwnership(challengerTeam);
             _requireNFTOwnershipForAddress(challengedTeam, challengedAddress);
@@ -253,6 +320,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return (true, winner);
     }
 
+    /**
+     * @dev 验证队伍所有权（指定地址）
+     * @param team 队伍NFT数组（6个）
+     * @param owner 所有权地址
+     */
     function _requireNFTOwnershipForAddress(uint256[6] memory team, address owner) internal view {
         require(nftContract != address(0), "Battle: NFT contract not set");
         for (uint256 i = 0; i < 6; i++) {
@@ -266,9 +338,14 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
     }
 
+    /**
+     * @dev 验证NFT有效性
+     * @param tokenId NFT ID
+     * @param isMockBattle 是否模拟战斗
+     * @return 是否有效
+     */
     function _isValidNFT(uint256 tokenId, bool isMockBattle) internal view returns (bool) {
         if (isMockBattle) {
-            // 模拟战斗中接受任何tokenId
             return true;
         }
         if (nftContract == address(0)) return false;
@@ -278,6 +355,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return success && data.length >= 32 && abi.decode(data, (address)) != address(0);
     }
 
+    /**
+     * @dev 执行战斗核心逻辑
+     * @param team1 队伍1（挑战者）
+     * @param team2 队伍2（被挑战者）
+     * @param randomSeed 随机种子
+     * @return winner 获胜方（1=队伍1，2=队伍2，0=平局）
+     */
     function _executeBattleCore(
         uint256[6] memory team1,
         uint256[6] memory team2,
@@ -380,11 +464,25 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return 0;
     }
 
+    /**
+     * @dev 判断是否应该使用技能（HP低于50%时使用）
+     * @param state 队伍状态
+     * @param attackerIndex 攻击者索引
+     * @return 是否应该使用技能
+     */
     function _shouldUseSkill(TeamState memory state, uint attackerIndex) internal pure returns (bool) {
         uint256 hpPercent = (state.hp[attackerIndex] * 100) / state.maxHp[attackerIndex];
         return hpPercent < 50;
     }
 
+    /**
+     * @dev 应用技能效果
+     * @param attacker 攻击者属性
+     * @param defenderState 防守方状态
+     * @param attackerIndex 攻击者索引
+     * @param skill 技能数据
+     * @return 更新后的防守方状态
+     */
     function _applySkill(NFTTraits memory attacker, TeamState memory defenderState, uint attackerIndex, Skill memory skill) internal view returns (TeamState memory) {
         uint256 baseDamage = 0;
         uint256 targetIndex = 6;
@@ -425,6 +523,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return defenderState;
     }
 
+    /**
+     * @dev 获取速度排序（决定攻击顺序）
+     * @param state 队伍状态
+     * @param seed 随机种子
+     * @return 排序后的索引数组
+     */
     function _getSpeedOrder(TeamState memory state, uint256 seed) internal pure returns (uint256[6] memory) {
         uint256[6] memory order = [uint256(0), 1, 2, 3, 4, 5];
         uint256[6] memory speeds = [
@@ -447,6 +551,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return order;
     }
 
+    /**
+     * @dev 计算速度值
+     * @param traits NFT属性
+     * @return 速度值
+     */
     function _calculateSpeed(NFTTraits memory traits) internal pure returns (uint256) {
         uint256 baseSpeed = 60;
         uint256 levelBonus = uint256(traits.level) * 5;
@@ -458,6 +567,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return baseSpeed + levelBonus + growthBonus + zodiacSpeedBonus[traits.zodiac];
     }
 
+    /**
+     * @dev 计算最大HP
+     * @param traits NFT属性
+     * @return 最大HP值
+     */
     function _calculateMaxHP(NFTTraits memory traits) internal pure returns (uint256) {
         uint256 baseHp = 100;
         uint256 levelBonus = uint256(traits.level) * 30;
@@ -465,33 +579,64 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return baseHp + levelBonus + growthBonus;
     }
 
+    /**
+     * @dev 生成随机种子 - 使用更安全的随机数生成方式
+     * 结合多个链上数据源，增加预测难度
+     * @param battleId 战斗ID
+     * @return 随机种子
+     */
+    function _generateRandomSeed(uint256 battleId) internal view returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(
+            battleId,
+            block.timestamp,
+            block.number,
+            blockhash(block.number > 0 ? block.number - 1 : block.number),
+            msg.sender,
+            address(this),
+            block.coinbase,
+            block.prevrandao,
+            gasleft()
+        )));
+    }
+
+    /**
+     * @dev 执行战斗（写入状态）
+     * @param team1 队伍1
+     * @param team2 队伍2
+     * @param battleId 战斗ID
+     * @return winner 获胜方
+     */
     function _executeBattle(
         uint256[6] memory team1,
         uint256[6] memory team2,
         uint256 battleId
     ) internal returns (uint8) {
-        uint256 randomSeed = uint256(keccak256(abi.encodePacked(
-            battleId,
-            block.timestamp,
-            block.number,
-            msg.sender
-        )));
+        uint256 randomSeed = _generateRandomSeed(battleId);
         return _executeBattleCore(team1, team2, randomSeed);
     }
 
+    /**
+     * @dev 执行战斗（只读模式）
+     * @param team1 队伍1
+     * @param team2 队伍2
+     * @param battleId 战斗ID
+     * @return winner 获胜方
+     */
     function _executeBattleView(
         uint256[6] memory team1,
         uint256[6] memory team2,
         uint256 battleId
     ) internal view returns (uint8) {
-        uint256 randomSeed = uint256(keccak256(abi.encodePacked(
-            battleId,
-            block.timestamp,
-            block.number
-        )));
+        uint256 randomSeed = _generateRandomSeed(battleId);
         return _executeBattleCore(team1, team2, randomSeed);
     }
 
+    /**
+     * @dev 模拟战斗（不记录战斗历史）
+     * @param team1 队伍1
+     * @param team2 队伍2
+     * @return winner 获胜方
+     */
     function simulateBattle(
         uint256[6] calldata team1,
         uint256[6] calldata team2
@@ -500,6 +645,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return _executeBattleCore(team1, team2, battleId);
     }
 
+    /**
+     * @dev 查找攻击目标（优先选择HP最低的目标）
+     * @param alive 存活状态数组
+     * @param traits 属性数组
+     * @param currentHp 当前HP数组
+     * @return 目标索引（6表示无目标）
+     */
     function _findTarget(bool[6] memory alive, NFTTraits[6] memory traits, uint256[6] memory currentHp) internal pure returns (uint) {
         uint minHpIndex = 6;
         uint256 minHpPercent = type(uint256).max;
@@ -526,6 +678,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return 6;
     }
 
+    /**
+     * @dev 检查队伍是否还有存活单位
+     * @param alive 存活状态数组
+     * @return 是否有存活单位
+     */
     function _hasAnyAlive(bool[6] memory alive) internal pure returns (bool) {
         for (uint i = 0; i < 6; i++) {
             if (alive[i]) return true;
@@ -533,6 +690,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return false;
     }
 
+    /**
+     * @dev 计算伤害
+     * @param attacker 攻击者属性
+     * @param defender 防御者属性
+     * @param seed 随机种子
+     * @return 伤害值
+     */
     function _calculateDamage(NFTTraits memory attacker, NFTTraits memory defender, uint256 seed) internal pure returns (uint) {
         uint baseDamage = uint(attacker.level) * 30 + uint(attacker.power) * 3;
 
@@ -563,6 +727,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return baseDamage;
     }
 
+    /**
+     * @dev 验证队伍有效性（6个NFT都不为0）
+     * @param team 队伍数组
+     * @return 是否有效
+     */
     function _validateTeam(uint256[6] memory team) internal pure returns (bool) {
         for (uint256 i = 0; i < 6; i++) {
             if (team[i] == 0) return false;
@@ -570,6 +739,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return true;
     }
 
+    /**
+     * @dev 快速战斗（只读，不记录历史）
+     * @param attackerTeam 攻击方队伍
+     * @param defenderTeam 防御方队伍
+     * @return success 是否成功
+     * @return winner 获胜方
+     */
     function battle(
         uint256[6] calldata attackerTeam,
         uint256[6] calldata defenderTeam
@@ -583,10 +759,26 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return (true, winner);
     }
 
+    /**
+     * @dev 获取战斗日志数量
+     * @return 战斗日志数量
+     */
     function getBattleLogCount() external view returns (uint256) {
         return battleHistory.length;
     }
 
+    /**
+     * @dev 获取战斗日志
+     * @param index 日志索引
+     * @return battleId 战斗ID
+     * @return challengerId 挑战者NFT ID
+     * @return challengedId 被挑战者NFT ID
+     * @return challenger 挑战者地址
+     * @return challenged 被挑战者地址
+     * @return winner 获胜方
+     * @return timestamp 时间戳
+     * @return status 状态
+     */
     function getBattleLog(uint256 index) external view returns (
         uint256 battleId,
         uint256 challengerId,
@@ -611,31 +803,25 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         );
     }
 
-
-
+    /**
+     * @dev 获取战斗常量
+     * @return MAX_ROUNDS 最大回合数
+     * @return ELEMENT_COUNT 属性数量
+     */
     function getBattleConstants() external pure returns (uint256, uint256) {
-        return (MAX_ROUNDS, PRECISION);
+        return (MAX_ROUNDS, 5);
     }
 
-    struct Skill {
-        uint256 skillId;
-        uint8 skillType;
-        uint256 damage;
-        uint256 cooldown;
-        uint256 duration;
-        bool isAoe;
-    }
-
-    mapping(uint256 => Skill) public skills;
-
+    /**
+     * @dev 初始化技能（公开接口）
+     */
     function initSkills() external onlyOwner {
-        _initWaterSkills();
-        _initWindSkills();
-        _initFireSkills();
-        _initDarkSkills();
-        _initLightSkills();
+        _initSkills();
     }
 
+    /**
+     * @dev 初始化技能（内部）
+     */
     function _initSkills() internal {
         _initWaterSkills();
         _initWindSkills();
@@ -644,6 +830,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         _initLightSkills();
     }
 
+    /**
+     * @dev 初始化水属性技能
+     */
     function _initWaterSkills() private {
         _setSkill(0, 1, 125, 3, 0, false); _setSkill(12, 6, 110, 4, 0, false);
         _setSkill(1, 0, 145, 5, 0, false); _setSkill(13, 8, 95, 4, 0, true);
@@ -657,6 +846,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
     }
 
+    /**
+     * @dev 初始化风属性技能
+     */
     function _initWindSkills() private {
         _setSkill(24, 1, 135, 3, 0, false); _setSkill(36, 6, 115, 4, 0, false);
         _setSkill(25, 0, 130, 5, 0, false); _setSkill(37, 8, 105, 4, 0, true);
@@ -670,6 +862,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
     }
 
+    /**
+     * @dev 初始化火属性技能
+     */
     function _initFireSkills() private {
         _setSkill(48, 1, 120, 3, 0, false); _setSkill(60, 6, 105, 4, 0, false);
         _setSkill(49, 0, 140, 5, 0, false); _setSkill(61, 8, 110, 4, 0, true);
@@ -683,6 +878,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
     }
 
+    /**
+     * @dev 初始化暗属性技能
+     */
     function _initDarkSkills() private {
         _setSkill(72, 1, 145, 3, 0, false); _setSkill(84, 6, 135, 4, 0, false);
         _setSkill(73, 0, 150, 5, 0, false); _setSkill(85, 8, 115, 4, 0, true);
@@ -696,6 +894,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
     }
 
+    /**
+     * @dev 初始化光属性技能
+     */
     function _initLightSkills() private {
         _setSkill(96, 1, 150, 3, 0, false); _setSkill(108, 6, 140, 4, 0, false);
         _setSkill(97, 0, 155, 5, 0, false); _setSkill(109, 8, 110, 4, 0, true);
@@ -709,10 +910,29 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
     }
 
+    /**
+     * @dev 设置技能
+     * @param tokenType 生肖类型
+     * @param skillType 技能类型
+     * @param damage 伤害倍率（百分比）
+     * @param cooldown 冷却回合数
+     * @param duration 持续回合数
+     * @param isAoe 是否范围攻击
+     */
     function _setSkill(uint256 tokenType, uint8 skillType, uint256 damage, uint256 cooldown, uint256 duration, bool isAoe) private {
         skills[tokenType] = Skill(tokenType, skillType, damage, cooldown, duration, isAoe);
     }
 
+    /**
+     * @dev 获取技能信息
+     * @param tokenType 生肖类型
+     * @return skillId 技能ID
+     * @return skillType_ 技能类型
+     * @return damage 伤害倍率
+     * @return cooldown 冷却回合数
+     * @return duration 持续回合数
+     * @return isAoe 是否范围攻击
+     */
     function getSkill(uint256 tokenType) external view returns (
         uint256 skillId,
         uint8 skillType_,

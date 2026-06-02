@@ -188,7 +188,11 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
 
-        INFTMint(nftContract).transferFrom(seller, msg.sender, tokenId);
+        try INFTMint(nftContract).safeTransferFrom(seller, msg.sender, tokenId) {
+            // 转账成功
+        } catch {
+            revert("NFTTrading: NFT transfer failed");
+        }
 
         if (fee > 0) {
             (bool feeSuccess, ) = payable(feeReceiver).call{value: fee}("");

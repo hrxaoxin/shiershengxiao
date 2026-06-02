@@ -88,6 +88,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @param _authorizer 授权合约地址
      */
     function initialize(address _authorizer) external initializer {
+        require(_authorizer != address(0), "DividendManager: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -411,23 +412,31 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         userCumulativeSnapshots[user] = cumulativePerWeightDividend;
     }
 
+    uint256 public constant MAX_NFT_LEVEL = 5;
+
     /**
      * @dev 根据等级和元素计算权重
+     * @param level NFT等级 (1-5)
+     * @param element 元素类型 (0-4)
+     * @return uint256 计算后的权重
      */
     function _calculateWeight(uint256 level, uint8 element) internal pure returns (uint256) {
         bool isRare = (element == 3 || element == 4);
+        
+        if (level == 0) return 0;
+        
         if (isRare) {
             uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
-            if (level > 0 && level <= 5) {
+            if (level <= MAX_NFT_LEVEL) {
                 return weights[level - 1];
             }
-            return 76;
+            return weights[MAX_NFT_LEVEL - 1];
         } else {
             uint256[5] memory weights = [uint256(1), 2, 6, 18, 66];
-            if (level > 0 && level <= 5) {
+            if (level <= MAX_NFT_LEVEL) {
                 return weights[level - 1];
             }
-            return 66;
+            return weights[MAX_NFT_LEVEL - 1];
         }
     }
 

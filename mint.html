@@ -574,11 +574,20 @@
                     displayCardInfo(cardInfo);
                 }
 
-                const txHash = result.transactionHash;
-                const explorerBase = ZODIAC_CONFIG.NETWORK_CONFIG.explorerUrl || 'https://bscscan.com';
-                document.getElementById('txHashLink').href = `${explorerBase}/tx/${txHash}`;
-                document.getElementById('txHashLink').textContent = txHash;
-                document.getElementById('mintTxHash').classList.remove('hidden');
+                // 获取交易哈希
+                let txHash = '';
+                if (tx && tx.transactionHash) {
+                    txHash = tx.transactionHash;
+                } else if (tx && tx.blockHash) {
+                    txHash = tx.blockHash;
+                }
+                
+                if (txHash) {
+                    const explorerBase = ZODIAC_CONFIG.NETWORK_CONFIG.explorerUrl || 'https://bscscan.com';
+                    document.getElementById('txHashLink').href = `${explorerBase}/tx/${txHash}`;
+                    document.getElementById('txHashLink').textContent = txHash;
+                    document.getElementById('mintTxHash').classList.remove('hidden');
+                }
 
                 document.getElementById('mintSuccessModal').classList.remove('hidden');
 

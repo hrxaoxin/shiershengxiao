@@ -368,6 +368,16 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             }
         }
 
+        distributionHistory.push(DistributionRecord({
+            timestamp: block.timestamp,
+            totalAmount: amount,
+            dividendAmount: dividendSuccess ? dividendAmount : 0,
+            nftStakingAmount: nftStakingSuccess ? nftStakingAmount : 0,
+            tokenStakingAmount: tokenStakingSuccess ? tokenStakingAmount : 0,
+            arenaRewardAmount: arenaRewardSuccess ? arenaRewardAmount : 0,
+            distributor: msg.sender
+        }));
+
         emit RewardDistributed(
             msg.sender,
             amount,

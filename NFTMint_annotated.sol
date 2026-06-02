@@ -81,14 +81,120 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     /// @dev NFT成长值映射 tokenId => growth (10-100)
     mapping(uint256 => uint8) public tokenGrowth;
 
+    // ============ 事件 ============
+    
+    /**
+     * @dev 铸造事件
+     * @param to 接收地址
+     * @param tokenId NFT ID
+     * @param zodiacType 生肖类型 (0-119)
+     * @param growth 成长值 (10-100)
+     */
     event Mint(address indexed to, uint256 indexed tokenId, uint256 zodiacType, uint8 growth);
+    
+    /**
+     * @dev NFT数据同步失败事件
+     * @param tokenId NFT ID
+     * @param zodiacType 生肖类型
+     */
     event NFTDataSyncFailed(uint256 indexed tokenId, uint256 zodiacType);
+    
+    /**
+     * @dev 批量铸造事件
+     * @param to 接收地址
+     * @param tokenIds NFT ID数组
+     */
     event BatchMint(address indexed to, uint256[] tokenIds);
+    
+    /**
+     * @dev 升级事件
+     * @param owner NFT所有者
+     * @param tokenId NFT ID
+     * @param oldLevel 旧等级
+     * @param newLevel 新等级
+     */
     event Upgrade(address indexed owner, uint256 indexed tokenId, uint8 oldLevel, uint8 newLevel);
+    
+    /**
+     * @dev 暂停事件
+     * @param account 操作账户
+     * @param reason 暂停原因
+     */
     event Paused(address account, string reason);
+    
+    /**
+     * @dev 恢复事件
+     * @param account 操作账户
+     */
     event Unpaused(address account);
+    
+    /**
+     * @dev 公开铸造开关事件
+     * @param allowed 是否允许
+     */
     event PublicMintingToggled(bool allowed);
+    
+    /**
+     * @dev 同步重试事件
+     * @param syncId 同步ID
+     * @param tokenId NFT ID
+     * @param success 是否成功
+     */
+    event SyncRetryAttempted(uint256 syncId, uint256 tokenId, bool success);
 
+    // ============ 结构体 ============
+    
+    /**
+     * @dev 同步失败记录结构体
+     */
+    struct FailedSync {
+        uint256 tokenId;        // NFT ID
+        uint256 zodiacType;     // 生肖类型
+        uint8 level;            // 等级
+        uint8 growth;           // 成长值
+        address to;             // 目标地址
+        uint256 timestamp;      // 时间戳
+        uint8 syncType;         // 0: setNFTInfo, 1: setTokenLevel
+    }
+    
+    /// @dev 同步失败记录映射
+    mapping(uint256 => FailedSync) public failedSyncs;
+    
+    /// @dev 同步失败计数
+    uint256 public failedSyncCount;
+
+    // ============ 修饰符 ============
+    
+    /**
+     * @dev 检查是否授权
+     */
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "NFTMint: Not authorized");
+        _;
+    }
+    
+    /**
+     * @dev 检查是否未暂停
+     */
+    modifier whenNotPaused() {
+        require(!paused, "NFTMint: Paused");
+        _;
+    }
+    
+    /**
+     * @dev 检查是否允许公开铸造
+     */
+    modifier whenPublicMintingAllowed() {
+        require(allowPublicMinting || msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+        _;
+    }
+
+    // ============ 初始化函数 ============
+    
+    /**
+     * @dev 初始化合约
+     * @param _authorizer 授权合约地址
+     */
     function initialize(address _authorizer) external initializer {
         __ERC721_init("Zodiac NFT", "ZNFT");
         __ERC721Enumerable_init();
@@ -99,44 +205,68 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         authorizer = _authorizer;
     }
 
+    // ============ 升级授权 ============
+    
+    /**
+     * @dev UUPS升级授权
+     * @param newImplementation 新实现地址
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
+    // ============ 设置函数 ============
+    
+    /**
+     * @dev 设置授权合约地址
+     * @param a 授权合约地址
+     */
     function setAuthorizer(address a) external onlyOwner {
         authorizer = a;
     }
-
-    modifier onlyAuthorized() {
-        require(msg.sender == owner() || msg.sender == authorizer, "NFTMint: Not authorized");
-        _;
-    }
-
+    
+    /**
+     * @dev 设置TokenBurner合约地址
+     * @param _tokenBurner TokenBurner合约地址
+     */
     function setTokenBurner(address _tokenBurner) external onlyAuthorized {
         require(_tokenBurner != address(0), "NFTMint: Invalid token burner address");
         tokenBurnerContract = _tokenBurner;
     }
     
+    /**
+     * @dev 设置NFT数据合约地址
+     * @param _nftData NFT数据合约地址
+     */
     function setNFTDataContract(address _nftData) external onlyAuthorized {
         nftDataContract = _nftData;
     }
     
-    struct FailedSync {
-        uint256 tokenId;
-        uint256 zodiacType;
-        uint8 level;
-        uint8 growth;
-        address to;
-        uint256 timestamp;
-        uint8 syncType; // 0: setNFTInfo, 1: setTokenLevel
+    /**
+     * @dev 设置公开铸造开关
+     * @param allowed 是否允许
+     */
+    function setAllowPublicMinting(bool allowed) external onlyOwner {
+        allowPublicMinting = allowed;
+        emit PublicMintingToggled(allowed);
     }
     
-    mapping(uint256 => FailedSync) public failedSyncs;
-    uint256 public failedSyncCount;
-    
-    event SyncRetryAttempted(uint256 syncId, uint256 tokenId, bool success);
+    /**
+     * @dev 设置稀有类型阈值
+     * @param _threshold 阈值 (0-120)
+     */
+    function setRareTypeThreshold(uint256 _threshold) external onlyOwner {
+        require(_threshold <= 120, "NFTMint: Invalid threshold");
+        rareTypeThreshold = _threshold;
+    }
+
+    // ============ 数据同步函数 ============
     
     /**
      * @dev 同步NFT数据到NFTData合约
-     * 使用重试机制和失败队列确保数据一致性
+     * @param to 接收地址
+     * @param tokenId NFT ID
+     * @param zodiacType 生肖类型
+     * @param level 等级
+     * @param growth 成长值
      */
     function _syncNFTData(address to, uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth) internal {
         if (nftDataContract != address(0)) {
@@ -148,6 +278,11 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         }
     }
     
+    /**
+     * @dev 更新NFT数据等级
+     * @param tokenId NFT ID
+     * @param newLevel 新等级
+     */
     function _updateNFTDataLevel(uint256 tokenId, uint8 newLevel) internal {
         if (nftDataContract != address(0)) {
             bool success = _trySetTokenLevel(tokenId, newLevel);
@@ -158,6 +293,15 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         }
     }
     
+    /**
+     * @dev 尝试同步NFT信息（重试3次）
+     * @param tokenId NFT ID
+     * @param zodiacType 生肖类型
+     * @param level 等级
+     * @param growth 成长值
+     * @param to 目标地址
+     * @return success 是否成功
+     */
     function _trySyncNFTInfo(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to) internal returns (bool) {
         for (uint8 i = 0; i < 3; i++) {
             (bool success, ) = nftDataContract.call(
@@ -171,6 +315,12 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return false;
     }
     
+    /**
+     * @dev 尝试设置Token等级（重试3次）
+     * @param tokenId NFT ID
+     * @param newLevel 新等级
+     * @return success 是否成功
+     */
     function _trySetTokenLevel(uint256 tokenId, uint8 newLevel) internal returns (bool) {
         for (uint8 i = 0; i < 3; i++) {
             (bool success, ) = nftDataContract.call(
@@ -181,6 +331,15 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return false;
     }
     
+    /**
+     * @dev 将同步失败加入队列
+     * @param tokenId NFT ID
+     * @param zodiacType 生肖类型
+     * @param level 等级
+     * @param growth 成长值
+     * @param to 目标地址
+     * @param syncType 同步类型
+     */
     function _queueFailedSync(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to, uint8 syncType) internal {
         failedSyncCount++;
         failedSyncs[failedSyncCount] = FailedSync({
@@ -194,6 +353,10 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         });
     }
     
+    /**
+     * @dev 重试失败的同步
+     * @param syncId 同步ID
+     */
     function retryFailedSync(uint256 syncId) external onlyAuthorized {
         FailedSync storage sync = failedSyncs[syncId];
         require(sync.tokenId != 0, "NFTMint: Invalid sync ID");
@@ -212,6 +375,9 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         emit SyncRetryAttempted(syncId, sync.tokenId, success);
     }
     
+    /**
+     * @dev 重试所有失败的同步
+     */
     function retryAllFailedSyncs() external onlyAuthorized {
         for (uint256 i = 1; i <= failedSyncCount; i++) {
             if (failedSyncs[i].tokenId != 0) {
@@ -220,6 +386,12 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         }
     }
 
+    // ============ 随机数生成 ============
+    
+    /**
+     * @dev 生成安全随机数
+     * @return 随机数
+     */
     function _generateSecureRandom() internal returns (uint256) {
         lastMintBlock = block.number;
         mintCounter++;
@@ -237,12 +409,22 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         );
         return uint256(entropy);
     }
-
+    
+    /**
+     * @dev 生成成长值 (10-100)
+     * @param randomSeed 随机种子
+     * @return 成长值
+     */
     function _generateGrowthValue(uint256 randomSeed) internal pure returns (uint8) {
         uint256 roll = randomSeed % 91;
         return uint8(roll + 10);
     }
-
+    
+    /**
+     * @dev 选择元素
+     * @param randomVal 随机值
+     * @return 元素索引 (0-4)
+     */
     function _chooseElement(uint256 randomVal) internal view returns (uint256) {
         uint256[5] memory cumulativeProbabilities;
         cumulativeProbabilities[0] = elementProbabilities[0];
@@ -257,7 +439,12 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         }
         return 0;
     }
-
+    
+    /**
+     * @dev 选择稀有元素
+     * @param randomVal 随机值
+     * @return 元素索引 (3-4)
+     */
     function _chooseRareElement(uint256 randomVal) internal view returns (uint256) {
         uint256 roll = randomVal % 100;
         if (roll < rareElementProbabilities[0]) {
@@ -265,18 +452,35 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         }
         return 4;
     }
-
+    
+    /**
+     * @dev 计算生肖类型
+     * @param element 元素 (0-4)
+     * @param zodiac 生肖 (0-11)
+     * @param gender 性别 (0-1)
+     * @return tokenType 类型 (0-119)
+     */
     function _calculateZodiacType(uint256 element, uint256 zodiac, uint256 gender) internal pure returns (uint256) {
         return element * 24 + zodiac * 2 + gender;
     }
-
+    
+    /**
+     * @dev 普通铸造
+     * @param randomSeed 随机种子
+     * @return tokenType 类型
+     */
     function _mintNormal(uint256 randomSeed) internal view returns (uint256) {
         uint256 element = _chooseElement(randomSeed % 100);
         uint256 zodiac = (randomSeed / 100) % 12;
         uint256 gender = (randomSeed / 100 / 12) % 2;
         return _calculateZodiacType(element, zodiac, gender);
     }
-
+    
+    /**
+     * @dev 稀有铸造
+     * @param randomSeed 随机种子
+     * @return tokenType 类型
+     */
     function _mintRare(uint256 randomSeed) internal view returns (uint256) {
         uint256 element = _chooseRareElement(randomSeed % 100);
         uint256 zodiac = (randomSeed / 100) % 12;
@@ -284,11 +488,14 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return _calculateZodiacType(element, zodiac, gender);
     }
 
-    modifier whenPublicMintingAllowed() {
-        require(allowPublicMinting || msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
-        _;
-    }
-
+    // ============ 铸造函数 ============
+    
+    /**
+     * @dev 铸造指定类型的NFT
+     * @param to 接收地址
+     * @param zodiacType 生肖类型 (0-119)
+     * @return tokenId NFT ID
+     */
     function mint(address to, uint256 zodiacType) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         require(zodiacType < 120, "NFTMint: Invalid zodiac type");
@@ -302,7 +509,13 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         emit Mint(to, tokenId, zodiacType, growth);
         return tokenId;
     }
-
+    
+    /**
+     * @dev 批量铸造指定类型的NFT
+     * @param to 接收地址
+     * @param zodiacTypes 生肖类型数组
+     * @return tokenIds NFT ID数组
+     */
     function mintBatch(address to, uint256[] calldata zodiacTypes) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         require(zodiacTypes.length > 0, "NFTMint: No zodiac types provided");
@@ -323,7 +536,12 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         emit BatchMint(to, tokenIds);
         return tokenIds;
     }
-
+    
+    /**
+     * @dev 普通铸造（随机）
+     * @param to 接收地址
+     * @return tokenId NFT ID
+     */
     function mintNormal(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256 randomSeed = _generateSecureRandom();
@@ -338,7 +556,12 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         emit Mint(to, tokenId, zodiacType, growth);
         return tokenId;
     }
-
+    
+    /**
+     * @dev 稀有铸造（随机，光/暗属性）
+     * @param to 接收地址
+     * @return tokenId NFT ID
+     */
     function mintRare(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256 randomSeed = _generateSecureRandom();
@@ -353,7 +576,12 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         emit Mint(to, tokenId, zodiacType, growth);
         return tokenId;
     }
-
+    
+    /**
+     * @dev 普通十连铸造
+     * @param to 接收地址
+     * @return tokenIds NFT ID数组
+     */
     function mintNormalTen(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256[] memory tokenIds = new uint256[](10);
@@ -373,7 +601,12 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         emit BatchMint(to, tokenIds);
         return tokenIds;
     }
-
+    
+    /**
+     * @dev 稀有十连铸造
+     * @param to 接收地址
+     * @return tokenIds NFT ID数组
+     */
     function mintRareTen(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256[] memory tokenIds = new uint256[](10);
@@ -393,7 +626,13 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         emit BatchMint(to, tokenIds);
         return tokenIds;
     }
-
+    
+    /**
+     * @dev 指定生肖铸造（铸造该生肖所有10种组合）
+     * @param to 接收地址
+     * @param baseZodiac 基础生肖 (0-11)
+     * @return tokenIds NFT ID数组
+     */
     function mintTargeted(address to, uint8 baseZodiac) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         require(baseZodiac < 12, "NFTMint: Invalid zodiac");
@@ -420,23 +659,50 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenIds;
     }
 
-    function setAllowPublicMinting(bool allowed) external onlyOwner {
-        allowPublicMinting = allowed;
-        emit PublicMintingToggled(allowed);
-    }
-
+    // ============ 查询函数 ============
+    
+    /**
+     * @dev 获取NFT类型
+     * @param tokenId NFT ID
+     * @return 生肖类型 (0-119)
+     */
     function getNFTType(uint256 tokenId) external view returns (uint256) {
         return tokenType[tokenId];
     }
-
+    
+    /**
+     * @dev 获取NFT基本信息
+     * @param tokenId NFT ID
+     * @return tokenType_ 类型
+     * @return level 等级
+     * @return growth 成长值
+     */
     function getNFTInfo(uint256 tokenId) external view returns (uint256, uint8, uint8) {
         return (tokenType[tokenId], tokenLevel[tokenId], tokenGrowth[tokenId]);
     }
-
+    
+    /**
+     * @dev 获取NFT成长值
+     * @param tokenId NFT ID
+     * @return 成长值
+     */
     function getNFTGrowth(uint256 tokenId) external view returns (uint8) {
         return tokenGrowth[tokenId];
     }
-
+    
+    /**
+     * @dev 获取NFT完整数据
+     * @param tokenId NFT ID
+     * @return tokenType_ 类型
+     * @return attack 攻击力
+     * @return defense 防御力
+     * @return health 生命值
+     * @return speed 速度
+     * @return level 等级
+     * @return rank 排名
+     * @return name 名称
+     * @return imageUrl 图片URL
+     */
     function getNFTData(uint256 tokenId) external view returns (
         uint256 tokenType_,
         uint256 attack,
@@ -490,13 +756,13 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         else if (element == 3) elementName = "暗";
         else elementName = "光";
 
-        string[12] memory zodiacNames = ["鼠", "牛", "虎", "兔", "龙", "蛇", "马", "羊", "猴", "鸡", "狗", "猪"};
+        string[12] memory zodiacNames = ["鼠", "牛", "虎", "兔", "龙", "蛇", "马", "羊", "猴", "鸡", "狗", "猪"];
         zodiacName = zodiacNames[zodiac];
 
         string memory genderName = gender == 0 ? "公" : "母";
-        string memory name = string(abi.encodePacked(elementName, "·", zodiacName, "·", genderName));
+        name = string(abi.encodePacked(elementName, "·", zodiacName, "·", genderName));
 
-        string memory imageUrl = string(abi.encodePacked("ipfs://metadata/", Strings.toString(t), ".json"));
+        imageUrl = string(abi.encodePacked("ipfs://metadata/", Strings.toString(t), ".json"));
 
         return (
             t,
@@ -510,25 +776,40 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             imageUrl
         );
     }
-
+    
+    /**
+     * @dev 判断NFT是否为稀有
+     * @param tokenId NFT ID
+     * @return 是否稀有
+     */
     function isRare(uint256 tokenId) external view returns (bool) {
         uint256 t = tokenType[tokenId];
         return t >= rareTypeThreshold;
     }
     
-    function setRareTypeThreshold(uint256 _threshold) external onlyOwner {
-        require(_threshold <= 120, "NFTMint: Invalid threshold");
-        rareTypeThreshold = _threshold;
-    }
-
+    /**
+     * @dev 判断NFT是否达到最大等级
+     * @param tokenId NFT ID
+     * @return 是否最大等级
+     */
     function isMaxLevel(uint256 tokenId) external view returns (bool) {
         return tokenLevel[tokenId] >= 5;
     }
-
+    
+    /**
+     * @dev 获取NFT等级
+     * @param tokenId NFT ID
+     * @return 等级
+     */
     function getNFTLevel(uint256 tokenId) external view returns (uint8) {
         return tokenLevel[tokenId];
     }
-
+    
+    /**
+     * @dev 管理员设置NFT等级
+     * @param tokenId NFT ID
+     * @param newLevel 新等级 (1-5)
+     */
     function adminSetNFTLevel(uint256 tokenId, uint256 newLevel) external whenNotPaused onlyAuthorized {
         require(newLevel <= 5 && newLevel >= 1, "NFTMint: Invalid level");
         uint8 oldLevel = tokenLevel[tokenId];
@@ -536,22 +817,42 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         _updateNFTDataLevel(tokenId, uint8(newLevel));
         emit Upgrade(ownerOf(tokenId), tokenId, oldLevel, uint8(newLevel));
     }
-
+    
+    /**
+     * @dev 获取NFT所有者
+     * @param tokenId NFT ID
+     * @return 所有者地址
+     */
     function ownerOf(uint256 tokenId) public view override returns (address) {
         return super.ownerOf(tokenId);
     }
-
+    
+    /**
+     * @dev 安全转移NFT
+     * @param from 发送地址
+     * @param to 接收地址
+     * @param tokenId NFT ID
+     */
     function safeTransferFrom(address from, address to, uint256 tokenId) public override(ERC721Upgradeable, IERC721Upgradeable) {
         super.safeTransferFrom(from, to, tokenId);
     }
-
+    
+    /**
+     * @dev 转移NFT
+     * @param from 发送地址
+     * @param to 接收地址
+     * @param tokenId NFT ID
+     */
     function transferFrom(address from, address to, uint256 tokenId) public override(ERC721Upgradeable, IERC721Upgradeable) {
         super.transferFrom(from, to, tokenId);
     }
-
+    
     /**
      * @dev 在代币转移前同步更新NFTData合约
-     * 使用重试机制确保数据一致性
+     * @param from 发送地址
+     * @param to 接收地址
+     * @param firstTokenId 第一个NFT ID
+     * @param batchSize 批量大小
      */
     function _beforeTokenTransfer(
         address from,
@@ -591,11 +892,21 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             }
         }
     }
-
+    
+    /**
+     * @dev 检查接口支持
+     * @param interfaceId 接口ID
+     * @return 是否支持
+     */
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
-
+    
+    /**
+     * @dev 批量获取NFT类型
+     * @param tokenIds NFT ID数组
+     * @return 类型数组
+     */
     function getNFTInfoBatch(uint256[] calldata tokenIds) external view returns (uint256[] memory) {
         uint256[] memory result = new uint256[](tokenIds.length);
         for (uint256 i = 0; i < tokenIds.length; i++) {
@@ -603,19 +914,36 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         }
         return result;
     }
-
+    
+    /**
+     * @dev 获取NFT名称
+     * @return 名称
+     */
     function name() public view override returns (string memory) {
         return "Zodiac NFT";
     }
-
+    
+    /**
+     * @dev 获取NFT符号
+     * @return 符号
+     */
     function symbol() public view override returns (string memory) {
         return "ZNFT";
     }
-
+    
+    /**
+     * @dev 获取下一个NFT ID
+     * @return NFT ID
+     */
     function nextCardId() external view returns (uint256) {
         return _nextCardId;
     }
-
+    
+    /**
+     * @dev 获取用户所有NFT ID
+     * @param owner 用户地址
+     * @return NFT ID数组
+     */
     function getTokenIdsByOwner(address owner) external view returns (uint256[] memory) {
         uint256 balance = balanceOf(owner);
         uint256[] memory tokenIds = new uint256[](balance);
@@ -625,27 +953,40 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenIds;
     }
 
-    modifier whenNotPaused() {
-        require(!paused, "NFTMint: Paused");
-        _;
-    }
-
+    // ============ 暂停控制 ============
+    
+    /**
+     * @dev 暂停合约
+     * @param reason 暂停原因
+     */
     function pause(string memory reason) external onlyOwner {
         paused = true;
         pauseReason = reason;
         emit Paused(msg.sender, reason);
     }
-
+    
+    /**
+     * @dev 恢复合约
+     */
     function unpause() external onlyOwner {
         paused = false;
         pauseReason = "";
         emit Unpaused(msg.sender);
     }
-
+    
+    /**
+     * @dev 升级合约
+     * @param newImplementation 新实现地址
+     */
     function upgradeTo(address newImplementation) external override onlyOwner {
         _upgradeToAndCall(newImplementation, "", true);
     }
-
+    
+    /**
+     * @dev 升级合约并调用
+     * @param newImplementation 新实现地址
+     * @param data 调用数据
+     */
     function upgradeToAndCall(address newImplementation, bytes memory data) external payable override onlyOwner {
         _upgradeToAndCall(newImplementation, data, true);
     }

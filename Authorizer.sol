@@ -80,13 +80,44 @@ interface ISetPoolManager {
     function setPoolManager(address _poolManager) external;
 }
 
+/**
+ * @title Authorizer
+ * @dev 合约授权管理器，负责管理系统中所有合约地址和权限控制
+ * 合约地址更新立即生效，无需等待时间锁
+ */
 contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     bool public paused;
     string public pauseReason;
-    uint256 public constant SET_DELAY = 2 days;
-    mapping(bytes32 => uint256) public pendingActions;
-    mapping(address => uint256) public lastSetAllContractsTime;
 
+    /**
+     * @struct ContractAddresses
+     * @dev 系统合约地址结构体，集中管理所有核心合约地址
+     * @param tokenAddress - 游戏代币合约地址
+     * @param usdtAddress - USDT代币合约地址
+     * @param mintModuleAddress - 铸造模块地址
+     * @param upgradeModuleAddress - 升级模块地址
+     * @param priceOracleAddress - 价格预言机地址
+     * @param battleAddress - 战斗合约地址
+     * @param breedingAddress - 繁殖合约地址
+     * @param stakingAddress - NFT质押合约地址
+     * @param tokenStakingAddress - 代币质押合约地址
+     * @param rewardManagerAddress - 奖励管理器地址
+     * @param dividendManagerAddress - 分红管理器地址
+     * @param poolManagerAddress - 池管理器地址
+     * @param tradingAddress - 交易模块地址
+     * @param arenaRankingAddress - 竞技场排名合约地址
+     * @param nftMintAddress - NFT铸造合约地址
+     * @param nftMintDelegatorAddress - NFT铸造代理地址
+     * @param nftUpdateAddress - NFT升级合约地址
+     * @param nftDataAddress - NFT数据合约地址
+     * @param tokenBurnerAddress - 代币销毁器地址
+     * @param weightManagerAddress - 权重管理器地址
+     * @param battleHistoryAddress - 战斗历史合约地址
+     * @param nftTradingAddress - NFT交易合约地址
+     * @param feeReceiverAddress - 费用接收地址
+     * @param pancakeSwapPairAddress - PancakeSwap交易对地址
+     * @param metadataContractAddress - 元数据合约地址
+     */
     struct ContractAddresses {
         address tokenAddress;
         address usdtAddress;
@@ -117,20 +148,28 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
     event Paused(address account, string reason);
     event Unpaused(address account);
-    event ContractAddressChangeScheduled(bytes32 indexed actionHash, uint256 executeTime);
-    event ContractAddressChangeCancelled(bytes32 indexed actionHash);
 
+    /**
+     * @dev 修饰器：确保合约未暂停
+     */
     modifier whenNotPaused() {
         require(!paused, "Authorizer: Paused");
         _;
     }
 
+    /**
+     * @dev 暂停合约
+     * @param reason - 暂停原因
+     */
     function pause(string memory reason) external onlyOwner {
         paused = true;
         pauseReason = reason;
         emit Paused(msg.sender, reason);
     }
 
+    /**
+     * @dev 取消暂停合约
+     */
     function unpause() external onlyOwner {
         paused = false;
         pauseReason = "";
@@ -169,18 +208,30 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
     event ContractAddressesUpdated(address[] addresses);
 
+    /**
+     * @dev 初始化函数，设置合约部署者为管理员
+     */
     function initialize() external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         admin = msg.sender;
     }
 
+    /**
+     * @dev UUPS升级授权函数，仅允许合约所有者升级
+     * @param newImplementation - 新实现合约地址
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     event WeightGranted(address indexed user, uint256 weight);
     event WeightRevoked(address indexed user);
     event WeightsUpdated(address[] users, uint256[] weights);
 
+    /**
+     * @dev 为用户授予权限权重
+     * @param user - 用户地址
+     * @param weight - 权限权重值
+     */
     function grantPermission(address user, uint256 weight) external onlyOwner {
         if (weights[user] == 0) {
             totalWeight += weight;
@@ -191,6 +242,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         emit WeightGranted(user, weight);
     }
 
+    /**
+     * @dev 撤销用户的权限
+     * @param user - 用户地址
+     */
     function revokePermission(address user) external onlyOwner {
         uint256 w = weights[user];
         require(w > 0, "Authorizer: No permission to revoke");
@@ -203,18 +258,38 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         emit WeightRevoked(user);
     }
 
+    /**
+     * @dev 检查用户是否具有足够的权限
+     * @param user - 用户地址
+     * @param weightRequired - 所需权限权重
+     * @return bool - 是否具有足够权限
+     */
     function hasPermission(address user, uint256 weightRequired) external view returns (bool) {
         return weights[user] >= weightRequired;
     }
 
+    /**
+     * @dev 获取用户的权限权重
+     * @param user - 用户地址
+     * @return uint256 - 用户权限权重
+     */
     function getWeight(address user) external view returns (uint256) {
         return weights[user];
     }
 
+    /**
+     * @dev 获取系统总权限权重
+     * @return uint256 - 总权重
+     */
     function getTotalWeight() external view returns (uint256) {
         return totalWeight;
     }
 
+    /**
+     * @dev 批量更新用户权限权重
+     * @param users - 用户地址数组
+     * @param newWeights - 新权重数组
+     */
     function updateWeightsBatch(
         address[] calldata users,
         uint256[] calldata newWeights
@@ -231,31 +306,19 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         emit WeightsUpdated(users, newWeights);
     }
 
+    /**
+     * @dev 设置管理员地址
+     * @param _admin - 新管理员地址
+     */
     function setAdmin(address _admin) external onlyOwner {
         admin = _admin;
     }
 
+    /**
+     * @dev 更新所有合约地址（立即生效）
+     * @param _addresses - 新的合约地址配置
+     */
     function setAllContracts(ContractAddresses calldata _addresses) external onlyOwner whenNotPaused {
-        require(
-            block.timestamp >= lastSetAllContractsTime[address(this)] + SET_DELAY,
-            "Authorizer: Must wait SET_DELAY between calls"
-        );
-
-        bytes32 actionHash = keccak256(abi.encode(_addresses));
-        pendingActions[actionHash] = block.timestamp + SET_DELAY;
-        lastSetAllContractsTime[address(this)] = block.timestamp;
-
-        emit ContractAddressChangeScheduled(actionHash, block.timestamp + SET_DELAY);
-    }
-
-    function executeContractAddresses(ContractAddresses calldata _addresses) external onlyOwner whenNotPaused {
-        bytes32 actionHash = keccak256(abi.encode(_addresses));
-        require(pendingActions[actionHash] != 0, "Authorizer: No pending action");
-        require(block.timestamp >= pendingActions[actionHash], "Authorizer: Time lock not expired");
-        require(block.timestamp <= pendingActions[actionHash] + SET_DELAY, "Authorizer: Action expired");
-
-        delete pendingActions[actionHash];
-
         _setCoreAddresses(_addresses);
         _setNFTAddresses(_addresses);
         _setOtherAddresses(_addresses);
@@ -269,13 +332,12 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _emitContractAddressesUpdated();
     }
 
-    function cancelContractAddressChange(ContractAddresses calldata _addresses) external onlyOwner {
-        bytes32 actionHash = keccak256(abi.encode(_addresses));
-        require(pendingActions[actionHash] != 0, "Authorizer: No pending action to cancel");
-        delete pendingActions[actionHash];
-        emit ContractAddressChangeCancelled(actionHash);
-    }
-
+    /**
+     * @dev 配置战斗和繁殖合约
+     * @param _battleAddress - 战斗合约地址
+     * @param _breedingAddress - 繁殖合约地址
+     * @param _nftMintAddress - NFT铸造合约地址
+     */
     function _setupBattleAndBreeding(
         address _battleAddress,
         address _breedingAddress,
@@ -290,6 +352,16 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
     }
 
+    /**
+     * @dev 配置质押和奖励相关合约
+     * @param _stakingAddress - NFT质押合约地址
+     * @param _rewardManagerAddress - 奖励管理器地址
+     * @param _dividendManagerAddress - 分红管理器地址
+     * @param _tokenStakingAddress - 代币质押合约地址
+     * @param _tokenAddress - 游戏代币地址
+     * @param _arenaRankingAddress - 竞技场排名合约地址
+     * @param _nftMintAddress - NFT铸造合约地址
+     */
     function _setupStakingAndReward(
         address _stakingAddress,
         address _rewardManagerAddress,
@@ -321,6 +393,13 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
     }
 
+    /**
+     * @dev 配置价格预言机和升级模块
+     * @param _priceOracleAddress - 价格预言机地址
+     * @param _upgradeModuleAddress - 升级模块地址
+     * @param _tokenAddress - 游戏代币地址
+     * @param _usdtAddress - USDT代币地址
+     */
     function _setupPriceAndUpgrade(
         address _priceOracleAddress,
         address _upgradeModuleAddress,
@@ -335,6 +414,14 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
     }
 
+    /**
+     * @dev 配置NFT相关合约
+     * @param _nftUpdateAddress - NFT升级合约地址
+     * @param _tokenBurnerAddress - 代币销毁器地址
+     * @param _nftMintAddress - NFT铸造合约地址
+     * @param _metadataContractAddress - 元数据合约地址
+     * @param _pancakeSwapPairAddress - PancakeSwap交易对地址
+     */
     function _setupNFTContracts(
         address _nftUpdateAddress,
         address _tokenBurnerAddress,
@@ -358,6 +445,15 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
     }
 
+    /**
+     * @dev 配置其他合约
+     * @param _weightManagerAddress - 权重管理器地址
+     * @param _battleHistoryAddress - 战斗历史合约地址
+     * @param _nftTradingAddress - NFT交易合约地址
+     * @param _feeReceiverAddress - 费用接收地址
+     * @param _arenaRankingAddress - 竞技场排名合约地址
+     * @param _rewardManagerAddress - 奖励管理器地址
+     */
     function _setupOtherContracts(
         address _weightManagerAddress,
         address _battleHistoryAddress,
@@ -383,8 +479,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
     }
 
-
-
+    /**
+     * @dev 设置核心合约地址
+     * @param _addresses - 合约地址配置
+     */
     function _setCoreAddresses(ContractAddresses calldata _addresses) internal {
         tokenAddress = _addresses.tokenAddress;
         usdtAddress = _addresses.usdtAddress;
@@ -397,6 +495,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         upgradeModuleAddress = _addresses.upgradeModuleAddress;
     }
 
+    /**
+     * @dev 设置NFT相关合约地址
+     * @param _addresses - 合约地址配置
+     */
     function _setNFTAddresses(ContractAddresses calldata _addresses) internal {
         nftUpdateAddress = _addresses.nftUpdateAddress;
         tokenBurnerAddress = _addresses.tokenBurnerAddress;
@@ -409,6 +511,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         tokenStakingAddress = _addresses.tokenStakingAddress;
     }
 
+    /**
+     * @dev 设置其他合约地址
+     * @param _addresses - 合约地址配置
+     */
     function _setOtherAddresses(ContractAddresses calldata _addresses) internal {
         mintModuleAddress = _addresses.mintModuleAddress;
         poolManagerAddress = _addresses.poolManagerAddress;
@@ -419,6 +525,9 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         metadataContractAddress = _addresses.metadataContractAddress;
     }
 
+    /**
+     * @dev 触发合约地址更新事件
+     */
     function _emitContractAddressesUpdated() internal {
         address[] memory addrs = new address[](20);
         _fillAddressesPart1(addrs);
@@ -426,6 +535,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         emit ContractAddressesUpdated(addrs);
     }
 
+    /**
+     * @dev 填充地址数组第一部分
+     * @param addrs - 地址数组
+     */
     function _fillAddressesPart1(address[] memory addrs) internal view {
         addrs[0] = tokenAddress;
         addrs[1] = usdtAddress;
@@ -439,6 +552,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         addrs[9] = nftUpdateAddress;
     }
 
+    /**
+     * @dev 填充地址数组第二部分
+     * @param addrs - 地址数组
+     */
     function _fillAddressesPart2(address[] memory addrs) internal view {
         addrs[10] = tokenBurnerAddress;
         addrs[11] = nftMintAddress;
@@ -452,6 +569,9 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         addrs[19] = metadataContractAddress;
     }
 
+    /**
+     * @dev 同步所有合约地址配置（用于紧急修复）
+     */
     function syncContractAddresses() external onlyOwner whenNotPaused {
         _setupBattleAndBreeding(battleAddress, breedingAddress, nftMintAddress);
         _setupStakingAndReward(stakingAddress, rewardManagerAddress, dividendManagerAddress, tokenStakingAddress, tokenAddress, arenaRankingAddress, nftMintAddress);

@@ -44,11 +44,17 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     bool public paused;
 
+    modifier whenNotPaused() {
+        require(!paused, "PoolManager: Paused");
+        _;
+    }
+
     /**
      * @dev 初始化函数
      * @param _authorizer 授权合约地址
      */
     function initialize(address _authorizer) external initializer {
+        require(_authorizer != address(0), "PoolManager: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -79,33 +85,30 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     /**
      * @dev 添加到NFT质押池
      */
-    function addToNFTStakingPool(uint256 amount) external onlyAuthorized {
-        require(!paused, "PoolManager: Paused");
+    function addToNFTStakingPool(uint256 amount) external onlyAuthorized whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        require(msg.sender == owner() || msg.sender == authorizer, "PoolManager: Not authorized");
         poolBalances[0] += amount;
+        _recordFlow(0, amount, msg.sender, address(this), 1);
         emit PoolDeposited(0, amount);
     }
 
     /**
      * @dev 添加到代币质押池
      */
-    function addToTokenStakingPool(uint256 amount) external onlyAuthorized {
-        require(!paused, "PoolManager: Paused");
+    function addToTokenStakingPool(uint256 amount) external onlyAuthorized whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        require(msg.sender == owner() || msg.sender == authorizer, "PoolManager: Not authorized");
         poolBalances[1] += amount;
+        _recordFlow(1, amount, msg.sender, address(this), 1);
         emit PoolDeposited(1, amount);
     }
 
     /**
      * @dev 添加到竞技场奖励池
      */
-    function addToArenaRewardPool(uint256 amount) external onlyAuthorized {
-        require(!paused, "PoolManager: Paused");
+    function addToArenaRewardPool(uint256 amount) external onlyAuthorized whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        require(msg.sender == owner() || msg.sender == authorizer, "PoolManager: Not authorized");
         poolBalances[2] += amount;
+        _recordFlow(2, amount, msg.sender, address(this), 1);
         emit PoolDeposited(2, amount);
     }
 
@@ -118,6 +121,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function withdrawFromNFTStakingPool(uint256 amount) external onlyOwner whenNotPaused {
         require(poolBalances[0] >= amount, "PoolManager: Insufficient balance");
         poolBalances[0] -= amount;
+        _recordFlow(0, amount, address(this), msg.sender, 2);
         emit PoolWithdrawn(0, amount);
     }
 
@@ -128,6 +132,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function withdrawFromTokenStakingPool(uint256 amount) external onlyOwner whenNotPaused {
         require(poolBalances[1] >= amount, "PoolManager: Insufficient balance");
         poolBalances[1] -= amount;
+        _recordFlow(1, amount, address(this), msg.sender, 2);
         emit PoolWithdrawn(1, amount);
     }
 

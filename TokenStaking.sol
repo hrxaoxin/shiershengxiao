@@ -125,6 +125,9 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @param _authorizer 授权合约地址
      */
     function initialize(address _tokenContract, address _authorizer) external initializer {
+        require(_tokenContract != address(0), "TokenStaking: Invalid token contract address");
+        require(_authorizer != address(0), "TokenStaking: Invalid authorizer address");
+        
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();

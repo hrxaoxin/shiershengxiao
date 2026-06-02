@@ -374,13 +374,12 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         }
         
         uint8 newLv = lv + 1;
-        m.setTokenLevel(tokenId, newLv);
-        nft.adminSetNFTLevel(tokenId, newLv); // 同时更新 NFTMint
         NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         
-        // 更新用户权重：先减去旧等级的权重，再加上新等级的权重
+        // 先更新权重，再更新等级，确保数据一致性
         require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
         
+        // 更新用户权重：先减去旧等级的权重，再加上新等级的权重
         (bool success, ) = dividendManager.call(
             abi.encodeWithSignature("updateUserWeight(address,uint256,bool,uint8)", 
                 msg.sender, 
@@ -400,6 +399,10 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             )
         );
         require(success, "NFTUpdate: Update new weight failed");
+        
+        // 权重更新成功后，再更新NFT等级
+        m.setTokenLevel(tokenId, newLv);
+        nft.adminSetNFTLevel(tokenId, newLv); // 同时更新 NFTMint
         
         emit CardUpgraded(tokenId, t, lv, newLv, msg.sender, uint64(block.timestamp));
         return newLv;
@@ -510,13 +513,13 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         INFTMint nft = INFTMint(nftContract);
         NFTDataTypes.ZodiacType t = m.tokenType(id);
         uint8 newLv = oldLv + 1;
-        m.setTokenLevel(id, newLv);
-        nft.adminSetNFTLevel(id, newLv); // 同时更新 NFTMint
+        
+        // 先更新权重，再更新等级，确保数据一致性
+        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
+        
         NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         
         // 更新用户权重：先减去旧等级的权重，再加上新等级的权重
-        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
-        
         (bool success, ) = dividendManager.call(
             abi.encodeWithSignature("updateUserWeight(address,uint256,bool,uint8)", 
                 msg.sender, 
@@ -536,6 +539,10 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             )
         );
         require(success, "NFTUpdate: Update new weight failed");
+        
+        // 权重更新成功后，再更新NFT等级
+        m.setTokenLevel(id, newLv);
+        nft.adminSetNFTLevel(id, newLv); // 同时更新 NFTMint
         
         emit CardUpgraded(id, t, oldLv, newLv, msg.sender, uint64(block.timestamp));
         return newLv;
