@@ -223,6 +223,18 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         require(breedingCooldowns[fatherId] <= block.timestamp, "Breeding: Father in cooldown");
         require(breedingCooldowns[motherId] <= block.timestamp, "Breeding: Mother in cooldown");
 
+        if (maleCoOwnerId > 0) {
+            require(nft.ownerOf(maleCoOwnerId) == maleOwner, "Breeding: Not male co-owner owner");
+            require(!isNFTInActiveBreeding[maleCoOwnerId], "Breeding: Male co-owner already in breeding");
+            require(breedingCooldowns[maleCoOwnerId] <= block.timestamp, "Breeding: Male co-owner in cooldown");
+        }
+
+        if (femaleCoOwnerId > 0) {
+            require(nft.ownerOf(femaleCoOwnerId) == femaleOwner, "Breeding: Not female co-owner owner");
+            require(!isNFTInActiveBreeding[femaleCoOwnerId], "Breeding: Female co-owner already in breeding");
+            require(breedingCooldowns[femaleCoOwnerId] <= block.timestamp, "Breeding: Female co-owner in cooldown");
+        }
+
         if (marketBreedingFee > 0) {
             require(tokenContract != address(0), "Breeding: Token contract not set");
             require(IERC20(tokenContract).transferFrom(msg.sender, address(this), marketBreedingFee), "Breeding: Fee transfer failed");

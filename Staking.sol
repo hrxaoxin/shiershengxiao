@@ -77,6 +77,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     function setNFTContract(address _nftContract) external onlyAuthorized {
+        require(_nftContract != address(0), "Staking: Invalid NFT contract address");
         nftContract = _nftContract;
     }
 

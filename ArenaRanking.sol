@@ -194,8 +194,13 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(nftContract != address(0), "ArenaRanking: NFT contract not set");
         require(challengedPlayer != msg.sender, "ArenaRanking: Cannot challenge self");
 
+        SeasonInfo storage currentSeason = seasons[currentSeasonId];
+        require(currentSeason.isActive, "ArenaRanking: Season not active");
+
         PlayerRecord storage challengerRecord = players[msg.sender];
         PlayerRecord storage challengedRecord = players[challengedPlayer];
+
+        require(userStakedNFTs[msg.sender].length > 0, "ArenaRanking: No staked NFTs");
 
         _checkAndResetAttempts(msg.sender);
         _checkAndResetAttempts(challengedPlayer);
@@ -208,7 +213,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _validateTeamStaked(msg.sender, playerTeam);
 
         uint256[6] memory challengedTeam = challengedRecord.battleTeam;
-        require(challengedRecord.hasTeam && challengedTeam.length == 6, "ArenaRanking: Target has no team");
+        require(challengedRecord.hasTeam && challengedTeam.length == TEAM_SIZE, "ArenaRanking: Target has no team");
         
         _validateTeamStaked(challengedPlayer, challengedTeam);
 

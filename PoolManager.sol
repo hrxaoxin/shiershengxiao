@@ -182,6 +182,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         address to,
         uint256 amount
     ) external onlyOwner nonReentrant {
+        require(paused, "PoolManager: Contract not paused");
         require(to != address(0), "PoolManager: Invalid address");
         require(amount > 0, "PoolManager: Invalid amount");
         require(amount <= emergencyWithdrawLimit, "PoolManager: Exceeds withdrawal limit");

@@ -47,9 +47,17 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     BattleState[] public battleHistory;
 
     uint256 public constant MAX_ROUNDS = 50;
+    uint256 public constant ZODIAC_COUNT = 12;
+    uint256 public constant GENDER_COUNT = 2;
+    uint256 public constant ELEMENT_COUNT = 5;
+    uint256 public constant ZODIAC_TYPE_COUNT = ZODIAC_COUNT * GENDER_COUNT;
+    uint256 public constant TOTAL_TYPE_COUNT = ELEMENT_COUNT * ZODIAC_TYPE_COUNT;
+    uint256 public constant MIN_GROWTH = 50;
+    uint256 public constant GROWTH_RANGE = 51;
 
     address public nftContract;
     address public authorizer;
+    address public battleCaller;
 
     bool public paused;
     string public pauseReason;
@@ -83,6 +91,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
     modifier onlyAuthorized() {
         require(msg.sender == owner() || msg.sender == authorizer, "Battle: Not authorized");
+        _;
+    }
+
+    modifier onlyBattleCaller() {
+        require(msg.sender == owner() || msg.sender == battleCaller, "Battle: Only authorized caller");
         _;
     }
 
@@ -133,6 +146,14 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     }
 
     /**
+     * @dev 设置战斗调用者（通常是ArenaRanking合约）
+     * @param _battleCaller 授权调用战斗的合约地址
+     */
+    function setBattleCaller(address _battleCaller) external onlyOwner {
+        battleCaller = _battleCaller;
+    }
+
+    /**
      * @dev 授权升级
      * @param newImplementation 新实现合约地址
      */
@@ -158,16 +179,16 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         if (nftContract != address(0)) {
             (uint256 zodiacType, uint256 level, uint256 growth) = _getNFTData(tokenId);
             traits.level = uint8(level);
-            traits.element = uint8(zodiacType / 24);
-            traits.zodiac = uint8((zodiacType / 2) % 12);
+            traits.element = uint8(zodiacType / ZODIAC_TYPE_COUNT);
+            traits.zodiac = uint8((zodiacType / GENDER_COUNT) % ZODIAC_COUNT);
             traits.growth = uint8(growth);
             traits.power = _calculatePower(traits.level, traits.growth);
         } else {
-            uint256 zodiacType = tokenId % 120;
-            traits.level = uint8((zodiacType / 24) + 1);
-            traits.element = uint8(zodiacType / 24);
-            traits.zodiac = uint8((zodiacType / 2) % 12);
-            traits.growth = uint8(50 + (tokenId % 51));
+            uint256 zodiacType = tokenId % TOTAL_TYPE_COUNT;
+            traits.level = uint8((zodiacType / ZODIAC_TYPE_COUNT) + 1);
+            traits.element = uint8(zodiacType / ZODIAC_TYPE_COUNT);
+            traits.zodiac = uint8((zodiacType / GENDER_COUNT) % ZODIAC_COUNT);
+            traits.growth = uint8(MIN_GROWTH + (tokenId % GROWTH_RANGE));
             traits.power = _calculatePower(traits.level, traits.growth);
         }
         return traits;
@@ -265,7 +286,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint256[6] calldata challengerTeam,
         uint256[6] calldata challengedTeam,
         address challengedAddress
-    ) external nonReentrant returns (bool, uint256) {
+    ) external nonReentrant onlyBattleCaller returns (bool, uint256) {
         bool isMockBattle = (challengedAddress == address(0));
 
         if (!isMockBattle) {
