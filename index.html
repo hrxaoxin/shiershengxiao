@@ -283,14 +283,14 @@
         <div id="mobileNavbarContainer"></div>
         <div id="mobileMenuContainer"></div>
 
-        <main class="container mx-auto px-4 pt-4 pb-36 md:pt-0 md:pb-0 md:ml-72">
+        <main class="container mx-auto px-4 pt-4 pb-36 md:pt-0 md:pb-0 md:ml-64">
             <section class="hero-section mb-12">
                 <div class="text-center mb-8 relative z-10">
                     <h1 class="text-4xl md:text-5xl font-bold mb-4">十二生肖NFT</h1>
                     <p class="text-xl text-white/90">探索东方神秘力量，开启你的生肖传奇</p>
                 </div>
                 
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 relative z-10">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8 relative z-10">
                     <div class="stats-card">
                         <div class="text-3xl font-bold text-yellow-300" id="totalPool">--</div>
                         <div class="text-sm text-white/80 mt-2">总分红池</div>
@@ -306,6 +306,10 @@
                     <div class="stats-card">
                         <div class="text-3xl font-bold text-purple-300" id="unclaimedDividend">--</div>
                         <div class="text-sm text-white/80 mt-2">待领取</div>
+                    </div>
+                    <div class="stats-card">
+                        <div class="text-3xl font-bold text-orange-300" id="userWeight">--</div>
+                        <div class="text-sm text-white/80 mt-2">我的权重</div>
                     </div>
                 </div>
                 
@@ -592,6 +596,7 @@
                 document.getElementById('distributed').textContent = '--';
                 document.getElementById('unclaimedDividend').textContent = '--';
                 document.getElementById('holders').textContent = '--';
+                document.getElementById('userWeight').textContent = '--';
                 return;
             }
 
@@ -616,6 +621,15 @@
                 const userDivWei = await rewardManager.methods.calcUserDividend(account).call();
                 const userDiv = web3.utils.fromWei(userDivWei, 'ether');
                 document.getElementById('unclaimedDividend').textContent = parseFloat(userDiv).toFixed(4);
+                
+                // 加载用户权重
+                try {
+                    const userWeight = await ZODIAC_WEB3.getUserWeight(account);
+                    document.getElementById('userWeight').textContent = userWeight.toString();
+                } catch (e) {
+                    console.error('Load user weight failed:', e);
+                    document.getElementById('userWeight').textContent = '--';
+                }
             } catch (error) {
                 console.error('Load dividend data failed:', error);
             }
@@ -660,6 +674,7 @@
                 document.getElementById('distributed').textContent = '--';
                 document.getElementById('unclaimedDividend').textContent = '--';
                 document.getElementById('holders').textContent = '--';
+                document.getElementById('userWeight').textContent = '--';
             });
 
             loadFenHongData();
