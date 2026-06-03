@@ -199,7 +199,10 @@ window.ZODIAC_WEB3 = (function() {
     async function getContract(name) {
         if (contracts[name]) return contracts[name];
         if (!web3 || !account) {
-            await initWeb3();
+            const initialized = await initWeb3();
+            if (!initialized) {
+                throw new Error(`[ZODIAC_WEB3] Web3 not initialized, cannot get contract: ${name}`);
+            }
         }
         if (contracts[name]) return contracts[name];
 
@@ -209,8 +212,14 @@ window.ZODIAC_WEB3 = (function() {
         if (!addr || addr === '0x0000000000000000000000000000000000000000') {
             throw new Error(`[ZODIAC_WEB3] Contract address not configured: ${name}`);
         }
-        contracts[name] = new web3.eth.Contract(abi, addr);
-        return contracts[name];
+        
+        try {
+            contracts[name] = new web3.eth.Contract(abi, addr);
+            return contracts[name];
+        } catch (e) {
+            console.error(`[ZODIAC_WEB3] Failed to create contract instance for ${name}:`, e);
+            throw new Error(`[ZODIAC_WEB3] Failed to initialize contract: ${name}`);
+        }
     }
 
     // --- Getters ---

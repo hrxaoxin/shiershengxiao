@@ -530,7 +530,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         zodiacName = zodiacNames[zodiac];
 
         string memory genderName = gender == 0 ? "公" : "母";
-        string memory name = string(abi.encodePacked(elementName, "·", zodiacName, "·", genderName));
+        string memory tokenName = string(abi.encodePacked(elementName, "·", zodiacName, "·", genderName));
 
         string memory imageUrl = string(abi.encodePacked("ipfs://metadata/", Strings.toString(t), ".json"));
 
@@ -542,7 +542,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             baseSpeed + speedIncrement + zodiacSpeedBonus,
             uint256(l),
             l,
-            name,
+            tokenName,
             imageUrl
         );
     }

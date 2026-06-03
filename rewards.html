@@ -295,9 +295,27 @@
         async function initContracts() {
             try {
                 rewardManagerContract = await window.ZODIAC_WEB3.getContract('rewardManager');
+                setupEventListeners();
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
                 ZODIAC_UI.showToast('合约初始化失败: ' + error.message, 'warning');
+            }
+        }
+
+        function setupEventListeners() {
+            if (!rewardManagerContract) return;
+            
+            try {
+                rewardManagerContract.events.DividendPoolAdded({
+                    fromBlock: 'latest'
+                }, async function(error, event) {
+                    if (!error) {
+                        await loadBNBReward();
+                        ZODIAC_UI.showToast('分红池已更新', 'success');
+                    }
+                });
+            } catch (error) {
+                console.warn('监听DividendPoolAdded事件失败:', error.message);
             }
         }
 
@@ -309,9 +327,17 @@
                 }
                 
                 const dividendData = await rewardManagerContract.methods.calcUserDividend(account).call();
-                const baseAmount = dividendData['0'];
-                const bnbAmount = web3.utils.fromWei(baseAmount, 'ether');
+                if (!dividendData || typeof dividendData !== 'object') {
+                    console.error('获取代币分红失败: 返回数据格式异常');
+                    return;
+                }
+                const pendingDividends = dividendData['0'] || dividendData.pendingDividends || '0';
+                const userWeight = dividendData['1'] || dividendData.userWeight || '0';
+                const bnbAmount = web3.utils.fromWei(pendingDividends, 'ether');
                 document.getElementById('bnbReward').textContent = bnbAmount.substring(0, 6) + ' 代币';
+                if (parseInt(userWeight) === 0) {
+                    document.getElementById('bnbReward').textContent = '0.000000 代币';
+                }
             } catch (error) {
                 console.error('获取代币分红失败:', error);
                 document.getElementById('bnbReward').textContent = '0.0000 代币';

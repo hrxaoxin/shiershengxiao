@@ -742,7 +742,10 @@
         };
 
         async function init() {
-            document.getElementById('connectWalletBtn').addEventListener('click', connectWallet);
+            const connectBtn = document.getElementById('connectWalletBtn');
+            if (connectBtn) {
+                connectBtn.addEventListener('click', connectWallet);
+            }
             document.getElementById('challengeBtn').addEventListener('click', executeRealChallenge);
             document.getElementById('mobileChallengeBtn')?.addEventListener('click', executeRealChallenge);
             document.getElementById('closeBattleModal').addEventListener('click', () => {

@@ -62,13 +62,14 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _;
     }
 
-    function initialize(address _tokenContract, address _nftMint, address _authorizer) external initializer {
+    function initialize(address _tokenContract, address _nftMint, address _authorizer, address _authorizedNFT) external initializer {
         __UUPSUpgradeable_init();
         __Ownable2Step_init();
         __ReentrancyGuard_init();
         tokenContract = _tokenContract;
         nftMintContract = _nftMint;
         authorizer = _authorizer;
+        authorizedNFTContract = _authorizedNFT;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -91,15 +92,17 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function setNormalMintCost(uint256 cost) external onlyOwner {
         require(cost > 0, "TokenBurner: cost must be > 0");
         uint256 oldNormal = normalMintCost;
+        uint256 oldRare = rareMintCost;
         normalMintCost = cost;
-        emit MintCostUpdated(oldNormal, cost, rareMintCost, rareMintCost, block.timestamp);
+        emit MintCostUpdated(oldNormal, cost, oldRare, rareMintCost, block.timestamp);
     }
 
     function setRareMintCost(uint256 cost) external onlyOwner {
         require(cost > 0, "TokenBurner: cost must be > 0");
+        uint256 oldNormal = normalMintCost;
         uint256 oldRare = rareMintCost;
         rareMintCost = cost;
-        emit MintCostUpdated(normalMintCost, normalMintCost, oldRare, cost, block.timestamp);
+        emit MintCostUpdated(oldNormal, normalMintCost, oldRare, cost, block.timestamp);
     }
 
     function setTokenContract(address _tokenContract) external onlyAdminOrAuthorizer {

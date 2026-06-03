@@ -360,8 +360,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
         uint8 winner = _executeBattle(challengerTeam, challengedTeam, battleId);
 
-        battleHistory[battleId - 1].winner = winner;
-        battleHistory[battleId - 1].status = 2;
+        uint256 historyIndex = battleHistory.length > MAX_BATTLE_HISTORY ? battleHistoryIndex : battleHistory.length - 1;
+        battleHistory[historyIndex].winner = winner;
+        battleHistory[historyIndex].status = 2;
 
         emit BattleEnded(battleId, winner);
 

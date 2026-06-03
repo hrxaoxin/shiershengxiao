@@ -25,8 +25,8 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
 
     uint256 public selfBreedingCooldown = 12 hours;
     uint256 public marketBreedingCooldown = 24 hours;
-    uint256 public selfBreedingFee = 100 * 1e18;
-    uint256 public marketBreedingFee = 500 * 1e18;
+    uint256 public selfBreedingFee = 888 * 1e18;
+    uint256 public marketBreedingFee = 888 * 1e18;
     address public nftMintContract;
     address public authorizer;
     address public tokenContract;
@@ -402,6 +402,8 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
             isNFTInActiveBreeding[pair.fatherId] = false;
             isNFTInActiveBreeding[pair.motherId] = false;
 
+            _burnFee(pair.breedingType);
+
             try nft.safeTransferFrom(address(this), pair.maleOwner, pair.fatherId) {
             } catch {
                 emit EmergencyNFTLocked(pair.fatherId, pair.maleOwner);
@@ -411,8 +413,6 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
             } catch {
                 emit EmergencyNFTLocked(pair.motherId, pair.femaleOwner);
             }
-
-            _burnFee(pair.breedingType);
 
             emit BreedingCompleted(pairId, childId, zodiacType);
             return (childId, 0);
@@ -428,6 +428,8 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
             pair.status = 1;
             isNFTInActiveBreeding[pair.fatherId] = false;
             isNFTInActiveBreeding[pair.motherId] = false;
+            
+            _burnFee(pair.breedingType);
 
             try nft.safeTransferFrom(address(this), pair.maleOwner, pair.fatherId) {
             } catch {

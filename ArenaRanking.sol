@@ -83,7 +83,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     mapping(uint256 => uint256) public nftBattleLocked;
 
     uint256 public currentSeasonId;
-    uint256 public seasonDuration = 7 days;
+    uint256 public seasonDuration = 1 days;
     
     address public authorizer;
     address public battleContract;
@@ -322,7 +322,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             currentIndex--;
         }
 
-        while (currentIndex < rankings.length - 1 && rankings.length <= MAX_LEADERBOARD_SIZE) {
+        while (currentIndex < rankings.length - 1 && currentIndex < MAX_LEADERBOARD_SIZE - 1) {
             address nextPlayer = rankings[currentIndex + 1];
             if (players[nextPlayer].score <= newScore) break;
             

@@ -164,7 +164,7 @@ contract WeightManager is
     }
     
     function _hasEligibility(address user) internal view returns (bool) {
-        uint256 w = user == owner() ? ownerWeight : userWeight[user];
+        uint256 w = getUserWeight(user);
         return w >= minOwnerWeight;
     }
     
@@ -178,6 +178,8 @@ contract WeightManager is
         
         if (oldWeight != newWeight) {
             userWeight[user] = newWeight;
+            cachedUserWeight[user] = newWeight;
+            cachedWeightTimestamp[user] = block.timestamp;
             emit UserWeightUpdated(user, oldWeight, newWeight, block.timestamp);
         }
         

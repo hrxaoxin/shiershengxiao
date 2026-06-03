@@ -47,6 +47,31 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * battleId => SingleBattleResult
      */
     mapping(uint256 => BattleLib.SingleBattleResult) public battleHistory;
+    
+    /**
+     * @dev 最大战斗记录数限制（默认10000条）
+     */
+    uint256 public constant MAX_BATTLE_RECORDS = 10000;
+    
+    /**
+     * @dev 当前战斗记录总数
+     */
+    uint256 public battleCount;
+    
+    /**
+     * @dev 最早的战斗ID（用于环形缓冲区）
+     */
+    uint256 public earliestBattleId;
+    
+    /**
+     * @dev battleId到索引的映射（用于快速查找）
+     */
+    mapping(uint256 => uint256) public battleIdToIndex;
+    
+    /**
+     * @dev 索引到battleId的映射（用于环形缓冲区）
+     */
+    mapping(uint256 => uint256) public indexToBattleId;
 
     /**
      * @dev 仅允许战斗合约调用的修饰器
@@ -103,7 +128,31 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @param result 战斗结果
      */
     function addBattle(uint256 battleId, BattleLib.SingleBattleResult calldata result) external onlyBattleContract {
+        if (battleCount >= MAX_BATTLE_RECORDS) {
+            uint256 oldestIndex = battleIdToIndex[earliestBattleId];
+            delete battleHistory[earliestBattleId];
+            delete battleIdToIndex[earliestBattleId];
+            
+            uint256 nextEarliestId = indexToBattleId[(oldestIndex + 1) % MAX_BATTLE_RECORDS];
+            if (nextEarliestId > 0) {
+                earliestBattleId = nextEarliestId;
+            }
+        } else {
+            battleCount++;
+        }
+        
+        uint256 newIndex = battleIdToIndex[battleId];
+        if (newIndex == 0) {
+            newIndex = battleCount % MAX_BATTLE_RECORDS;
+        }
+        
         battleHistory[battleId] = result;
+        battleIdToIndex[battleId] = newIndex;
+        indexToBattleId[newIndex] = battleId;
+        
+        if (battleCount == 1 || battleId < earliestBattleId) {
+            earliestBattleId = battleId;
+        }
     }
 
     /**

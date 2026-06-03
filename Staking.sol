@@ -265,6 +265,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @dev 每日奖励计算（仅增加全局增量，不遍历用户）
      */
     function calculateDailyReward() external whenNotPaused onlyAuthorized {
+        require(rewardTokenContract != address(0), "Staking: Reward token contract not set");
         _checkNewDay();
         require(todayRewardAmount == 0, "Staking: Daily reward already calculated");
         _doCalculateDailyReward();
