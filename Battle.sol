@@ -155,14 +155,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @param a 新的授权器地址
      */
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "Battle: Invalid authorizer address");
         authorizer = a;
     }
 
-    /**
-     * @dev 设置战斗调用者（通常是ArenaRanking合约）
-     * @param _battleCaller 授权调用战斗的合约地址
-     */
     function setBattleCaller(address _battleCaller) external onlyOwner {
+        require(_battleCaller != address(0), "Battle: Invalid battle caller address");
         battleCaller = _battleCaller;
     }
 

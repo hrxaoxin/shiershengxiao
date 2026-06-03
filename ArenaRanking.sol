@@ -127,17 +127,21 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _unpause();
     }
 
-    function setAuthorizer(address a) external onlyOwner { 
-        authorizer = a; 
+    function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "ArenaRanking: Invalid authorizer address");
+        authorizer = a;
     }
-    function setBattleContract(address a) external onlyOwner { 
-        battleContract = a; 
+    function setBattleContract(address a) external onlyOwner {
+        require(a != address(0), "ArenaRanking: Invalid battle contract address");
+        battleContract = a;
     }
-    function setNFTContract(address a) external onlyOwner { 
-        nftContract = a; 
+    function setNFTContract(address a) external onlyOwner {
+        require(a != address(0), "ArenaRanking: Invalid NFT contract address");
+        nftContract = a;
     }
-    function setTokenContract(address a) external onlyOwner { 
-        tokenContract = a; 
+    function setTokenContract(address a) external onlyOwner {
+        require(a != address(0), "ArenaRanking: Invalid token contract address");
+        tokenContract = a;
     }
     function setSeasonRewardRate(uint256 rate) external onlyOwner { 
         seasonRewardRate = rate; 
@@ -523,17 +527,19 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
                 seasonRankings[seasonNumber].length > 0 && seasonRankings[seasonNumber][0] == msg.sender,
                 "ArenaRanking: Player not found in rankings");
 
-        // 使用赛季节算时预计算的奖励值，避免因 rewardPool 变化导致奖励错误
+        // 使用赛季结算时预计算的奖励值，避免因 rewardPool 变化导致奖励错误
         uint256 reward = playerSeasonRewards[seasonNumber][msg.sender];
         require(seasons[seasonNumber].rewardCalculated, "ArenaRanking: Season rewards not calculated");
-        
+        require(reward > 0, "ArenaRanking: No reward to claim");
+
         seasonRewardsClaimed[seasonNumber][msg.sender] = true;
-        
-        if (reward > 0) {
-            require(address(this).balance >= reward, "ArenaRanking: Insufficient BNB balance");
-            (bool success, ) = payable(msg.sender).call{value: reward}("");
-            require(success, "ArenaRanking: BNB transfer failed");
-        }
+
+        // 使用预计算的奖励池总量进行安全检查
+        uint256 totalSeasonReward = seasons[seasonNumber].rewardPool;
+        require(address(this).balance >= totalSeasonReward, "ArenaRanking: Insufficient contract balance for season rewards");
+
+        (bool success, ) = payable(msg.sender).call{value: reward}("");
+        require(success, "ArenaRanking: BNB transfer failed");
         
         emit RewardClaimed(msg.sender, reward, seasonNumber);
     }

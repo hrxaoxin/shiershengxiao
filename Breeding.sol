@@ -113,8 +113,9 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
      * @dev 设置授权器地址
      * @param a 新的授权器地址
      */
-    function setAuthorizer(address a) external onlyOwner { 
-        authorizer = a; 
+    function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "Breeding: Invalid authorizer address");
+        authorizer = a;
     }
 
     function setStakingContract(address _stakingContract) external onlyOwner {
@@ -269,23 +270,27 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         });
 
         // 带 try-catch 的 NFT 转账，防止单方转账失败导致费用损失
+        bool fatherTransferred = false;
+        bool motherTransferred = false;
+
         try nft.safeTransferFrom(maleOwner, address(this), fatherId) {
+            fatherTransferred = true;
         } catch {
-            // 退还费用
             if (marketBreedingFee > 0 && tokenContract != address(0)) {
                 IERC20(tokenContract).transfer(msg.sender, marketBreedingFee);
             }
             revert("Breeding: Father NFT transfer failed");
         }
-        
+
         try nft.safeTransferFrom(femaleOwner, address(this), motherId) {
+            motherTransferred = true;
         } catch {
-            // 回滚已转入的 father NFT
-            try nft.safeTransferFrom(address(this), maleOwner, fatherId) {
-            } catch {
-                emit EmergencyNFTLocked(fatherId, maleOwner);
+            if (fatherTransferred) {
+                try nft.safeTransferFrom(address(this), maleOwner, fatherId) {
+                } catch {
+                    emit EmergencyNFTLocked(fatherId, maleOwner);
+                }
             }
-            // 退还费用
             if (marketBreedingFee > 0 && tokenContract != address(0)) {
                 IERC20(tokenContract).transfer(msg.sender, marketBreedingFee);
             }
@@ -441,21 +446,27 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         breedingCooldowns[pair.fatherId] = block.timestamp;
         breedingCooldowns[pair.motherId] = block.timestamp;
         
-        // 费用退还逻辑 - 只在繁殖对创建后且费用未被销毁时退还
+        // 费用退还逻辑 - 取消时无论费用是否已销毁都应退还
         if (tokenContract != address(0)) {
             IERC20 token = IERC20(tokenContract);
-            
+
             if (pair.breedingType == BREEDING_TYPE_SELF && selfBreedingFee > 0) {
                 uint256 contractBalance = token.balanceOf(address(this));
                 if (contractBalance >= selfBreedingFee) {
                     token.transfer(pair.maleOwner, selfBreedingFee);
+                } else if (contractBalance > 0) {
+                    token.transfer(pair.maleOwner, contractBalance);
                 }
             } else if (pair.breedingType == BREEDING_TYPE_MARKET && marketBreedingFee > 0) {
                 uint256 contractBalance = token.balanceOf(address(this));
+                uint256 halfFee = marketBreedingFee / 2;
                 if (contractBalance >= marketBreedingFee) {
-                    uint256 halfFee = marketBreedingFee / 2;
                     token.transfer(pair.maleOwner, halfFee);
                     token.transfer(pair.femaleOwner, halfFee);
+                } else if (contractBalance > 0) {
+                    uint256 quarterFee = contractBalance / 2;
+                    token.transfer(pair.maleOwner, quarterFee);
+                    token.transfer(pair.femaleOwner, contractBalance - quarterFee);
                 }
             }
         }

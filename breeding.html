@@ -582,7 +582,6 @@
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
                 ZODIAC_UI.showToast('合约初始化失败，请刷新重试', 'error');
-                throw error;
             }
         }
 

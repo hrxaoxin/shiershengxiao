@@ -109,6 +109,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "NFTMint: Invalid authorizer address");
         authorizer = a;
     }
 
@@ -121,8 +122,9 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         require(_tokenBurner != address(0), "NFTMint: Invalid token burner address");
         tokenBurnerContract = _tokenBurner;
     }
-    
+
     function setNFTDataContract(address _nftData) external onlyAuthorized {
+        require(_nftData != address(0), "NFTMint: Invalid NFT data contract address");
         nftDataContract = _nftData;
     }
     

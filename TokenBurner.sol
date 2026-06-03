@@ -62,11 +62,6 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _;
     }
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
     function initialize(address _tokenContract, address _nftMint, address _authorizer) external initializer {
         __UUPSUpgradeable_init();
         __Ownable2Step_init();
@@ -79,6 +74,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "TokenBurner: Invalid authorizer address");
         authorizer = a;
     }
 

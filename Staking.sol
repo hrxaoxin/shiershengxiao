@@ -90,6 +90,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "Staking: Invalid authorizer address");
         authorizer = a;
     }
 
@@ -386,24 +387,14 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function _calcUserPending(address user) internal view returns (uint256) {
         uint256 totalWeight = userStakedWeight[user];
         if (totalWeight == 0) return 0;
-        
+
         uint256 snapshotBase = _userSnapshotWeight[user];
-        
-        // 使用 Solidity 0.8+ 的内置溢出检查，安全计算
-        uint256 rewardBase;
-        if (globalRewardPerWeight > type(uint256).max / totalWeight) {
-            // 溢出保护：使用精度因子先除后乘，避免中间值溢出
-            uint256 globalDivided = globalRewardPerWeight / STAKING_REWARD_PRECISION;
-            rewardBase = globalDivided * totalWeight;
-            rewardBase = rewardBase * STAKING_REWARD_PRECISION;
-        } else {
-            rewardBase = globalRewardPerWeight * totalWeight;
-        }
-        
+
+        uint256 rewardBase = globalRewardPerWeight * totalWeight;
+
         if (rewardBase <= snapshotBase) return 0;
-        
-        uint256 pending = rewardBase - snapshotBase;
-        return pending / STAKING_REWARD_PRECISION;
+
+        return (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
     }
 
     function setRewardTokenContract(address _tokenContract) external onlyAuthorized {

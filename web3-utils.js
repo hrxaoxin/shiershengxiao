@@ -342,6 +342,27 @@ window.ZODIAC_WEB3 = (function() {
         if (callbacks.onBattleEnded) {
             events.push({ contract: 'battle', event: 'BattleEnded', callback: callbacks.onBattleEnded });
         }
+        if (callbacks.onMint) {
+            events.push({ contract: 'nftMint', event: 'Mint', callback: callbacks.onMint });
+        }
+        if (callbacks.onUpgrade) {
+            events.push({ contract: 'nftUpdate', event: 'Upgrade', callback: callbacks.onUpgrade });
+        }
+        if (callbacks.onBreedingCompleted) {
+            events.push({ contract: 'breeding', event: 'BreedingCompleted', callback: callbacks.onBreedingCompleted });
+        }
+        if (callbacks.onBreedingStarted) {
+            events.push({ contract: 'breeding', event: 'BreedingStarted', callback: callbacks.onBreedingStarted });
+        }
+        if (callbacks.onRewardClaimed) {
+            events.push({ contract: 'arena', event: 'RewardClaimed', callback: callbacks.onRewardClaimed });
+        }
+        if (callbacks.onStaked) {
+            events.push({ contract: 'staking', event: 'Staked', callback: callbacks.onStaked });
+        }
+        if (callbacks.onUnstaked) {
+            events.push({ contract: 'staking', event: 'Unstaked', callback: callbacks.onUnstaked });
+        }
         listenToEvents(events);
     }
 
@@ -587,6 +608,40 @@ window.ZODIAC_WEB3 = (function() {
         return Promise.all(tokenIds.map((id, i) => listNFT(id, prices[i])));
     }
 
+    // --- Token Burner Methods (Mint) ---
+    async function burnAndMint(isRare) {
+        try {
+            const contract = await getContract('tokenBurner');
+            const receipt = await sendAndTrackTransaction(contract, 'burnAndMint', [account, isRare]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] burnAndMint failed:', e);
+            throw e;
+        }
+    }
+
+    async function burnAndMintTen(isRare) {
+        try {
+            const contract = await getContract('tokenBurner');
+            const receipt = await sendAndTrackTransaction(contract, 'burnAndMintTen', [account, isRare]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] burnAndMintTen failed:', e);
+            throw e;
+        }
+    }
+
+    async function burnAndMintTargeted(zodiac) {
+        try {
+            const contract = await getContract('tokenBurner');
+            const receipt = await sendAndTrackTransaction(contract, 'burnAndMintTargeted', [account, zodiac]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] burnAndMintTargeted failed:', e);
+            throw e;
+        }
+    }
+
     // --- Arena Methods ---
     async function stakeArenaNFTs(tokenIds) {
         const contract = await getContract('arena');
@@ -672,6 +727,11 @@ window.ZODIAC_WEB3 = (function() {
         // Token Staking
         stakeTokens,
         unstakeTokens,
-        claimTokenStakingReward
+        claimTokenStakingReward,
+
+        // Token Burner (Mint)
+        burnAndMint,
+        burnAndMintTen,
+        burnAndMintTargeted
     };
 })();
