@@ -293,13 +293,16 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 设置手续费率
-     * 仅合约所有者可调用
+     * @dev 设置手续费率（仅所有者）
      */
     function setFeePercent(uint256 percent) external onlyOwner {
-        require(percent <= 100, "NFTTrading: Fee too high");
+        require(percent <= 20, "NFTTrading: Fee too high");
+        require(percent >= 0, "NFTTrading: Fee must be non-negative");
         feePercent = percent;
+        emit FeePercentUpdated(feePercent);
     }
+    
+    event FeePercentUpdated(uint256 newFeePercent);
 
     /**
      * @dev 从列表移除

@@ -53,7 +53,7 @@ contract WeightManager is
     mapping(address => uint256) public userWeight;
     mapping(address => uint256) public cachedUserWeight;
     mapping(address => uint256) public cachedWeightTimestamp;
-    uint256 public weightCacheDuration = 5 minutes;
+    uint256 public weightCacheDuration = 15 minutes;
     
     mapping(address => address) public eligibleUserPrev;
     mapping(address => address) public eligibleUserNext;

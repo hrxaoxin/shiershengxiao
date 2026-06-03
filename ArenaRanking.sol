@@ -41,6 +41,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         bool rewardCalculated;
         uint256 totalPlayers;
         uint256 rewardPool;
+        uint256 pendingRewards;
     }
 
     struct LeaderboardEntry {
@@ -84,6 +85,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     uint256 public currentSeasonId;
     uint256 public seasonDuration = 1 days;
+    uint256 public rewardRate = 10; // 0.1% (10/10000)
     
     address public authorizer;
     address public battleContract;
@@ -96,8 +98,9 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public constant TEAM_SIZE = 6;
     uint256 public constant RECHARGE_COST = 888;
     uint256 public constant RECHARGE_ATTEMPTS = 3;
-    uint256 public constant MAX_LEADERBOARD_SIZE = 100;
+    uint256 public constant MAX_LEADERBOARD_SIZE = 1000;
     uint256 public constant MAX_SEASONS_TO_KEEP = 20;
+    uint256 public constant PRECISION = 10000;
     uint256 public maxRechargeAttempts = 10;
     uint256 public seasonRewardRate;
     mapping(address => uint256) public lastBattleTime;
@@ -340,6 +343,37 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         }
     }
 
+    function _removeFromRanking(address player) internal {
+        uint256 seasonId = currentSeasonId;
+        uint256 currentIndex = playerRankIndex[seasonId][player];
+        
+        if (currentIndex == 0) {
+            return;
+        }
+        
+        address[] storage rankings = seasonRankings[seasonId];
+        uint256 lastIndex = rankings.length - 1;
+        
+        if (currentIndex <= lastIndex) {
+            address lastPlayer = rankings[lastIndex];
+            rankings[currentIndex] = lastPlayer;
+            playerRankIndex[seasonId][lastPlayer] = currentIndex;
+            rankings.pop();
+            playerRankIndex[seasonId][player] = 0;
+        }
+    }
+
+    function _clearSeasonData(address player) internal {
+        PlayerRecord storage record = players[player];
+        
+        _removeFromRanking(player);
+        
+        record.score = 0;
+        record.wins = 0;
+        record.losses = 0;
+        record.seasonId = currentSeasonId;
+    }
+
     uint256 public constant MAX_MOCK_PLAYERS = 1000;
     uint256 public constant MOCK_ID_OFFSET = 10000;
     uint256 public constant MOCK_ID_MULTIPLIER = 1000;
@@ -380,6 +414,8 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         
         PlayerRecord storage record = players[msg.sender];
         
+        bool shouldClearSeasonData = false;
+        
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId > 0, "ArenaRanking: Invalid token ID");
@@ -395,7 +431,10 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
                     break;
                 }
             }
-            require(!inTeam, "ArenaRanking: NFT is in battle team");
+            
+            if (inTeam) {
+                shouldClearSeasonData = true;
+            }
             
             nft.safeTransferFrom(address(this), msg.sender, tokenId);
             nftStakedOwner[tokenId] = address(0);
@@ -409,6 +448,12 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
                     break;
                 }
             }
+        }
+        
+        if (shouldClearSeasonData || userStakedNFTs[msg.sender].length == 0) {
+            _clearSeasonData(msg.sender);
+            delete record.battleTeam;
+            record.hasTeam = false;
         }
         
         emit NFTsUnstaked(msg.sender, tokenIds);
@@ -440,6 +485,9 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function clearBattleTeam() external {
         PlayerRecord storage record = players[msg.sender];
+        
+        _clearSeasonData(msg.sender);
+        
         delete record.battleTeam;
         record.hasTeam = false;
         
@@ -506,7 +554,8 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             isSettled: false,
             rewardCalculated: false,
             totalPlayers: 0,
-            rewardPool: 0
+            rewardPool: 0,
+            pendingRewards: 0
         });
         emit SeasonStarted(currentSeasonId, block.timestamp);
     }
@@ -546,19 +595,62 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         SeasonInfo storage season = seasons[seasonId];
         if (season.rewardCalculated) return;
         
+        uint256 contractBalance = address(this).balance;
+        uint256 availableBalance = contractBalance - season.pendingRewards;
+        
+        season.rewardPool = availableBalance * rewardRate / PRECISION;
+        
         uint256 totalPlayers = seasonRankings[seasonId].length;
+        uint256 totalRealPlayers = _countRealPlayers(seasonId);
         uint256 totalDistributed = 0;
         
         for (uint256 i = 0; i < totalPlayers; i++) {
             address player = seasonRankings[seasonId][i];
-            uint256 rank = i + 1;
-            uint256 reward = _calculateRankReward(rank, season.rewardPool);
+            
+            if (_isMockPlayer(player)) {
+                continue;
+            }
+            
+            uint256 rank = _getRealPlayerRank(seasonId, i);
+            uint256 reward = _calculateRankReward(rank, season.rewardPool, totalRealPlayers);
             playerSeasonRewards[seasonId][player] = reward;
             totalDistributed += reward;
         }
         
+        season.pendingRewards += totalDistributed;
         season.rewardCalculated = true;
         emit SeasonRewardsCalculated(seasonId, season.rewardPool, totalDistributed);
+    }
+    
+    function _countRealPlayers(uint256 seasonId) internal view returns (uint256) {
+        uint256 total = 0;
+        uint256 totalPlayers = seasonRankings[seasonId].length;
+        
+        for (uint256 i = 0; i < totalPlayers; i++) {
+            address player = seasonRankings[seasonId][i];
+            if (!_isMockPlayer(player)) {
+                total++;
+            }
+        }
+        
+        return total;
+    }
+    
+    function _getRealPlayerRank(uint256 seasonId, uint256 index) internal view returns (uint256) {
+        uint256 rank = 0;
+        
+        for (uint256 i = 0; i <= index; i++) {
+            address player = seasonRankings[seasonId][i];
+            if (!_isMockPlayer(player)) {
+                rank++;
+            }
+        }
+        
+        return rank;
+    }
+    
+    function _isMockPlayer(address player) internal pure returns (bool) {
+        return player > address(0) && player < address(1000);
     }
     
     function claimReward(uint256 seasonNumber) external nonReentrant {
@@ -578,10 +670,12 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(reward > 0, "ArenaRanking: No reward to claim");
 
         seasonRewardsClaimed[seasonNumber][msg.sender] = true;
+        
+        // 更新待领取额度
+        seasons[seasonNumber].pendingRewards -= reward;
 
-        // 使用预计算的奖励池总量进行安全检查
-        uint256 totalSeasonReward = seasons[seasonNumber].rewardPool;
-        require(address(this).balance >= totalSeasonReward, "ArenaRanking: Insufficient contract balance for season rewards");
+        // 检查合约余额是否足够支付当前用户的奖励
+        require(address(this).balance >= reward, "ArenaRanking: Insufficient contract balance");
 
         (bool success, ) = payable(msg.sender).call{value: reward}("");
         require(success, "ArenaRanking: BNB transfer failed");
@@ -599,32 +693,162 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         PlayerRecord storage record = players[msg.sender];
         if (record.seasonId != seasonNumber) return 0;
         
-        uint256 rank = playerRankIndex[seasonNumber][msg.sender] + 1;
+        uint256 totalRealPlayers = _countRealPlayers(seasonNumber);
+        uint256 rank = _getRealPlayerRank(seasonNumber, playerRankIndex[seasonNumber][msg.sender]);
         
-        return _calculateRankReward(rank, seasons[seasonNumber].rewardPool);
+        return _calculateRankReward(rank, seasons[seasonNumber].rewardPool, totalRealPlayers);
     }
 
     function getPendingRewardsByPlayer(address player) external view returns (uint256) {
         PlayerRecord storage record = players[player];
         if (!seasons[record.seasonId].isSettled) return 0;
         
-        uint256 rank = playerRankIndex[record.seasonId][player] + 1;
+        uint256 seasonId = record.seasonId;
+        uint256 totalRealPlayers = _countRealPlayers(seasonId);
+        uint256 rank = _getRealPlayerRank(seasonId, playerRankIndex[seasonId][player]);
         
-        return _calculateRankReward(rank, seasons[record.seasonId].rewardPool);
+        return _calculateRankReward(rank, seasons[seasonId].rewardPool, totalRealPlayers);
     }
 
     function getPlayerRank(address player) external view returns (uint256) {
         return playerRankIndex[currentSeasonId][player] + 1;
     }
 
-    function _calculateRankReward(uint256 rank, uint256 pool) internal pure returns (uint256) {
-        uint256 basisPoints = 10000; // 10000个基点 = 100%
-        if (rank == 1) return pool * 2000 / basisPoints;    // 第1名20%
-        if (rank == 2) return pool * 1500 / basisPoints;    // 第2名15%
-        if (rank == 3) return pool * 1000 / basisPoints;    // 第3名10%
-        if (rank <= 10) return pool * 300 / basisPoints;    // 4-10名各3% (7人×3%=21%)
-        if (rank <= 50) return pool * 85 / basisPoints;     // 11-50名各0.85% (40人×0.85%=34%)
-        return 0;
+    function _calculateRankReward(uint256 rank, uint256 pool, uint256 totalRealPlayers) internal pure returns (uint256) {
+        if (totalRealPlayers == 0 || pool == 0 || rank > totalRealPlayers) return 0;
+        
+        uint256 basisPoints = 10000;
+        
+        if (totalRealPlayers <= 3) {
+            return _calculateRewardForSmallGroup(rank, pool, totalRealPlayers);
+        }
+        
+        if (totalRealPlayers <= 10) {
+            return _calculateRewardForMediumGroup(rank, pool, totalRealPlayers);
+        }
+        
+        return _calculateRewardForLargeGroup(rank, pool, totalRealPlayers);
+    }
+    
+    function _calculateRewardForSmallGroup(uint256 rank, uint256 pool, uint256 totalPlayers) internal pure returns (uint256) {
+        uint256 basisPoints = 10000;
+        
+        if (totalPlayers == 1) {
+            return pool;
+        } else if (totalPlayers == 2) {
+            if (rank == 1) return pool * 6000 / basisPoints;
+            return pool * 4000 / basisPoints;
+        } else {
+            if (rank == 1) return pool * 4500 / basisPoints;
+            if (rank == 2) return pool * 3000 / basisPoints;
+            return pool * 2500 / basisPoints;
+        }
+    }
+    
+    function _calculateRewardForMediumGroup(uint256 rank, uint256 pool, uint256 totalPlayers) internal pure returns (uint256) {
+        uint256 basisPoints = 10000;
+        
+        uint256[] memory ratios = [2000, 1500, 1200, 1000, 800, 700, 600, 500, 400, 300];
+        
+        uint256 sum = 0;
+        for (uint256 i = 0; i < totalPlayers; i++) {
+            sum += ratios[i];
+        }
+        
+        return pool * ratios[rank - 1] / sum;
+    }
+    
+    function _calculateRewardForLargeGroup(uint256 rank, uint256 pool, uint256 totalPlayers) internal pure returns (uint256) {
+        uint256 basisPoints = 10000;
+        
+        uint256 guaranteedPool = pool * 1000 / basisPoints;
+        uint256 tierPool = pool * 9000 / basisPoints;
+        
+        uint256 guaranteedReward = guaranteedPool / totalPlayers;
+        
+        uint256 tierReward = _calculateTierBasedReward(rank, tierPool, totalPlayers);
+        
+        return guaranteedReward + tierReward;
+    }
+    
+    function _calculateTierBasedReward(uint256 rank, uint256 pool, uint256 totalPlayers) internal pure returns (uint256) {
+        if (rank > totalPlayers || pool == 0) return 0;
+        
+        uint256 tier1Size = totalPlayers > 100 ? 100 : totalPlayers;
+        uint256 tier2Size = totalPlayers > 500 ? 400 : (totalPlayers > 100 ? totalPlayers - 100 : 0);
+        uint256 tier3Size = totalPlayers > 1000 ? 500 : (totalPlayers > 500 ? totalPlayers - 500 : 0);
+        uint256 tier4Size = totalPlayers > 1000 ? totalPlayers - 1000 : 0;
+        
+        uint256 tier1Pool = pool * 5000 / 9000;
+        uint256 tier2Pool = pool * 2500 / 9000;
+        uint256 tier3Pool = pool * 1000 / 9000;
+        uint256 tier4Pool = pool * 500 / 9000;
+        
+        if (rank <= tier1Size) {
+            return _calculateTier1Reward(rank, tier1Pool, tier1Size);
+        } else if (rank <= tier1Size + tier2Size) {
+            return _calculateTier2Reward(rank - tier1Size, tier2Pool, tier2Size);
+        } else if (rank <= tier1Size + tier2Size + tier3Size) {
+            return _calculateTier3Reward(rank - tier1Size - tier2Size, tier3Pool, tier3Size);
+        } else {
+            return _calculateTier4Reward(rank - tier1Size - tier2Size - tier3Size, tier4Pool, tier4Size);
+        }
+    }
+    
+    function _calculateTier1Reward(uint256 rank, uint256 pool, uint256 total) internal pure returns (uint256) {
+        if (rank == 1) return pool * 2500 / 5000;
+        if (rank == 2) return pool * 1500 / 5000;
+        if (rank == 3) return pool * 600 / 5000;
+        
+        uint256 remaining = pool * 400 / 5000;
+        uint256 remainingPlayers = total > 3 ? total - 3 : 0;
+        
+        if (remainingPlayers == 0) return 0;
+        
+        uint256 baseWeight = 100;
+        uint256 decay = 1;
+        uint256 sumWeight = 0;
+        
+        for (uint256 i = 0; i < remainingPlayers; i++) {
+            uint256 weight = baseWeight > i * decay ? baseWeight - i * decay : 10;
+            sumWeight += weight;
+        }
+        
+        uint256 currentWeight = baseWeight > (rank - 4) * decay ? baseWeight - (rank - 4) * decay : 10;
+        
+        return remaining * currentWeight / sumWeight;
+    }
+    
+    function _calculateTier2Reward(uint256 rank, uint256 pool, uint256 total) internal pure returns (uint256) {
+        if (total == 0) return 0;
+        
+        uint256 baseWeight = 50;
+        uint256 decay = 0.5;
+        uint256 sumWeight = 0;
+        
+        for (uint256 i = 0; i < total; i++) {
+            uint256 weight = baseWeight > i * decay ? baseWeight - i * decay : 10;
+            sumWeight += weight;
+        }
+        
+        uint256 currentWeight = baseWeight > (rank - 1) * decay ? baseWeight - (rank - 1) * decay : 10;
+        
+        return pool * currentWeight / sumWeight;
+    }
+    
+    function _calculateTier3Reward(uint256 rank, uint256 pool, uint256 total) internal pure returns (uint256) {
+        if (total == 0) return 0;
+        
+        uint256 weight = total - rank + 1;
+        uint256 sumWeight = total * (total + 1) / 2;
+        
+        return pool * weight / sumWeight;
+    }
+    
+    function _calculateTier4Reward(uint256 rank, uint256 pool, uint256 total) internal pure returns (uint256) {
+        if (total == 0) return 0;
+        
+        return pool / total;
     }
 
     function getSeasonInfo(uint256 seasonId) external view returns (uint256 startTime, uint256 endTime, bool isActive, bool isSettled, uint256 totalPlayers) {
@@ -761,12 +985,14 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function calculateRewardForRank(uint256 rank) external view returns (uint256) {
         require(rank > 0, "ArenaRanking: Rank must be > 0");
-        return _calculateRankReward(rank, seasons[currentSeasonId].rewardPool);
+        uint256 totalRealPlayers = _countRealPlayers(currentSeasonId);
+        return _calculateRankReward(rank, seasons[currentSeasonId].rewardPool, totalRealPlayers);
     }
 
     function getRewardForRank(uint256 rank) external view returns (uint256) {
         require(rank > 0, "ArenaRanking: Rank must be > 0");
-        return _calculateRankReward(rank, seasons[currentSeasonId].rewardPool);
+        uint256 totalRealPlayers = _countRealPlayers(currentSeasonId);
+        return _calculateRankReward(rank, seasons[currentSeasonId].rewardPool, totalRealPlayers);
     }
 
     function calculateSeasonRewards(uint256 seasonNumber) external onlyAuthorized {
@@ -776,21 +1002,32 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         SeasonInfo storage season = seasons[seasonNumber];
         address[] storage rankings = seasonRankings[seasonNumber];
         
+        uint256 contractBalance = address(this).balance;
+        uint256 availableBalance = contractBalance - season.pendingRewards;
+        season.rewardPool = availableBalance * rewardRate / PRECISION;
+        
         uint256 totalReward = season.rewardPool;
         require(totalReward > 0, "ArenaRanking: No reward in pool");
         
+        uint256 totalRealPlayers = _countRealPlayers(seasonNumber);
         uint256 distributed = 0;
         uint256 maxRank = rankings.length;
         
         for (uint256 i = 0; i < maxRank; i++) {
             address player = rankings[i];
-            uint256 rank = i + 1;
-            uint256 rankReward = _calculateRankReward(rank, totalReward);
+            
+            if (_isMockPlayer(player)) {
+                continue;
+            }
+            
+            uint256 rank = _getRealPlayerRank(seasonNumber, i);
+            uint256 rankReward = _calculateRankReward(rank, totalReward, totalRealPlayers);
             
             playerSeasonRewards[seasonNumber][player] = rankReward;
             distributed += rankReward;
         }
         
+        season.pendingRewards += distributed;
         season.rewardCalculated = true;
         emit SeasonRewardsCalculated(seasonNumber, totalReward, distributed);
     }

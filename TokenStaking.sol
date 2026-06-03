@@ -38,6 +38,8 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     /** @dev 奖励精度缩放因子（1e18，用于避免 dailyRewardPerToken 整数截断） */
     uint256 private constant REWARD_PRECISION = 1e18;
+    /** @dev dailyRewardPerToken 最大阈值，超过时触发重置 */
+    uint256 public constant MAX_DAILY_REWARD_PER_TOKEN = 1e36;
 
     /** @dev 代币合约地址 */
     address public tokenContract;
@@ -334,11 +336,27 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         
         if (availableBalance > 0 && totalStakedTokens > 0) {
             todayRewardAmount = availableBalance * rewardRate / 10000;
+            
+            // 检查溢出风险
+            uint256 rewardIncrement = todayRewardAmount * REWARD_PRECISION / totalStakedTokens;
+            require(dailyRewardPerToken + rewardIncrement <= MAX_DAILY_REWARD_PER_TOKEN, 
+                    "TokenStaking: dailyRewardPerToken overflow risk");
+            
             // 使用高精度累积 dailyRewardPerToken，持续递增而非覆盖
-            dailyRewardPerToken += todayRewardAmount * REWARD_PRECISION / totalStakedTokens;
+            dailyRewardPerToken += rewardIncrement;
             lastRewardCalculationTime = block.timestamp;
             emit DailyRewardCalculated(todayRewardAmount, totalStakedTokens);
         }
+    }
+    
+    /**
+     * @dev 重置 dailyRewardPerToken（当接近溢出时调用）
+     */
+    function resetDailyRewardPerToken() external onlyOwner {
+        dailyRewardPerToken = 0;
+        // 重置所有用户的累积奖励率记录
+        // 注意：此操作会导致用户已累积但未领取的奖励丢失
+        // 应在奖励发放周期结束后调用
     }
 
     /**

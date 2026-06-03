@@ -101,10 +101,15 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     struct struct_NFTInfo {
         uint256 tokenId;         // NFT唯一ID
         uint256 zodiacType;       // 生肖类型（0-119）
-        uint8 level;              // 等级（1-5）
+        uint8 level;              // 等级（1-5，使用uint8但限制为1-5）
         uint8 growth;             // 成长值（10-100）
         uint256 mintTime;         // 铸造时间戳
     }
+    
+    /** @dev 最大等级限制 */
+    uint8 public constant MAX_LEVEL = 5;
+    /** @dev 最小等级限制 */
+    uint8 public constant MIN_LEVEL = 1;
 
     /**
      * @dev 授权合约地址（Authorizer）

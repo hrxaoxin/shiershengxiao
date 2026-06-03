@@ -526,7 +526,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         else if (element == 3) elementName = "暗";
         else elementName = "光";
 
-        string[12] memory zodiacNames = ["鼠", "牛", "虎", "兔", "龙", "蛇", "马", "羊", "猴", "鸡", "狗", "猪"};
+        string[12] memory zodiacNames = ["鼠", "牛", "虎", "兔", "龙", "蛇", "马", "羊", "猴", "鸡", "狗", "猪"];
         zodiacName = zodiacNames[zodiac];
 
         string memory genderName = gender == 0 ? "公" : "母";
@@ -545,6 +545,19 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             tokenName,
             imageUrl
         );
+    }
+    
+    /**
+     * @dev 获取NFT基本信息（轻量级，仅返回tokenType和level）
+     * @param tokenId - NFT的tokenId
+     * @return tokenType_ - NFT类型
+     * @return level - NFT等级
+     */
+    function getNFTBasicInfo(uint256 tokenId) external view returns (
+        uint256 tokenType_,
+        uint256 level
+    ) {
+        return (tokenType[tokenId], uint256(tokenLevel[tokenId]));
     }
 
     function isRare(uint256 tokenId) external view returns (bool) {

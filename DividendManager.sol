@@ -426,7 +426,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @param element 元素类型（0-4对应水风火暗光）
      */
     /** @dev 最小权重更新间隔（秒）- 防止频繁操作 */
-    uint256 public minWeightUpdateInterval = 60;
+    uint256 public minWeightUpdateInterval = 10;
     
     /** @dev 用户上次权重更新时间 */
     mapping(address => uint256) public lastWeightUpdateTime;

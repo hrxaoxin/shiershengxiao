@@ -368,27 +368,45 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
         uint256 arenaRewardAmount = amount * arenaRewardPercent / PRECISION;
 
+        // 使用try-catch分别处理每个分配，允许部分成功
         if (dividendPool != address(0) && dividendAmount > 0) {
-            require(token.transfer(dividendPool, dividendAmount), "RewardManager: Dividend pool transfer failed");
-            // 同步 DividendManager 分红池，使转账的代币被正确计入分红计算
-            try IDividendManager(dividendPool).syncDividendPool() {} catch {}
+            try {
+                require(token.transfer(dividendPool, dividendAmount), "RewardManager: Dividend pool transfer failed");
+                // 同步 DividendManager 分红池，使转账的代币被正确计入分红计算
+                try IDividendManager(dividendPool).syncDividendPool() {} catch {}
+                emit RewardTransferFailed(0, dividendPool, dividendAmount);
+            } catch {
+                emit RewardTransferFailed(0, dividendPool, dividendAmount);
+            }
         }
         if (nftStakingPool != address(0) && nftStakingAmount > 0) {
-            require(token.transfer(nftStakingPool, nftStakingAmount), "RewardManager: NFT staking pool transfer failed");
-            if (poolManager != address(0)) {
-                IPoolManager(poolManager).addToNFTStakingPool(nftStakingAmount);
+            try {
+                require(token.transfer(nftStakingPool, nftStakingAmount), "RewardManager: NFT staking pool transfer failed");
+                if (poolManager != address(0)) {
+                    try IPoolManager(poolManager).addToNFTStakingPool(nftStakingAmount) {} catch {}
+                }
+            } catch {
+                emit RewardTransferFailed(1, nftStakingPool, nftStakingAmount);
             }
         }
         if (tokenStakingPool != address(0) && tokenStakingAmount > 0) {
-            require(token.transfer(tokenStakingPool, tokenStakingAmount), "RewardManager: Token staking pool transfer failed");
-            if (poolManager != address(0)) {
-                IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount);
+            try {
+                require(token.transfer(tokenStakingPool, tokenStakingAmount), "RewardManager: Token staking pool transfer failed");
+                if (poolManager != address(0)) {
+                    try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch {}
+                }
+            } catch {
+                emit RewardTransferFailed(2, tokenStakingPool, tokenStakingAmount);
             }
         }
         if (arenaRewardPool != address(0) && arenaRewardAmount > 0) {
-            require(token.transfer(arenaRewardPool, arenaRewardAmount), "RewardManager: Arena reward pool transfer failed");
-            if (poolManager != address(0)) {
-                IPoolManager(poolManager).addToArenaRewardPool(arenaRewardAmount);
+            try {
+                require(token.transfer(arenaRewardPool, arenaRewardAmount), "RewardManager: Arena reward pool transfer failed");
+                if (poolManager != address(0)) {
+                    try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardAmount) {} catch {}
+                }
+            } catch {
+                emit RewardTransferFailed(3, arenaRewardPool, arenaRewardAmount);
             }
         }
 

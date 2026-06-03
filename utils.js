@@ -18,7 +18,7 @@ window.ZODIAC_UTILS = (function() {
      */
     function getNFTInfo(typeId) {
         const typedId = parseInt(typeId, 10);
-        if (isNaN(typedId) || typedId < 0 || typedId > 119) {
+        if (isNaN(typedId) || typedId < 0 || typedId >= 120) {
             return {
                 typeId: typedId,
                 elementIndex: 0,

@@ -214,6 +214,8 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     address public metadataContractAddress;
 
     event ContractAddressesUpdated(address[] addresses);
+    event ContractSetupFailed(string contractName, string errorMessage);
+    event ContractSetupSuccess(string contractName);
 
     /**
      * @dev 初始化函数，设置合约部署者为管理员
@@ -351,11 +353,30 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         address _nftMintAddress
     ) internal {
         if (_battleAddress != address(0)) {
-            ISetNFTContract(_battleAddress).setNFTContract(_nftMintAddress);
+            try ISetNFTContract(_battleAddress).setNFTContract(_nftMintAddress) {
+                emit ContractSetupSuccess("Battle");
+            } catch Error(string memory reason) {
+                emit ContractSetupFailed("Battle", reason);
+            } catch {
+                emit ContractSetupFailed("Battle", "Unknown error");
+            }
         }
         if (_breedingAddress != address(0)) {
-            ISetNFTContract(_breedingAddress).setNFTContract(_nftMintAddress);
-            ISetTokenContract(_breedingAddress).setTokenContract(tokenAddress);
+            try ISetNFTContract(_breedingAddress).setNFTContract(_nftMintAddress) {
+                emit ContractSetupSuccess("Breeding-NFT");
+            } catch Error(string memory reason) {
+                emit ContractSetupFailed("Breeding-NFT", reason);
+            } catch {
+                emit ContractSetupFailed("Breeding-NFT", "Unknown error");
+            }
+            
+            try ISetTokenContract(_breedingAddress).setTokenContract(tokenAddress) {
+                emit ContractSetupSuccess("Breeding-Token");
+            } catch Error(string memory reason) {
+                emit ContractSetupFailed("Breeding-Token", reason);
+            } catch {
+                emit ContractSetupFailed("Breeding-Token", "Unknown error");
+            }
         }
     }
 

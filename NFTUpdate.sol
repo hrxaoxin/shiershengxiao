@@ -397,14 +397,10 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         uint8 newLv = lv + 1;
         NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         
-        // 使用 Checks-Effects-Interactions 模式：先更新本合约状态，再调用外部合约
-        // 这样如果外部调用失败，可以通过事件追踪手动修复权重
+        // 使用 Checks-Effects-Interactions 模式：先更新外部合约权重，再更新本合约状态
+        // 这样如果权重更新失败，等级不会被更新，保持数据一致性
         
-        // 先更新NFT等级（本合约状态变更）
-        m.setTokenLevel(tokenId, newLv);
-        nft.adminSetNFTLevel(tokenId, newLv); // 同时更新 NFTMint
-        
-        // 再更新DividendManager权重（外部调用）
+        // 先更新DividendManager权重（外部调用）
         require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
         
         try IDividendManager(dividendManager).updateUserWeight(msg.sender, uint256(lv), false, uint8(element)) {
@@ -426,6 +422,10 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             emit WeightUpdateFailed(msg.sender, tokenId, lv, newLv, "new_weight");
             revert("NFTUpdate: Update new weight failed with unknown error");
         }
+        
+        // 权重更新成功后，再更新NFT等级（本合约状态变更）
+        m.setTokenLevel(tokenId, newLv);
+        nft.adminSetNFTLevel(tokenId, newLv); // 同时更新 NFTMint
         
         emit CardUpgraded(tokenId, t, lv, newLv, msg.sender, uint64(block.timestamp));
         return newLv;

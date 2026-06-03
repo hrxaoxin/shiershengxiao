@@ -235,8 +235,8 @@ window.ZODIAC_WEB3 = (function() {
     async function getUserWeight(userAddress) {
         try {
             const contract = await getContract('dividendManager');
-            const result = await contract.methods.calcUserDividend(userAddress).call();
-            return result['1'] || 0;
+            const [claimable, weight] = await contract.methods.calcUserDividend(userAddress).call();
+            return weight || 0;
         } catch (e) {
             console.error('[ZODIAC_WEB3] getUserWeight failed:', e);
             return 0;

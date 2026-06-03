@@ -14,7 +14,7 @@ window.ZODIAC_STATE = (function() {
     };
 
     const listeners = {};
-    const PERSISTED_KEYS = ['account', 'chainId'];
+    const PERSISTED_KEYS = ['account', 'chainId', 'tokenBalance', 'nftCount', 'stakedCount', 'dividendBalance'];
 
     function loadFromStorage() {
         try {

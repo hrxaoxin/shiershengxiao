@@ -77,7 +77,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
     event BreedingPairCreated(uint256 indexed pairId, uint256 indexed fatherId, uint256 indexed motherId, uint256 breedingType);
     event BreedingCompleted(uint256 indexed pairId, uint256 indexed childId, uint256 zodiacType);
     event MaleChildGenerated(uint256 indexed pairId, uint256 indexed childId);
-    event BreedingCancelled(uint256 indexed pairId);
+    
     event CooldownUpdated(uint256 selfCooldown, uint256 marketCooldown);
     event BreedingFeeBurned(uint256 amount);
     event Paused(address indexed account, string reason);
@@ -449,71 +449,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         }
     }
 
-    /** @dev 繁殖取消时间窗口（秒）- 默认1小时 */
-    uint256 public cancelWindowSeconds = 3600;
     
-    /**
-     * @dev 取消繁殖
-     * 注意：繁殖对创建后即进入冷却期，用户可以在cancelWindowSeconds时间内取消。
-     * 取消后NFT立即归还，冷却时间重置，费用退还。
-     * 如果超过取消窗口，不允许取消。
-     * 如果冷却期已过，用户应调用 completeBreeding 而非 cancelBreeding。
-     * @param pairId 繁殖对ID
-     */
-    function cancelBreeding(uint256 pairId) external whenNotPaused nonReentrant {
-        BreedingPair storage pair = breedingPairs[pairId];
-        require(pair.status == 0, "Breeding: Pair not active");
-        require(msg.sender == pair.maleOwner || msg.sender == pair.femaleOwner, "Breeding: Not pair owner");
-        require(pair.startTime > 0, "Breeding: Pair does not exist");
-        
-        // 检查是否在取消时间窗口内
-        require(block.timestamp <= pair.startTime + cancelWindowSeconds, "Breeding: Cancel window expired");
-
-        INFTMint nft = INFTMint(nftMintContract);
-        
-        try nft.safeTransferFrom(address(this), pair.maleOwner, pair.fatherId) {
-        } catch {
-            emit EmergencyNFTLocked(pair.fatherId, pair.maleOwner);
-        }
-        
-        try nft.safeTransferFrom(address(this), pair.femaleOwner, pair.motherId) {
-        } catch {
-            emit EmergencyNFTLocked(pair.motherId, pair.femaleOwner);
-        }
-
-        pair.status = 2;
-        isNFTInActiveBreeding[pair.fatherId] = false;
-        isNFTInActiveBreeding[pair.motherId] = false;
-        breedingCooldowns[pair.fatherId] = block.timestamp;
-        breedingCooldowns[pair.motherId] = block.timestamp;
-        
-        // 费用退还逻辑 - 取消时无论费用是否已销毁都应退还
-        if (tokenContract != address(0)) {
-            IERC20 token = IERC20(tokenContract);
-
-            if (pair.breedingType == BREEDING_TYPE_SELF && selfBreedingFee > 0) {
-                uint256 contractBalance = token.balanceOf(address(this));
-                if (contractBalance >= selfBreedingFee) {
-                    token.safeTransfer(pair.maleOwner, selfBreedingFee);
-                } else if (contractBalance > 0) {
-                    token.safeTransfer(pair.maleOwner, contractBalance);
-                }
-            } else if (pair.breedingType == BREEDING_TYPE_MARKET && marketBreedingFee > 0) {
-                uint256 contractBalance = token.balanceOf(address(this));
-                uint256 halfFee = marketBreedingFee / 2;
-                if (contractBalance >= marketBreedingFee) {
-                    token.safeTransfer(pair.maleOwner, halfFee);
-                    token.safeTransfer(pair.femaleOwner, halfFee);
-                } else if (contractBalance > 0) {
-                    uint256 quarterFee = contractBalance / 2;
-                    token.safeTransfer(pair.maleOwner, quarterFee);
-                    token.safeTransfer(pair.femaleOwner, contractBalance - quarterFee);
-                }
-            }
-        }
-        
-        emit BreedingCancelled(pairId);
-    }
 
     /**
      * @dev 获取繁殖对信息
