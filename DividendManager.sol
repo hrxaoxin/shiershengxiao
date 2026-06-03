@@ -73,6 +73,13 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     event DividendClaimed(address indexed user, uint256 amount);
 
     /**
+     * @dev 分红领取警告事件（用户超过30天未领取）
+     * @param user 用户地址
+     * @param daysSinceLastClaim 距离上次领取的天数
+     */
+    event DividendClaimWarning(address indexed user, uint256 daysSinceLastClaim);
+
+    /**
      * @dev 分红池增加事件
      */
     event DividendPoolAdded(uint256 amount, uint256 totalDividend, uint256 perWeightDividendIncrement);
@@ -92,6 +99,16 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 最大快照数量限制，防止无限增长
      */
     uint256 public constant MAX_SNAPSHOTS = 100;
+    
+    /**
+     * @dev 分红领取警告阈值（秒）- 用户超过此时间未领取分红将触发警告
+     */
+    uint256 public constant DIVIDEND_CLAIM_WARNING_THRESHOLD = 30 days;
+    
+    /**
+     * @dev 用户上次领取分红时间
+     */
+    mapping(address => uint256) public lastClaimTime;
 
     /**
      * @dev 初始化函数
@@ -262,9 +279,16 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      */
     function getSnapshot(uint256 index) external view returns (uint256, uint256, uint256, uint256) {
         require(index < snapshots.length, "DividendManager: Invalid snapshot index");
-        uint256 actualIndex = (snapshotStartIndex + index) % snapshots.length;
+        uint256 actualIndex = _getActualIndex(index);
         DividendSnapshot memory snapshot = snapshots[actualIndex];
         return (snapshot.totalWeight, snapshot.totalDividend, snapshot.perWeightDividend, snapshot.timestamp);
+    }
+    
+    /**
+     * @dev 内部函数：将逻辑索引转换为环形缓冲区实际索引
+     */
+    function _getActualIndex(uint256 logicalIndex) internal view returns (uint256) {
+        return (snapshotStartIndex + logicalIndex) % snapshots.length;
     }
 
     /**
@@ -274,15 +298,26 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256 userWeight = userWeights[msg.sender];
         require(userWeight > 0, "DividendManager: No weight");
 
-        // 计算用户应得的增量分红
+        // 检查用户是否长时间未领取分红
+        if (lastClaimTime[msg.sender] > 0 && 
+            block.timestamp - lastClaimTime[msg.sender] > DIVIDEND_CLAIM_WARNING_THRESHOLD) {
+            emit DividendClaimWarning(msg.sender, block.timestamp - lastClaimTime[msg.sender]);
+        }
+
         uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[msg.sender];
-        uint256 newDividend = userWeight * cumulativeDiff / 1e18;
+        
+        uint256 newDividend;
+        unchecked {
+            newDividend = (userWeight * cumulativeDiff) / 1e18;
+        }
+        
         uint256 totalDividend = pendingDividends[msg.sender] + newDividend;
         
         require(totalDividend > 0, "DividendManager: No dividend");
 
         pendingDividends[msg.sender] = 0;
         userCumulativeSnapshots[msg.sender] = cumulativePerWeightDividend;
+        lastClaimTime[msg.sender] = block.timestamp;
 
         require(tokenContract != address(0), "DividendManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
@@ -359,14 +394,22 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         return totalWeight;
     }
 
+    /** @dev 最大单用户权重限制 */
+    uint256 public constant MAX_USER_WEIGHT = 100000;
+    
     /**
      * @dev 设置用户权重（直接设置）
      */
     function setUserWeight(address user, uint256 weight) external onlyAuthorized {
+        require(weight <= MAX_USER_WEIGHT, "DividendManager: Weight exceeds maximum");
+        
         // 先结算用户当前未领取的分红
         if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
             uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-            uint256 pending = userWeights[user] * cumulativeDiff / 1e18;
+            uint256 pending;
+            unchecked {
+                pending = (userWeights[user] * cumulativeDiff) / 1e18;
+            }
             pendingDividends[user] += pending;
         }
         
@@ -382,13 +425,26 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @param isAdd 是否增加权重（true=增加，false=减少）
      * @param element 元素类型（0-4对应水风火暗光）
      */
+    /** @dev 最小权重更新间隔（秒）- 防止频繁操作 */
+    uint256 public minWeightUpdateInterval = 60;
+    
+    /** @dev 用户上次权重更新时间 */
+    mapping(address => uint256) public lastWeightUpdateTime;
+
     function updateUserWeight(address user, uint256 level, bool isAdd, uint8 element) external onlyAuthorized {
         uint256 weight = _calculateWeight(level, element);
+        
+        // 检查最小更新间隔
+        require(block.timestamp >= lastWeightUpdateTime[user] + minWeightUpdateInterval, 
+            "DividendManager: Weight update too frequent");
         
         // 先结算用户当前未领取的分红
         if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
             uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-            uint256 pending = userWeights[user] * cumulativeDiff / 1e18;
+            uint256 pending;
+            unchecked {
+                pending = (userWeights[user] * cumulativeDiff) / 1e18;
+            }
             pendingDividends[user] += pending;
         }
 
@@ -403,6 +459,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         }
         
         userCumulativeSnapshots[user] = cumulativePerWeightDividend;
+        lastWeightUpdateTime[user] = block.timestamp;
     }
 
     uint256 public constant MAX_NFT_LEVEL = 5;
@@ -539,27 +596,6 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev [DEPRECATED] 此功能未被完整实现，始终返回 0。
-     * 如需按快照查询用户权重，需在合约中维护 user => snapshotIndex => weight 的映射。
-     * @param user 用户地址
-     * @param snapshotIndex 快照索引
-     */
-    function getUserWeightAtSnapshot(address user, uint256 snapshotIndex) external pure returns (uint256) {
-        user; snapshotIndex; // 消除未使用变量警告
-        return 0;
-    }
-
-    /**
-     * @dev [DEPRECATED] 此功能未被完整实现，始终返回 0。
-     * 如需统计用户相关快照数量，需在合约中维护 user => snapshotCount 的映射。
-     * @param user 用户地址
-     */
-    function getUserSnapshotCount(address user) external pure returns (uint256) {
-        user; // 消除未使用变量警告
-        return 0;
-    }
-
-    /**
      * @dev 获取分红池统计
      * @return currentPool 当前池余额
      * @return totalWeight 总权重
@@ -585,20 +621,46 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         }
     }
 
+    /** @dev 紧急提现时间锁（秒）- 默认24小时 */
+    uint256 public emergencyWithdrawTimelock = 86400;
+    
+    /** @dev 紧急提现请求时间 */
+    uint256 public emergencyWithdrawRequestedAt;
+    
+    /** @dev 是否已请求紧急提现 */
+    bool public emergencyWithdrawRequested;
+
+    function requestEmergencyWithdraw() external onlyOwner {
+        emergencyWithdrawRequested = true;
+        emergencyWithdrawRequestedAt = block.timestamp;
+        emit EmergencyWithdrawRequested(msg.sender, block.timestamp);
+    }
+    
     function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+        require(emergencyWithdrawRequested, "DividendManager: Withdrawal not requested");
+        require(block.timestamp >= emergencyWithdrawRequestedAt + emergencyWithdrawTimelock, 
+            "DividendManager: Timelock not expired");
         require(amount > 0, "DividendManager: Amount must be > 0");
         require(amount <= address(this).balance, "DividendManager: Insufficient balance");
-        payable(owner()).transfer(amount);
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        require(success, "DividendManager: BNB transfer failed");
+        emergencyWithdrawRequested = false;
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+        require(emergencyWithdrawRequested, "DividendManager: Withdrawal not requested");
+        require(block.timestamp >= emergencyWithdrawRequestedAt + emergencyWithdrawTimelock, 
+            "DividendManager: Timelock not expired");
         require(amount > 0, "DividendManager: Amount must be > 0");
         require(tokenContract != address(0), "DividendManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "DividendManager: Insufficient token balance");
         require(token.transfer(owner(), amount), "DividendManager: Token transfer failed");
+        emergencyWithdrawRequested = false;
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
+    
+    event EmergencyWithdrawRequested(address indexed operator, uint256 timestamp);
 
 }

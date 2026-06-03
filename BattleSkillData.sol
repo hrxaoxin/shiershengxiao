@@ -36,13 +36,25 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
     bool public skillsInitialized;
 
+    bool public skillsInitializationPending;
+
     /**
-     * @dev 初始化函数
+     * @dev 初始化函数（仅部署时调用一次）
      */
     function initialize() external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        skillsInitializationPending = true;
+    }
+
+    /**
+     * @dev 确认并执行技能初始化
+     * 两步初始化机制：部署后owner需手动确认初始化
+     */
+    function confirmSkillInitialization() external onlyOwner {
+        require(skillsInitializationPending, "BattleSkillData: No pending initialization");
         _initAllSkills();
+        skillsInitializationPending = false;
     }
 
     /**
@@ -64,6 +76,7 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * 调用BattleSkills库初始化水、风、火、暗、光五个属性的技能
      */
     function initAllSkills() external onlyOwner {
+        require(skillsInitialized, "BattleSkillData: Skills not initialized yet");
         _initAllSkills();
     }
 
@@ -93,24 +106,24 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 获取生肖基础速度
+     * @dev 获取生肖基础速度（与NFTLib.BASE_SPEED保持一致）
      * @param zodiac 生肖索引 (0-11)
      * @return uint256 基础速度值
      */
     function getZodiacSpeed(uint256 zodiac) external pure returns (uint256) {
         uint256[12] memory speeds = [
             uint256(95),   // RAT (0) - 鼠
-            uint256(55),   // OX (1) - 牛
+            uint256(40),   // OX (1) - 牛
             uint256(70),   // TIGER (2) - 虎
             uint256(90),   // RABBIT (3) - 兔
             uint256(80),   // DRAGON (4) - 龙
             uint256(85),   // SNAKE (5) - 蛇
             uint256(100),  // HORSE (6) - 马
-            uint256(50),   // GOAT (7) - 羊
+            uint256(35),   // GOAT (7) - 羊
             uint256(110),  // MONKEY (8) - 猴
-            uint256(60),   // ROOSTER (9) - 鸡
-            uint256(65),   // DOG (10) - 狗
-            uint256(45)    // PIG (11) - 猪
+            uint256(55),   // ROOSTER (9) - 鸡
+            uint256(60),   // DOG (10) - 狗
+            uint256(30)    // PIG (11) - 猪
         ];
         return speeds[zodiac];
     }

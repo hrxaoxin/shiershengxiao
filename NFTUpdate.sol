@@ -9,6 +9,10 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 
+interface IDividendManager {
+    function updateUserWeight(address user, uint256 level, bool isAdd, uint8 element) external;
+}
+
 /**
  * @title NFTUpdate
  * @dev NFT升级合约
@@ -82,6 +86,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     uint256 public lastPriceUpdateBlock;
     /** @dev 价格更新最小区块间隔（默认1个区块） */
     uint256 public minPriceUpdateBlocks = 1;
+    /** @dev 价格更新最小时间间隔（秒）- 防止快速出块链上的时间窗口攻击 */
+    uint256 public minPriceUpdateSeconds = 60;
 
     /** @dev 各级别升级费用（代币数量，含精度18） */
     uint256 public level1UpgradeCost = 10000 * 10**18;
@@ -243,10 +249,11 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param costs 所有等级的升级费用数组（长度4，索引0到3对应等级1到4）
      */
     function setAllLevelUpgradeCosts(uint256[4] calldata costs) external onlyOwner {
-        require(costs[0] > 0, "NFTUpdate: Invalid level 1 cost");
-        require(costs[1] > 0, "NFTUpdate: Invalid level 2 cost");
-        require(costs[2] > 0, "NFTUpdate: Invalid level 3 cost");
-        require(costs[3] > 0, "NFTUpdate: Invalid level 4 cost");
+        uint256 maxCost = 1e30;
+        require(costs[0] > 0 && costs[0] <= maxCost, "NFTUpdate: Invalid level 1 cost");
+        require(costs[1] > 0 && costs[1] <= maxCost, "NFTUpdate: Invalid level 2 cost");
+        require(costs[2] > 0 && costs[2] <= maxCost, "NFTUpdate: Invalid level 3 cost");
+        require(costs[3] > 0 && costs[3] <= maxCost, "NFTUpdate: Invalid level 4 cost");
         
         level1UpgradeCost = costs[0];
         level2UpgradeCost = costs[1];
@@ -346,11 +353,17 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(lv < 5, "E16");
         
         uint256[] memory allUserTokens = nft.getTokenIdsByOwner(msg.sender);
-        uint256[] memory arr = new uint256[](allUserTokens.length);
+        uint256 maxIterations = 100;
+        uint256 actualIterations = allUserTokens.length;
+        if (actualIterations > maxIterations) {
+            actualIterations = maxIterations;
+        }
+        
+        uint256[] memory arr = new uint256[](actualIterations);
         uint256 arrLength = 0;
         uint256 count = 0;
         
-        for (uint i = 0; i < allUserTokens.length; i++) {
+        for (uint i = 0; i < actualIterations; i++) {
             uint256 tid = allUserTokens[i];
             if (nft.tokenType(tid) == uint256(t)) {
                 arr[arrLength] = tid;
@@ -361,6 +374,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             }
         }
         require(count >= lv + 1, "E17");
+        require(allUserTokens.length <= maxIterations, "E33: Too many NFTs, please reduce holdings");
         
         uint256[] memory burnCandidates = new uint256[](lv);
         uint256 candidateIdx = 0;
@@ -383,33 +397,35 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         uint8 newLv = lv + 1;
         NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         
-        // 先更新权重，再更新等级，确保数据一致性
-        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
+        // 使用 Checks-Effects-Interactions 模式：先更新本合约状态，再调用外部合约
+        // 这样如果外部调用失败，可以通过事件追踪手动修复权重
         
-        // 更新用户权重：先减去旧等级的权重，再加上新等级的权重
-        (bool success, ) = dividendManager.call(
-            abi.encodeWithSignature("updateUserWeight(address,uint256,bool,uint8)", 
-                msg.sender, 
-                uint256(lv), 
-                false, 
-                uint8(element)
-            )
-        );
-        require(success, "NFTUpdate: Update old weight failed");
-        
-        (success, ) = dividendManager.call(
-            abi.encodeWithSignature("updateUserWeight(address,uint256,bool,uint8)", 
-                msg.sender, 
-                uint256(newLv), 
-                true, 
-                uint8(element)
-            )
-        );
-        require(success, "NFTUpdate: Update new weight failed");
-        
-        // 权重更新成功后，再更新NFT等级
+        // 先更新NFT等级（本合约状态变更）
         m.setTokenLevel(tokenId, newLv);
         nft.adminSetNFTLevel(tokenId, newLv); // 同时更新 NFTMint
+        
+        // 再更新DividendManager权重（外部调用）
+        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
+        
+        try IDividendManager(dividendManager).updateUserWeight(msg.sender, uint256(lv), false, uint8(element)) {
+            // 成功
+        } catch Error(string memory reason) {
+            emit WeightUpdateFailed(msg.sender, tokenId, lv, newLv, "old_weight");
+            revert(string(abi.encodePacked("NFTUpdate: Update old weight failed - ", reason)));
+        } catch {
+            emit WeightUpdateFailed(msg.sender, tokenId, lv, newLv, "old_weight");
+            revert("NFTUpdate: Update old weight failed with unknown error");
+        }
+        
+        try IDividendManager(dividendManager).updateUserWeight(msg.sender, uint256(newLv), true, uint8(element)) {
+            // 成功
+        } catch Error(string memory reason) {
+            emit WeightUpdateFailed(msg.sender, tokenId, lv, newLv, "new_weight");
+            revert(string(abi.encodePacked("NFTUpdate: Update new weight failed - ", reason)));
+        } catch {
+            emit WeightUpdateFailed(msg.sender, tokenId, lv, newLv, "new_weight");
+            revert("NFTUpdate: Update new weight failed with unknown error");
+        }
         
         emit CardUpgraded(tokenId, t, lv, newLv, msg.sender, uint64(block.timestamp));
         return newLv;
@@ -473,6 +489,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         
         // 防御同一区块内的价格操纵：要求至少间隔 minPriceUpdateBlocks 个区块
         require(block.number >= lastPriceUpdateBlock + minPriceUpdateBlocks, "E31: Price update too frequent");
+        // 防御时间窗口攻击：要求至少间隔 minPriceUpdateSeconds 秒
+        require(block.timestamp >= lastPriceUpdateTime + minPriceUpdateSeconds, "E32: Price update too frequent (time)");
         
         // 首次价格获取：直接使用，同时缓存
         if (lastPrice == 0) {
@@ -527,25 +545,21 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         
         // 更新用户权重：先减去旧等级的权重，再加上新等级的权重
-        (bool success, ) = dividendManager.call(
-            abi.encodeWithSignature("updateUserWeight(address,uint256,bool,uint8)", 
-                msg.sender, 
-                uint256(oldLv), 
-                false, 
-                uint8(element)
-            )
-        );
-        require(success, "NFTUpdate: Update old weight failed");
+        try IDividendManager(dividendManager).updateUserWeight(msg.sender, uint256(oldLv), false, uint8(element)) {
+            // 成功
+        } catch Error(string memory reason) {
+            revert(string(abi.encodePacked("NFTUpdate: Update old weight failed - ", reason)));
+        } catch {
+            revert("NFTUpdate: Update old weight failed with unknown error");
+        }
         
-        (success, ) = dividendManager.call(
-            abi.encodeWithSignature("updateUserWeight(address,uint256,bool,uint8)", 
-                msg.sender, 
-                uint256(newLv), 
-                true, 
-                uint8(element)
-            )
-        );
-        require(success, "NFTUpdate: Update new weight failed");
+        try IDividendManager(dividendManager).updateUserWeight(msg.sender, uint256(newLv), true, uint8(element)) {
+            // 成功
+        } catch Error(string memory reason) {
+            revert(string(abi.encodePacked("NFTUpdate: Update new weight failed - ", reason)));
+        } catch {
+            revert("NFTUpdate: Update new weight failed with unknown error");
+        }
         
         // 权重更新成功后，再更新NFT等级
         m.setTokenLevel(id, newLv);
@@ -573,6 +587,16 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param timestamp 时间戳
      */
     event CardUpgraded(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, address indexed owner, uint64 timestamp);
+    
+    /**
+     * @dev 权重更新失败事件（用于追踪和手动修复）
+     * @param user 用户地址
+     * @param tokenId NFT ID
+     * @param oldLevel 旧等级
+     * @param newLevel 新等级
+     * @param failureType 失败类型（old_weight/new_weight）
+     */
+    event WeightUpdateFailed(address indexed user, uint256 indexed tokenId, uint8 oldLevel, uint8 newLevel, string failureType);
     
     /**
      * @dev 使用代币升级事件

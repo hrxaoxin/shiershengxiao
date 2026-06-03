@@ -36,6 +36,11 @@ import "./NFTInterface.sol";
 contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     using NFTDataTypes for uint256;
 
+    uint256 public constant RARE_TYPE_START = 72;
+    uint256 public constant MAX_ZODIAC_TYPE = 119;
+    
+    event LevelUpdated(uint256 indexed tokenId, uint8 oldLevel, uint8 newLevel, uint64 timestamp);
+
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
      */
@@ -167,6 +172,10 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         uint8 growth,
         uint256 mintTime
     ) internal {
+        require(zodiacType <= MAX_ZODIAC_TYPE, "NFTData: Invalid zodiacType");
+        require(level >= 1 && level <= 5, "NFTData: Invalid level");
+        require(growth >= 10 && growth <= 100, "NFTData: Invalid growth value");
+        
         _nftInfo[tokenId] = struct_NFTInfo({
             tokenId: tokenId,
             zodiacType: zodiacType,
@@ -236,7 +245,11 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      */
     function _setNFTLevel(uint256 tokenId, uint8 newLevel) internal {
         require(newLevel >= 1 && newLevel <= 5, "NFTData: Invalid level");
+        uint8 oldLevel = _nftInfo[tokenId].level;
         _nftInfo[tokenId].level = newLevel;
+        if (oldLevel != newLevel) {
+            emit LevelUpdated(tokenId, oldLevel, newLevel, uint64(block.timestamp));
+        }
     }
 
     /**
@@ -430,8 +443,8 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             else if (info.level == 4) levelWeight = 18;
             else if (info.level == 5) levelWeight = 66;
             
-            // 稀有度乘数（稀有类型 >= 72）
-            if (info.zodiacType >= 72) {
+            // 稀有度乘数（稀有类型 >= RARE_TYPE_START）
+            if (info.zodiacType >= RARE_TYPE_START) {
                 levelWeight *= 10;
             }
             
@@ -480,5 +493,32 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      */
     function getUserNFTs(address user) external view returns (uint256[] memory) {
         return _getUserNFTs(user);
+    }
+    
+    /**
+     * @dev 获取用户NFT列表（分页）
+     * @param user 用户地址
+     * @param offset 起始索引
+     * @param limit 返回数量限制
+     * @return nfts NFT列表
+     * @return total 总数量
+     */
+    function getUserNFTsPaginated(address user, uint256 offset, uint256 limit) external view returns (uint256[] memory nfts, uint256 total) {
+        uint256[] storage allNFTs = _userNFTs[user];
+        total = allNFTs.length;
+        
+        if (offset >= total) {
+            return (new uint256[](0), total);
+        }
+        
+        uint256 size = total - offset;
+        if (size > limit) {
+            size = limit;
+        }
+        
+        nfts = new uint256[](size);
+        for (uint256 i = 0; i < size; i++) {
+            nfts[i] = allNFTs[offset + i];
+        }
     }
 }

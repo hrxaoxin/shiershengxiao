@@ -49,8 +49,14 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     /// @dev 铸造计数器，用于增加随机数熵
     uint256 public mintCounter;
     
+    /// @dev 铸造计数器溢出预警阈值（距离最大值的安全距离）
+    uint256 public constant MINT_COUNTER_WARNING_THRESHOLD = 1000000;
+    
     /// @dev 上次铸造区块号
     uint256 public lastMintBlock;
+    
+    /// @dev 是否已触发过溢出预警
+    bool public mintCounterWarningTriggered;
     
     /// @dev 下一个NFT ID
     uint256 public _nextCardId;
@@ -95,6 +101,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     event Paused(address account, string reason);
     event Unpaused(address account);
     event PublicMintingToggled(bool allowed);
+    event MintCounterWarning(uint256 currentCount);
 
     function initialize(address _authorizer) external initializer {
         __ERC721_init("Zodiac NFT", "ZNFT");
@@ -141,7 +148,14 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     mapping(uint256 => FailedSync) public failedSyncs;
     uint256 public failedSyncCount;
     
+    /// @dev 同步失败警告阈值
+    uint256 public constant SYNC_FAILURE_WARNING_THRESHOLD = 10;
+    
+    /// @dev 是否已触发同步失败警告
+    bool public syncFailureWarningTriggered;
+    
     event SyncRetryAttempted(uint256 syncId, uint256 tokenId, bool success);
+    event SyncFailureWarning(uint256 failedCount, uint256 timestamp);
     
     /**
      * @dev 同步NFT数据到NFTData合约
@@ -201,6 +215,11 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             timestamp: block.timestamp,
             syncType: syncType
         });
+        
+        if (!syncFailureWarningTriggered && failedSyncCount >= SYNC_FAILURE_WARNING_THRESHOLD) {
+            syncFailureWarningTriggered = true;
+            emit SyncFailureWarning(failedSyncCount, block.timestamp);
+        }
     }
     
     function retryFailedSync(uint256 syncId) external onlyAuthorized {
@@ -231,6 +250,14 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
 
     function _generateSecureRandom() internal returns (uint256) {
         lastMintBlock = block.number;
+        
+        require(mintCounter < type(uint256).max, "NFTMint: Mint counter overflow");
+        
+        if (!mintCounterWarningTriggered && mintCounter > type(uint256).max - MINT_COUNTER_WARNING_THRESHOLD) {
+            mintCounterWarningTriggered = true;
+            emit MintCounterWarning(mintCounter);
+        }
+        
         mintCounter++;
         bytes32 entropy = keccak256(
             abi.encodePacked(

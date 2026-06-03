@@ -52,6 +52,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     }
 
     BattleState[] public battleHistory;
+    uint256 public battleHistoryIndex = 0;
 
     uint256 public constant MAX_ROUNDS = 50;
     uint256 public constant ZODIAC_COUNT = 12;
@@ -327,25 +328,33 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             require(INFTMint(nftContract).ownerOf(challengedId) == challengedAddress, "Battle: Not owner of challenged NFT");
         }
 
-        if (battleHistory.length >= MAX_BATTLE_HISTORY) {
-            for (uint256 i = 0; i < battleHistory.length - 1; i++) {
-                battleHistory[i] = battleHistory[i + 1];
-            }
-            battleHistory.pop();
+        uint256 battleId = battleHistoryIndex + 1;
+        
+        if (battleHistory.length < MAX_BATTLE_HISTORY) {
+            battleHistory.push(BattleState({
+                battleId: battleId,
+                startTime: block.timestamp,
+                status: 1,
+                winner: 0,
+                challengerId: challengerId,
+                challengedId: challengedId,
+                challenger: msg.sender,
+                challenged: challengedAddress
+            }));
+        } else {
+            battleHistory[battleHistoryIndex] = BattleState({
+                battleId: battleId,
+                startTime: block.timestamp,
+                status: 1,
+                winner: 0,
+                challengerId: challengerId,
+                challengedId: challengedId,
+                challenger: msg.sender,
+                challenged: challengedAddress
+            });
         }
         
-        battleHistory.push(BattleState({
-            battleId: battleHistory.length + 1,
-            startTime: block.timestamp,
-            status: 1,
-            winner: 0,
-            challengerId: challengerId,
-            challengedId: challengedId,
-            challenger: msg.sender,
-            challenged: challengedAddress
-        }));
-
-        uint256 battleId = battleHistory.length;
+        battleHistoryIndex = (battleHistoryIndex + 1) % MAX_BATTLE_HISTORY;
 
         emit BattleStarted(battleId, msg.sender, challengedAddress, challengerTeam, challengedTeam);
 
@@ -772,13 +781,17 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     }
 
     /**
-     * @dev 验证队伍有效性（6个NFT都不为0）
+     * @dev 验证队伍有效性（6个NFT都不为0，且无重复）
      * @param team 队伍数组
      * @return 是否有效
      */
     function _validateTeam(uint256[6] memory team) internal pure returns (bool) {
         for (uint256 i = 0; i < 6; i++) {
             if (team[i] == 0) return false;
+            // 检查是否有重复的NFT
+            for (uint256 j = i + 1; j < 6; j++) {
+                if (team[i] == team[j]) return false;
+            }
         }
         return true;
     }

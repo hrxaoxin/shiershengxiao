@@ -14,6 +14,40 @@ window.ZODIAC_WEB3 = (function() {
     let contracts = {};
     let isInitialized = false;
 
+    // --- Utility Functions ---
+    function safeToString(value, defaultValue = '0') {
+        if (value === null || value === undefined || value === '') {
+            return defaultValue;
+        }
+        if (typeof value.toString === 'function') {
+            return value.toString();
+        }
+        return String(value);
+    }
+
+    const isProduction = () => {
+        return window.location.hostname !== 'localhost' && 
+               window.location.hostname !== '127.0.0.1' &&
+               !window.location.href.includes('localhost') &&
+               !window.location.href.includes('127.0.0.1');
+    };
+
+    function logError(tag, message, error) {
+        if (isProduction()) {
+            console.error(`${tag}: ${message}`);
+        } else {
+            console.error(`${tag}: ${message}`, error);
+        }
+    }
+
+    function logWarn(tag, message, data) {
+        if (!isProduction() || data === undefined) {
+            console.warn(`${tag}: ${message}`, data);
+        } else {
+            console.warn(`${tag}: ${message}`);
+        }
+    }
+
     // --- Event System ---
     const listeners = {};
 
@@ -234,10 +268,52 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
+    // --- Alias functions for backward compatibility ---
+    /**
+     * @dev 质押NFT（别名函数，向后兼容）
+     * 底层调用 Staking 合约的 stake 方法
+     * @param tokenIds - 要质押的NFT ID数组
+     */
+    async function stake(tokenIds) {
+        return stakeNFTs(tokenIds);
+    }
+
+    /**
+     * @dev 赎回NFT（别名函数，向后兼容）
+     * 底层调用 Staking 合约的 unstake 方法
+     * @param tokenIds - 要赎回的NFT ID数组
+     */
+    async function unstake(tokenIds) {
+        return unstakeNFTs(tokenIds);
+    }
+
+    /**
+     * @dev 领取质押奖励（别名函数，向后兼容）
+     * 底层调用 Staking 合约的 claimReward 方法
+     */
+    async function claimReward() {
+        return claimStakingReward();
+    }
+
+    /**
+     * @dev 领取分红
+     * 底层调用 DividendManager 合约的 claim 方法
+     */
+    async function claimDividend() {
+        try {
+            const contract = await getContract('dividendManager');
+            const receipt = await sendAndTrackTransaction(contract, 'claim', []);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] claimDividend failed:', e);
+            throw e;
+        }
+    }
+
     async function claimStakingRewardBatch(tokenIds) {
         try {
             const contract = await getContract('staking');
-            const receipt = await sendAndTrackTransaction(contract, 'claimRewards', [tokenIds]);
+            const receipt = await sendAndTrackTransaction(contract, 'claimReward', []);
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] claimStakingRewardBatch failed:', e);
@@ -289,6 +365,27 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
+    async function claimTokenRewards() {
+        return claimTokenStakingReward();
+    }
+
+    async function approveToken(spender, amount) {
+        if (!spender || spender === '0x0000000000000000000000000000000000000000') {
+            throw new Error('Invalid spender address');
+        }
+        if (!amount || amount <= 0) {
+            throw new Error('Invalid approval amount');
+        }
+        try {
+            const contract = await getContract('tokenContract');
+            const receipt = await sendAndTrackTransaction(contract, 'approve', [spender, amount]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] approveToken failed:', e);
+            throw e;
+        }
+    }
+
     // --- Gas Estimation ---
     async function estimateGas(contract, methodName, args, from) {
         try {
@@ -306,6 +403,16 @@ window.ZODIAC_WEB3 = (function() {
                 'challengeRealPlayer': 1000000,
                 'listNFT': 300000,
                 'buyNFT': 400000,
+                'delistNFT': 300000,
+                'upgradeWithToken': 1500000,
+                'upgradeWithNFT': 2000000,
+                'upgradeWithUSDValue': 1500000,
+                'createSelfBreedingPair': 2000000,
+                'createMarketBreedingPairPublic': 2500000,
+                'completeBreeding': 1500000,
+                'cancelBreeding': 800000,
+                'listForMarketBreeding': 500000,
+                'delistFromMarketBreeding': 500000,
                 'delistNFT': 200000,
                 'completeBreeding': 1500000,
                 'claimReward': 200000
@@ -316,15 +423,80 @@ window.ZODIAC_WEB3 = (function() {
 
     // --- Event Listening ---
     let activeEventSubscriptions = [];
+    const MAX_EVENT_SUBSCRIPTIONS = 100;
+
+    function cleanupOldestSubscription() {
+        if (activeEventSubscriptions.length === 0) return;
+        
+        let oldestIndex = 0;
+        let oldestTime = activeEventSubscriptions[0].timestamp;
+        
+        for (let i = 1; i < activeEventSubscriptions.length; i++) {
+            if (activeEventSubscriptions[i].timestamp < oldestTime) {
+                oldestTime = activeEventSubscriptions[i].timestamp;
+                oldestIndex = i;
+            }
+        }
+        
+        const oldest = activeEventSubscriptions[oldestIndex];
+        try {
+            if (oldest.subscription && typeof oldest.subscription.unsubscribe === 'function') {
+                oldest.subscription.unsubscribe();
+            }
+        } catch (e) {
+            console.warn('[ZODIAC_WEB3] Failed to unsubscribe oldest subscription:', e);
+        }
+        
+        activeEventSubscriptions.splice(oldestIndex, 1);
+    }
 
     function listenToEvent(contractName, eventName, callback, options) {
+        if (!web3 || !account) {
+            console.warn('[ZODIAC_WEB3] Web3 not initialized or account not connected');
+            return;
+        }
+        
+        if (activeEventSubscriptions.length >= MAX_EVENT_SUBSCRIPTIONS) {
+            cleanupOldestSubscription();
+        }
+        
         getContract(contractName).then(contract => {
             if (!contract) return;
-            const eventOptions = Object.assign({ fromBlock: 'latest' }, options || {});
+            
+            const eventOptions = { fromBlock: 'latest' };
+            
+            if (options) {
+                if (options.filter) {
+                    eventOptions.filter = options.filter;
+                }
+                if (options.topics) {
+                    eventOptions.topics = options.topics;
+                }
+                if (options.fromBlock !== undefined) {
+                    eventOptions.fromBlock = options.fromBlock;
+                }
+                if (options.toBlock !== undefined) {
+                    eventOptions.toBlock = options.toBlock;
+                }
+            }
+            
             const subscription = contract.events[eventName](eventOptions, callback);
-            activeEventSubscriptions.push({ contractName, eventName, subscription });
+            activeEventSubscriptions.push({ contractName, eventName, subscription, timestamp: Date.now(), filter: options?.filter });
         }).catch(e => {
             console.warn(`[ZODIAC_WEB3] Failed to subscribe to ${contractName}.${eventName}:`, e);
+        });
+    }
+    
+    function clearOldSubscriptions(maxAge = 3600000) {
+        const now = Date.now();
+        activeEventSubscriptions = activeEventSubscriptions.filter(sub => {
+            if (now - sub.timestamp > maxAge) {
+                if (sub.subscription && sub.subscription.unsubscribe) {
+                    sub.subscription.unsubscribe();
+                }
+                return false;
+            }
+            return true;
         });
     }
 
@@ -346,7 +518,7 @@ window.ZODIAC_WEB3 = (function() {
             events.push({ contract: 'nftMint', event: 'Mint', callback: callbacks.onMint });
         }
         if (callbacks.onUpgrade) {
-            events.push({ contract: 'nftUpdate', event: 'Upgrade', callback: callbacks.onUpgrade });
+            events.push({ contract: 'nftUpdate', event: 'CardUpgraded', callback: callbacks.onUpgrade });
         }
         if (callbacks.onBreedingCompleted) {
             events.push({ contract: 'breeding', event: 'BreedingCompleted', callback: callbacks.onBreedingCompleted });
@@ -415,16 +587,27 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function waitForReceipt(txHash, maxAttempts, intervalMs) {
-        maxAttempts = maxAttempts || 60;
-        intervalMs = intervalMs || 2000;
+        const defaultMaxAttempts = 60;
+        const defaultIntervalMs = 2000;
+        
+        maxAttempts = maxAttempts || defaultMaxAttempts;
+        intervalMs = intervalMs || defaultIntervalMs;
+        
+        const maxWaitTime = maxAttempts * intervalMs;
+        console.log(`[ZODIAC_WEB3] Waiting for transaction ${txHash} (max ${maxWaitTime / 1000}s)`);
+        
         for (let i = 0; i < maxAttempts; i++) {
             try {
                 const receipt = await web3.eth.getTransactionReceipt(txHash);
                 if (receipt) return receipt;
             } catch (e) {}
-            await new Promise(resolve => setTimeout(resolve, intervalMs));
+            
+            if (i < maxAttempts - 1) {
+                await new Promise(resolve => setTimeout(resolve, intervalMs));
+            }
         }
-        throw new Error(`Transaction ${txHash} not confirmed after ${maxAttempts * intervalMs / 1000}s`);
+        
+        throw new Error(`Transaction ${txHash} not confirmed after ${maxWaitTime / 1000}s`);
     }
 
     function getPendingTransactions() { return Array.from(pendingTransactions.values()); }
@@ -434,38 +617,121 @@ window.ZODIAC_WEB3 = (function() {
 
     async function sendAndTrackTransaction(contract, methodName, args, options) {
         const opts = options || {};
+        const maxRetries = opts.maxRetries || 2;
+        const retryDelayMs = opts.retryDelayMs || 3000;
         const from = opts.from || account;
-        const sendArgs = [methodName, ...args];
-        const gas = opts.gas || await estimateGas(contract, methodName, args, from);
 
-        try {
-            const receipt = await new Promise((resolve, reject) => {
-                contract.methods[methodName](...args).send({
-                    from,
-                    gas,
-                    value: opts.value || 0
-                })
-                .on('transactionHash', function(txHash) {
-                    trackTransaction(txHash, {
-                        contractName: contract._address || 'unknown',
-                        methodName,
-                        onSuccess: opts.onSuccess,
-                        onError: opts.onError
-                    });
-                    if (opts.onTransactionHash) opts.onTransactionHash(txHash);
-                })
-                .on('receipt', resolve)
-                .on('error', reject);
-            });
-            return receipt;
-        } catch (error) {
-            console.error(`[ZODIAC_WEB3] Transaction failed: ${methodName}`, error);
-            if (window.ZODIAC_UI) {
-                const errorMessage = error.message || '交易失败';
-                ZODIAC_UI.showToast(errorMessage, 'error');
+        let gas = opts.gas;
+        if (!gas) {
+            try {
+                gas = await estimateGas(contract, methodName, args, from);
+            } catch (gasError) {
+                console.warn(`[ZODIAC_WEB3] Gas estimation failed, using default gas for ${methodName}`, gasError);
+                gas = getGasLimit(methodName);
             }
-            throw error;
         }
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const receipt = await new Promise((resolve, reject) => {
+                    contract.methods[methodName](...args).send({
+                        from,
+                        gas,
+                        value: opts.value || 0
+                    })
+                    .on('transactionHash', function(txHash) {
+                        trackTransaction(txHash, {
+                            contractName: contract._address || 'unknown',
+                            methodName,
+                            onSuccess: opts.onSuccess,
+                            onError: opts.onError
+                        });
+                        if (opts.onTransactionHash) opts.onTransactionHash(txHash);
+                    })
+                    .on('receipt', resolve)
+                    .on('error', reject);
+                });
+                return receipt;
+            } catch (error) {
+                const isRetryableError = isRetryableTransactionError(error);
+                
+                if (attempt < maxRetries && isRetryableError) {
+                    console.warn(`[ZODIAC_WEB3] Transaction attempt ${attempt} failed, retrying in ${retryDelayMs}ms: ${methodName}`, error);
+                    await new Promise(resolve => setTimeout(resolve, retryDelayMs));
+                    continue;
+                }
+                
+                console.error(`[ZODIAC_WEB3] Transaction failed after ${attempt} attempts: ${methodName}`, error);
+                if (window.ZODIAC_UI) {
+                    const errorMessage = parseErrorMessage(error);
+                    ZODIAC_UI.showToast(errorMessage, 'error');
+                }
+                throw error;
+            }
+        }
+        
+        throw new Error(`[ZODIAC_WEB3] Transaction failed after ${maxRetries} attempts: ${methodName}`);
+    }
+
+    function isRetryableTransactionError(error) {
+        if (!error) return false;
+        
+        const message = error.message || error.toString().toLowerCase();
+        
+        return message.includes('timeout') ||
+               message.includes('network') ||
+               message.includes('connection') ||
+               message.includes('reset') ||
+               message.includes('aborted') ||
+               message.includes('cancelled') ||
+               message.includes('gas estimation failed');
+    }
+    
+    function parseErrorMessage(error) {
+        if (!error) return '交易失败';
+        
+        const message = error.message || error.toString();
+        
+        if (message.includes('user rejected') || message.includes('User rejected')) {
+            return '用户取消了操作';
+        }
+        
+        if (message.includes('insufficient funds') || message.includes('Insufficient funds')) {
+            return '余额不足';
+        }
+        
+        if (message.includes('gas') || message.includes('Gas')) {
+            if (message.includes('exceeds block gas limit')) {
+                return 'Gas限制不足，请尝试增加Gas';
+            }
+            return 'Gas费用不足';
+        }
+        
+        if (message.includes('reverted')) {
+            const match = message.match(/reason:\s*['"]?([^'"]+)['"]?/i);
+            if (match && match[1]) {
+                const reason = match[1].trim();
+                if (reason.startsWith('0x')) {
+                    try {
+                        return web3.utils.hexToUtf8(reason);
+                    } catch (e) {
+                        return '交易失败：合约执行异常';
+                    }
+                }
+                return reason;
+            }
+            return '交易失败：合约执行异常';
+        }
+        
+        if (message.includes('underpriced')) {
+            return 'Gas价格过低，请提高Gas价格';
+        }
+        
+        if (message.includes('timeout')) {
+            return '交易超时，请重试';
+        }
+        
+        return message.length > 100 ? message.substring(0, 100) + '...' : message;
     }
 
     // --- Network Methods ---
@@ -521,9 +787,16 @@ window.ZODIAC_WEB3 = (function() {
                 });
                 return true;
             } catch (e) {
+                if (e.code === 4001) {
+                    if (window.ZODIAC_UI) {
+                        ZODIAC_UI.showToast('请手动切换到正确的网络', 'warning');
+                        showNetworkInfo();
+                    }
+                    return false;
+                }
+                
                 if (e.code === 4902) {
                     try {
-                        // 提供多个 RPC 节点，提高连接更稳定
                         const rpcUrls = NETWORK_ID === 56 
                             ? ['https://bsc-dataseed.binance.org/', 'https://bsc-dataseed1.defibit.io/', 'https://bsc-dataseed1.ninicoin.io/']
                             : ['https://data-seed-prebsc-1-s1.binance.org:8545/'];
@@ -546,6 +819,7 @@ window.ZODIAC_WEB3 = (function() {
                     } catch (addError) {
                         if (window.ZODIAC_UI) {
                             ZODIAC_UI.showToast('添加网络失败，请手动添加', 'error');
+                            showNetworkInfo();
                         }
                     }
                 }
@@ -555,6 +829,15 @@ window.ZODIAC_WEB3 = (function() {
             }
         }
         return false;
+    }
+    
+    function showNetworkInfo() {
+        const info = `网络配置信息：\n链ID: ${NETWORK_ID}\n网络名称: ${NETWORK_NAME}\nRPC地址: ${NETWORK_ID === 56 ? 'https://bsc-dataseed.binance.org/' : 'https://data-seed-prebsc-1-s1.binance.org:8545/'}`;
+        if (window.ZODIAC_UI) {
+            ZODIAC_UI.showToast(info, 'info');
+        } else {
+            alert(info);
+        }
     }
 
     function startEventCleanup(intervalMs) {
@@ -588,7 +871,9 @@ window.ZODIAC_WEB3 = (function() {
         const contract = await getContract('nftTrading');
         const listing = await contract.methods.listings(tokenId).call();
         const price = listing.priceWei || listing['1'];
+        
         const receipt = await sendAndTrackTransaction(contract, 'buyNFT', [tokenId], { value: price });
+        
         return receipt;
     }
 
@@ -604,8 +889,26 @@ window.ZODIAC_WEB3 = (function() {
         return receipt;
     }
 
-    function listNFTBatch(tokenIds, prices) {
-        return Promise.all(tokenIds.map((id, i) => listNFT(id, prices[i])));
+    async function listNFTBatch(tokenIds, prices, options = {}) {
+        const { atomic = false } = options;
+        
+        if (atomic) {
+            const results = [];
+            for (let i = 0; i < tokenIds.length; i++) {
+                try {
+                    const result = await listNFT(tokenIds[i], prices[i]);
+                    results.push({ tokenId: tokenIds[i], success: true, result });
+                } catch (error) {
+                    results.push({ tokenId: tokenIds[i], success: false, error: error.message });
+                    if (atomic) {
+                        throw new Error(`Batch operation failed at tokenId ${tokenIds[i]}: ${error.message}`);
+                    }
+                }
+            }
+            return results;
+        } else {
+            return Promise.all(tokenIds.map((id, i) => listNFT(id, prices[i])));
+        }
     }
 
     // --- Token Burner Methods (Mint) ---
@@ -644,6 +947,12 @@ window.ZODIAC_WEB3 = (function() {
 
     // --- Arena Methods ---
     async function stakeArenaNFTs(tokenIds) {
+        if (!tokenIds || !Array.isArray(tokenIds)) {
+            throw new Error('[ZODIAC_WEB3] stakeArenaNFTs requires an array of tokenIds');
+        }
+        if (tokenIds.length !== 6) {
+            throw new Error(`[ZODIAC_WEB3] stakeArenaNFTs requires exactly 6 NFTs, got ${tokenIds.length}`);
+        }
         const contract = await getContract('arena');
         const receipt = await sendAndTrackTransaction(contract, 'stakeNFTs', [tokenIds]);
         return receipt;
@@ -661,8 +970,146 @@ window.ZODIAC_WEB3 = (function() {
         return receipt;
     }
 
-    // --- Cleanup on page unload ---
+    async function challengeMockPlayer(playerTeam, mockIndex) {
+        try {
+            const contract = await getContract('arena');
+            const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [playerTeam, mockIndex]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] challengeMockPlayer failed:', e);
+            throw e;
+        }
+    }
+
+    async function challengeRealPlayer(challengedPlayer, playerTeam) {
+        try {
+            const contract = await getContract('arena');
+            const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer, playerTeam]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] challengeRealPlayer failed:', e);
+            throw e;
+        }
+    }
+
+    async function claimSeasonReward() {
+        try {
+            const contract = await getContract('arena');
+            const receipt = await sendAndTrackTransaction(contract, 'claimReward', []);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] claimSeasonReward failed:', e);
+            throw e;
+        }
+    }
+
+    // --- Breeding Methods ---
+    async function createSelfBreedingPair(fatherId, motherId, coOwnerId) {
+        try {
+            const contract = await getContract('breeding');
+            const receipt = await sendAndTrackTransaction(contract, 'createSelfBreedingPair', [fatherId, motherId, coOwnerId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] createSelfBreedingPair failed:', e);
+            throw e;
+        }
+    }
+
+    async function completeBreeding(pairId) {
+        try {
+            const contract = await getContract('breeding');
+            const receipt = await sendAndTrackTransaction(contract, 'completeBreeding', [pairId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] completeBreeding failed:', e);
+            throw e;
+        }
+    }
+
+    async function cancelBreeding(pairId) {
+        try {
+            const contract = await getContract('breeding');
+            const receipt = await sendAndTrackTransaction(contract, 'cancelBreeding', [pairId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] cancelBreeding failed:', e);
+            throw e;
+        }
+    }
+
+    async function listForMarketBreeding(tokenId) {
+        try {
+            const contract = await getContract('breeding');
+            const receipt = await sendAndTrackTransaction(contract, 'listForMarketBreeding', [tokenId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] listForMarketBreeding failed:', e);
+            throw e;
+        }
+    }
+
+    async function createMarketBreedingPairPublic(fatherId, motherId) {
+        try {
+            const contract = await getContract('breeding');
+            const receipt = await sendAndTrackTransaction(contract, 'createMarketBreedingPairPublic', [fatherId, motherId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] createMarketBreedingPairPublic failed:', e);
+            throw e;
+        }
+    }
+
+    async function delistFromMarketBreeding(orderId) {
+        try {
+            const contract = await getContract('breeding');
+            const receipt = await sendAndTrackTransaction(contract, 'delistFromMarketBreeding', [orderId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] delistFromMarketBreeding failed:', e);
+            throw e;
+        }
+    }
+
+    // --- Upgrade Methods ---
+    async function upgradeWithNFT(nftId) {
+        try {
+            const contract = await getContract('nftUpdate');
+            const receipt = await sendAndTrackTransaction(contract, 'upgradeWithNFT', [nftId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] upgradeWithNFT failed:', e);
+            throw e;
+        }
+    }
+
+    async function upgradeWithToken(nftId) {
+        try {
+            const contract = await getContract('nftUpdate');
+            const receipt = await sendAndTrackTransaction(contract, 'upgradeWithToken', [nftId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] upgradeWithToken failed:', e);
+            throw e;
+        }
+    }
+
+    async function upgradeWithUSDValue(nftId) {
+        try {
+            const contract = await getContract('nftUpdate');
+            const receipt = await sendAndTrackTransaction(contract, 'upgradeWithUSDValue', [nftId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] upgradeWithUSDValue failed:', e);
+            throw e;
+        }
+    }
+
+    // --- Cleanup on page unload or hash change (SPA) ---
     window.addEventListener('beforeunload', function() {
+        clearAllEventListeners();
+    });
+    
+    window.addEventListener('hashchange', function() {
         clearAllEventListeners();
     });
 
@@ -723,15 +1170,41 @@ window.ZODIAC_WEB3 = (function() {
         claimStakingReward,
         claimStakingRewardBatch,
         getStakingInfo,
+        
+        // Alias functions for backward compatibility
+        stake,
+        unstake,
+        claimReward,
+        claimDividend,
+        claimTokenRewards,
 
         // Token Staking
         stakeTokens,
         unstakeTokens,
         claimTokenStakingReward,
+        approveToken,
 
         // Token Burner (Mint)
         burnAndMint,
         burnAndMintTen,
-        burnAndMintTargeted
+        burnAndMintTargeted,
+
+        // Breeding
+        createSelfBreedingPair,
+        completeBreeding,
+        cancelBreeding,
+        listForMarketBreeding,
+        createMarketBreedingPairPublic,
+        delistFromMarketBreeding,
+
+        // Arena
+        challengeMockPlayer,
+        challengeRealPlayer,
+        claimSeasonReward,
+
+        // Upgrade
+        upgradeWithNFT,
+        upgradeWithToken,
+        upgradeWithUSDValue
     };
 })();

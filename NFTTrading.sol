@@ -181,6 +181,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 购买NFT
      */
     function buyNFT(uint256 tokenId) external payable whenNotPaused nonReentrant {
+        require(tokenId > 0, "NFTTrading: Invalid token ID");
+        require(msg.sender != address(0), "NFTTrading: Invalid buyer address");
         require(listings[tokenId].seller != address(0), "NFTTrading: Listing not found");
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(feeReceiver != address(0), "NFTTrading: Fee receiver not set");
@@ -189,6 +191,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         address seller = listing.seller;
         uint256 price = listing.priceWei;
         
+        require(msg.sender != seller, "NFTTrading: Cannot buy own NFT");
         require(msg.value >= price, "NFTTrading: Insufficient payment");
         require(msg.sender.balance >= msg.value, "NFTTrading: Insufficient balance");
 
@@ -198,6 +201,9 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(INFTMint(nftContract).ownerOf(tokenId) == seller, "NFTTrading: Seller no longer owns NFT");
         require(INFTMint(nftContract).isApprovedForAll(seller, address(this)), "NFTTrading: Contract not approved");
 
+        // 删除挂牌信息前再次验证价格未被篡改
+        require(listings[tokenId].priceWei == price, "NFTTrading: Price changed");
+        
         // 先删除挂牌信息，防止重入
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
@@ -211,6 +217,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
         // 先处理费用
         if (fee > 0) {
+            require(feeReceiver != address(0), "NFTTrading: Invalid fee receiver");
             (bool feeSuccess, ) = payable(feeReceiver).call{value: fee}("");
             require(feeSuccess, "NFTTrading: Fee payment failed");
         }
@@ -409,7 +416,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
         require(amount > 0, "NFTTrading: Amount must be > 0");
         require(amount <= address(this).balance, "NFTTrading: Insufficient balance");
-        payable(owner()).transfer(amount);
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        require(success, "NFTTrading: BNB transfer failed");
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 

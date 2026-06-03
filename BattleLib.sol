@@ -105,39 +105,56 @@ library BattleLib {
         uint256 teamSize,
         uint256 seed
     ) internal pure {
-        for (uint256 i = 0; i < teamSize - 1; i++) {
-            for (uint256 j = 0; j < teamSize - i - 1; j++) {
-                if (team[j].speed < team[j + 1].speed) {
-                    NFTTeamMember memory temp = team[j];
-                    team[j] = team[j + 1];
-                    team[j + 1] = temp;
+        for (uint256 i = 1; i < teamSize; i++) {
+            NFTTeamMember memory key = team[i];
+            uint256 j = i;
+            
+            while (j > 0 && team[j - 1].speed < key.speed) {
+                team[j] = team[j - 1];
+                j--;
+            }
+            
+            if (j > 0 && team[j - 1].speed == key.speed) {
+                uint256 rand1 = uint256(keccak256(abi.encodePacked(seed, team[j - 1].tokenId))) % 100;
+                uint256 rand2 = uint256(keccak256(abi.encodePacked(seed, key.tokenId))) % 100;
+                if (rand1 < rand2) {
+                    team[j] = team[j - 1];
+                    j--;
                 }
             }
+            
+            team[j] = key;
         }
     }
 
     /**
      * @dev 计算闪避
      *
-     * @param defenderDodge 防守方闪避率
-     * @param randomSeed 随机种子
+     * @param defenderDodge 防守方闪避率（0-10000）
+     * @param randomValue 外部生成的随机值（0-9999）
      * @return bool 是否闪避成功
+     * 
+     * Note: 随机值应由调用方使用commit-reveal方案或Chainlink VRF生成，
+     * 避免在view函数中使用block.timestamp（可被矿工操纵）
      */
-    function calculateDodge(uint256 defenderDodge, uint256 randomSeed) internal view returns (bool) {
-        uint256 randomVal = uint256(keccak256(abi.encodePacked(block.timestamp, block.number, randomSeed))) % 10000;
-        return randomVal < defenderDodge;
+    function calculateDodge(uint256 defenderDodge, uint256 randomValue) internal pure returns (bool) {
+        require(randomValue < 10000, "BattleLib: Invalid random value");
+        return randomValue < defenderDodge;
     }
 
     /**
      * @dev 计算暴击
      *
-     * @param attackerCritical 攻击方暴击率
-     * @param randomSeed 随机种子
+     * @param attackerCritical 攻击方暴击率（0-10000）
+     * @param randomValue 外部生成的随机值（0-9999）
      * @return bool 是否暴击
+     * 
+     * Note: 随机值应由调用方使用commit-reveal方案或Chainlink VRF生成，
+     * 避免在view函数中使用block.timestamp（可被矿工操纵）
      */
-    function calculateCritical(uint256 attackerCritical, uint256 randomSeed) internal view returns (bool) {
-        uint256 randomVal = uint256(keccak256(abi.encodePacked(block.timestamp, block.number, randomSeed + 1))) % 10000;
-        return randomVal < attackerCritical;
+    function calculateCritical(uint256 attackerCritical, uint256 randomValue) internal pure returns (bool) {
+        require(randomValue < 10000, "BattleLib: Invalid random value");
+        return randomValue < attackerCritical;
     }
 
     /**
@@ -193,18 +210,37 @@ library BattleLib {
     }
 
     /**
+     * @dev 应用伤害结果结构体
+     */
+    struct DamageResult {
+        bool wasKilled;      // 是否击杀
+        uint256 remainingHp; // 剩余生命值
+        uint256 actualDamage; // 实际造成的伤害
+    }
+
+    /**
      * @dev 应用伤害
      *
      * @param defender 防守方
      * @param damage 伤害值
+     * @return DamageResult 伤害结果（供调用方emit事件使用）
      */
-    function applyDamage(NFTTeamMember storage defender, uint256 damage) internal {
+    function applyDamage(NFTTeamMember storage defender, uint256 damage) internal returns (DamageResult memory) {
+        DamageResult memory result;
+        result.actualDamage = damage > defender.hp ? defender.hp : damage;
+        
         if (damage >= defender.hp) {
             defender.hp = 0;
             defender.isAlive = false;
+            result.wasKilled = true;
+            result.remainingHp = 0;
         } else {
             defender.hp = defender.hp - damage;
+            result.wasKilled = false;
+            result.remainingHp = defender.hp;
         }
+        
+        return result;
     }
 
     /**
@@ -278,13 +314,14 @@ library BattleLib {
     /**
      * @dev 获取战斗结果
      *
-     * @param team1Wins 队伍1获胜次数
-     * @param team2Wins 队伍2获胜次数
+     * @param team1Defeated 队伍1是否已全灭
+     * @param team2Defeated 队伍2是否已全灭
      * @return BattleResult 战斗结果
      */
-    function determineWinner(bool team1Wins, bool team2Wins) internal pure returns (BattleResult) {
-        if (team1Wins && !team2Wins) return BattleResult.TEAM1_WINS;
-        if (team2Wins && !team1Wins) return BattleResult.TEAM2_WINS;
+    function determineWinner(bool team1Defeated, bool team2Defeated) internal pure returns (BattleResult) {
+        if (team1Defeated && !team2Defeated) return BattleResult.TEAM2_WINS;
+        if (team2Defeated && !team1Defeated) return BattleResult.TEAM1_WINS;
+        if (team1Defeated && team2Defeated) return BattleResult.IN_PROGRESS;
         return BattleResult.IN_PROGRESS;
     }
 }

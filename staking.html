@@ -216,6 +216,12 @@
                             <p class="text-lg font-bold text-green-600" id="annualRate">0.00%</p>
                         </div>
                     </div>
+                    <div class="mt-3 pt-3 border-t border-blue-200">
+                        <p class="text-xs text-gray-500 flex items-start">
+                            <span class="mr-1">⚠️</span>
+                            <span>收益预估基于当前总权重计算，实际收益可能因其他用户质押/解质押而变化</span>
+                        </p>
+                    </div>
                 </div>
                 <button id="claimBtn" class="btn-primary w-full" disabled>
                     领取奖励
@@ -443,6 +449,76 @@
                 await loadRewards();
                 await loadContractInfo();
                 await loadTokenStakingInfo();
+                
+                setupEventListeners();
+                await updateRewardEstimate();
+                startRewardEstimateRefresh();
+            }
+        }
+        
+        function setupEventListeners() {
+            try {
+                window.ZODIAC_WEB3.listenToEvent('nftUpdate', 'CardUpgraded', async (event) => {
+                    console.log('CardUpgraded event:', event.returnValues);
+                    await loadMyStakes();
+                    await loadRewards();
+                    await loadContractInfo();
+                    await updateRewardEstimate();
+                });
+                
+                window.ZODIAC_WEB3.listenToEvent('staking', 'Staked', async () => {
+                    await loadMyStakes();
+                    await loadRewards();
+                    await loadContractInfo();
+                    await updateRewardEstimate();
+                });
+                
+                window.ZODIAC_WEB3.listenToEvent('staking', 'Unstaked', async () => {
+                    await loadMyStakes();
+                    await loadRewards();
+                    await loadContractInfo();
+                    await updateRewardEstimate();
+                });
+            } catch (error) {
+                console.warn('Failed to subscribe to staking events:', error);
+            }
+        }
+        
+        async function updateRewardEstimate() {
+            try {
+                const totalWeighted = await stakingContract.methods.totalWeightedNFTs().call();
+                const myStakedCount = parseInt(document.getElementById('myStakedCount').textContent) || 0;
+                
+                if (myStakedCount === 0 || totalWeighted === '0') {
+                    document.getElementById('dailyReward').textContent = '0.00';
+                    document.getElementById('annualRate').textContent = '0.00%';
+                    return;
+                }
+                
+                const myWeight = myStakedCount * (parseInt(document.getElementById('normalWeight').textContent) || 1);
+                const dailyRewardBNB = (myWeight / totalWeighted) * 10;
+                const annualRate = (dailyRewardBNB * 365 / 100) * 100;
+                
+                document.getElementById('dailyReward').textContent = dailyRewardBNB.toFixed(4);
+                document.getElementById('annualRate').textContent = annualRate.toFixed(2) + '%';
+            } catch (error) {
+                console.error('更新收益预估失败:', error);
+            }
+        }
+        
+        let rewardEstimateInterval = null;
+        
+        function startRewardEstimateRefresh() {
+            if (rewardEstimateInterval) {
+                clearInterval(rewardEstimateInterval);
+            }
+            rewardEstimateInterval = setInterval(updateRewardEstimate, 30000);
+        }
+        
+        function stopRewardEstimateRefresh() {
+            if (rewardEstimateInterval) {
+                clearInterval(rewardEstimateInterval);
+                rewardEstimateInterval = null;
             }
         }
 
@@ -496,6 +572,19 @@
                 return `${hours}小时${minutes}分钟`;
             }
             return `${minutes}分钟`;
+        }
+
+        function parseStakeInfo(stakeInfo) {
+            if (!stakeInfo) {
+                return { amount: '0', lastRewardTime: '0', accumulatedRewards: '0', stakedAt: '0' };
+            }
+            
+            return {
+                amount: stakeInfo.amount !== undefined ? stakeInfo.amount : (stakeInfo[0] || '0'),
+                lastRewardTime: stakeInfo.lastRewardTime !== undefined ? stakeInfo.lastRewardTime : (stakeInfo[1] || '0'),
+                accumulatedRewards: stakeInfo.accumulatedRewards !== undefined ? stakeInfo.accumulatedRewards : (stakeInfo[2] || '0'),
+                stakedAt: stakeInfo.stakedAt !== undefined ? stakeInfo.stakedAt : (stakeInfo[3] || '0')
+            };
         }
 
         function isNFTLevelEligible(level) {
@@ -743,7 +832,13 @@
                             continue;
                         }
                         
-                        const approveGas = await ZODIAC_WEB3.estimateGas(nftContract, 'approve', [stakingAddress, tokenId], account);
+                        let approveGas;
+                        try {
+                            approveGas = await ZODIAC_WEB3.estimateGas(nftContract, 'approve', [stakingAddress, tokenId], account);
+                        } catch (gasError) {
+                            console.warn('Gas estimation failed, using default:', gasError.message);
+                            approveGas = 100000;
+                        }
                         await nftContract.methods.approve(stakingAddress, tokenId).send({
                             from: account,
                             gas: approveGas
@@ -843,23 +938,24 @@
 
             try {
                 const balance = await tokenContract.methods.balanceOf(account).call();
-                document.getElementById('tokenBalance').textContent = web3.utils.fromWei(balance, 'ether').substring(0, 10);
+                const balanceStr = web3.utils.fromWei(balance, 'ether').substring(0, 10);
+                document.getElementById('tokenBalance').textContent = balanceStr;
+                document.getElementById('tokenStakeAmount').max = parseFloat(balanceStr);
 
                 const stakeInfo = await tokenStakingContract.methods.getUserStake(account).call();
-                const stakedAmount = stakeInfo.amount || stakeInfo[0]; // amount
-                document.getElementById('myTokenStakeAmount').textContent = web3.utils.fromWei(stakedAmount, 'ether').substring(0, 10);
                 
-                // getUserStake 返回 StakeInfo{amount, lastRewardTime, accumulatedRewards, stakedAt}
-                const accumulatedRewards = stakeInfo.accumulatedRewards || stakeInfo[2] || '0'; // accumulatedRewards
-                const claimableBNB = web3.utils.fromWei(accumulatedRewards.toString(), 'ether').substring(0, 10);
+                const parsedStakeInfo = parseStakeInfo(stakeInfo);
+                
+                document.getElementById('myTokenStakeAmount').textContent = web3.utils.fromWei(parsedStakeInfo.amount, 'ether').substring(0, 10);
+                
+                const claimableBNB = web3.utils.fromWei(parsedStakeInfo.accumulatedRewards.toString(), 'ether').substring(0, 10);
                 
                 document.getElementById('tokenRewardsAmount').textContent = claimableBNB;
                 document.getElementById('claimableBNB').textContent = claimableBNB;
 
-                if (stakedAmount > 0) {
-                    const stakedTime = stakeInfo.stakedAt || stakeInfo[3]; // stakedAt
-                    if (stakedTime > 0) {
-                        const date = new Date(stakedTime * 1000);
+                if (parsedStakeInfo.amount > 0) {
+                    if (parsedStakeInfo.stakedAt > 0) {
+                        const date = new Date(parsedStakeInfo.stakedAt * 1000);
                         document.getElementById('tokenStakedAt').textContent = date.toLocaleString('zh-CN');
                     } else {
                         document.getElementById('tokenStakedAt').textContent = '-';

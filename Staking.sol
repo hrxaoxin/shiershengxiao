@@ -6,6 +6,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 
 interface IBreeding {
@@ -17,6 +18,7 @@ interface IBreeding {
  * @dev NFT质押合约（优化版：支持大规模用户，实时奖励计算）
  */
 contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
 
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
@@ -36,6 +38,10 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     // 核心优化：全局累积的每单位权重奖励值
     // 每次 calculateDailyReward 时增加，用户领取时做差值计算
     uint256 public globalRewardPerWeight;
+    
+    // 溢出保护阈值：当globalRewardPerWeight接近最大值的90%时触发重置
+    uint256 public constant REWARD_OVERFLOW_THRESHOLD = 158456325028528675187087900672; // ~90% of 2^256
+    uint256 public rewardResetCount;
 
     mapping(address => uint256) public pendingRewards;
     uint256 public todayIncomingTokens;
@@ -134,6 +140,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
+            require(tokenId > 0, "Staking: Invalid token ID");
             require(stakingInfo[tokenId].owner == address(0), "Staking: Already staked");
             require(nft.ownerOf(tokenId) == msg.sender, "Staking: Not owner of token");
             
@@ -170,12 +177,17 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
+            require(tokenId > 0, "Staking: Invalid token ID");
             StakingInfo storage info = stakingInfo[tokenId];
             require(info.owner == msg.sender, "Staking: Not owner");
             require(block.timestamp >= info.stakeTime + minStakingDuration, "Staking: Lock period");
 
-            // 赎回前先结算该 NFT 的奖励
-            _settleNFTReward(info);
+            // 赎回前先计算该 NFT 的奖励（不立即领取，避免余额不足导致NFT锁定）
+            uint256 pendingForNFT = _calculatePendingForNFT(info);
+            if (pendingForNFT > 0) {
+                pendingRewards[msg.sender] += pendingForNFT;
+            }
+            info.accumulatedReward = globalRewardPerWeight;
 
             bool wasRare = info.isRare;
             uint256 weight = wasRare ? rareNFTWeight : normalNFTWeight;
@@ -225,7 +237,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         _userSnapshotWeight[msg.sender] = globalRewardPerWeight * userStakedWeight[msg.sender];
         pendingRewards[msg.sender] = 0;
         
-        require(rewardToken.transfer(msg.sender, totalClaimable), "Staking: Transfer failed");
+        rewardToken.safeTransfer(msg.sender, totalClaimable);
         
         emit RewardClaimed(msg.sender, totalClaimable);
     }
@@ -272,6 +284,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function _doCalculateDailyReward() internal {
         if (!_shouldCalculateDailyReward()) return;
         
+        _checkRewardOverflow();
+        
         IERC20 rewardToken = IERC20(rewardTokenContract);
         uint256 contractBalance = rewardToken.balanceOf(address(this));
         
@@ -287,6 +301,33 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             todayRewardAmount = dailyReward;
             emit DailyRewardCalculated(dailyReward, increment);
         }
+    }
+
+    /**
+     * @dev 检查并处理globalRewardPerWeight溢出风险
+     */
+    function _checkRewardOverflow() internal {
+        if (globalRewardPerWeight >= REWARD_OVERFLOW_THRESHOLD) {
+            _resetRewardTracking();
+        }
+    }
+
+    /**
+     * @dev 重置奖励跟踪（溢出保护）
+     */
+    function _resetRewardTracking() internal {
+        rewardResetCount++;
+        
+        for (uint256 i = 0; i < stakingUsers.length; i++) {
+            address user = stakingUsers[i];
+            if (isStakingUser[user]) {
+                uint256 pending = _calcUserPending(user);
+                pendingRewards[user] += pending;
+                _userSnapshotWeight[user] = 0;
+            }
+        }
+        
+        globalRewardPerWeight = 0;
     }
 
     /**
@@ -473,19 +514,20 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         return index + 1;
     }
 
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner whenNotPaused {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
         require(amount > 0, "Staking: Amount must be > 0");
         require(amount <= address(this).balance, "Staking: Insufficient balance");
-        payable(owner()).transfer(amount);
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        require(success, "Staking: BNB transfer failed");
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner whenNotPaused {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
         require(amount > 0, "Staking: Amount must be > 0");
         require(rewardTokenContract != address(0), "Staking: Token contract not set");
         IERC20 token = IERC20(rewardTokenContract);
         require(token.balanceOf(address(this)) >= amount, "Staking: Insufficient token balance");
-        require(token.transfer(owner(), amount), "Staking: Token transfer failed");
+        token.safeTransfer(owner(), amount);
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
 }

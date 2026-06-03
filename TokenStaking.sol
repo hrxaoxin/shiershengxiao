@@ -454,7 +454,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @dev 紧急提取BNB（仅限管理员）
      * @param amount 提取金额
      */
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner whenNotPaused nonReentrant {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "TokenStaking: Amount must be > 0");
         require(amount <= address(this).balance, "TokenStaking: Insufficient BNB balance");
         (bool success, ) = payable(owner()).call{value: amount}("");
@@ -462,7 +462,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner whenNotPaused nonReentrant {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "TokenStaking: Amount must be > 0");
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         require(tokenContract != address(0), "TokenStaking: Token contract not set");

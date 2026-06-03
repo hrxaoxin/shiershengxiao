@@ -342,6 +342,17 @@
 
     <script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
     <script>
+        const BREEDING_STATUS = {
+            ACTIVE: '0',
+            COMPLETED: '1',
+            CANCELLED: '2'
+        };
+        
+        const BREEDING_TYPE = {
+            SELF: '0',
+            MARKET: '1'
+        };
+        
         let nftContract, breedingContract;
         let currentTab = 'self';
         let selectedMaleNFT = null;
@@ -356,6 +367,8 @@
         
         let currentMarketPage = 1;
         const marketPageSize = 10;
+        
+        let isTransactionInProgress = false;
         let totalMarketOrders = 0;
         let myMarketOrders = [];
         let activeSelfOrder = null;
@@ -413,6 +426,24 @@
             await initWeb3();
             await setupEventListeners();
         });
+        
+        window.addEventListener('beforeunload', function() {
+            Object.keys(countdownIntervals).forEach(key => {
+                if (countdownIntervals[key]) {
+                    clearInterval(countdownIntervals[key]);
+                    delete countdownIntervals[key];
+                }
+            });
+        });
+        
+        window.addEventListener('hashchange', function() {
+            Object.keys(countdownIntervals).forEach(key => {
+                if (countdownIntervals[key]) {
+                    clearInterval(countdownIntervals[key]);
+                    delete countdownIntervals[key];
+                }
+            });
+        });
 
         let eventCleanupFn = null;
 
@@ -457,6 +488,17 @@
                     }));
                 } catch (e) {
                     console.warn('Failed to subscribe to MaleChildGenerated event:', e);
+                }
+
+                try {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'FemaleChildGenerated', async (event) => {
+                        console.log('FemaleChildGenerated event:', event.returnValues);
+                        const childId = event.returnValues.childId;
+                        ZODIAC_UI.showToast(`🎉 母方获得新NFT #${childId}！`, 'success');
+                        await loadNFTs();
+                    }));
+                } catch (e) {
+                    console.warn('Failed to subscribe to FemaleChildGenerated event:', e);
                 }
 
                 try {
@@ -612,27 +654,35 @@
                     const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
                     const gender = tokenType % 2;
 
+                    let cooldownEndTime = null;
+                    let isOnCooldown = false;
                     try {
-                        const isOnCooldown = await breedingContract.methods.isInCooldown(tokenId).call();
-                        if (isOnCooldown) continue;
+                        isOnCooldown = await breedingContract.methods.isInCooldown(tokenId).call();
+                        if (isOnCooldown) {
+                            cooldownEndTime = await breedingContract.methods.getCooldownEndTime(tokenId).call();
+                        }
                     } catch (error) {
                         console.warn('检查NFT冷却期失败:', error);
                     }
 
                     if (isNFTLevelEligible(tokenLevel)) {
                         const nftData = {
-                            id: tokenId.toString(),
-                            type: tokenType.toString(),
-                            level: tokenLevel.toString(),
+                            id: tokenId ? tokenId.toString() : '0',
+                            type: tokenType ? tokenType.toString() : '0',
+                            level: tokenLevel ? tokenLevel.toString() : '0',
                             gender: gender,
                             image: getNFTImage(tokenType),
-                            name: getNFTName(tokenType)
+                            name: getNFTName(tokenType),
+                            isOnCooldown: isOnCooldown,
+                            cooldownEndTime: cooldownEndTime
                         };
                         breedableNFTs.push(nftData);
-                        if (gender === 1) {
-                            maleNFTs.push(nftData);
-                        } else {
-                            femaleNFTs.push(nftData);
+                        if (!isOnCooldown) {
+                            if (gender === 1) {
+                                maleNFTs.push(nftData);
+                            } else {
+                                femaleNFTs.push(nftData);
+                            }
                         }
                     }
                 }
@@ -699,15 +749,37 @@
             breedableNFTs.forEach(nft => {
                 const selected = selectedListNFT && selectedListNFT.id === nft.id ? 'selected' : '';
                 const genderIcon = nft.gender === 1 ? '♂' : '♀';
+                const cooldownClass = nft.isOnCooldown ? 'opacity-50 cursor-not-allowed' : '';
+                const cooldownText = nft.isOnCooldown ? getCooldownText(nft.cooldownEndTime) : '';
                 html += `
-                    <div class="nft-card ${selected}" onclick="selectListNFT(${nft.id})"><img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                    <div class="nft-card ${selected} ${cooldownClass}" ${nft.isOnCooldown ? '' : 'onclick="selectListNFT(' + nft.id + ')"'}><img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
                         <p class="text-gray-800 text-sm truncate">${nft.name} ${genderIcon}</p>
                         <p class="text-gray-500 text-xs">${getStars(nft.level)}</p>
                         <p class="text-gray-400 text-xs">ID: ${nft.id}</p>
+                        ${cooldownText}
                     </div>
                 `;
             });
             container.innerHTML = html;
+        }
+        
+        function getCooldownText(endTime) {
+            if (!endTime) return '';
+            const now = Math.floor(Date.now() / 1000);
+            const remaining = parseInt(endTime, 10) - now;
+            if (remaining <= 0) return '';
+            
+            const hours = Math.floor(remaining / 3600);
+            const minutes = Math.floor((remaining % 3600) / 60);
+            const seconds = remaining % 60;
+            
+            if (hours > 0) {
+                return `<p class="text-red-500 text-xs mt-1">冷却中: ${hours}小时${minutes}分钟</p>`;
+            } else if (minutes > 0) {
+                return `<p class="text-red-500 text-xs mt-1">冷却中: ${minutes}分${seconds}秒</p>`;
+            } else {
+                return `<p class="text-red-500 text-xs mt-1">冷却中: ${seconds}秒</p>`;
+            }
         }
 
         function selectMaleNFT(id) {
@@ -768,21 +840,27 @@
         }
 
         async function startSelfBreeding() {
-        if (!selectedMaleNFT || !selectedFemaleNFT) {
-            ZODIAC_UI.showToast('请选择两张NFT', 'warning');
-            return;
-        }
+            if (isTransactionInProgress) {
+                ZODIAC_UI.showToast('请等待上一笔交易完成', 'warning');
+                return;
+            }
+            
+            if (!selectedMaleNFT || !selectedFemaleNFT) {
+                ZODIAC_UI.showToast('请选择两张NFT', 'warning');
+                return;
+            }
 
-        const confirm = await ZODIAC_UI.showConfirmModal(
-            '确认开始自我孕育',
-            `将消耗 ${selectedMaleNFT.name} 和 ${selectedFemaleNFT.name} 进行孕育，需要等待${formatDuration(selfBreedingCooldown)}完成。`
-        );
+            const confirm = await ZODIAC_UI.showConfirmModal(
+                '确认开始自我孕育',
+                `将消耗 ${selectedMaleNFT.name} 和 ${selectedFemaleNFT.name} 进行孕育，需要等待${formatDuration(selfBreedingCooldown)}完成。`
+            );
 
-        if (!confirm) return;
+            if (!confirm) return;
 
-        const btn = document.getElementById('startSelfBreedingBtn');
-        btn.disabled = true;
-        btn.textContent = '处理中...';
+            isTransactionInProgress = true;
+            const btn = document.getElementById('startSelfBreedingBtn');
+            btn.disabled = true;
+            btn.textContent = '处理中...';
 
         try {
             await ZODIAC_WEB3.createSelfBreedingPair(selectedMaleNFT.id, selectedFemaleNFT.id, 0);
@@ -796,31 +874,65 @@
         } catch (error) {
             console.error('开始自我孕育失败:', error);
             ZODIAC_UI.handleError(error, '开始自我孕育');
+            selectedMaleNFT = null;
+            selectedFemaleNFT = null;
+            updateSelectedPair();
+            renderMaleNFTs();
+            renderFemaleNFTs();
+        } finally {
+            isTransactionInProgress = false;
+            btn.disabled = false;
+            btn.textContent = '开始自我孕育';
         }
-
-        btn.disabled = false;
-        btn.textContent = '开始自我孕育';
     }
 
         async function checkActiveSelfOrder() {
             try {
                 const account = getAccount();
+                
+                if (breedingContract.methods.getUserActiveOrders) {
+                    try {
+                        const activeOrderIds = await breedingContract.methods.getUserActiveOrders(account).call();
+                        if (activeOrderIds.length > 0) {
+                            for (const orderId of activeOrderIds) {
+                                const order = await breedingContract.methods.breedingPairs(orderId).call();
+                                if (order.status === BREEDING_STATUS.ACTIVE && 
+                                    order.breedingType === BREEDING_TYPE.SELF) {
+                                    activeSelfOrder = {
+                                        id: parseInt(orderId, 10),
+                                        fatherId: order.fatherId ? order.fatherId.toString() : '0',
+                                        motherId: order.motherId ? order.motherId.toString() : '0',
+                                        maleOwner: order.maleOwner,
+                                        femaleOwner: order.femaleOwner,
+                                        startTime: order.startTime ? order.startTime.toString() : '0',
+                                        status: order.status
+                                    };
+                                    showSelfBreedingStatus();
+                                    return;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('getUserActiveOrders API call failed, falling back to iteration:', e);
+                    }
+                }
+                
                 const pairCount = parseInt(await breedingContract.methods.breedingPairCount().call(), 10);
                 const maxCheck = Math.min(pairCount, 100);
-                for (let i = pairCount; i > pairCount - maxCheck && i > 0; i--) {
+                for (let i = pairCount; i >= Math.max(1, pairCount - maxCheck + 1); i--) {
                     try {
                         const order = await breedingContract.methods.breedingPairs(i).call();
                         if (order.maleOwner.toLowerCase() === account.toLowerCase() && 
                             order.femaleOwner.toLowerCase() === account.toLowerCase() && 
-                            order.status === '0' && 
-                            order.breedingType === '0') { 
+                            order.status === BREEDING_STATUS.ACTIVE && 
+                            order.breedingType === BREEDING_TYPE.SELF) { 
                             activeSelfOrder = {
                                 id: i,
-                                fatherId: order.fatherId.toString(),
-                                motherId: order.motherId.toString(),
+                                fatherId: order.fatherId ? order.fatherId.toString() : '0',
+                                motherId: order.motherId ? order.motherId.toString() : '0',
                                 maleOwner: order.maleOwner,
                                 femaleOwner: order.femaleOwner,
-                                startTime: order.startTime.toString(),
+                                startTime: order.startTime ? order.startTime.toString() : '0',
                                 status: order.status
                             };
                             showSelfBreedingStatus();
@@ -850,20 +962,35 @@
             countdownIntervals['self'] = setInterval(updateSelfCountdown, 1000);
         }
 
+        let lastChainTimestamp = null;
+        let lastSyncTime = null;
+
+        async function syncChainTime() {
+            try {
+                const block = await window.ZODIAC_WEB3.getWeb3().eth.getBlock('latest');
+                lastChainTimestamp = block.timestamp;
+                lastSyncTime = Date.now();
+            } catch (error) {
+                console.warn('Failed to sync chain time:', error);
+            }
+        }
+
+        function getCurrentTime() {
+            if (lastChainTimestamp !== null && lastSyncTime !== null) {
+                const elapsed = Math.floor((Date.now() - lastSyncTime) / 1000);
+                return lastChainTimestamp + elapsed;
+            }
+            return Math.floor(Date.now() / 1000);
+        }
+
         async function updateSelfCountdown() {
             if (!activeSelfOrder) return;
 
+            await syncChainTime();
+            
             const startTime = parseInt(activeSelfOrder.startTime, 10);
             const endTime = startTime + selfBreedingCooldown;
-            
-            let now;
-            try {
-                const block = await window.ZODIAC_WEB3.getWeb3().eth.getBlock('latest');
-                now = block.timestamp;
-            } catch (error) {
-                now = Math.floor(Date.now() / 1000);
-                console.warn('Failed to get block timestamp, using local time:', error);
-            }
+            const now = getCurrentTime();
             
             const remaining = endTime - now;
 
@@ -884,13 +1011,24 @@
 
         async function completeSelfBreeding() {
         if (!activeSelfOrder) return;
+        
+        if (isTransactionInProgress) {
+            ZODIAC_UI.showToast('请等待上一笔交易完成', 'warning');
+            return;
+        }
 
+        isTransactionInProgress = true;
         const btn = document.getElementById('completeSelfBreedingBtn');
         btn.disabled = true;
         btn.textContent = '处理中...';
 
         try {
             const result = await ZODIAC_WEB3.completeBreeding(activeSelfOrder.id);
+            
+            if (!result || !result.events || !result.events.BreedingCompleted) {
+                throw new Error('未能获取孕育结果');
+            }
+            
             const femaleChildId = result.events.BreedingCompleted.returnValues.childId;
             
             ZODIAC_UI.showToast(`🎉 恭喜！孕育完成！获得新NFT #${femaleChildId}！`, 'success');
@@ -902,6 +1040,8 @@
             
             activeSelfOrder = null;
             document.getElementById('selfBreedingStatus').classList.add('hidden');
+            
+            await new Promise(resolve => setTimeout(resolve, 3000));
             await loadNFTs();
         } catch (error) {
             console.error('完成自我孕育失败:', error);
@@ -933,6 +1073,8 @@
             
             activeSelfOrder = null;
             document.getElementById('selfBreedingStatus').classList.add('hidden');
+            
+            await new Promise(resolve => setTimeout(resolve, 3000));
             await loadNFTs();
         } catch (error) {
             console.error('取消孕育失败:', error);
@@ -1195,7 +1337,7 @@
                 for (let i = pairCount; i > pairCount - maxCheck && i > 0; i--) {
                     try {
                         const order = await breedingContract.methods.breedingPairs(i).call();
-                        if (order.status === '0' && order.breedingType === '1') {
+                        if (order.status === BREEDING_STATUS.ACTIVE && order.breedingType === BREEDING_TYPE.MARKET) {
                             if (order.maleOwner.toLowerCase() === account.toLowerCase() ||
                                 order.femaleOwner.toLowerCase() === account.toLowerCase()) {
                                 activePairOrders.push({
@@ -1468,6 +1610,11 @@
 
         try {
             const result = await ZODIAC_WEB3.completeBreeding(orderId);
+            
+            if (!result || !result.events || !result.events.BreedingCompleted) {
+                throw new Error('未能获取孕育结果');
+            }
+            
             const femaleChildId = result.events.BreedingCompleted.returnValues.childId;
             let maleChildId = null;
             if (result.events.MaleChildGenerated) {

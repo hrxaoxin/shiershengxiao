@@ -75,6 +75,12 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * user => tokenId[]
      */
     mapping(address => uint256[]) public userStakedNFTs;
+    
+    /**
+     * @dev NFT战斗锁定状态
+     * tokenId => battleId (0表示未锁定)
+     */
+    mapping(uint256 => uint256) public nftBattleLocked;
 
     uint256 public currentSeasonId;
     uint256 public seasonDuration = 7 days;
@@ -90,6 +96,8 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public constant TEAM_SIZE = 6;
     uint256 public constant RECHARGE_COST = 888;
     uint256 public constant RECHARGE_ATTEMPTS = 3;
+    uint256 public constant MAX_LEADERBOARD_SIZE = 100;
+    uint256 public constant MAX_SEASONS_TO_KEEP = 20;
     uint256 public maxRechargeAttempts = 10;
     uint256 public seasonRewardRate;
     mapping(address => uint256) public lastBattleTime;
@@ -177,6 +185,8 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external whenNotPaused returns (bool success) {
         require(nftContract != address(0), "ArenaRanking: NFT contract not set");
+        require(battleContract != address(0), "ArenaRanking: Battle contract not set");
+        require(mockIndex < 10, "ArenaRanking: Invalid mock player index");
         require(block.timestamp >= lastBattleTime[msg.sender] + BATTLE_COOLDOWN, "ArenaRanking: Battle cooldown");
 
         PlayerRecord storage record = players[msg.sender];
@@ -202,6 +212,8 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external whenNotPaused returns (bool success) {
         require(nftContract != address(0), "ArenaRanking: NFT contract not set");
+        require(battleContract != address(0), "ArenaRanking: Battle contract not set");
+        require(challengedPlayer != address(0), "ArenaRanking: Invalid challenged address");
         require(challengedPlayer != msg.sender, "ArenaRanking: Cannot challenge self");
 
         SeasonInfo storage currentSeason = seasons[currentSeasonId];
@@ -281,6 +293,10 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 currentIndex = playerRankIndex[seasonId][player];
         address[] storage rankings = seasonRankings[seasonId];
 
+        if (currentIndex == 0 && rankings.length >= MAX_LEADERBOARD_SIZE) {
+            return;
+        }
+
         if (currentIndex > 0) {
             address prevPlayer = rankings[currentIndex - 1];
             if (players[prevPlayer].score >= newScore) {
@@ -306,7 +322,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             currentIndex--;
         }
 
-        while (currentIndex < rankings.length - 1) {
+        while (currentIndex < rankings.length - 1 && rankings.length <= MAX_LEADERBOARD_SIZE) {
             address nextPlayer = rankings[currentIndex + 1];
             if (players[nextPlayer].score <= newScore) break;
             
@@ -315,6 +331,12 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             rankings[currentIndex + 1] = player;
             playerRankIndex[seasonId][player] = currentIndex + 1;
             currentIndex++;
+        }
+
+        if (rankings.length > MAX_LEADERBOARD_SIZE) {
+            address removedPlayer = rankings[MAX_LEADERBOARD_SIZE];
+            playerRankIndex[seasonId][removedPlayer] = 0;
+            rankings.pop();
         }
     }
 
@@ -333,6 +355,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     function stakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
+        require(tokenIds.length > 0 && tokenIds.length <= 6, "ArenaRanking: Invalid tokenIds count");
         require(nftContract != address(0), "ArenaRanking: NFT contract not set");
         INFT nft = INFT(nftContract);
         
@@ -362,6 +385,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             require(tokenId > 0, "ArenaRanking: Invalid token ID");
             require(nftStakedOwner[tokenId] != address(0), "ArenaRanking: NFT not staked");
             require(nftStakedOwner[tokenId] == msg.sender, "ArenaRanking: Not owner of staked NFT");
+            require(nftBattleLocked[tokenId] == 0, "ArenaRanking: NFT locked in battle");
             
             // 检查该 NFT 是否在战斗队伍中
             bool inTeam = false;
@@ -456,9 +480,20 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     function startNewSeason() external onlyAuthorized {
+        _tryStartNewSeason();
+    }
+
+    function _tryStartNewSeason() internal {
         require(block.timestamp >= seasons[currentSeasonId].endTime, "ArenaRanking: Current season not ended");
         _settleCurrentSeason();
+        _cleanupOldSeasons();
         _startNewSeason();
+    }
+
+    function checkAndStartNewSeason() external whenNotPaused {
+        if (block.timestamp >= seasons[currentSeasonId].endTime) {
+            _tryStartNewSeason();
+        }
     }
 
     function _startNewSeason() internal {
@@ -481,6 +516,16 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         season.isActive = false;
         season.isSettled = true;
         emit SeasonSettled(currentSeasonId, block.timestamp);
+    }
+
+    function _cleanupOldSeasons() internal {
+        uint256 seasonsToRemove = currentSeasonId > MAX_SEASONS_TO_KEEP ? 
+            currentSeasonId - MAX_SEASONS_TO_KEEP : 0;
+        
+        for (uint256 i = 1; i <= seasonsToRemove; i++) {
+            delete seasonRankings[i];
+            delete seasons[i];
+        }
     }
 
     function settleSeason(uint256 seasonId) external onlyAuthorized {
@@ -586,6 +631,45 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(seasonId <= currentSeasonId, "ArenaRanking: Invalid season");
         SeasonInfo memory s = seasons[seasonId];
         return (s.startTime, s.endTime, s.isActive, s.isSettled, s.totalPlayers);
+    }
+    
+    /**
+     * @dev 获取赛季历史记录
+     * @param startSeasonId 起始赛季ID
+     * @param count 获取数量
+     * @return 赛季信息数组
+     */
+    function getSeasonHistory(uint256 startSeasonId, uint256 count) external view returns (SeasonInfo[] memory) {
+        require(startSeasonId > 0, "ArenaRanking: Invalid start season");
+        require(startSeasonId <= currentSeasonId, "ArenaRanking: Start season exceeds current");
+        
+        uint256 endSeasonId = startSeasonId + count - 1;
+        if (endSeasonId > currentSeasonId) {
+            endSeasonId = currentSeasonId;
+        }
+        
+        uint256 resultCount = endSeasonId - startSeasonId + 1;
+        SeasonInfo[] memory result = new SeasonInfo[](resultCount);
+        
+        for (uint256 i = 0; i < resultCount; i++) {
+            result[i] = seasons[startSeasonId + i];
+        }
+        
+        return result;
+    }
+    
+    /**
+     * @dev 获取最近的赛季历史记录
+     * @param count 获取数量
+     * @return 赛季信息数组
+     */
+    function getRecentSeasons(uint256 count) external view returns (SeasonInfo[] memory) {
+        if (currentSeasonId == 0) {
+            return new SeasonInfo[](0);
+        }
+        
+        uint256 startSeasonId = currentSeasonId >= count ? currentSeasonId - count + 1 : 1;
+        return getSeasonHistory(startSeasonId, count);
     }
 
     function getPlayerRecord(address player) external view returns (uint256 score, uint256 wins, uint256 losses, uint256 seasonId) {
@@ -751,6 +835,31 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             uint256 tokenId = team[i];
             require(tokenId > 0, "ArenaRanking: Invalid token ID");
             require(nftStakedOwner[tokenId] == owner, "ArenaRanking: NFT not staked or not owner");
+            require(nftBattleLocked[tokenId] == 0, "ArenaRanking: NFT locked in battle");
+        }
+    }
+    
+    /**
+     * @dev 锁定NFT用于战斗
+     */
+    function _lockNFTsForBattle(uint256[6] calldata team, uint256 battleId) internal {
+        for (uint256 i = 0; i < 6; i++) {
+            uint256 tokenId = team[i];
+            if (tokenId > 0) {
+                nftBattleLocked[tokenId] = battleId;
+            }
+        }
+    }
+    
+    /**
+     * @dev 解锁战斗中的NFT
+     */
+    function _unlockNFTsFromBattle(uint256[6] calldata team) internal {
+        for (uint256 i = 0; i < 6; i++) {
+            uint256 tokenId = team[i];
+            if (tokenId > 0) {
+                nftBattleLocked[tokenId] = 0;
+            }
         }
     }
 

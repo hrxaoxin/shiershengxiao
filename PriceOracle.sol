@@ -172,8 +172,8 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     event PriceUpdated(uint256 tokenPrice, uint256 ethPrice, address updater);
 
-    uint256 public constant MAX_PRICE_CHANGE_PERCENT = 5000;
-    uint256 public constant PRICE_UPDATE_COOLDOWN = 5 minutes;
+    uint256 public maxPriceChangePercent = 5000;
+    uint256 public priceUpdateCooldown = 5 minutes;
     uint256 public lastTokenPriceUpdateTime;
     uint256 public lastETHPriceUpdateTime;
     uint256 public pendingTokenPrice;
@@ -186,34 +186,34 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     event PendingPriceCancelled(uint256 price, bool isTokenPrice);
 
     modifier onlyAfterCooldown(uint256 lastUpdateTime) {
-        require(block.timestamp >= lastUpdateTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Price update cooldown");
+        require(block.timestamp >= lastUpdateTime + priceUpdateCooldown, "PriceOracle: Price update cooldown");
         _;
     }
 
     function setPriceChangeLimit(uint256 percent) external onlyOwner {
         require(percent >= 1000 && percent <= 10000, "PriceOracle: Invalid percent");
-        MAX_PRICE_CHANGE_PERCENT = percent;
+        maxPriceChangePercent = percent;
     }
 
     function setPriceUpdateCooldown(uint256 cooldown) external onlyOwner {
         require(cooldown >= 1 minutes && cooldown <= 1 hours, "PriceOracle: Invalid cooldown");
-        PRICE_UPDATE_COOLDOWN = cooldown;
+        priceUpdateCooldown = cooldown;
     }
 
     function proposeTokenPrice(uint256 _newPrice) external onlyOwner whenNotPaused {
         require(_newPrice > 0, "PriceOracle: Invalid price");
         require(_newPrice <= 10**27, "PriceOracle: Price too high");
-        require(block.timestamp >= lastTokenPriceUpdateTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Cooldown not elapsed");
+        require(block.timestamp >= lastTokenPriceUpdateTime + priceUpdateCooldown, "PriceOracle: Cooldown not elapsed");
 
         if (tokenPriceUSD > 0) {
-            uint256 maxNewPrice = tokenPriceUSD * MAX_PRICE_CHANGE_PERCENT / 10000;
-            uint256 minNewPrice = tokenPriceUSD * (10000 - MAX_PRICE_CHANGE_PERCENT) / 10000;
+            uint256 maxNewPrice = tokenPriceUSD * maxPriceChangePercent / 10000;
+            uint256 minNewPrice = tokenPriceUSD * (10000 - maxPriceChangePercent) / 10000;
             require(_newPrice >= minNewPrice && _newPrice <= maxNewPrice, "PriceOracle: Price change too large");
         }
 
         pendingTokenPrice = _newPrice;
         hasPendingTokenPrice = true;
-        pendingPriceEffectiveTime = block.timestamp + PRICE_UPDATE_COOLDOWN;
+        pendingPriceEffectiveTime = block.timestamp + priceUpdateCooldown;
 
         emit PriceChangeProposed(tokenPriceUSD, _newPrice, pendingPriceEffectiveTime, msg.sender);
     }
@@ -221,7 +221,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function executePendingTokenPrice() external onlyOwner {
         require(hasPendingTokenPrice, "PriceOracle: No pending price");
         require(block.timestamp >= pendingPriceEffectiveTime, "PriceOracle: Not yet executable");
-        require(block.timestamp <= pendingPriceEffectiveTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Pending price expired");
+        require(block.timestamp <= pendingPriceEffectiveTime + priceUpdateCooldown / 2, "PriceOracle: Pending price expired");
 
         uint256 oldPrice = tokenPriceUSD;
         tokenPriceUSD = pendingTokenPrice;
@@ -241,17 +241,17 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function proposeETHPrice(uint256 _newPrice) external onlyOwner whenNotPaused {
         require(_newPrice > 0, "PriceOracle: Invalid price");
         require(_newPrice <= 10**24, "PriceOracle: Price too high");
-        require(block.timestamp >= lastETHPriceUpdateTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Cooldown not elapsed");
+        require(block.timestamp >= lastETHPriceUpdateTime + priceUpdateCooldown, "PriceOracle: Cooldown not elapsed");
 
         if (ethPriceUSD > 0) {
-            uint256 maxNewPrice = ethPriceUSD * MAX_PRICE_CHANGE_PERCENT / 10000;
-            uint256 minNewPrice = ethPriceUSD * (10000 - MAX_PRICE_CHANGE_PERCENT) / 10000;
+            uint256 maxNewPrice = ethPriceUSD * maxPriceChangePercent / 10000;
+            uint256 minNewPrice = ethPriceUSD * (10000 - maxPriceChangePercent) / 10000;
             require(_newPrice >= minNewPrice && _newPrice <= maxNewPrice, "PriceOracle: Price change too large");
         }
 
         pendingETHPrice = _newPrice;
         hasPendingETHPrice = true;
-        pendingPriceEffectiveTime = block.timestamp + PRICE_UPDATE_COOLDOWN;
+        pendingPriceEffectiveTime = block.timestamp + priceUpdateCooldown;
 
         emit PriceChangeProposed(ethPriceUSD, _newPrice, pendingPriceEffectiveTime, msg.sender);
     }
@@ -259,7 +259,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function executePendingETHPrice() external onlyOwner {
         require(hasPendingETHPrice, "PriceOracle: No pending price");
         require(block.timestamp >= pendingPriceEffectiveTime, "PriceOracle: Not yet executable");
-        require(block.timestamp <= pendingPriceEffectiveTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Pending price expired");
+        require(block.timestamp <= pendingPriceEffectiveTime + priceUpdateCooldown / 2, "PriceOracle: Pending price expired");
 
         uint256 oldPrice = ethPriceUSD;
         ethPriceUSD = pendingETHPrice;
@@ -301,7 +301,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      *
      * @param _tokenPriceUSD 新的代币价格（USD，精度18位）
      */
-    function updateTokenPrice(uint256 _tokenPriceUSD) external onlyOwner whenNotPaused {
+    function updateTokenPrice(uint256 _tokenPriceUSD) external onlyAuthorized whenNotPaused {
         require(_tokenPriceUSD > 0, "PriceOracle: Invalid token price");
         require(_tokenPriceUSD <= 10**27, "PriceOracle: Token price too high");
         tokenPriceUSD = _tokenPriceUSD;
@@ -314,7 +314,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      *
      * @param _ethPriceUSD 新的ETH价格（USD，精度18位）
      */
-    function updateETHPrice(uint256 _ethPriceUSD) external onlyOwner whenNotPaused {
+    function updateETHPrice(uint256 _ethPriceUSD) external onlyAuthorized whenNotPaused {
         require(_ethPriceUSD > 0, "PriceOracle: Invalid ETH price");
         require(_ethPriceUSD <= 10**24, "PriceOracle: ETH price too high");
         ethPriceUSD = _ethPriceUSD;
@@ -415,6 +415,30 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
+     * @dev 获取最近N条价格记录（简化接口，无需理解环形缓冲区）
+     * @param count 要获取的记录数量
+     * @return PriceRecord[] 价格记录数组（最新的在前）
+     */
+    function getLastNPrices(uint256 count) external view returns (PriceRecord[] memory) {
+        require(count > 0, "PriceOracle: Invalid count");
+        
+        uint256 actualCount = count;
+        if (actualCount > priceHistory.length) {
+            actualCount = priceHistory.length;
+        }
+        
+        PriceRecord[] memory records = new PriceRecord[](actualCount);
+        uint256 latestIndex = (priceHistoryStartIndex + priceHistory.length - 1) % priceHistory.length;
+        
+        for (uint256 i = 0; i < actualCount; i++) {
+            uint256 historyIndex = (latestIndex + priceHistory.length - i) % priceHistory.length;
+            records[i] = priceHistory[historyIndex];
+        }
+        
+        return records;
+    }
+
+    /**
      * @dev 设置价格有效时间
      *
      * @param duration 有效时间（秒）
@@ -477,8 +501,10 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function calculateUSDTEquivalent(uint256 tokenAmount) external view returns (uint256) {
         if (tokenPriceUSD == 0 || tokenAmount == 0) return 0;
-        // 使用更安全的精度计算：先乘后除，使用更大的中间结果
-        return (tokenAmount * tokenPriceUSD) / (10**30);
+        // 使用先除后乘策略减少精度损失
+        uint256 tokenAmountScaled = tokenAmount / 10**12;
+        uint256 priceScaled = tokenPriceUSD / 10**6;
+        return tokenAmountScaled * priceScaled;
     }
 
     /**

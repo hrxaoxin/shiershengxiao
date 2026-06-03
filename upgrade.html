@@ -407,12 +407,15 @@
 
             let html = '';
             nfts.forEach(nft => {
+                const isSelected = selectedNft && selectedNft.id === nft.id;
+                const selectedClass = isSelected ? 'ring-2 ring-blue-500 ring-offset-2 ring-offset-white bg-blue-50' : '';
                 html += `
-                    <div class="nft-card" onclick="selectNFT(${nft.id}, ${nft.type}, ${nft.level}, '${nft.name}', '${nft.image}')">
+                    <div class="nft-card cursor-pointer transition-all duration-200 hover:shadow-lg ${selectedClass}" onclick="selectNFT(${nft.id}, ${nft.type}, ${nft.level}, '${nft.name}', '${nft.image}')">
                         <img src="${nft.image}" alt="${nft.name}">
                         <h4>${nft.name}</h4>
                         <p class="text-xs text-gray-500">等级: ${getStars(nft.level)}</p>
                         <p class="text-xs text-gray-500">ID: ${nft.id}</p>
+                        ${isSelected ? '<div class="absolute top-2 right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center"><svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div>' : ''}
                     </div>
                 `;
             });
@@ -501,6 +504,8 @@
                 await loadUserNFTs();
             } catch (error) {
                 ZODIAC_UI.hideLoading();
+                selectedNft = null;
+                document.getElementById('upgradeSection').classList.add('hidden');
                 const errorMsg = ZODIAC_CONFIG.getErrorMessage(error);
                 await ZODIAC_UI.showErrorModal(`升级失败: ${errorMsg}`);
             }
@@ -537,6 +542,8 @@
                 await loadUserNFTs();
             } catch (error) {
                 ZODIAC_UI.hideLoading();
+                selectedNft = null;
+                document.getElementById('upgradeSection').classList.add('hidden');
                 const errorMsg = ZODIAC_CONFIG.getErrorMessage(error);
                 await ZODIAC_UI.showErrorModal(`升级失败: ${errorMsg}`);
             }
@@ -551,6 +558,17 @@
             }
 
             const requiredUSD = getUSDValue(selectedNft.level);
+            
+            try {
+                const isPriceValid = await ZODIAC_WEB3.isTokenPriceValid();
+                if (!isPriceValid) {
+                    await ZODIAC_UI.showErrorModal('价格数据过期，请稍后重试');
+                    return;
+                }
+            } catch (e) {
+                console.warn('Failed to check price validity:', e);
+            }
+
             const confirmed = await ZODIAC_UI.showConfirmModal(
                 '升级确认',
                 `确认使用USDT价值升阶？\n\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level} → ${selectedNft.level + 1}\n将消耗价值 ${requiredUSD} USDT的代币`
@@ -566,6 +584,8 @@
                 await loadUserNFTs();
             } catch (error) {
                 ZODIAC_UI.hideLoading();
+                selectedNft = null;
+                document.getElementById('upgradeSection').classList.add('hidden');
                 const errorMsg = ZODIAC_CONFIG.getErrorMessage(error);
                 await ZODIAC_UI.showErrorModal(`升级失败: ${errorMsg}`);
             }

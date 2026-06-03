@@ -220,6 +220,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     uint256 public constant DEFAULT_BATTLE_REWARD_AMOUNT = 100;
     uint256 public defaultBattleReward = DEFAULT_BATTLE_REWARD_AMOUNT * 10**18;
+    
+    /**
+     * @dev 最大战斗类型值限制
+     */
+    uint256 public constant MAX_BATTLE_TYPE = 100;
 
     /**
      * @dev 设置特定战斗类型的奖励金额
@@ -243,6 +248,9 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         address loser,
         uint256 battleType
     ) external onlyAuthorized whenNotPaused {
+        // 验证 battleType 在合理范围内
+        require(battleType <= MAX_BATTLE_TYPE, "RewardManager: Invalid battle type");
+        
         // 根据 battleType 动态计算奖励，未配置时使用默认值
         uint256 reward = battleRewardAmounts[battleType];
         if (reward == 0) {
@@ -330,6 +338,13 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     function calcUserDividend(address user) external view returns (uint256, uint256) {
         return (pendingDividends[user], userWeights[user]);
     }
+    
+    /**
+     * @dev 获取用户待领取分红（仅返回金额）
+     */
+    function getUserPendingDividend(address user) external view returns (uint256) {
+        return pendingDividends[user];
+    }
 
     /**
      * @dev 获取分红池余额
@@ -353,66 +368,71 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
         uint256 arenaRewardAmount = amount * arenaRewardPercent / PRECISION;
 
-        bool dividendSuccess = true;
-        bool nftStakingSuccess = true;
-        bool tokenStakingSuccess = true;
-        bool arenaRewardSuccess = true;
-
         if (dividendPool != address(0) && dividendAmount > 0) {
-            dividendSuccess = token.transfer(dividendPool, dividendAmount);
-            if (dividendSuccess) {
-                // 同步 DividendManager 分红池，使转账的代币被正确计入分红计算
-                try IDividendManager(dividendPool).syncDividendPool() {} catch {}
-            } else {
-                emit RewardTransferFailed(0, dividendPool, dividendAmount);
-            }
+            require(token.transfer(dividendPool, dividendAmount), "RewardManager: Dividend pool transfer failed");
+            // 同步 DividendManager 分红池，使转账的代币被正确计入分红计算
+            try IDividendManager(dividendPool).syncDividendPool() {} catch {}
         }
         if (nftStakingPool != address(0) && nftStakingAmount > 0) {
-            nftStakingSuccess = token.transfer(nftStakingPool, nftStakingAmount);
-            if (nftStakingSuccess && poolManager != address(0)) {
+            require(token.transfer(nftStakingPool, nftStakingAmount), "RewardManager: NFT staking pool transfer failed");
+            if (poolManager != address(0)) {
                 IPoolManager(poolManager).addToNFTStakingPool(nftStakingAmount);
-            } else if (!nftStakingSuccess) {
-                emit RewardTransferFailed(1, nftStakingPool, nftStakingAmount);
             }
         }
         if (tokenStakingPool != address(0) && tokenStakingAmount > 0) {
-            tokenStakingSuccess = token.transfer(tokenStakingPool, tokenStakingAmount);
-            if (tokenStakingSuccess && poolManager != address(0)) {
+            require(token.transfer(tokenStakingPool, tokenStakingAmount), "RewardManager: Token staking pool transfer failed");
+            if (poolManager != address(0)) {
                 IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount);
-            } else if (!tokenStakingSuccess) {
-                emit RewardTransferFailed(2, tokenStakingPool, tokenStakingAmount);
             }
         }
         if (arenaRewardPool != address(0) && arenaRewardAmount > 0) {
-            arenaRewardSuccess = token.transfer(arenaRewardPool, arenaRewardAmount);
-            if (arenaRewardSuccess && poolManager != address(0)) {
+            require(token.transfer(arenaRewardPool, arenaRewardAmount), "RewardManager: Arena reward pool transfer failed");
+            if (poolManager != address(0)) {
                 IPoolManager(poolManager).addToArenaRewardPool(arenaRewardAmount);
-            } else if (!arenaRewardSuccess) {
-                emit RewardTransferFailed(3, arenaRewardPool, arenaRewardAmount);
             }
         }
 
-        distributionHistory.push(DistributionRecord({
-            timestamp: block.timestamp,
-            totalAmount: amount,
-            dividendAmount: dividendSuccess ? dividendAmount : 0,
-            nftStakingAmount: nftStakingSuccess ? nftStakingAmount : 0,
-            tokenStakingAmount: tokenStakingSuccess ? tokenStakingAmount : 0,
-            arenaRewardAmount: arenaRewardSuccess ? arenaRewardAmount : 0,
-            distributor: msg.sender
-        }));
+        _addDistributionRecord(amount, dividendAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount);
 
         emit RewardDistributed(
             msg.sender,
             amount,
-            dividendSuccess ? dividendAmount : 0,
-            nftStakingSuccess ? nftStakingAmount : 0,
-            tokenStakingSuccess ? tokenStakingAmount : 0,
-            arenaRewardSuccess ? arenaRewardAmount : 0
+            dividendAmount,
+            nftStakingAmount,
+            tokenStakingAmount,
+            arenaRewardAmount
         );
     }
 
     event RewardTransferFailed(uint256 poolType, address pool, uint256 amount);
+    
+    /**
+     * @dev 内部函数：添加分发记录（使用环形缓冲区）
+     */
+    function _addDistributionRecord(
+        uint256 totalAmount,
+        uint256 dividendAmount,
+        uint256 nftStakingAmount,
+        uint256 tokenStakingAmount,
+        uint256 arenaRewardAmount
+    ) internal {
+        DistributionRecord memory record = DistributionRecord({
+            timestamp: block.timestamp,
+            totalAmount: totalAmount,
+            dividendAmount: dividendAmount,
+            nftStakingAmount: nftStakingAmount,
+            tokenStakingAmount: tokenStakingAmount,
+            arenaRewardAmount: arenaRewardAmount,
+            distributor: msg.sender
+        });
+        
+        if (distributionHistory.length < MAX_DISTRIBUTION_RECORDS) {
+            distributionHistory.push(record);
+        } else {
+            distributionHistory[distributionHistoryStartIndex] = record;
+            distributionHistoryStartIndex = (distributionHistoryStartIndex + 1) % MAX_DISTRIBUTION_RECORDS;
+        }
+    }
 
     /**
      * @dev 设置分配比例
@@ -460,9 +480,19 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 分发历史记录数组
+     * @dev 分发历史记录数组（使用环形缓冲区）
      */
     DistributionRecord[] public distributionHistory;
+    
+    /**
+     * @dev 最大分发历史记录数
+     */
+    uint256 public constant MAX_DISTRIBUTION_RECORDS = 1000;
+    
+    /**
+     * @dev 分发历史记录起始索引（环形缓冲区）
+     */
+    uint256 public distributionHistoryStartIndex;
 
     /**
      * @dev 获取分发历史记录长度
@@ -473,21 +503,23 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
     /**
      * @dev 获取指定范围的分发历史
-     * @param startIndex 起始索引
+     * @param startIndex 起始索引（逻辑索引）
      * @param count 获取数量
      */
     function getDistributionHistory(uint256 startIndex, uint256 count) external view returns (DistributionRecord[] memory) {
         require(startIndex < distributionHistory.length, "RewardManager: Invalid start index");
         require(count > 0, "RewardManager: Invalid count");
 
+        uint256 totalCount = distributionHistory.length;
         uint256 endIndex = startIndex + count;
-        if (endIndex > distributionHistory.length) {
-            endIndex = distributionHistory.length;
+        if (endIndex > totalCount) {
+            endIndex = totalCount;
         }
 
         DistributionRecord[] memory records = new DistributionRecord[](endIndex - startIndex);
         for (uint256 i = startIndex; i < endIndex; i++) {
-            records[i - startIndex] = distributionHistory[i];
+            uint256 actualIndex = (distributionHistoryStartIndex + i) % totalCount;
+            records[i - startIndex] = distributionHistory[actualIndex];
         }
 
         return records;
@@ -502,14 +534,16 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             return new DistributionRecord[](0);
         }
 
-        if (count > distributionHistory.length) {
-            count = distributionHistory.length;
+        uint256 totalCount = distributionHistory.length;
+        if (count > totalCount) {
+            count = totalCount;
         }
 
         DistributionRecord[] memory records = new DistributionRecord[](count);
-        uint256 startIndex = distributionHistory.length - count;
         for (uint256 i = 0; i < count; i++) {
-            records[i] = distributionHistory[startIndex + i];
+            uint256 logicalIndex = totalCount - count + i;
+            uint256 actualIndex = (distributionHistoryStartIndex + logicalIndex) % totalCount;
+            records[i] = distributionHistory[actualIndex];
         }
 
         return records;
@@ -546,14 +580,15 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         }
     }
 
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner whenNotPaused {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
         require(amount > 0, "RewardManager: Amount must be > 0");
         require(amount <= address(this).balance, "RewardManager: Insufficient balance");
-        payable(owner()).transfer(amount);
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        require(success, "RewardManager: BNB transfer failed");
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner whenNotPaused {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
         require(amount > 0, "RewardManager: Amount must be > 0");
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);

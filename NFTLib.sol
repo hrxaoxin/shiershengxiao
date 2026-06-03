@@ -24,6 +24,36 @@ pragma solidity ^0.8.20;
  * - 暗克光：暗属性攻击光属性时伤害×1.5
  */
 library NFTLib {
+    uint256[12] internal constant BASE_HP = [
+        uint256(1200), uint256(2000), uint256(1600), uint256(1000), uint256(1800), uint256(1400),
+        uint256(1500), uint256(900), uint256(1100), uint256(800), uint256(1300), uint256(700)
+    ];
+
+    uint256[12] internal constant BASE_ATTACK = [
+        uint256(120), uint256(80), uint256(150), uint256(90), uint256(180), uint256(140),
+        uint256(130), uint256(60), uint256(160), uint256(70), uint256(100), uint256(50)
+    ];
+
+    uint256[12] internal constant BASE_DEFENSE = [
+        uint256(80), uint256(120), uint256(100), uint256(70), uint256(130), uint256(110),
+        uint256(90), uint256(60), uint256(100), uint256(50), uint256(110), uint256(40)
+    ];
+
+    uint256[12] internal constant BASE_CRITICAL = [
+        uint256(800), uint256(500), uint256(900), uint256(600), uint256(850), uint256(750),
+        uint256(700), uint256(400), uint256(950), uint256(550), uint256(650), uint256(350)
+    ];
+
+    uint256[12] internal constant BASE_DODGE = [
+        uint256(600), uint256(200), uint256(500), uint256(800), uint256(300), uint256(700),
+        uint256(400), uint256(250), uint256(900), uint256(550), uint256(450), uint256(350)
+    ];
+
+    uint256[12] internal constant BASE_SPEED = [
+        uint256(95), uint256(40), uint256(70), uint256(90), uint256(80), uint256(85),
+        uint256(100), uint256(35), uint256(110), uint256(55), uint256(60), uint256(30)
+    ];
+
     /**
      * @dev 战斗属性结构体
      *
@@ -76,22 +106,8 @@ library NFTLib {
      * - 猪(PIG): 30 - 最慢
      */
     function getBaseSpeed(uint256 zodiacType) internal pure returns (uint256) {
-        uint256[12] memory baseSpeeds = [
-            uint256(95),   // RAT (0) - 鼠
-            uint256(40),   // OX (1) - 牛
-            uint256(70),   // TIGER (2) - 虎
-            uint256(90),   // RABBIT (3) - 兔
-            uint256(80),   // DRAGON (4) - 龙
-            uint256(85),   // SNAKE (5) - 蛇
-            uint256(100),  // HORSE (6) - 马
-            uint256(35),   // GOAT (7) - 羊
-            uint256(110),  // MONKEY (8) - 猴
-            uint256(55),   // ROOSTER (9) - 鸡
-            uint256(60),   // DOG (10) - 狗
-            uint256(30)    // PIG (11) - 猪
-        ];
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
-        return baseSpeeds[zodiacType];
+        return BASE_SPEED[zodiacType];
     }
 
     /**
@@ -132,38 +148,21 @@ library NFTLib {
      * - dodge: 基础闪避 + 等级加成(每级+1%)
      */
     function calculateBattleAttributes(uint256 zodiacType, uint256 level) internal pure returns (BattleAttributes memory) {
-        uint256[12] memory baseHP = [
-            uint256(1200), uint256(2000), uint256(1600), uint256(1000), uint256(1800), uint256(1400),
-            uint256(1500), uint256(900), uint256(1100), uint256(800), uint256(1300), uint256(700)
-        ];
-        uint256[12] memory baseAttack = [
-            uint256(120), uint256(80), uint256(150), uint256(90), uint256(180), uint256(140),
-            uint256(130), uint256(60), uint256(160), uint256(70), uint256(100), uint256(50)
-        ];
-        uint256[12] memory baseDefense = [
-            uint256(80), uint256(120), uint256(100), uint256(70), uint256(130), uint256(110),
-            uint256(90), uint256(60), uint256(100), uint256(50), uint256(110), uint256(40)
-        ];
-        uint256[12] memory baseCritical = [
-            uint256(800), uint256(500), uint256(900), uint256(600), uint256(850), uint256(750),
-            uint256(700), uint256(400), uint256(950), uint256(550), uint256(650), uint256(350)
-        ];
-
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         require(level >= 1 && level <= 5, "NFTLib: Invalid level");
 
         uint256 multiplier = getLevelMultiplier(level);
 
         BattleAttributes memory attrs;
-        attrs.hp = baseHP[zodiacType] * multiplier / 100;
-        attrs.attack = baseAttack[zodiacType] * multiplier / 100;
-        attrs.defense = baseDefense[zodiacType] * multiplier / 100;
-        attrs.speed = getBaseSpeed(zodiacType) * multiplier / 100;
-        attrs.critical = baseCritical[zodiacType] + level * 200;
-        attrs.dodge = 500 + level * 100;
+        attrs.hp = BASE_HP[zodiacType] * multiplier / 100;
+        attrs.attack = BASE_ATTACK[zodiacType] * multiplier / 100;
+        attrs.defense = BASE_DEFENSE[zodiacType] * multiplier / 100;
+        attrs.speed = BASE_SPEED[zodiacType] * multiplier / 100;
+        attrs.critical = BASE_CRITICAL[zodiacType] + (level * 150);
+        attrs.dodge = BASE_DODGE[zodiacType] + (level * 80);
 
-        if (attrs.critical > 3500) attrs.critical = 3500;
-        if (attrs.dodge > 1500) attrs.dodge = 1500;
+        if (attrs.critical > 3000) attrs.critical = 3000;
+        if (attrs.dodge > 1800) attrs.dodge = 1800;
 
         return attrs;
     }
@@ -258,14 +257,10 @@ library NFTLib {
      * @return uint256 攻击力
      */
     function calculateAttack(uint256 zodiacType, uint256 level) internal pure returns (uint256) {
-        uint256[12] memory baseAttack = [
-            uint256(120), uint256(80), uint256(150), uint256(90), uint256(180), uint256(140),
-            uint256(130), uint256(60), uint256(160), uint256(70), uint256(100), uint256(50)
-        ];
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         require(level >= 1 && level <= 5, "NFTLib: Invalid level");
         uint256 multiplier = getLevelMultiplier(level);
-        return baseAttack[zodiacType] * multiplier / 100;
+        return BASE_ATTACK[zodiacType] * multiplier / 100;
     }
 
     /**
@@ -276,14 +271,10 @@ library NFTLib {
      * @return uint256 防御力
      */
     function calculateDefense(uint256 zodiacType, uint256 level) internal pure returns (uint256) {
-        uint256[12] memory baseDefense = [
-            uint256(80), uint256(120), uint256(100), uint256(70), uint256(130), uint256(110),
-            uint256(90), uint256(60), uint256(100), uint256(50), uint256(110), uint256(40)
-        ];
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         require(level >= 1 && level <= 5, "NFTLib: Invalid level");
         uint256 multiplier = getLevelMultiplier(level);
-        return baseDefense[zodiacType] * multiplier / 100;
+        return BASE_DEFENSE[zodiacType] * multiplier / 100;
     }
 
     /**
@@ -294,14 +285,10 @@ library NFTLib {
      * @return uint256 生命值
      */
     function calculateHP(uint256 zodiacType, uint256 level) internal pure returns (uint256) {
-        uint256[12] memory baseHP = [
-            uint256(1200), uint256(2000), uint256(1600), uint256(1000), uint256(1800), uint256(1400),
-            uint256(1500), uint256(900), uint256(1100), uint256(800), uint256(1300), uint256(700)
-        ];
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         require(level >= 1 && level <= 5, "NFTLib: Invalid level");
         uint256 multiplier = getLevelMultiplier(level);
-        return baseHP[zodiacType] * multiplier / 100;
+        return BASE_HP[zodiacType] * multiplier / 100;
     }
 
     /**
@@ -447,8 +434,12 @@ library NFTLib {
 
     /**
      * @dev 安全执行除法
-     *
-     * 防止除以零错误
+     * 
+     * Note: 在Solidity 0.8+中，safeAdd/safeSub的溢出检查已内置，但safeDiv仍需要
+     * 因为除法不会自动检查除零错误。保留这些函数是为了：
+     * 1. 与旧代码保持兼容性
+     * 2. 提供统一的错误消息格式
+     * 3. safeDiv的除零检查仍然必要
      *
      * @param a 被除数
      * @param b 除数
@@ -460,9 +451,10 @@ library NFTLib {
     }
 
     /**
-     * @dev 安全执行加法
-     *
-     * 防止溢出
+     * @dev 安全执行加法（保留用于向后兼容）
+     * 
+     * Note: Solidity 0.8+已内置溢出检查，此函数主要用于保持与旧代码的兼容性。
+     * 保留的原因：统一错误消息格式，便于调试和日志记录。
      *
      * @param a 加数
      * @param b 加数
@@ -475,9 +467,10 @@ library NFTLib {
     }
 
     /**
-     * @dev 安全执行减法
-     *
-     * 防止下溢
+     * @dev 安全执行减法（保留用于向后兼容）
+     * 
+     * Note: Solidity 0.8+已内置下溢检查，此函数主要用于保持与旧代码的兼容性。
+     * 保留的原因：统一错误消息格式，便于调试和日志记录。
      *
      * @param a 被减数
      * @param b 减数

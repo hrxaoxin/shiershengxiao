@@ -468,8 +468,8 @@
         </div>
     </main>
 
-    <div id="battleModal" class="fixed inset-0 bg-black/80 z-50 hidden overflow-y-auto flex justify-center">
-        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-2 md:p-4 max-w-6xl w-full mx-1 md:mx-auto my-2 md:my-4 border border-white/10 flex flex-col min-h-fit md:min-h-0 md:max-h-[90vh]">
+    <div id="battleModal" class="fixed inset-0 bg-black/80 z-50 hidden overflow-y-auto flex items-start justify-center pt-2 pb-4">
+        <div class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-2 sm:p-3 md:p-4 max-w-xs sm:max-w-sm md:max-w-lg lg:max-w-2xl xl:max-w-4xl w-full mx-2 sm:mx-4 md:mx-auto my-2 md:my-4 border border-white/10 flex flex-col min-h-[80vh] max-h-[95vh] md:max-h-[90vh]">
             <div class="text-center mb-1 md:mb-3 flex-shrink-0">
                 <h2 class="text-base md:text-xl font-bold text-white mb-0.5">⚔️ 6v6 战斗开始！</h2>
                 <div class="text-gray-400 text-[10px] md:text-sm" id="battleModeText">积分模式</div>
@@ -477,9 +477,9 @@
             </div>
 
             <div class="md:flex-1 flex flex-col md:flex-row gap-1.5 md:gap-3 relative">
-                <!-- 进攻方 -->
+                <!-- 防守方 -->
                 <div class="flex-1 flex flex-col order-1">
-                    <h3 class="text-blue-400 font-semibold text-center mb-0.5 md:mb-2 text-xs md:text-sm">防守方</h3>
+                    <h3 class="text-red-400 font-semibold text-center mb-0.5 md:mb-2 text-xs md:text-sm">防守方</h3>
                     <div class="flex-1 flex flex-col justify-around min-h-0">
                         <div class="space-y-0">
                             <div class="text-center text-gray-500 text-[10px] mb-0">前排</div>
@@ -566,9 +566,9 @@
                     </div>
                 </div>
 
-                <!-- 防守方 -->
+                <!-- 进攻方 -->
                 <div class="flex-1 flex flex-col order-3">
-                    <h3 class="text-red-400 font-semibold text-center mb-0.5 md:mb-2 text-xs md:text-sm">进攻方</h3>
+                    <h3 class="text-blue-400 font-semibold text-center mb-0.5 md:mb-2 text-xs md:text-sm">进攻方</h3>
                     <div class="flex-1 flex flex-col justify-around min-h-0">
                         <div class="space-y-0">
                             <div class="text-center text-gray-500 text-[10px] mb-0">前排</div>
@@ -808,9 +808,32 @@
         }
 
         let arenaUnsubscribeFunctions = [];
+        let leaderboardRefreshTimer = null;
+
+        function startLeaderboardRefresh() {
+            if (leaderboardRefreshTimer) {
+                clearInterval(leaderboardRefreshTimer);
+            }
+            leaderboardRefreshTimer = setInterval(async () => {
+                try {
+                    await loadLeaderboard();
+                } catch (e) {
+                    console.warn('Failed to refresh leaderboard:', e);
+                }
+            }, 30000);
+        }
+
+        function stopLeaderboardRefresh() {
+            if (leaderboardRefreshTimer) {
+                clearInterval(leaderboardRefreshTimer);
+                leaderboardRefreshTimer = null;
+            }
+        }
 
         async function setupEventListeners() {
             try {
+                startLeaderboardRefresh();
+                
                 const unsubScoreUpdated = await ZODIAC_WEB3.listenToEvent('arena', 'ScoreUpdated', async (event) => {
                     console.log('Score updated:', event.returnValues);
                     await loadMyStats();
@@ -863,6 +886,13 @@
                     await loadMyTeam();
                 });
                 arenaUnsubscribeFunctions.push(unsubBattleTeamCleared);
+
+                const unsubBattleEnded = await ZODIAC_WEB3.listenToEvent('battle', 'BattleEnded', async (event) => {
+                    console.log('Battle ended:', event.returnValues);
+                    await loadLeaderboard();
+                    await loadMyStats();
+                });
+                arenaUnsubscribeFunctions.push(unsubBattleEnded);
 
                 console.log('Arena event listeners setup complete');
             } catch (error) {
@@ -1243,6 +1273,18 @@
                 }
                 
                 const tokenIds = battleTeam.map(nft => nft.tokenId);
+                
+                ZODIAC_UI.showLoading('正在检查NFT质押状态...');
+                
+                const stakingContract = await ZODIAC_WEB3.getContract('staking');
+                for (const tokenId of tokenIds) {
+                    const stakedInfo = await stakingContract.methods.stakedNFTs(tokenId).call();
+                    if (stakedInfo.staked) {
+                        ZODIAC_UI.hideLoading();
+                        ZODIAC_UI.showToast(`NFT #${tokenId} 已被质押，无法加入战队`, 'error');
+                        return;
+                    }
+                }
                 
                 ZODIAC_UI.showLoading('正在检查NFT授权状态...');
                 
@@ -1701,6 +1743,65 @@
                 
                 document.getElementById('leaderboard').dataset.leaderboardData = JSON.stringify(topPlayers);
                 
+                // 获取当前用户的排名（如果不在前20名）
+                if (account) {
+                    try {
+                        const userRank = await arenaContract.methods.getPlayerRank(account).call();
+                        const userRankNum = parseInt(userRank) || 0;
+                        const userInTop20 = topPlayers.some(p => p.address.toLowerCase() === account.toLowerCase());
+                        
+                        // 如果用户不在前20名，添加用户排名信息
+                        if (userRankNum > 0 && !userInTop20) {
+                            const myStats = await arenaContract.methods.getPlayerRecord(account).call();
+                            const userPoints = parseInt(myStats[0] || '0');
+                            const userWins = parseInt(myStats[1] || '0');
+                            const userLosses = parseInt(myStats[2] || '0');
+                            
+                            // 添加分隔线和用户排名
+                            const userRankInfo = {
+                                address: account,
+                                points: userPoints,
+                                wins: userWins,
+                                losses: userLosses,
+                                rank: userRankNum,
+                                isMock: false,
+                                isCurrentUser: true,
+                                team: []
+                            };
+                            
+                            // 在适当位置插入用户排名
+                            let insertIndex = topPlayers.length;
+                            for (let i = 0; i < topPlayers.length; i++) {
+                                if (userPoints > topPlayers[i].points) {
+                                    insertIndex = i;
+                                    break;
+                                }
+                            }
+                            
+                            // 只在用户排名接近前20时显示（前后5名）
+                            if (insertIndex < 25) {
+                                topPlayers.splice(insertIndex, 0, userRankInfo);
+                                // 更新排名
+                                for (let i = 0; i < topPlayers.length; i++) {
+                                    topPlayers[i].rank = i + 1;
+                                }
+                                // 如果超过25个，只显示用户和前20
+                                if (topPlayers.length > 21) {
+                                    topPlayers = topPlayers.slice(0, 20);
+                                }
+                            }
+                            
+                            // 显示用户排名提示
+                            const myRankDiv = document.getElementById('myRankDisplay');
+                            if (myRankDiv) {
+                                myRankDiv.innerHTML = `当前排名: <span class="text-yellow-400 font-bold">#${userRankNum}</span> | 积分: ${userPoints}`;
+                            }
+                        }
+                    } catch (e) {
+                        console.log('获取用户排名失败:', e);
+                    }
+                }
+                
                 const rewards = [];
                 for (let i = 0; i < topPlayers.length; i++) {
                     try {
@@ -1977,7 +2078,7 @@
                     }
                 } else {
                     const defenderAddress = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
-                    challengeTx = await ZODIAC_WEB3.challengeRealPlayer(playerTeam, defenderAddress);
+                    challengeTx = await ZODIAC_WEB3.challengeRealPlayer(defenderAddress, playerTeam);
                     victory = challengeTx.events?.ChallengeResult?.returnValues?.isVictory;
                     if (victory === undefined) {
                         victory = selectedOpponent.points < getPlayerPoints();
@@ -2633,6 +2734,7 @@
         function cleanup() {
             battleDomCache = {};
             hpBarCache = {};
+            stopLeaderboardRefresh();
             cleanupEventListeners();
         }
 
