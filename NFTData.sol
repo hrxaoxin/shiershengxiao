@@ -459,9 +459,13 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             else if (info.level == 4) levelWeight = 18;
             else if (info.level == 5) levelWeight = 66;
             
-            // 稀有度乘数（稀有类型 >= RARE_TYPE_START）
+            // 稀有属性权重（光/暗属性）
             if (info.zodiacType >= RARE_TYPE_START) {
-                levelWeight *= 10;
+                if (info.level == 1) levelWeight = 10;
+                else if (info.level == 2) levelWeight = 12;
+                else if (info.level == 3) levelWeight = 16;
+                else if (info.level == 4) levelWeight = 28;
+                else if (info.level == 5) levelWeight = 76;
             }
             
             totalWeight += levelWeight;
