@@ -485,7 +485,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 NFTTraits memory attackerTrait = state2.traits[attackerIndex];
                 uint256 skillKey = attackerTrait.element * ZODIAC_TYPE_COUNT + attackerTrait.zodiac;
                 Skill memory skill = skills[skillKey];
-                bool useSkill = skillCooldown2[attackerIndex] == 0 && (randomSeed % 5 == 0 || _shouldUseSkill(state2, attackerIndex));
+                bool useSkill = skillCooldown2[attackerIndex] == 0 && (randomSeed % SKILL_USE_CHANCE_DENOMINATOR == 0 || _shouldUseSkill(state2, attackerIndex));
                 
                 if (useSkill && skill.skillId > 0) {
                     state1 = _applySkill(attackerTrait, state1, attackerIndex, skill);
@@ -631,6 +631,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     /**
      * @dev 生成随机种子 - 使用更安全的随机数生成方式
      * 结合多个链上数据源，增加预测难度
+     * 
+     * 注意：当前实现使用链上数据源组合生成随机数，虽然增加了预测难度，
+     * 但在验证者节点仍可能存在一定的可预测性。
+     * 建议在主网部署时引入 Chainlink VRF 或其他去中心化预言机随机数方案。
+     * 
      * @param battleId 战斗ID
      * @return 随机种子
      */
@@ -647,10 +652,63 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             gasleft(),
             tx.gasprice,
             block.basefee,
-            uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, battleId)))
+            tx.nonce,
+            block.difficulty,
+            uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, battleId))),
+            uint256(keccak256(abi.encodePacked(block.prevrandao, tx.gasprice, gasleft())))
         ));
         
         return uint256(entropy);
+    }
+    
+    /**
+     * @dev Chainlink VRF 请求ID映射（预留接口）
+     * requestId => battleId
+     */
+    mapping(bytes32 => uint256) public vrfRequestToBattleId;
+    
+    /**
+     * @dev 是否已启用Chainlink VRF（默认关闭）
+     */
+    bool public vrfEnabled;
+    
+    /**
+     * @dev Chainlink VRF协调器地址
+     */
+    address public vrfCoordinator;
+    
+    /**
+     * @dev Chainlink VRF密钥哈希
+     */
+    bytes32 public vrfKeyHash;
+    
+    /**
+     * @dev Chainlink VRF订阅ID
+     */
+    uint64 public vrfSubscriptionId;
+    
+    /**
+     * @dev 启用Chainlink VRF随机数
+     * @param _vrfCoordinator VRF协调器地址
+     * @param _vrfKeyHash VRF密钥哈希
+     * @param _subscriptionId VRF订阅ID
+     */
+    function enableVRF(address _vrfCoordinator, bytes32 _vrfKeyHash, uint64 _subscriptionId) external onlyOwner {
+        require(_vrfCoordinator != address(0), "Battle: Invalid VRF coordinator");
+        require(_vrfKeyHash != bytes32(0), "Battle: Invalid VRF key hash");
+        require(_subscriptionId > 0, "Battle: Invalid subscription ID");
+        
+        vrfCoordinator = _vrfCoordinator;
+        vrfKeyHash = _vrfKeyHash;
+        vrfSubscriptionId = _subscriptionId;
+        vrfEnabled = true;
+    }
+    
+    /**
+     * @dev 禁用Chainlink VRF，回退到链上随机数
+     */
+    function disableVRF() external onlyOwner {
+        vrfEnabled = false;
     }
 
     /**

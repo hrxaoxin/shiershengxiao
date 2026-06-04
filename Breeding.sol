@@ -44,6 +44,11 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
     bool public paused;
     string public pauseReason;
 
+    // 繁殖状态枚举：0 = 进行中，1 = 已完成，2 = 已取消
+    uint256 public constant BREEDING_STATUS_ACTIVE = 0;
+    uint256 public constant BREEDING_STATUS_COMPLETED = 1;
+    uint256 public constant BREEDING_STATUS_CANCELLED = 2;
+
     struct BreedingPair {
         uint256 fatherId;
         uint256 motherId;
@@ -57,6 +62,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         uint256 childId;
         uint256 maleChildId;
         bool rewardsClaimed;
+        uint256 cancelledAt; // 记录取消时间
     }
 
     struct MarketListing { 
@@ -77,6 +83,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
     event BreedingPairCreated(uint256 indexed pairId, uint256 indexed fatherId, uint256 indexed motherId, uint256 breedingType);
     event BreedingCompleted(uint256 indexed pairId, uint256 indexed childId, uint256 zodiacType);
     event MaleChildGenerated(uint256 indexed pairId, uint256 indexed childId);
+    event FemaleChildGenerated(uint256 indexed pairId, uint256 indexed childId);
     
     event CooldownUpdated(uint256 selfCooldown, uint256 marketCooldown);
     event BreedingFeeBurned(uint256 amount);
@@ -226,8 +233,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
 
         if (selfBreedingFee > 0) {
             require(tokenContract != address(0), "Breeding: Token contract not set");
-            try {
-                IERC20(tokenContract).safeTransferFrom(msg.sender, address(this), selfBreedingFee);
+            try IERC20(tokenContract).safeTransferFrom(msg.sender, address(this), selfBreedingFee) {
             } catch {
                 if (fatherTransferred) {
                     try nft.safeTransferFrom(address(this), msg.sender, fatherId) {
@@ -376,12 +382,59 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
     /**
      * @dev 完成繁殖（产出子代NFT）
      * @param pairId 繁殖对ID
+     * @dev 取消繁殖配对
+     * @param pairId 繁殖配对ID
+     */
+    function cancelBreeding(uint256 pairId) external nonReentrant whenNotPaused {
+        BreedingPair storage pair = breedingPairs[pairId];
+        require(pair.status == BREEDING_STATUS_ACTIVE, "Breeding: Pair not active");
+        require(pair.childId == 0, "Breeding: Already completed");
+        require(msg.sender == pair.maleOwner || msg.sender == pair.femaleOwner, "Breeding: Not pair owner");
+        require(nftMintContract != address(0), "Breeding: NFT contract not set");
+
+        // 只允许在冷却期结束前取消
+        uint256 cooldown = pair.breedingType == BREEDING_TYPE_SELF ? selfBreedingCooldown : marketBreedingCooldown;
+        require(block.timestamp < pair.startTime + cooldown, "Breeding: Cannot cancel after cooldown ended");
+
+        INFTMint nft = INFTMint(nftMintContract);
+        
+        // 先更新状态为取消（防止重入）
+        pair.status = BREEDING_STATUS_CANCELLED;
+        pair.cancelledAt = block.timestamp;
+        
+        // 清除NFT活跃繁殖标记
+        isNFTInActiveBreeding[pair.fatherId] = false;
+        isNFTInActiveBreeding[pair.motherId] = false;
+        
+        // 重置冷却时间
+        breedingCooldowns[pair.fatherId] = 0;
+        breedingCooldowns[pair.motherId] = 0;
+        
+        // 最后归还NFT给原所有者，失败时锁在合约中
+        try nft.safeTransferFrom(address(this), pair.maleOwner, pair.fatherId) {
+        } catch {
+            emit EmergencyNFTLocked(pair.fatherId, pair.maleOwner);
+        }
+        
+        try nft.safeTransferFrom(address(this), pair.femaleOwner, pair.motherId) {
+        } catch {
+            emit EmergencyNFTLocked(pair.motherId, pair.femaleOwner);
+        }
+        
+        emit BreedingCancelled(pairId, pair.fatherId, pair.motherId, msg.sender);
+    }
+    
+    event BreedingCancelled(uint256 indexed pairId, uint256 fatherId, uint256 motherId, address indexed canceller);
+    
+    /**
+     * @dev 完成繁殖，生成新的NFT
+     * @param pairId 繁殖配对ID
      * @return childId 母方获得的子代NFT ID
      * @return maleChildId 父方获得的子代NFT ID（市场繁殖时）
      */
     function completeBreeding(uint256 pairId) external nonReentrant whenNotPaused returns (uint256, uint256) {
         BreedingPair storage pair = breedingPairs[pairId];
-        require(pair.status == 0, "Breeding: Pair not active");
+        require(pair.status == BREEDING_STATUS_ACTIVE, "Breeding: Pair not active");
         require(pair.childId == 0, "Breeding: Already completed");
         require(msg.sender == pair.maleOwner || msg.sender == pair.femaleOwner, "Breeding: Not pair owner");
         require(nftMintContract != address(0), "Breeding: NFT contract not set");
@@ -428,8 +481,6 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
             pair.status = 1;
             isNFTInActiveBreeding[pair.fatherId] = false;
             isNFTInActiveBreeding[pair.motherId] = false;
-            
-            _burnFee(pair.breedingType);
 
             try nft.safeTransferFrom(address(this), pair.maleOwner, pair.fatherId) {
             } catch {
@@ -445,6 +496,7 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
 
             emit BreedingCompleted(pairId, childIdForFemale, zodiacType);
             emit MaleChildGenerated(pairId, childIdForMale);
+            emit FemaleChildGenerated(pairId, childIdForFemale);
             return (childIdForFemale, childIdForMale);
         }
     }
@@ -614,6 +666,33 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         require(_tokenContract != address(0), "Breeding: Invalid token contract address"); 
         tokenContract = _tokenContract; 
         emit TokenContractSet(_tokenContract); 
+    }
+
+    /**
+     * @dev 获取用户活跃的繁殖订单
+     * @param user 用户地址
+     * @return 活跃繁殖订单ID数组
+     */
+    function getUserActiveOrders(address user) external view returns (uint256[] memory) {
+        uint256[] memory result = new uint256[](breedingPairCount);
+        uint256 count = 0;
+        
+        for (uint256 i = 1; i <= breedingPairCount; i++) {
+            BreedingPair storage pair = breedingPairs[i];
+            if (pair.status == BREEDING_STATUS_ACTIVE && 
+                (pair.maleOwner == user || pair.femaleOwner == user)) {
+                result[count] = i;
+                count++;
+            }
+        }
+        
+        // 截断数组到实际长度
+        uint256[] memory trimmedResult = new uint256[](count);
+        for (uint256 i = 0; i < count; i++) {
+            trimmedResult[i] = result[i];
+        }
+        
+        return trimmedResult;
     }
 
     /**

@@ -7,6 +7,15 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 
 /**
+ * @dev DEX Router 接口（兼容 Uniswap V2 标准）
+ * 支持 FlapSwap、PancakeSwap、Uniswap
+ */
+interface IDEXRouter {
+    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
+    function WETH() external pure returns (address);
+}
+
+/**
  * @title PriceOracle
  * @dev 价格预言机合约，提供代币和ETH的USD价格查询
  *
@@ -164,6 +173,27 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     uint256 public constant USDT_PRECISION = 10**6;
 
     /**
+     * @dev DEX Router 配置 - 支持 FlapSwap、PancakeSwap、Uniswap
+     */
+    address public flapSwapRouter;
+    address public pancakeSwapRouter;
+    address public uniswapRouter;
+    address public wbnb;
+    
+    /**
+     * @dev 当前活跃的DEX类型
+     * 0: FlapSwap
+     * 1: PancakeSwap
+     * 2: Uniswap
+     */
+    uint8 public activeDEX;
+    
+    /**
+     * @dev 是否启用DEX自动价格获取
+     */
+    bool public autoPriceEnabled = true;
+
+    /**
      * @dev 价格更新事件
      *
      * @param tokenPrice 新的代币价格
@@ -171,6 +201,11 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param updater 更新者地址
      */
     event PriceUpdated(uint256 tokenPrice, uint256 ethPrice, address updater);
+    
+    /**
+     * @dev DEX价格获取事件
+     */
+    event PriceFetchedFromDEX(uint8 indexed dexType, uint256 tokenPrice, uint256 ethPrice);
 
     uint256 public maxPriceChangePercent = 5000;
     uint256 public priceUpdateCooldown = 5 minutes;
@@ -294,6 +329,206 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function setUSDTAddress(address _usdtAddress) external onlyAuthorized {
         require(_usdtAddress != address(0), "PriceOracle: Invalid USDT address");
         usdtAddress = _usdtAddress;
+    }
+
+    /**
+     * @dev 设置DEX Router地址（支持 FlapSwap、PancakeSwap、Uniswap）
+     * @param _flapSwapRouter FlapSwap Router 地址
+     * @param _pancakeSwapRouter PancakeSwap Router 地址
+     * @param _uniswapRouter Uniswap Router 地址
+     */
+    function setDEXRouters(address _flapSwapRouter, address _pancakeSwapRouter, address _uniswapRouter) external onlyOwner {
+        flapSwapRouter = _flapSwapRouter;
+        pancakeSwapRouter = _pancakeSwapRouter;
+        uniswapRouter = _uniswapRouter;
+        
+        // 设置默认活跃DEX（优先使用PancakeSwap，如果可用）
+        if (_pancakeSwapRouter != address(0)) {
+            activeDEX = 1;
+            wbnb = IDEXRouter(_pancakeSwapRouter).WETH();
+        } else if (_flapSwapRouter != address(0)) {
+            activeDEX = 0;
+            wbnb = IDEXRouter(_flapSwapRouter).WETH();
+        } else if (_uniswapRouter != address(0)) {
+            activeDEX = 2;
+            wbnb = IDEXRouter(_uniswapRouter).WETH();
+        }
+    }
+
+    /**
+     * @dev 设置活跃DEX
+     * @param _dexType DEX类型：0=FlapSwap, 1=PancakeSwap, 2=Uniswap
+     */
+    function setActiveDEX(uint8 _dexType) external onlyOwner {
+        require(_dexType <= 2, "PriceOracle: Invalid DEX type");
+        
+        address router;
+        if (_dexType == 0) {
+            require(flapSwapRouter != address(0), "PriceOracle: FlapSwap not configured");
+            router = flapSwapRouter;
+        } else if (_dexType == 1) {
+            require(pancakeSwapRouter != address(0), "PriceOracle: PancakeSwap not configured");
+            router = pancakeSwapRouter;
+        } else {
+            require(uniswapRouter != address(0), "PriceOracle: Uniswap not configured");
+            router = uniswapRouter;
+        }
+        
+        activeDEX = _dexType;
+        wbnb = IDEXRouter(router).WETH();
+    }
+
+    /**
+     * @dev 设置自动价格获取开关
+     */
+    function setAutoPriceEnabled(bool enabled) external onlyOwner {
+        autoPriceEnabled = enabled;
+    }
+
+    /**
+     * @dev 从DEX获取当前代币价格（通过WBNB/ETH中转）
+     * @return uint256 代币价格（USD，精度18位）
+     */
+    function fetchPriceFromDEX() external onlyAuthorized whenNotPaused returns (uint256, uint256) {
+        require(autoPriceEnabled, "PriceOracle: Auto price disabled");
+        
+        address router = _getActiveRouter();
+        require(router != address(0), "PriceOracle: No DEX configured");
+        
+        // 获取代币价格（代币 -> WBNB -> USDT）
+        uint256 tokenPrice = _fetchTokenPrice(router);
+        uint256 ethPrice = _fetchETHPrice(router);
+        
+        if (tokenPrice > 0) {
+            tokenPriceUSD = tokenPrice;
+            tokenPriceUpdatedAt = block.timestamp;
+        }
+        if (ethPrice > 0) {
+            ethPriceUSD = ethPrice;
+            ethPriceUpdatedAt = block.timestamp;
+        }
+        
+        emit PriceFetchedFromDEX(activeDEX, tokenPrice, ethPrice);
+        emit PriceUpdated(tokenPriceUSD, ethPriceUSD, msg.sender);
+        
+        return (tokenPrice, ethPrice);
+    }
+
+    /**
+     * @dev 获取当前活跃的DEX Router
+     */
+    function _getActiveRouter() internal view returns (address) {
+        if (activeDEX == 0) return flapSwapRouter;
+        if (activeDEX == 1) return pancakeSwapRouter;
+        return uniswapRouter;
+    }
+
+    /**
+     * @dev 从DEX获取代币价格
+     */
+    function _fetchTokenPrice(address router) internal view returns (uint256) {
+        if (tokenAddress == address(0) || usdtAddress == address(0) || wbnb == address(0)) {
+            return 0;
+        }
+        
+        // 路径：代币 -> WBNB -> USDT
+        address[] memory path = new address[](3);
+        path[0] = tokenAddress;
+        path[1] = wbnb;
+        path[2] = usdtAddress;
+        
+        try IDEXRouter(router).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
+            if (amounts.length == 3 && amounts[2] > 0) {
+                // amounts[2] 是 USDT 数量（6位精度）
+                // 转换为 USD 价格（18位精度）
+                return amounts[2] * 10**12;
+            }
+        } catch {}
+        
+        return 0;
+    }
+
+    /**
+     * @dev 从DEX获取ETH价格
+     */
+    function _fetchETHPrice(address router) internal view returns (uint256) {
+        if (usdtAddress == address(0) || wbnb == address(0)) {
+            return 0;
+        }
+        
+        // 路径：WBNB -> USDT
+        address[] memory path = new address[](2);
+        path[0] = wbnb;
+        path[1] = usdtAddress;
+        
+        try IDEXRouter(router).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
+            if (amounts.length == 2 && amounts[1] > 0) {
+                // amounts[1] 是 USDT 数量（6位精度）
+                // 转换为 USD 价格（18位精度）
+                return amounts[1] * 10**12;
+            }
+        } catch {}
+        
+        return 0;
+    }
+
+    /**
+     * @dev 获取所有DEX的价格并返回平均值
+     */
+    function fetchPriceFromAllDEX() external onlyAuthorized whenNotPaused returns (uint256, uint256) {
+        uint256 tokenPriceSum = 0;
+        uint256 ethPriceSum = 0;
+        uint256 count = 0;
+        
+        // 从FlapSwap获取
+        if (flapSwapRouter != address(0)) {
+            uint256 tp = _fetchTokenPrice(flapSwapRouter);
+            uint256 ep = _fetchETHPrice(flapSwapRouter);
+            if (tp > 0 && ep > 0) {
+                tokenPriceSum += tp;
+                ethPriceSum += ep;
+                count++;
+            }
+        }
+        
+        // 从PancakeSwap获取
+        if (pancakeSwapRouter != address(0)) {
+            uint256 tp = _fetchTokenPrice(pancakeSwapRouter);
+            uint256 ep = _fetchETHPrice(pancakeSwapRouter);
+            if (tp > 0 && ep > 0) {
+                tokenPriceSum += tp;
+                ethPriceSum += ep;
+                count++;
+            }
+        }
+        
+        // 从Uniswap获取
+        if (uniswapRouter != address(0)) {
+            uint256 tp = _fetchTokenPrice(uniswapRouter);
+            uint256 ep = _fetchETHPrice(uniswapRouter);
+            if (tp > 0 && ep > 0) {
+                tokenPriceSum += tp;
+                ethPriceSum += ep;
+                count++;
+            }
+        }
+        
+        if (count == 0) {
+            return (0, 0);
+        }
+        
+        uint256 avgTokenPrice = tokenPriceSum / count;
+        uint256 avgETHPrice = ethPriceSum / count;
+        
+        tokenPriceUSD = avgTokenPrice;
+        ethPriceUSD = avgETHPrice;
+        tokenPriceUpdatedAt = block.timestamp;
+        ethPriceUpdatedAt = block.timestamp;
+        
+        emit PriceFetchedFromDEX(activeDEX, avgTokenPrice, avgETHPrice);
+        emit PriceUpdated(avgTokenPrice, avgETHPrice, msg.sender);
+        
+        return (avgTokenPrice, avgETHPrice);
     }
 
     /**

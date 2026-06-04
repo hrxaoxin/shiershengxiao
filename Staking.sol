@@ -51,6 +51,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     // 用户级别累计权重跟踪（优化 getPendingReward / claimReward 的 Gas 消耗）
     mapping(address => uint256) public userStakedWeight;      // 用户质押的NFT总权重
     mapping(address => uint256) private _userSnapshotWeight;   // Σ(accumulatedReward * weight) 每用户
+    
+    // 用户级别累计快照溢出保护阈值（距离最大值的安全距离）
+    uint256 public constant USER_SNAPSHOT_OVERFLOW_THRESHOLD = 158456325028528675187087900672; // ~90% of 2^256
 
     struct StakingInfo {
         address owner;
@@ -166,6 +169,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             totalWeightedNFTs += weight;
             // 更新用户级别累计跟踪
             userStakedWeight[msg.sender] += weight;
+            
+            // 用户级别累计快照溢出检查
+            require(_userSnapshotWeight[msg.sender] < USER_SNAPSHOT_OVERFLOW_THRESHOLD, "Staking: User snapshot overflow imminent");
             _userSnapshotWeight[msg.sender] += globalRewardPerWeight * weight;
         }
         emit Staked(msg.sender, tokenIds);
@@ -175,19 +181,35 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         require(nftContract != address(0), "Staking: NFT contract not set");
         INFT nft = INFT(nftContract);
         
+        // 先计算并领取当前用户的所有待领取奖励
+        uint256 totalClaimable = _calcUserPending(msg.sender);
+        if (totalClaimable > 0 && rewardTokenContract != address(0)) {
+            IERC20 rewardToken = IERC20(rewardTokenContract);
+            require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance for unstake");
+            
+            // 先领取奖励
+            rewardToken.safeTransfer(msg.sender, totalClaimable);
+            emit RewardClaimed(msg.sender, totalClaimable);
+            
+            // 重置用户状态
+            uint256[] storage userNFTs = userStakedNFTs[msg.sender];
+            for (uint256 j = 0; j < userNFTs.length; j++) {
+                StakingInfo storage info = stakingInfo[userNFTs[j]];
+                if (info.owner == msg.sender) {
+                    info.accumulatedReward = globalRewardPerWeight;
+                    info.lastClaimTime = block.timestamp;
+                }
+            }
+            _userSnapshotWeight[msg.sender] = globalRewardPerWeight * userStakedWeight[msg.sender];
+            pendingRewards[msg.sender] = 0;
+        }
+        
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId > 0, "Staking: Invalid token ID");
             StakingInfo storage info = stakingInfo[tokenId];
             require(info.owner == msg.sender, "Staking: Not owner");
             require(block.timestamp >= info.stakeTime + minStakingDuration, "Staking: Lock period");
-
-            // 赎回前先计算该 NFT 的奖励（不立即领取，避免余额不足导致NFT锁定）
-            uint256 pendingForNFT = _calculatePendingForNFT(info);
-            if (pendingForNFT > 0) {
-                pendingRewards[msg.sender] += pendingForNFT;
-            }
-            info.accumulatedReward = globalRewardPerWeight;
 
             bool wasRare = info.isRare;
             uint256 weight = wasRare ? rareNFTWeight : normalNFTWeight;
@@ -285,8 +307,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function _doCalculateDailyReward() internal {
         if (!_shouldCalculateDailyReward()) return;
         
-        _checkRewardOverflow();
-        
         IERC20 rewardToken = IERC20(rewardTokenContract);
         uint256 contractBalance = rewardToken.balanceOf(address(this));
         
@@ -298,6 +318,12 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         
         if (totalWeightedNFTs > 0 && dailyReward > 0) {
             uint256 increment = dailyReward * STAKING_REWARD_PRECISION / totalWeightedNFTs;
+            // 在累加前检查溢出
+            require(globalRewardPerWeight <= type(uint256).max - increment, "Staking: Reward overflow imminent");
+            // 检查是否需要重置
+            if (globalRewardPerWeight + increment >= REWARD_OVERFLOW_THRESHOLD) {
+                _resetRewardTracking();
+            }
             globalRewardPerWeight += increment;
             todayRewardAmount = dailyReward;
             emit DailyRewardCalculated(dailyReward, increment);
@@ -428,15 +454,15 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      */
     function _calcUserPending(address user) internal view returns (uint256) {
         uint256 totalWeight = userStakedWeight[user];
-        if (totalWeight == 0) return 0;
+        if (totalWeight == 0) return pendingRewards[user];
 
         uint256 snapshotBase = _userSnapshotWeight[user];
 
         uint256 rewardBase = globalRewardPerWeight * totalWeight;
 
-        if (rewardBase <= snapshotBase) return 0;
-
-        return (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
+        uint256 earnedReward = rewardBase <= snapshotBase ? 0 : (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
+        
+        return earnedReward + pendingRewards[user];
     }
 
     function setRewardTokenContract(address _tokenContract) external onlyAuthorized {

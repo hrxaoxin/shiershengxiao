@@ -18,6 +18,23 @@ interface IPoolManager {
 }
 
 /**
+ * @dev DEX Router 接口（兼容 Uniswap V2 标准）
+ * 支持 FlapSwap、PancakeSwap、Uniswap
+ */
+interface IDEXRouter {
+    function swapExactETHForTokens(
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external payable returns (uint256[] memory amounts);
+    
+    function WETH() external pure returns (address);
+    
+    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
+}
+
+/**
  * @dev DividendManager 接口，用于同步分红池
  */
 interface IDividendManager {
@@ -138,6 +155,31 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     address public poolManager;
 
     /**
+     * @dev DEX Router 配置 - 支持 FlapSwap、PancakeSwap、Uniswap
+     */
+    address public dexRouter;
+    address public wbnb;
+    
+    /**
+     * @dev 自动兑换设置
+     */
+    bool public autoSwapEnabled = true;
+    uint256 public minSwapAmount = 1000000000000000;  // 0.001 BNB
+    
+    /**
+     * @dev 滑点保护参数（千分比）
+     */
+    uint256 public slippage = 50;  // 0.5%
+    
+    /**
+     * @dev 当前活跃的DEX类型
+     * 0: FlapSwap
+     * 1: PancakeSwap
+     * 2: Uniswap
+     */
+    uint8 public activeDEX;
+
+    /**
      * @dev 奖励分配比例（精度4位小数）
      */
     uint256 public dividendPercent = 5000;    // 50%
@@ -208,6 +250,197 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     function setPoolManager(address _poolManager) external onlyAuthorized {
         poolManager = _poolManager;
     }
+
+    /**
+     * @dev 设置DEX Router地址（支持 FlapSwap、PancakeSwap、Uniswap）
+     * @param _dexRouter DEX Router 合约地址
+     * @param _dexType DEX类型：0=FlapSwap, 1=PancakeSwap, 2=Uniswap
+     */
+    function setDEXRouter(address _dexRouter, uint8 _dexType) external onlyOwner {
+        require(_dexRouter != address(0), "RewardManager: Invalid DEX router");
+        require(_dexType <= 2, "RewardManager: Invalid DEX type");
+        
+        dexRouter = _dexRouter;
+        activeDEX = _dexType;
+        // 自动获取 WBNB 地址
+        wbnb = IDEXRouter(_dexRouter).WETH();
+        
+        emit DEXRouterUpdated(_dexRouter, _dexType);
+    }
+
+    /**
+     * @dev 设置自动兑换开关
+     */
+    function setAutoSwapEnabled(bool enabled) external onlyOwner {
+        autoSwapEnabled = enabled;
+    }
+
+    /**
+     * @dev 设置最小兑换金额
+     */
+    function setMinSwapAmount(uint256 amount) external onlyOwner {
+        minSwapAmount = amount;
+    }
+
+    /**
+     * @dev 设置滑点保护
+     */
+    function setSlippage(uint256 _slippage) external onlyOwner {
+        require(_slippage <= 500, "RewardManager: Slippage too high (max 5%)");
+        slippage = _slippage;
+    }
+
+    /**
+     * @dev 接收BNB并自动处理
+     */
+    receive() external payable {
+        if (msg.value > 0 && autoSwapEnabled && dexRouter != address(0)) {
+            if (msg.value >= minSwapAmount) {
+                _distributeBNB(msg.value);
+            }
+        }
+    }
+
+    /**
+     * @dev 手动触发BNB分配（用于处理小额BNB或调试）
+     */
+    function distributeBNB() external onlyAuthorized nonReentrant {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "RewardManager: No BNB to distribute");
+        _distributeBNB(balance);
+    }
+
+    /**
+     * @dev 内部函数：分配BNB到各池
+     * - 分红池：直接转账BNB
+     * - 代币质押池：直接转账BNB
+     * - NFT质押池、竞技场奖励池：兑换为代币后转账
+     */
+    function _distributeBNB(uint256 amount) internal {
+        require(tokenContract != address(0), "RewardManager: Token contract not set");
+        require(dexRouter != address(0), "RewardManager: DEX router not set");
+
+        // 计算各池分配金额
+        uint256 dividendAmount = amount * dividendPercent / PRECISION;
+        uint256 nftStakingAmount = amount * nftStakingPercent / PRECISION;
+        uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
+        uint256 arenaRewardAmount = amount * arenaRewardPercent / PRECISION;
+
+        // 分红池：直接转账BNB
+        if (dividendPool != address(0) && dividendAmount > 0) {
+            (bool success, ) = payable(dividendPool).call{value: dividendAmount}("");
+            if (success) {
+                try IDividendManager(dividendPool).syncDividendPool() {} catch {}
+            } else {
+                emit BNBTransferFailed(0, dividendPool, dividendAmount);
+            }
+        }
+
+        // 代币质押池：直接转账BNB
+        if (tokenStakingPool != address(0) && tokenStakingAmount > 0) {
+            (bool success, ) = payable(tokenStakingPool).call{value: tokenStakingAmount}("");
+            if (success) {
+                if (poolManager != address(0)) {
+                    try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch {}
+                }
+            } else {
+                emit BNBTransferFailed(2, tokenStakingPool, tokenStakingAmount);
+            }
+        }
+
+        // 需要兑换为代币的总金额（仅NFT质押池和竞技场奖励池）
+        uint256 totalSwapAmount = nftStakingAmount + arenaRewardAmount;
+        
+        if (totalSwapAmount > 0) {
+            // 兑换 BNB -> 代币
+            uint256 tokenAmount = _swapBNBToToken(totalSwapAmount);
+            
+            if (tokenAmount > 0) {
+                // 分配兑换后的代币到NFT质押池和竞技场奖励池
+                _distributeSwappedTokens(tokenAmount, 0, nftStakingAmount, arenaRewardAmount, totalSwapAmount);
+            }
+        }
+
+        emit BNBDistributed(msg.sender, amount, dividendAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount);
+    }
+
+    /**
+     * @dev 内部函数：将BNB兑换为代币
+     */
+    function _swapBNBToToken(uint256 bnbAmount) internal returns (uint256) {
+        require(tokenContract != address(0), "RewardManager: Token contract not set");
+        
+        address[] memory path = new address[](2);
+        path[0] = wbnb;
+        path[1] = tokenContract;
+
+        // 获取预估输出金额并计算滑点
+        uint256[] memory amounts = IDEXRouter(dexRouter).getAmountsOut(bnbAmount, path);
+        uint256 expectedOut = amounts[1];
+        uint256 minOut = expectedOut * (1000 - slippage) / 1000;
+
+        try IDEXRouter(dexRouter).swapExactETHForTokens{value: bnbAmount}(
+            minOut,
+            path,
+            address(this),
+            block.timestamp + 300
+        ) returns (uint256[] memory outputAmounts) {
+            emit BNBConverted(bnbAmount, outputAmounts[1]);
+            return outputAmounts[1];
+        } catch {
+            emit SwapFailed(bnbAmount);
+            return 0;
+        }
+    }
+
+    /**
+     * @dev 内部函数：分配兑换后的代币到NFT质押池和竞技场奖励池
+     * 分红池和代币质押池直接使用BNB，不需要兑换
+     */
+    function _distributeSwappedTokens(
+        uint256 totalTokenAmount,
+        uint256 /*dividendBNBAmount*/,
+        uint256 nftStakingBNBAmount,
+        uint256 arenaRewardBNBAmount,
+        uint256 totalBNBAmount
+    ) internal {
+        IERC20 token = IERC20(tokenContract);
+        
+        // 计算各池应得代币数量（按BNB金额比例）
+        uint256 nftStakingTokenAmount = totalTokenAmount * nftStakingBNBAmount / totalBNBAmount;
+        uint256 arenaRewardTokenAmount = totalTokenAmount * arenaRewardBNBAmount / totalBNBAmount;
+
+        // 分配到NFT质押池
+        if (nftStakingPool != address(0) && nftStakingTokenAmount > 0) {
+            try {
+                require(token.transfer(nftStakingPool, nftStakingTokenAmount), "RewardManager: NFT staking pool transfer failed");
+                if (poolManager != address(0)) {
+                    try IPoolManager(poolManager).addToNFTStakingPool(nftStakingTokenAmount) {} catch {}
+                }
+            } catch {
+                emit RewardTransferFailed(1, nftStakingPool, nftStakingTokenAmount);
+            }
+        }
+
+        // 分配到竞技场奖励池
+        if (arenaRewardPool != address(0) && arenaRewardTokenAmount > 0) {
+            try {
+                require(token.transfer(arenaRewardPool, arenaRewardTokenAmount), "RewardManager: Arena reward pool transfer failed");
+                if (poolManager != address(0)) {
+                    try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardTokenAmount) {} catch {}
+                }
+            } catch {
+                emit RewardTransferFailed(3, arenaRewardPool, arenaRewardTokenAmount);
+            }
+        }
+    }
+
+    // DEX相关事件
+    event DEXRouterUpdated(address indexed router, uint8 indexed dexType);
+    event BNBConverted(uint256 bnbAmount, uint256 tokenAmount);
+    event SwapFailed(uint256 bnbAmount);
+    event BNBDistributed(address indexed from, uint256 totalAmount, uint256 dividendAmount, uint256 nftStakingAmount, uint256 tokenStakingAmount, uint256 arenaRewardAmount);
+    event BNBTransferFailed(uint256 poolType, address pool, uint256 amount);
 
     /**
      * @dev 战斗类型对应的奖励金额映射
