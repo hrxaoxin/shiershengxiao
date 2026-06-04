@@ -937,6 +937,70 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return entries;
     }
 
+    function getLeaderboardByPage(uint256 seasonId, uint256 page, uint256 pageSize) external view returns (
+        LeaderboardEntry[] memory entries,
+        uint256 totalPages,
+        uint256 totalPlayers
+    ) {
+        require(seasonId <= currentSeasonId, "ArenaRanking: Invalid season");
+        require(page > 0, "ArenaRanking: Page must be > 0");
+        require(pageSize > 0 && pageSize <= 100, "ArenaRanking: Invalid page size");
+        
+        uint256 len = seasonRankings[seasonId].length;
+        totalPlayers = len;
+        
+        if (len == 0) {
+            entries = new LeaderboardEntry[](0);
+            totalPages = 0;
+            return (entries, totalPages, totalPlayers);
+        }
+        
+        totalPages = (len + pageSize - 1) / pageSize;
+        
+        uint256 startIndex = (page - 1) * pageSize;
+        if (startIndex >= len) {
+            entries = new LeaderboardEntry[](0);
+            return (entries, totalPages, totalPlayers);
+        }
+        
+        uint256 endIndex = startIndex + pageSize;
+        if (endIndex > len) endIndex = len;
+        
+        uint256 count = endIndex - startIndex;
+        entries = new LeaderboardEntry[](count);
+        
+        uint256 entryIndex = 0;
+        for (uint256 i = startIndex; i < endIndex; i++) {
+            address player = seasonRankings[seasonId][i];
+            PlayerRecord memory record = players[player];
+            entries[entryIndex] = LeaderboardEntry({
+                playerAddress: player,
+                points: record.score,
+                wins: record.wins,
+                losses: record.losses,
+                isMock: false
+            });
+            entryIndex++;
+        }
+        
+        return (entries, totalPages, totalPlayers);
+    }
+
+    function getLeaderboardPageCount(uint256 seasonId, uint256 pageSize) external view returns (uint256) {
+        require(seasonId <= currentSeasonId, "ArenaRanking: Invalid season");
+        require(pageSize > 0, "ArenaRanking: Page size must be > 0");
+        
+        uint256 len = seasonRankings[seasonId].length;
+        if (len == 0) return 0;
+        
+        return (len + pageSize - 1) / pageSize;
+    }
+
+    function getTotalPlayersInSeason(uint256 seasonId) external view returns (uint256) {
+        require(seasonId <= currentSeasonId, "ArenaRanking: Invalid season");
+        return seasonRankings[seasonId].length;
+    }
+
     function getPlayerBattleTeam(address player) external view returns (uint256[6] memory) {
         PlayerRecord storage record = players[player];
         uint256[6] memory team;

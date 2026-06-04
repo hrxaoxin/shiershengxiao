@@ -640,7 +640,16 @@
             ZODIAC_COMPONENTS.openMobileMenu();
         }
 
+        function cleanup() {
+            if (window.ZODIAC_WEB3) {
+                ZODIAC_WEB3.removeEventListeners();
+                ZODIAC_WEB3.clearAllEventListeners();
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async function() {
+            ZODIAC_UI.initGlobalErrorHandler();
+            
             particlesJS('particles-js', {
                 particles: {
                     number: { value: 80, density: { enable: true, value_area: 800 } },
@@ -682,6 +691,9 @@
 
             document.getElementById('menuBtn').addEventListener('click', openMobileMenu);
         });
+
+        window.addEventListener('beforeunload', cleanup);
+        window.addEventListener('pagehide', cleanup);
     </script>
 </body>
 </html>

@@ -377,11 +377,32 @@
                     </div>
 
                     <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
-                        <h3 class="text-white font-semibold mb-4 flex items-center">
-                            <span class="mr-2">📊</span> 排行榜
+                        <h3 class="text-white font-semibold mb-4 flex items-center justify-between">
+                            <span class="flex items-center">
+                                <span class="mr-2">📊</span> 排行榜
+                            </span>
+                            <span id="leaderboardStats" class="text-xs text-gray-400"></span>
                         </h3>
-                        <div id="leaderboard" class="space-y-3 max-h-80 overflow-y-auto">
+                        <div id="leaderboard" class="space-y-3 max-h-64 overflow-y-auto">
                             <div class="text-center text-gray-400 py-4">加载中...</div>
+                        </div>
+                        <div id="pagination" class="mt-4 flex items-center justify-center space-x-2">
+                            <button id="prevPage" class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                上一页
+                            </button>
+                            <div class="flex items-center space-x-1">
+                                <span id="currentPage" class="text-white text-sm">1</span>
+                                <span class="text-gray-400 text-sm">/</span>
+                                <span id="totalPages" class="text-gray-400 text-sm">1</span>
+                            </div>
+                            <button id="nextPage" class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                                下一页
+                            </button>
+                            <select id="pageSizeSelect" class="ml-2 px-2 py-1 text-sm bg-gray-700 text-white rounded-lg border border-gray-600">
+                                <option value="10">10/页</option>
+                                <option value="20">20/页</option>
+                                <option value="50">50/页</option>
+                            </select>
                         </div>
                     </div>
 
@@ -805,6 +826,25 @@
                 document.getElementById('opponentBattleTeam').innerHTML = '<div class="text-gray-500 text-center py-8">请选择对手</div>';
                 document.getElementById('challengeBtn').disabled = true;
                 loadLeaderboard();
+            });
+            
+            // 分页事件监听
+            document.getElementById('prevPage').addEventListener('click', function() {
+                if (currentPage > 1) {
+                    loadLeaderboard(currentPage - 1, pageSize);
+                }
+            });
+            
+            document.getElementById('nextPage').addEventListener('click', function() {
+                if (currentPage < totalPages) {
+                    loadLeaderboard(currentPage + 1, pageSize);
+                }
+            });
+            
+            document.getElementById('pageSizeSelect').addEventListener('change', function(e) {
+                pageSize = parseInt(e.target.value);
+                currentPage = 1;
+                loadLeaderboard(1, pageSize);
             });
             
             setupEventListeners();
@@ -1633,11 +1673,18 @@
         // 暴露给 inline onclick
         window.claimSeasonReward = claimSeasonRewardHandler;
 
-            async function loadLeaderboard() {
+            let currentPage = 1;
+        let totalPages = 1;
+        let totalPlayers = 0;
+        let pageSize = 10;
+
+        async function loadLeaderboard(page = 1, size = pageSize) {
             try {
                 const topPlayers = [];
-                let players = [];
-                let scores = [];
+                const startRank = (page - 1) * size + 1;
+                
+                pageSize = size;
+                currentPage = page;
                 
                 // 获取当前赛季ID
                 let currentSeasonId;
@@ -1648,48 +1695,45 @@
                     currentSeasonId = 1;
                 }
                 
+                let useMockData = false;
+                let paginationResult = null;
+                
                 try {
-                    const result = await arenaContract.methods.getTopPlayers(currentSeasonId, 20).call();
-                    players = result.playerAddrs || result.players || [];
-                    scores = result.scores || [];
+                    paginationResult = await arenaContract.methods.getLeaderboardByPage(currentSeasonId, page, size).call();
+                    totalPages = parseInt(paginationResult.totalPages) || 1;
+                    totalPlayers = parseInt(paginationResult.totalPlayers) || 0;
                 } catch (e) {
-                    console.log('获取排行榜失败，使用模拟数据:', e);
+                    console.log('获取分页排行榜失败，使用模拟数据:', e);
+                    useMockData = true;
                 }
                 
-                if (players.length > 0) {
-                    const leaderboardEntries = [];
+                document.getElementById('totalPages').textContent = totalPages;
+                document.getElementById('currentPage').textContent = page;
+                document.getElementById('leaderboardStats').textContent = `共 ${totalPlayers} 名玩家`;
+                
+                // 更新分页按钮状态
+                document.getElementById('prevPage').disabled = page <= 1;
+                document.getElementById('nextPage').disabled = page >= totalPages;
+                
+                if (!useMockData && paginationResult && paginationResult.entries && paginationResult.entries.length > 0) {
+                    const entries = paginationResult.entries;
                     
-                    for (let i = 0; i < players.length; i++) {
-                        if (players[i] === '0x0000000000000000000000000000000000000000') continue;
+                    for (let i = 0; i < entries.length; i++) {
+                        const entry = entries[i];
+                        const address = entry.playerAddress;
+                        if (address === '0x0000000000000000000000000000000000000000') continue;
                         
-                        let playerRecord = null;
-                        try {
-                            playerRecord = await arenaContract.methods.getPlayerRecord(players[i]).call();
-                        } catch (e) {}
-                        
-                        const points = playerRecord ? parseInt(playerRecord[0] || '1000') : parseInt(scores[i] || '1000');
-                        const wins = playerRecord ? parseInt(playerRecord[1] || '0') : 0;
-                        const losses = playerRecord ? parseInt(playerRecord[2] || '0') : 0;
+                        const points = parseInt(entry.points || '0');
+                        const wins = parseInt(entry.wins || '0');
+                        const losses = parseInt(entry.losses || '0');
                         const isMock = points >= 10000;
+                        const rank = startRank + i;
                         
-                        leaderboardEntries.push({
-                            address: players[i],
-                            points: points,
-                            wins: wins,
-                            losses: losses,
-                            isMock: isMock
-                        });
-                    }
-                    
-                    leaderboardEntries.sort((a, b) => b.points - a.points);
-                    
-                    for (let i = 0; i < leaderboardEntries.length; i++) {
-                        const entry = leaderboardEntries[i];
                         let team = [];
                         
-                        if (!entry.isMock) {
+                        if (!isMock) {
                             try {
-                                const teamTokens = await arenaContract.methods.getPlayerBattleTeam(entry.address).call();
+                                const teamTokens = await arenaContract.methods.getPlayerBattleTeam(address).call();
                                 for (const tokenId of teamTokens) {
                                     if (tokenId && tokenId !== '0' && tokenId !== 0) {
                                         try {
@@ -1719,26 +1763,34 @@
                         }
                         
                         topPlayers.push({
-                            address: entry.address,
-                            points: entry.points,
-                            wins: entry.wins,
-                            losses: entry.losses,
-                            rank: i + 1,
-                            isMock: entry.isMock,
+                            address: address,
+                            points: points,
+                            wins: wins,
+                            losses: losses,
+                            rank: rank,
+                            isMock: isMock,
                             team: team
                         });
                     }
                 } else {
-                    for (let i = 0; i < 10; i++) {
-                        const opponent = mockOpponents[i % mockOpponents.length];
+                    totalPages = 10;
+                    totalPlayers = 100;
+                    document.getElementById('totalPages').textContent = totalPages;
+                    document.getElementById('leaderboardStats').textContent = `共 ${totalPlayers} 名玩家`;
+                    
+                    for (let i = 0; i < size; i++) {
+                        const globalIndex = (page - 1) * size + i;
+                        if (globalIndex >= 100) break;
+                        
+                        const opponent = mockOpponents[globalIndex % mockOpponents.length];
                         topPlayers.push({
-                            address: `0x${(1234 + i).toString(16).padStart(8, '0')}...${(5678 + i).toString(16).padStart(4, '0')}`,
-                            points: 15000 - i * 1500,
-                            wins: 45 - i * 3,
-                            losses: 12 + i * 2,
-                            rank: i + 1,
+                            address: `0x${(1234 + globalIndex).toString(16).padStart(8, '0')}...${(5678 + globalIndex).toString(16).padStart(4, '0')}`,
+                            points: Math.max(1000, 15000 - globalIndex * 150),
+                            wins: Math.max(1, 45 - Math.floor(globalIndex / 2) * 3),
+                            losses: 12 + Math.floor(globalIndex / 3) * 2,
+                            rank: globalIndex + 1,
                             isMock: true,
-                            mockIndex: i % mockOpponents.length,
+                            mockIndex: globalIndex % mockOpponents.length,
                             team: opponent.team
                         });
                     }
@@ -1746,55 +1798,16 @@
                 
                 document.getElementById('leaderboard').dataset.leaderboardData = JSON.stringify(topPlayers);
                 
-                // 获取当前用户的排名（如果不在前20名）
+                // 获取当前用户的排名
                 if (account) {
                     try {
                         const userRank = await arenaContract.methods.getPlayerRank(account).call();
                         const userRankNum = parseInt(userRank) || 0;
-                        const userInTop20 = topPlayers.some(p => p.address.toLowerCase() === account.toLowerCase());
                         
-                        // 如果用户不在前20名，添加用户排名信息
-                        if (userRankNum > 0 && !userInTop20) {
+                        if (userRankNum > 0) {
                             const myStats = await arenaContract.methods.getPlayerRecord(account).call();
                             const userPoints = parseInt(myStats[0] || '0');
-                            const userWins = parseInt(myStats[1] || '0');
-                            const userLosses = parseInt(myStats[2] || '0');
                             
-                            // 添加分隔线和用户排名
-                            const userRankInfo = {
-                                address: account,
-                                points: userPoints,
-                                wins: userWins,
-                                losses: userLosses,
-                                rank: userRankNum,
-                                isMock: false,
-                                isCurrentUser: true,
-                                team: []
-                            };
-                            
-                            // 在适当位置插入用户排名
-                            let insertIndex = topPlayers.length;
-                            for (let i = 0; i < topPlayers.length; i++) {
-                                if (userPoints > topPlayers[i].points) {
-                                    insertIndex = i;
-                                    break;
-                                }
-                            }
-                            
-                            // 只在用户排名接近前20时显示（前后5名）
-                            if (insertIndex < 25) {
-                                topPlayers.splice(insertIndex, 0, userRankInfo);
-                                // 更新排名
-                                for (let i = 0; i < topPlayers.length; i++) {
-                                    topPlayers[i].rank = i + 1;
-                                }
-                                // 如果超过25个，只显示用户和前20
-                                if (topPlayers.length > 21) {
-                                    topPlayers = topPlayers.slice(0, 20);
-                                }
-                            }
-                            
-                            // 显示用户排名提示
                             const myRankDiv = document.getElementById('myRankDisplay');
                             if (myRankDiv) {
                                 myRankDiv.innerHTML = `当前排名: <span class="text-yellow-400 font-bold">#${userRankNum}</span> | 积分: ${userPoints}`;

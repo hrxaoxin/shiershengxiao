@@ -105,10 +105,18 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
-    function setupEventListeners() {
-        if (!window.ethereum) return;
+    let isEventListenersSetup = false;
+    let ethereumEventHandlers = {
+        accountsChanged: null,
+        chainChanged: null,
+        disconnect: null
+    };
 
-        window.ethereum.on('accountsChanged', function(accounts) {
+    function setupEventListeners() {
+        if (!window.ethereum || isEventListenersSetup) return;
+        isEventListenersSetup = true;
+
+        ethereumEventHandlers.accountsChanged = function(accounts) {
             if (accounts.length === 0) {
                 account = null;
                 isInitialized = false;
@@ -124,22 +132,36 @@ window.ZODIAC_WEB3 = (function() {
                     emit('accountsChanged', [account]);
                 }
             }
-        });
+        };
 
-        window.ethereum.on('chainChanged', function(chainId) {
+        ethereumEventHandlers.chainChanged = function(chainId) {
             web3 = new window.Web3(window.ethereum);
             contracts = {};
             initContracts();
             checkNetwork();
             emit('chainChanged', { chainId });
-        });
+        };
 
-        window.ethereum.on('disconnect', function() {
+        ethereumEventHandlers.disconnect = function() {
             account = null;
             isInitialized = false;
             contracts = {};
             emit('disconnect', {});
-        });
+        };
+
+        window.ethereum.on('accountsChanged', ethereumEventHandlers.accountsChanged);
+        window.ethereum.on('chainChanged', ethereumEventHandlers.chainChanged);
+        window.ethereum.on('disconnect', ethereumEventHandlers.disconnect);
+    }
+
+    function removeEventListeners() {
+        if (!window.ethereum) return;
+        
+        window.ethereum.removeListener('accountsChanged', ethereumEventHandlers.accountsChanged);
+        window.ethereum.removeListener('chainChanged', ethereumEventHandlers.chainChanged);
+        window.ethereum.removeListener('disconnect', ethereumEventHandlers.disconnect);
+        ethereumEventHandlers = { accountsChanged: null, chainChanged: null, disconnect: null };
+        isEventListenersSetup = false;
     }
 
     async function checkNetwork() {
@@ -312,6 +334,15 @@ window.ZODIAC_WEB3 = (function() {
         try {
             const contract = await getContract('dividendManager');
             const receipt = await sendAndTrackTransaction(contract, 'claim', []);
+            
+            if (!receipt) {
+                throw new Error('[ZODIAC_WEB3] claimDividend returned no receipt');
+            }
+            
+            if (receipt.status === false) {
+                throw new Error('[ZODIAC_WEB3] claimDividend transaction failed');
+            }
+            
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] claimDividend failed:', e);
@@ -428,6 +459,49 @@ window.ZODIAC_WEB3 = (function() {
             };
             return gasLimits[methodName] || 800000;
         }
+    }
+
+    function getGasLimit(methodName) {
+        const gasLimits = {
+            'mint': 2000000,
+            'mintBatch': 5000000,
+            'stake': 1500000,
+            'unstake': 1500000,
+            'rechargeChallengeAttempts': 300000,
+            'challengeMockPlayer': 800000,
+            'challengeRealPlayer': 1000000,
+            'listNFT': 300000,
+            'buyNFT': 400000,
+            'delistNFT': 300000,
+            'upgradeWithToken': 1500000,
+            'upgradeWithNFT': 2000000,
+            'upgradeWithUSDValue': 1500000,
+            'createSelfBreedingPair': 2000000,
+            'createMarketBreedingPairPublic': 2500000,
+            'completeBreeding': 1500000,
+            'cancelBreeding': 800000,
+            'listForMarketBreeding': 500000,
+            'delistFromMarketBreeding': 500000,
+            'claimReward': 200000,
+            'claimDividend': 200000,
+            'stakeTokens': 300000,
+            'unstakeTokens': 300000,
+            'claimRewards': 200000,
+            'claimTokenStakingReward': 200000,
+            'approve': 100000,
+            'burnAndMint': 2000000,
+            'burnAndMintTen': 5000000,
+            'burnAndMintTargeted': 5000000,
+            'stakeArenaNFTs': 2000000,
+            'unstakeArenaNFTs': 1500000,
+            'clearBattleTeam': 500000,
+            'claimSeasonReward': 200000,
+            'claimStakingReward': 200000,
+            'claimStakingRewardBatch': 400000,
+            'setNFTApprovalForAll': 150000,
+            'listNFTBatch': 500000
+        };
+        return gasLimits[methodName] || 800000;
     }
 
     // --- Event Listening ---
@@ -608,8 +682,26 @@ window.ZODIAC_WEB3 = (function() {
         for (let i = 0; i < maxAttempts; i++) {
             try {
                 const receipt = await web3.eth.getTransactionReceipt(txHash);
-                if (receipt) return receipt;
-            } catch (e) {}
+                if (receipt) {
+                    if (receipt.status === false) {
+                        throw new Error(`Transaction ${txHash} failed (reverted)`);
+                    }
+                    return receipt;
+                }
+                
+                const tx = await web3.eth.getTransaction(txHash);
+                if (tx && tx.blockNumber === null && i > maxAttempts / 2) {
+                    const gasPrice = await web3.eth.getGasPrice();
+                    if (tx.gasPrice && web3.utils.toBN(tx.gasPrice).lt(web3.utils.toBN(gasPrice).mul(web3.utils.toBN(2)))) {
+                        console.warn(`[ZODIAC_WEB3] Transaction ${txHash} may be stuck (low gas price)`);
+                    }
+                }
+            } catch (e) {
+                if (e.message && e.message.includes('cancelled')) {
+                    throw new Error(`Transaction ${txHash} was cancelled by user`);
+                }
+                console.warn(`[ZODIAC_WEB3] Error checking transaction ${txHash}:`, e.message);
+            }
             
             if (i < maxAttempts - 1) {
                 await new Promise(resolve => setTimeout(resolve, intervalMs));
@@ -700,23 +792,30 @@ window.ZODIAC_WEB3 = (function() {
         if (!error) return '交易失败';
         
         const message = error.message || error.toString();
+        const lowerMessage = message.toLowerCase();
         
-        if (message.includes('user rejected') || message.includes('User rejected')) {
+        if (lowerMessage.includes('user rejected') || lowerMessage.includes('user denied')) {
             return '用户取消了操作';
         }
         
-        if (message.includes('insufficient funds') || message.includes('Insufficient funds')) {
+        if (lowerMessage.includes('insufficient funds')) {
             return '余额不足';
         }
         
-        if (message.includes('gas') || message.includes('Gas')) {
-            if (message.includes('exceeds block gas limit')) {
+        if (lowerMessage.includes('gas')) {
+            if (lowerMessage.includes('exceeds block gas limit')) {
                 return 'Gas限制不足，请尝试增加Gas';
+            }
+            if (lowerMessage.includes('price too low') || lowerMessage.includes('underpriced')) {
+                return 'Gas价格过低，请提高Gas价格';
+            }
+            if (lowerMessage.includes('out of gas')) {
+                return 'Gas不足，交易失败';
             }
             return 'Gas费用不足';
         }
         
-        if (message.includes('reverted')) {
+        if (lowerMessage.includes('reverted')) {
             const match = message.match(/reason:\s*['"]?([^'"]+)['"]?/i);
             if (match && match[1]) {
                 const reason = match[1].trim();
@@ -732,12 +831,24 @@ window.ZODIAC_WEB3 = (function() {
             return '交易失败：合约执行异常';
         }
         
-        if (message.includes('underpriced')) {
-            return 'Gas价格过低，请提高Gas价格';
+        if (lowerMessage.includes('timeout') || lowerMessage.includes('time out')) {
+            return '交易超时，请重试';
         }
         
-        if (message.includes('timeout')) {
-            return '交易超时，请重试';
+        if (lowerMessage.includes('connection') || lowerMessage.includes('network')) {
+            return '网络连接异常，请检查网络';
+        }
+        
+        if (lowerMessage.includes('invalid') || lowerMessage.includes('invalid address')) {
+            return '无效的地址';
+        }
+        
+        if (lowerMessage.includes('approve') && lowerMessage.includes('allowance')) {
+            return '授权额度不足，请先授权';
+        }
+        
+        if (lowerMessage.includes('contract') && lowerMessage.includes('not found')) {
+            return '合约地址未配置或不存在';
         }
         
         return message.length > 100 ? message.substring(0, 100) + '...' : message;
@@ -1153,6 +1264,7 @@ window.ZODIAC_WEB3 = (function() {
         startEventCleanup,
         stopEventCleanup,
         cleanupOrphanedListeners,
+        removeEventListeners,
 
         // Network
         isCorrectNetwork,

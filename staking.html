@@ -994,7 +994,7 @@
                 document.getElementById('currentReleaseRatio').textContent = releaseRatio + '%';
 
                 document.getElementById('tokenStakeBtn').disabled = false;
-                document.getElementById('tokenUnstakeBtn').disabled = stakedAmount == 0;
+                document.getElementById('tokenUnstakeBtn').disabled = parsedStakeInfo.amount == 0;
                 document.getElementById('claimTokenRewardsBtn').disabled = parseFloat(claimableBNB) <= 0;
             } catch (error) {
                 console.error('加载代币质押信息失败:', error);

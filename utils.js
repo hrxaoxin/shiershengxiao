@@ -67,10 +67,74 @@ window.ZODIAC_UTILS = (function() {
 
     /** 获取星级字符串 */
     function getStars(level) {
+        if (level === null || level === undefined) return '';
         const lv = parseInt(level, 10);
-        if (isNaN(lv) || lv <= 0) return '';
-        return '⭐'.repeat(Math.min(lv, 5));
+        if (isNaN(lv) || !isFinite(lv) || lv <= 0) return '';
+        return '⭐'.repeat(Math.min(Math.max(lv, 0), 5));
     }
+
+    /**
+     * 输入验证工具
+     */
+    const Validation = {
+        isPositiveInteger(value) {
+            const num = parseInt(value, 10);
+            return !isNaN(num) && isFinite(num) && num > 0 && num === Math.floor(num);
+        },
+
+        isNonNegativeInteger(value) {
+            const num = parseInt(value, 10);
+            return !isNaN(num) && isFinite(num) && num >= 0 && num === Math.floor(num);
+        },
+
+        isPositiveNumber(value) {
+            const num = parseFloat(value);
+            return !isNaN(num) && isFinite(num) && num > 0;
+        },
+
+        isValidAddress(address) {
+            if (!address) return false;
+            return /^0x[a-fA-F0-9]{40}$/.test(address);
+        },
+
+        isValidAmount(value, min = 0, max = null) {
+            const num = parseFloat(value);
+            if (isNaN(num) || !isFinite(num) || num < min) return false;
+            if (max !== null && num > max) return false;
+            return true;
+        },
+
+        isValidTokenId(tokenId) {
+            const id = parseInt(tokenId, 10);
+            return !isNaN(id) && isFinite(id) && id > 0;
+        },
+
+        validateMintCount(count) {
+            const num = parseInt(count, 10);
+            if (isNaN(num) || !isFinite(num)) return { valid: false, message: '数量必须是数字' };
+            if (num < 1) return { valid: false, message: '数量必须大于0' };
+            if (num > 10) return { valid: false, message: '单次铸造数量不能超过10' };
+            return { valid: true, message: '' };
+        },
+
+        validateStakeAmount(amount) {
+            const num = parseFloat(amount);
+            if (isNaN(num) || !isFinite(num)) return { valid: false, message: '金额必须是数字' };
+            if (num <= 0) return { valid: false, message: '金额必须大于0' };
+            return { valid: true, message: '' };
+        },
+
+        validateTeamSize(tokenIds) {
+            if (!Array.isArray(tokenIds)) return { valid: false, message: '战队必须是数组' };
+            if (tokenIds.length !== 6) return { valid: false, message: '战队必须包含6个NFT' };
+            const uniqueIds = [...new Set(tokenIds)];
+            if (uniqueIds.length !== 6) return { valid: false, message: '战队中不能有重复的NFT' };
+            for (const id of tokenIds) {
+                if (!this.isValidTokenId(id)) return { valid: false, message: `无效的NFT ID: ${id}` };
+            }
+            return { valid: true, message: '' };
+        }
+    };
 
     /** 格式化地址显示 */
     function formatAddress(address) {
@@ -150,6 +214,7 @@ window.ZODIAC_UTILS = (function() {
         formatNumber,
         getElementColor,
         getElementCardClass,
+        Validation,
         ZODIAC_NAMES,
         ATTR_NAMES,
         ATTR_PREFIXES,

@@ -3,6 +3,52 @@
  * 提供 Toast 通知、Loading 遮罩、钱包按钮绑定、事件系统等 UI 功能
  */
 window.ZODIAC_UI = (function() {
+    // --- Global Error Handling ---
+    let isGlobalErrorHandlerInitialized = false;
+
+    function initGlobalErrorHandler() {
+        if (isGlobalErrorHandlerInitialized) return;
+        isGlobalErrorHandlerInitialized = true;
+
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error('[ZODIAC_UI] Global error caught:', {
+                message,
+                source,
+                lineno,
+                colno,
+                error
+            });
+            
+            if (error && error.message) {
+                if (error.message.includes('cancelled') || error.message.includes('User rejected')) {
+                    showToast('用户取消了操作', 'info');
+                } else {
+                    showToast('发生错误: ' + error.message.substring(0, 50), 'error');
+                }
+            } else {
+                showToast('发生未知错误', 'error');
+            }
+            
+            return true;
+        };
+
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('[ZODIAC_UI] Unhandled promise rejection:', event.reason);
+            
+            if (event.reason && event.reason.message) {
+                if (event.reason.message.includes('cancelled') || event.reason.message.includes('User rejected')) {
+                    showToast('用户取消了操作', 'info');
+                } else {
+                    showToast('发生错误: ' + event.reason.message.substring(0, 50), 'error');
+                }
+            } else {
+                showToast('发生未知错误', 'error');
+            }
+            
+            event.preventDefault();
+        });
+    }
+
     // --- Event System ---
     const listeners = {};
 
@@ -26,8 +72,9 @@ window.ZODIAC_UI = (function() {
     // --- Toast ---
     let toastTimer = null;
 
-    function showToast(message, type) {
+    function showToast(message, type, duration) {
         type = type || 'info';
+        duration = duration || 3000;
         let toast = document.getElementById('zodiacToast');
         if (!toast) {
             toast = document.createElement('div');
@@ -42,7 +89,7 @@ window.ZODIAC_UI = (function() {
         if (toastTimer) clearTimeout(toastTimer);
         toastTimer = setTimeout(function() {
             toast.classList.remove('toast-active');
-        }, 3000);
+        }, duration);
     }
 
     // --- Loading ---
@@ -189,6 +236,76 @@ window.ZODIAC_UI = (function() {
         document.body.removeChild(textarea);
     }
 
+    function showConfirmModal(title, message) {
+        return new Promise(function(resolve) {
+            let modal = document.getElementById('zodiacConfirmModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'zodiacConfirmModal';
+                modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">${title}</h3>
+                        <p class="text-gray-600 mb-6">${message}</p>
+                        <div class="flex space-x-3">
+                            <button id="confirmCancelBtn" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
+                                取消
+                            </button>
+                            <button id="confirmOkBtn" class="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                                确认
+                            </button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+
+            const cancelBtn = modal.querySelector('#confirmCancelBtn');
+            const okBtn = modal.querySelector('#confirmOkBtn');
+
+            const handleCancel = function() {
+                modal.style.display = 'none';
+                cancelBtn.removeEventListener('click', handleCancel);
+                okBtn.removeEventListener('click', handleOk);
+                resolve(false);
+            };
+
+            const handleOk = function() {
+                modal.style.display = 'none';
+                cancelBtn.removeEventListener('click', handleCancel);
+                okBtn.removeEventListener('click', handleOk);
+                resolve(true);
+            };
+
+            cancelBtn.addEventListener('click', handleCancel);
+            okBtn.addEventListener('click', handleOk);
+            modal.style.display = 'flex';
+        });
+    }
+
+    function handleContractError(error, actionName) {
+        let errorMsg = actionName + '失败';
+        if (error.code === 4001) {
+            errorMsg = '用户取消了操作';
+        } else if (error.message) {
+            const msg = error.message.toLowerCase();
+            if (msg.includes('insufficient funds')) {
+                errorMsg = '余额不足';
+            } else if (msg.includes('reverted')) {
+                errorMsg = '合约执行失败';
+            } else if (msg.includes('gas')) {
+                errorMsg = 'Gas不足或Gas价格过低';
+            } else {
+                errorMsg += ': ' + error.message.substring(0, 100);
+            }
+        }
+        showToast(errorMsg, 'error');
+    }
+
+    function handleError(error, actionName) {
+        handleContractError(error, actionName);
+    }
+
     return {
         on,
         off,
@@ -198,6 +315,10 @@ window.ZODIAC_UI = (function() {
         hideLoading,
         initWalletButton,
         showConfirmation,
-        copyToClipboard
+        copyToClipboard,
+        showConfirmModal,
+        handleContractError,
+        handleError,
+        initGlobalErrorHandler
     };
 })();

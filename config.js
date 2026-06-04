@@ -155,11 +155,14 @@ window.ZODIAC_CONFIG = (function() {
     }
 
     const CONTRACT_ADDRESS_CATEGORIES = {
-        core: ['nftMint', 'tokenContract', 'battle'],
+        core: ['nftMint', 'tokenContract', 'battle', 'nftData'],
         staking: ['staking', 'tokenStaking'],
         trading: ['nftTrading', 'breeding'],
         rewards: ['rewardManager', 'dividendManager', 'poolManager'],
-        system: ['authorizer', 'weightManager', 'tokenBurner']
+        system: ['authorizer', 'weightManager', 'tokenBurner'],
+        arena: ['arena', 'battleHistory', 'battleSkillData'],
+        oracle: ['priceOracle'],
+        upgrade: ['nftUpdate']
     };
 
     function validateContractAddresses() {
@@ -556,6 +559,9 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"getPendingRewards","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"getPlayerRank","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"limit","type":"uint256"}],"name":"getLeaderboard","outputs":[{"components":[{"internalType":"address","name":"playerAddress","type":"address"},{"internalType":"uint256","name":"points","type":"uint256"},{"internalType":"uint256","name":"wins","type":"uint256"},{"internalType":"uint256","name":"losses","type":"uint256"},{"internalType":"bool","name":"isMock","type":"bool"}],"internalType":"struct ArenaRanking.LeaderboardEntry[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"seasonId","type":"uint256"},{"internalType":"uint256","name":"page","type":"uint256"},{"internalType":"uint256","name":"pageSize","type":"uint256"}],"name":"getLeaderboardByPage","outputs":[{"components":[{"internalType":"address","name":"playerAddress","type":"address"},{"internalType":"uint256","name":"points","type":"uint256"},{"internalType":"uint256","name":"wins","type":"uint256"},{"internalType":"uint256","name":"losses","type":"uint256"},{"internalType":"bool","name":"isMock","type":"bool"}],"internalType":"struct ArenaRanking.LeaderboardEntry[]","name":"entries","type":"tuple[]"},{"internalType":"uint256","name":"totalPages","type":"uint256"},{"internalType":"uint256","name":"totalPlayers","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"seasonId","type":"uint256"},{"internalType":"uint256","name":"pageSize","type":"uint256"}],"name":"getLeaderboardPageCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"seasonId","type":"uint256"}],"name":"getTotalPlayersInSeason","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"seasonId","type":"uint256"},{"internalType":"uint256","name":"count","type":"uint256"}],"name":"getTopPlayers","outputs":[{"internalType":"address[]","name":"playerAddrs","type":"address[]"},{"internalType":"uint256[]","name":"scores","type":"uint256[]"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"getPlayerBattleTeam","outputs":[{"internalType":"uint256[6]","name":"","type":"uint256[6]"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"getRemainingAttempts","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
