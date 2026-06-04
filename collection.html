@@ -604,7 +604,7 @@
             document.getElementById('modalCardImage').style.filter = isOwned ? 'none' : 'grayscale(100%)';
             document.getElementById('modalCardName').textContent = nftInfo.name;
             document.getElementById('modalCardDesc').textContent = desc;
-            document.getElementById('modalCardId').textContent = typeId + 1;
+            document.getElementById('modalCardId').textContent = `类型ID: ${typeId}`;
             
             const rarityBadge = document.getElementById('modalCardRarity');
             if (rarityBadge) {

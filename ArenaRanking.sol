@@ -24,6 +24,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 score;
         uint256 wins;
         uint256 losses;
+        uint256 draws;
         uint256 lastBattleTime;
         uint256 lastResetTime;
         uint256 remainingAttempts;
@@ -40,7 +41,8 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         bool isSettled;
         bool rewardCalculated;
         uint256 totalPlayers;
-        uint256 rewardPool;
+        uint256 rewardPool; // 通用奖励池，根据rewardType使用
+        uint256 tokenRewardPool; // ERC20代币奖励池（备用）
         uint256 pendingRewards;
     }
 
@@ -92,6 +94,13 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     address public nftContract;
     address public tokenContract;
     
+    /**
+     * @dev 奖励类型：0 = BNB, 1 = ERC20代币
+     */
+    uint8 public rewardType = 1;
+    
+    event RewardTypeUpdated(uint8 oldType, uint8 newType);
+    
     uint256 public constant DAILY_ATTEMPTS = 3;
     uint256 public constant MAX_RECHARGE_ATTEMPTS = 50;
     uint256 public constant BATTLE_COOLDOWN = 60 seconds;
@@ -101,6 +110,13 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public constant MAX_LEADERBOARD_SIZE = 1000;
     uint256 public constant MAX_SEASONS_TO_KEEP = 20;
     uint256 public constant PRECISION = 10000;
+    
+    /**
+     * @dev Mock玩家地址的特殊前缀和后缀
+     * 格式: 0x000000000000000000000000000000000000DEAD
+     */
+    address public constant MOCK_PLAYER_PREFIX = address(0x0000000000000000000000000000000000000000);
+    address public constant MOCK_PLAYER_SUFFIX = address(0x000000000000000000000000000000000000DEAD);
     uint256 public maxRechargeAttempts = 10;
     uint256 public seasonRewardRate;
     mapping(address => uint256) public lastBattleTime;
@@ -176,13 +192,13 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         PlayerRecord storage record = players[player];
         record.lastResetTime = block.timestamp;
         record.remainingAttempts = DAILY_ATTEMPTS;
-        rechargeCount[player] = 0;
     }
 
     function _checkAndResetAttempts(address player) internal {
         PlayerRecord storage record = players[player];
         if (block.timestamp >= record.lastResetTime + 24 hours) {
             _resetAttempts(player);
+            rechargeCount[player] = 0;
         }
     }
 
@@ -200,17 +216,28 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         _validateTeamStaked(msg.sender, playerTeam);
 
-        (bool success_, uint256 winner) = IBattle(battleContract).challenge(
+        uint256 battleId = block.timestamp;
+        _lockNFTsForBattle(playerTeam, battleId);
+
+        try IBattle(battleContract).challenge(
             playerTeam[0],
             uint256(mockIndex + 1) * 1000,
             playerTeam,
             _generateMockTeam(mockIndex),
             address(0)
-        );
+        ) returns (bool success_, uint256 winner) {
+            if (winner == 1) {
+                _updateScore(msg.sender, true);
+            } else if (winner == 0) {
+                _updateScoreOnDraw(msg.sender);
+            }
+            emit ChallengeResult(msg.sender, address(0), winner == 1, currentSeasonId);
+            success = success_;
+        } finally {
+            _unlockNFTsFromBattle(playerTeam);
+        }
 
-        _updateScore(msg.sender, winner == 1);
-        emit ChallengeResult(msg.sender, address(0), winner == 1, currentSeasonId);
-        return success_;
+        return success;
     }
 
     function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external whenNotPaused returns (bool success) {
@@ -235,7 +262,9 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(block.timestamp >= lastBattleTime[msg.sender] + BATTLE_COOLDOWN, "ArenaRanking: Battle cooldown");
         require(block.timestamp >= lastBattleTime[challengedPlayer] + BATTLE_COOLDOWN, "ArenaRanking: Target in battle cooldown");
         challengerRecord.remainingAttempts--;
+        challengedRecord.remainingAttempts--;
         lastBattleTime[msg.sender] = block.timestamp;
+        lastBattleTime[challengedPlayer] = block.timestamp;
 
         _validateTeamStaked(msg.sender, playerTeam);
 
@@ -244,18 +273,35 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         
         _validateTeamStaked(challengedPlayer, challengedTeam);
 
-        (bool success_, uint256 winner) = IBattle(battleContract).challenge(
+        uint256 battleId = block.timestamp;
+        _lockNFTsForBattle(playerTeam, battleId);
+        _lockNFTsForBattle(challengedTeam, battleId);
+
+        try IBattle(battleContract).challenge(
             playerTeam[0],
             challengedTeam[0],
             playerTeam,
             challengedTeam,
             challengedPlayer
-        );
+        ) returns (bool success_, uint256 winner) {
+            if (winner == 1) {
+                _updateScore(msg.sender, true);
+                _updateScore(challengedPlayer, false);
+            } else if (winner == 2) {
+                _updateScore(msg.sender, false);
+                _updateScore(challengedPlayer, true);
+            } else {
+                _updateScoreOnDraw(msg.sender);
+                _updateScoreOnDraw(challengedPlayer);
+            }
+            emit ChallengeResult(msg.sender, challengedPlayer, winner == 1, currentSeasonId);
+            success = success_;
+        } finally {
+            _unlockNFTsFromBattle(playerTeam);
+            _unlockNFTsFromBattle(challengedTeam);
+        }
 
-        _updateScore(msg.sender, winner == 1);
-        _updateScore(challengedPlayer, winner == 2);
-        emit ChallengeResult(msg.sender, challengedPlayer, winner == 1, currentSeasonId);
-        return success_;
+        return success;
     }
 
     function _updateScore(address player, bool isWinner) internal {
@@ -269,6 +315,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             record.score = 1000;
             record.wins = 0;
             record.losses = 0;
+            record.draws = 0;
             record.lastBattleTime = block.timestamp;
             record.lastResetTime = block.timestamp;
             record.remainingAttempts = DAILY_ATTEMPTS;
@@ -288,6 +335,32 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         record.lastBattleTime = block.timestamp;
 
         _updateRanking(player, record.score);
+        emit ScoreUpdated(player, record.score, currentSeasonId);
+    }
+
+    function _updateScoreOnDraw(address player) internal {
+        SeasonInfo storage currentSeason = seasons[currentSeasonId];
+        require(currentSeason.isActive, "ArenaRanking: Season not active");
+
+        PlayerRecord storage record = players[player];
+        
+        if (record.seasonId != currentSeasonId) {
+            record.seasonId = currentSeasonId;
+            record.score = 1000;
+            record.wins = 0;
+            record.losses = 0;
+            record.draws = 0;
+            record.lastBattleTime = block.timestamp;
+            record.lastResetTime = block.timestamp;
+            record.remainingAttempts = DAILY_ATTEMPTS;
+            seasonRankings[currentSeasonId].push(player);
+            playerRankIndex[currentSeasonId][player] = seasonRankings[currentSeasonId].length - 1;
+            currentSeason.totalPlayers++;
+        }
+
+        record.draws++;
+        record.lastBattleTime = block.timestamp;
+        
         emit ScoreUpdated(player, record.score, currentSeasonId);
     }
 
@@ -526,6 +599,17 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         maxRechargeAttempts = _limit;
         emit RechargeLimitUpdated(_limit);
     }
+    
+    /**
+     * @dev 设置奖励类型（仅合约所有者）
+     * @param _rewardType 0 = BNB, 1 = ERC20代币
+     */
+    function setRewardType(uint8 _rewardType) external onlyOwner {
+        require(_rewardType == 0 || _rewardType == 1, "ArenaRanking: Invalid reward type");
+        uint8 oldType = rewardType;
+        rewardType = _rewardType;
+        emit RewardTypeUpdated(oldType, _rewardType);
+    }
 
     function startNewSeason() external onlyAuthorized {
         _tryStartNewSeason();
@@ -595,8 +679,20 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         SeasonInfo storage season = seasons[seasonId];
         if (season.rewardCalculated) return;
         
-        uint256 contractBalance = address(this).balance;
-        uint256 availableBalance = contractBalance - season.pendingRewards;
+        uint256 availableBalance = 0;
+        if (rewardType == 0) {
+            // BNB奖励
+            uint256 contractBalance = address(this).balance;
+            uint256 totalPendingRewards = _getTotalPendingRewards();
+            availableBalance = contractBalance > totalPendingRewards ? contractBalance - totalPendingRewards : 0;
+        } else {
+            // ERC20代币奖励
+            require(tokenContract != address(0), "ArenaRanking: Token contract not set");
+            IERC20 token = IERC20(tokenContract);
+            uint256 contractBalance = token.balanceOf(address(this));
+            uint256 totalPendingRewards = _getTotalPendingRewards();
+            availableBalance = contractBalance > totalPendingRewards ? contractBalance - totalPendingRewards : 0;
+        }
         
         season.rewardPool = availableBalance * rewardRate / PRECISION;
         
@@ -649,8 +745,27 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return rank;
     }
     
+    /**
+     * @dev 检查是否是Mock玩家（使用特殊地址范围
+     * Mock玩家地址格式为: 0x000000000000000000000000000000000000DEAD + index
+     */
     function _isMockPlayer(address player) internal pure returns (bool) {
-        return player > address(0) && player < address(1000);
+        // Mock玩家地址必须在特殊范围内：
+        // 前缀: 0x000000000000000000000000000000000000DEAD 
+        // 到: 0x000000000000000000000000000000000000DEAD + 999
+        return uint256(uint160(player)) >= 0x000000000000000000000000000000000000DEAD && 
+               uint256(uint160(player)) <= 0x000000000000000000000000000000000000DEAD + 999;
+    }
+    
+    /**
+     * @dev 获取所有赛季的待支付奖励总额
+     */
+    function _getTotalPendingRewards() internal view returns (uint256) {
+        uint256 totalPending = 0;
+        for (uint256 i = 1; i <= currentSeasonId; i++) {
+            totalPending += seasons[i].pendingRewards;
+        }
+        return totalPending;
     }
     
     function claimReward(uint256 seasonNumber) external nonReentrant {
@@ -674,11 +789,18 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         // 更新待领取额度
         seasons[seasonNumber].pendingRewards -= reward;
 
-        // 检查合约余额是否足够支付当前用户的奖励
-        require(address(this).balance >= reward, "ArenaRanking: Insufficient contract balance");
-
-        (bool success, ) = payable(msg.sender).call{value: reward}("");
-        require(success, "ArenaRanking: BNB transfer failed");
+        if (rewardType == 0) {
+            // BNB奖励
+            require(address(this).balance >= reward, "ArenaRanking: Insufficient BNB balance");
+            (bool success, ) = payable(msg.sender).call{value: reward}("");
+            require(success, "ArenaRanking: BNB transfer failed");
+        } else {
+            // ERC20代币奖励
+            require(tokenContract != address(0), "ArenaRanking: Token contract not set");
+            IERC20 token = IERC20(tokenContract);
+            require(token.balanceOf(address(this)) >= reward, "ArenaRanking: Insufficient token balance");
+            token.safeTransfer(msg.sender, reward);
+        }
         
         emit RewardClaimed(msg.sender, reward, seasonNumber);
     }

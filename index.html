@@ -407,9 +407,9 @@
                             <li>• 代币交易时扣除3%作为税收</li>
                             <li>• 1.0%进入分红池，按权重分配给NFT持有者</li>
                             <li>• 1.0%用于销毁代币实现通缩</li>
-                            <li>• 0.5%兑换成代币进入NFT质押矿池，用于挖矿产出</li>
+                            <li>• 0.4%兑换成代币进入NFT质押矿池，用于挖矿产出</li>
                             <li>• 0.3%用于竞技场排名奖励</li>
-                            <li>• 0.2%进入代币质押矿池，用于挖矿产出</li>
+                            <li>• 0.3%进入代币质押矿池，用于挖矿产出</li>
                         </ul>
                     </div>
                     <div class="bg-white/10 p-6 rounded-xl backdrop-blur-md">
@@ -591,46 +591,63 @@
         async function loadFenHongData() {
             const account = ZODIAC_WEB3.getAccount();
             
+            // 初始化默认值
+            document.getElementById('totalPool').textContent = '--';
+            document.getElementById('distributed').textContent = '--';
+            document.getElementById('unclaimedDividend').textContent = '--';
+            document.getElementById('holders').textContent = '--';
+            document.getElementById('userWeight').textContent = '--';
+            
             if (!account) {
-                document.getElementById('totalPool').textContent = '--';
-                document.getElementById('distributed').textContent = '--';
-                document.getElementById('unclaimedDividend').textContent = '--';
-                document.getElementById('holders').textContent = '--';
-                document.getElementById('userWeight').textContent = '--';
                 return;
             }
 
             try {
-                const rewardManager = await ZODIAC_WEB3.getContract('rewardManager');
-
-                const dividendPoolAddr = await rewardManager.methods.dividendPool().call();
-                const tokenContractObj = await ZODIAC_WEB3.getContract('tokenContract');
-                const totalPoolWei = await tokenContractObj.methods.balanceOf(dividendPoolAddr).call();
-                const totalPool = web3.utils.fromWei(totalPoolWei, 'ether');
-                document.getElementById('totalPool').textContent = parseFloat(totalPool).toFixed(4);
-
-                let distributed = '0.0000';
-                try {
-                    const distributedWei = await rewardManager.methods.dividendPoolBalance().call();
-                    distributed = web3.utils.fromWei(distributedWei, 'ether');
-                } catch (e) {}
-                document.getElementById('distributed').textContent = parseFloat(distributed).toFixed(4);
-
-                document.getElementById('holders').textContent = '--';
-
-                const userDivResult = await rewardManager.methods.calcUserDividend(account).call();
-                const userDivWei = userDivResult['0'];
-                const userDiv = web3.utils.fromWei(userDivWei, 'ether');
-                document.getElementById('unclaimedDividend').textContent = parseFloat(userDiv).toFixed(4);
+                const dividendManager = await ZODIAC_WEB3.getContract('dividendManager');
+                if (!dividendManager) {
+                    console.error('DividendManager contract not available');
+                    return;
+                }
                 
-                // 加载用户权重
+                // 加载总池金额
                 try {
-                    const userWeight = await ZODIAC_WEB3.getUserWeight(account);
+                    const totalPoolWei = await dividendManager.methods.dividendPoolBalance().call();
+                    const totalPool = web3.utils.fromWei(totalPoolWei, 'ether');
+                    document.getElementById('totalPool').textContent = parseFloat(totalPool).toFixed(4);
+                } catch (e) {
+                    console.error('Failed to load total pool:', e);
+                }
+                
+                // 加载已分配金额 (暂用总池替代，因为没有直接的totalDistributed)
+                try {
+                    const totalPoolWei = await dividendManager.methods.dividendPoolBalance().call();
+                    const distributed = web3.utils.fromWei(totalPoolWei, 'ether');
+                    document.getElementById('distributed').textContent = parseFloat(distributed).toFixed(4);
+                } catch (e) {
+                    console.error('Failed to load distributed:', e);
+                }
+
+                // 加载待领取分红
+                try {
+                    const userDivResult = await dividendManager.methods.calcUserDividend(account).call();
+                    const userDivWei = userDivResult ? userDivResult['0'] : '0';
+                    const userDiv = web3.utils.fromWei(userDivWei, 'ether');
+                    document.getElementById('unclaimedDividend').textContent = parseFloat(userDiv).toFixed(4);
+                    
+                    // 同时加载用户权重 (从同一个结果中获取)
+                    const userWeight = userDivResult ? userDivResult['1'] : '0';
                     document.getElementById('userWeight').textContent = userWeight.toString();
                 } catch (e) {
-                    console.error('Load user weight failed:', e);
-                    document.getElementById('userWeight').textContent = '--';
+                    console.error('Failed to load user dividend:', e);
+                    // 备用方案：单独加载用户权重
+                    try {
+                        const userWeight = await dividendManager.methods.getUserWeight(account).call();
+                        document.getElementById('userWeight').textContent = userWeight.toString();
+                    } catch (e2) {
+                        console.error('Load user weight failed:', e2);
+                    }
                 }
+                
             } catch (error) {
                 console.error('Load dividend data failed:', error);
             }

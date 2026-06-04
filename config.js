@@ -127,6 +127,14 @@ window.ZODIAC_CONFIG = (function() {
         return defaultAddress;
     }
 
+    // DEX Router 配置（支持 FlapSwap、PancakeSwap、Uniswap）
+    const DEX_ROUTERS = {
+        flapswap: getEnvContractAddress('flapswapRouter', '0x1111111111111111111111111111111111111111'),
+        pancakeswap: getEnvContractAddress('pancakeswapRouter', '0x10ED43C718714eb63d5aA57B78B54704E256024E'),
+        uniswap: getEnvContractAddress('uniswapRouter', '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'),
+        wbnb: getEnvContractAddress('wbnb', '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c')
+    };
+
     // 示例合约地址配置 - 部署后请替换为真实地址
     const CONTRACT_ADDRESSES = {
         tokenContract: getEnvContractAddress('token', '0x1234567890abcdef1234567890abcdef12345678'),
@@ -729,7 +737,19 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[{"internalType":"uint256","name":"usdtAmount","type":"uint256"}],"name":"calculateTokenEquivalent","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"ethAmount","type":"uint256"}],"name":"calculateETHUSDTEquivalent","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"getPrecisionInfo","outputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[],"name":"isPriceValid","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"}
+            {"inputs":[],"name":"isPriceValid","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+            // DEX Related Functions
+            {"inputs":[],"name":"flapSwapRouter","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"pancakeSwapRouter","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"uniswapRouter","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"wbnb","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"activeDEX","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"autoPriceEnabled","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"address","name":"_flapSwapRouter","type":"address"},{"internalType":"address","name":"_pancakeSwapRouter","type":"address"},{"internalType":"address","name":"_uniswapRouter","type":"address"}],"name":"setDEXRouters","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint8","name":"_dexType","type":"uint8"}],"name":"setActiveDEX","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"bool","name":"enabled","type":"bool"}],"name":"setAutoPriceEnabled","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"fetchPriceFromDEX","outputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"fetchPriceFromAllDEX","outputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"}
         ],
         poolManagerABI: [
             {"inputs":[{"internalType":"address","name":"_authorizer","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},

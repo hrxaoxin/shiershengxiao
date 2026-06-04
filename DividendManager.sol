@@ -198,6 +198,16 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 上次同步时的合约代币余额（用于自动检测新增资金）
      */
     uint256 public lastSyncedBalance;
+    
+    /**
+     * @dev 自动同步的最小时间间隔（6小时）
+     */
+    uint256 public constant AUTO_SYNC_INTERVAL = 6 hours;
+    
+    /**
+     * @dev 最后一次自动同步的时间
+     */
+    uint256 public lastAutoSyncTime;
 
     /**
      * @dev 添加到分红池（手动指定金额）
@@ -224,6 +234,27 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         }
 
         lastSyncedBalance = currentBalance;
+        lastAutoSyncTime = block.timestamp;
+    }
+    
+    /**
+     * @dev 自动同步分红池（在用户操作时调用）
+     */
+    function _autoSyncDividendPool() internal {
+        if (tokenContract == address(0)) return;
+        
+        if (block.timestamp >= lastAutoSyncTime + AUTO_SYNC_INTERVAL) {
+            IERC20 token = IERC20(tokenContract);
+            uint256 currentBalance = token.balanceOf(address(this));
+
+            if (currentBalance > lastSyncedBalance) {
+                uint256 newFunds = currentBalance - lastSyncedBalance;
+                _addToDividendPool(newFunds);
+            }
+
+            lastSyncedBalance = currentBalance;
+            lastAutoSyncTime = block.timestamp;
+        }
     }
 
     /**
@@ -295,6 +326,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 领取分红
      */
     function claim() external nonReentrant whenNotPaused returns (uint256) {
+        _autoSyncDividendPool();
+        
         uint256 userWeight = userWeights[msg.sender];
         require(userWeight > 0, "DividendManager: No weight");
 
@@ -425,8 +458,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @param isAdd 是否增加权重（true=增加，false=减少）
      * @param element 元素类型（0-4对应水风火暗光）
      */
-    /** @dev 最小权重更新间隔（秒）- 防止频繁操作 */
-    uint256 public minWeightUpdateInterval = 10;
+    /** @dev 最小权重更新间隔（秒）- 防止频繁操作，默认60秒 */
+    uint256 public minWeightUpdateInterval = 60;
     
     /** @dev 用户上次权重更新时间 */
     mapping(address => uint256) public lastWeightUpdateTime;
@@ -491,29 +524,46 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 批量更新用户权重
+     * @dev 批量更新用户权重（原子性操作）
      */
     function updateUserWeightsBatch(
         address[] calldata users,
         uint256[] calldata weights
     ) external onlyOwner {
         require(users.length == weights.length, "DividendManager: Length mismatch");
-
-        for (uint256 i = 0; i < users.length; i++) {
+        
+        uint256 usersLength = users.length;
+        uint256[] memory pendingDividendUpdates = new uint256[](usersLength);
+        uint256[] memory oldWeights = new uint256[](usersLength);
+        uint256 totalWeightChange = 0;
+        
+        for (uint256 i = 0; i < usersLength; i++) {
+            address user = users[i];
+            uint256 newWeight = weights[i];
+            oldWeights[i] = userWeights[user];
+            
+            // 计算用户应结算的分红
+            if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
+                uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
+                pendingDividendUpdates[i] = userWeights[user] * cumulativeDiff / 1e18;
+            }
+            
+            totalWeightChange = totalWeightChange - userWeights[user] + newWeight;
+        }
+        
+        for (uint256 i = 0; i < usersLength; i++) {
             address user = users[i];
             uint256 newWeight = weights[i];
             
-            // 先结算用户当前未领取的分红
-            if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
-                uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-                uint256 pending = userWeights[user] * cumulativeDiff / 1e18;
-                pendingDividends[user] += pending;
+            if (pendingDividendUpdates[i] > 0) {
+                pendingDividends[user] += pendingDividendUpdates[i];
             }
             
-            totalWeight = totalWeight - userWeights[user] + newWeight;
             userWeights[user] = newWeight;
             userCumulativeSnapshots[user] = cumulativePerWeightDividend;
         }
+        
+        totalWeight = totalWeight + totalWeightChange;
     }
 
     /**

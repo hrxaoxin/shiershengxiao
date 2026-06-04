@@ -294,6 +294,17 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                 break;
             }
         }
+        
+        // 同步更新按类型分组的用户NFT列表
+        uint256 zodiacType = _getNFTType(tokenId);
+        uint256[] storage typeTokens = _userNFTsByType[user][zodiacType];
+        for (uint256 i = 0; i < typeTokens.length; i++) {
+            if (typeTokens[i] == tokenId) {
+                typeTokens[i] = typeTokens[typeTokens.length - 1];
+                typeTokens.pop();
+                break;
+            }
+        }
     }
 
     /**

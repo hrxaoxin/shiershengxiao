@@ -560,7 +560,7 @@
                     const mintedTokenIds = [];
                     const currentNextCardId = parseInt(await nftMintContract.methods.nextCardId().call(), 10);
                     for (let i = 0; i < 10; i++) {
-                        const tokenId = (currentNextCardId - 1 - i).toString();
+                        const tokenId = (currentNextCardId - 10 + i).toString();
                         const cardType = await nftMintContract.methods.tokenType(tokenId).call();
                         mintedTokenIds.push({ cardId: tokenId, cardType: cardType });
                     }

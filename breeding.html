@@ -1414,12 +1414,13 @@
 
         async function openJoinModal(orderId) {
             selectedJoinOrderId = orderId;
+            let orderValid = true;
             
             // 从链上获取挂单信息
             const listing = await breedingContract.methods.getMarketListing(orderId).call();
             if (!listing.isActive) {
                 ZODIAC_UI.showToast('订单不存在或已过期', 'error');
-                return;
+                orderValid = false;
             }
 
             // 链上验证：检查 NFT 是否仍属于原卖家
@@ -1428,10 +1429,16 @@
                 if (currentOwner.toLowerCase() !== listing.owner.toLowerCase()) {
                     ZODIAC_UI.showToast('NFT所属权已变更，订单已失效', 'warning');
                     await loadMarketOrders();
-                    return;
+                    orderValid = false;
                 }
             } catch (chainError) {
                 console.warn('链上验证订单失败:', chainError);
+                orderValid = false;
+            }
+            
+            // 如果验证失败，禁用按钮
+            if (!orderValid) {
+                document.getElementById('joinBreedingBtn').disabled = true;
             }
             
             const nftType = await nftContract.methods.tokenType(orderId).call();

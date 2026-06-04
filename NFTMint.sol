@@ -251,14 +251,19 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     function _generateSecureRandom() internal returns (uint256) {
         lastMintBlock = block.number;
         
-        require(mintCounter < type(uint256).max, "NFTMint: Mint counter overflow");
-        
         if (!mintCounterWarningTriggered && mintCounter > type(uint256).max - MINT_COUNTER_WARNING_THRESHOLD) {
             mintCounterWarningTriggered = true;
             emit MintCounterWarning(mintCounter);
         }
         
-        mintCounter++;
+        // 自动重置机制：当计数器接近最大值时自动重置为1
+        if (mintCounter >= type(uint256).max - MINT_COUNTER_WARNING_THRESHOLD) {
+            mintCounter = 1;
+            mintCounterWarningTriggered = false;
+        } else {
+            mintCounter++;
+        }
+        
         bytes32 entropy = keccak256(
             abi.encodePacked(
                 blockhash(block.number > 1 ? block.number - 1 : block.number),
@@ -272,6 +277,14 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             )
         );
         return uint256(entropy);
+    }
+    
+    /**
+     * @dev 手动重置铸造计数器（仅所有者）
+     */
+    function resetMintCounter() external onlyOwner {
+        mintCounter = 1;
+        mintCounterWarningTriggered = false;
     }
 
     function _generateGrowthValue(uint256 randomSeed) internal pure returns (uint8) {
@@ -566,7 +579,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     }
     
     function setRareTypeThreshold(uint256 _threshold) external onlyOwner {
-        require(_threshold <= 120, "NFTMint: Invalid threshold");
+        require(_threshold >= 60 && _threshold <= 120, "NFTMint: Invalid threshold (must be 60-120)");
         rareTypeThreshold = _threshold;
     }
 
