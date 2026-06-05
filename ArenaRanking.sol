@@ -1415,7 +1415,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
                 points: record.score,
                 wins: record.wins,
                 losses: record.losses,
-                isMock: false
+                isMock: _isMockPlayer(player)
             });
             entryIndex++;
         }

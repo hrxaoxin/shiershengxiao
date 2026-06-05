@@ -648,4 +648,32 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param hidden 是否隐藏
      */
     event USDUpgradeHiddenChanged(bool hidden);
+    
+    /**
+     * @dev 紧急提取BNB（仅限合约所有者）
+     * @param amount 提取金额
+     */
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+        require(amount > 0, "NFTUpdate: Amount must be > 0");
+        require(amount <= address(this).balance, "NFTUpdate: Insufficient BNB balance");
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        require(success, "NFTUpdate: BNB transfer failed");
+        emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
+    }
+
+    /**
+     * @dev 紧急提取代币（仅限合约所有者）
+     * @param amount 提取金额
+     */
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+        require(amount > 0, "NFTUpdate: Amount must be > 0");
+        require(tokenContract != address(0), "NFTUpdate: Token contract not set");
+        IToken token = IToken(tokenContract);
+        require(token.balanceOf(address(this)) >= amount, "NFTUpdate: Insufficient token balance");
+        require(token.transfer(owner(), amount), "NFTUpdate: Token transfer failed");
+        emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
+    }
+
+    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 }
