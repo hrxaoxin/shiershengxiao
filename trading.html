@@ -295,8 +295,9 @@
         let allListings = [];
         let supportsPaginatedAPI = null;
         let pageCache = {};
-        let cacheTimestamp = {};
+        let pageCacheTimestamp = {};
         let lazyLoadObserver = null;
+        let originalListings = [];
 
         function initLazyLoading() {
             if (lazyLoadObserver) {
@@ -589,18 +590,10 @@
             }
         }
 
-        let marketplaceCache = null;
-        let cacheTimestamp = 0;
-        const CACHE_DURATION = 30000;
-
-        function clearMarketplaceCache() {
-            marketplaceCache = null;
-            cacheTimestamp = 0;
-        }
-
         function getCacheAge() {
-            if (!cacheTimestamp) return '无缓存';
-            const seconds = Math.floor((Date.now() - cacheTimestamp) / 1000);
+            const timestamp = pageCacheTimestamp[currentPage] || 0;
+            if (!timestamp) return '无缓存';
+            const seconds = Math.floor((Date.now() - timestamp) / 1000);
             if (seconds < 60) return `${seconds}秒前`;
             const minutes = Math.floor(seconds / 60);
             return `${minutes}分钟前`;
@@ -646,16 +639,15 @@
                 
                 const now = Date.now();
                 
-                if (!forceRefresh && pageCache[currentPage] && (now - (cacheTimestamp[currentPage] || 0)) < CACHE_DURATION) {
-                    allListings = pageCache[currentPage];
-                    displayMarketplaceListings(allListings);
+                if (!forceRefresh && pageCache[currentPage] && (now - (pageCacheTimestamp[currentPage] || 0)) < CACHE_DURATION) {
+                    displayMarketplaceListings(pageCache[currentPage]);
                     updateCacheStatus();
                     return;
                 }
                 
                 if (forceRefresh) {
                     pageCache = {};
-                    cacheTimestamp = {};
+                    pageCacheTimestamp = {};
                 }
                 
                 const listedTokenIds = await nftTradingContract.methods.getListedNFTs().call();
@@ -664,7 +656,7 @@
                 if (listedTokenIds.length === 0) {
                     allListings = [];
                     pageCache[currentPage] = [];
-                    cacheTimestamp[currentPage] = Date.now();
+                    pageCacheTimestamp[currentPage] = Date.now();
                     updatePagination();
                     displayMarketplaceListings([]);
                     return;
@@ -695,9 +687,11 @@
                     }
                 }
                 
+                allListings = listings;
+                originalListings = listings;
                 updatePagination();
                 pageCache[currentPage] = listings;
-                cacheTimestamp[currentPage] = Date.now();
+                pageCacheTimestamp[currentPage] = Date.now();
                 updateCacheStatus();
                 displayMarketplaceListings(listings);
             } catch (error) {
@@ -795,18 +789,18 @@
         function filterMarketplace() {
             const filterType = document.getElementById('filterType').value;
             
-            if (!allListings || allListings.length === 0) {
+            if (!originalListings || originalListings.length === 0) {
                 loadMarketplace();
                 return;
             }
             
-            let filteredListings = [...allListings];
+            let filteredListings = [...originalListings];
             
             if (filterType !== 'all') {
                 const attrIndexes = { water: 0, wind: 1, fire: 2, dark: 3, light: 4 };
                 const targetAttrIndex = attrIndexes[filterType];
                 if (targetAttrIndex !== undefined) {
-                    filteredListings = allListings.filter(item => {
+                    filteredListings = originalListings.filter(item => {
                         const typeId = parseInt(item.type, 10);
                         const itemAttrIndex = Math.floor(typeId / 24);
                         return itemAttrIndex === targetAttrIndex;
@@ -870,7 +864,8 @@
                 
                 ZODIAC_UI.showToast('购买成功！', 'success');
                 document.getElementById('buyModal').classList.add('hidden');
-                marketplaceCache = null;
+                pageCache = {};
+                pageCacheTimestamp = {};
                 await loadMarketplace();
             } catch (error) {
                 let errorMsg = '购买失败';
@@ -971,8 +966,8 @@
                 userNftCache = null;
                 document.getElementById('listingPrice').value = '';
                 await loadUserNftsForListing();
-                marketplaceCache = null;
-                cacheTimestamp = 0;
+                pageCache = {};
+                pageCacheTimestamp = {};
                 await loadMarketplace();
                 await loadMyListings();
             } catch (error) {
@@ -1083,8 +1078,8 @@
                 await ZODIAC_WEB3.delistNFT(tokenId);
 
                 ZODIAC_UI.showToast('取消成功！', 'success');
-                marketplaceCache = null;
-                cacheTimestamp = 0;
+                pageCache = {};
+                pageCacheTimestamp = {};
                 await loadMarketplace();
                 await loadMyListings();
             } catch (error) {
@@ -1192,7 +1187,7 @@
             document.getElementById('selectedNftInfo').classList.remove('hidden');
             document.getElementById('selectedNftIcon').innerHTML = `<img src="${imagePath}" alt="${nftInfo.name}" class="w-full h-full object-cover rounded-lg" onerror="this.parentElement.innerHTML='<span class=\\'text-3xl\\'>🐾</span>';">`;
             document.getElementById('selectedNftName').textContent = nftInfo.name;
-            document.getElementById('selectedNftId').textContent = `NFT #${tokenId} · 等级 ${nftInfo.level}`;
+            document.getElementById('selectedNftId').textContent = `NFT #${tokenId} · 等级 ${nft.level}`;
 
             document.querySelectorAll('.nft-card').forEach(card => {
                 if (parseInt(card.getAttribute('data-tokenid'), 10) === tokenId) {
