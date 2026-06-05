@@ -94,9 +94,12 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     uint256 public level2UpgradeCost = 40000 * 10**18;
     uint256 public level3UpgradeCost = 120000 * 10**18;
     uint256 public level4UpgradeCost = 480000 * 10**18;
+    
+    /** @dev USD价值升级方式是否隐藏（默认隐藏） */
+    bool public usdUpgradeHidden = true;
 
     /** @dev 存储间隙，用于合约升级兼容性 */
-    uint256[50] private __gap;
+    uint256[49] private __gap;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
@@ -259,6 +262,15 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         level2UpgradeCost = costs[1];
         level3UpgradeCost = costs[2];
         level4UpgradeCost = costs[3];
+    }
+
+    /**
+     * @dev 设置USD价值升级方式的显示/隐藏状态
+     * @param hidden 是否隐藏（true=隐藏，false=显示）
+     */
+    function setUSDUpgradeHidden(bool hidden) external onlyOwner {
+        usdUpgradeHidden = hidden;
+        emit USDUpgradeHiddenChanged(hidden);
     }
 
     /**
@@ -630,4 +642,10 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param timestamp 时间戳
      */
     event PriceUpdated(uint256 price, uint256 timestamp);
+    
+    /**
+     * @dev USD价值升级方式显示/隐藏状态变更事件
+     * @param hidden 是否隐藏
+     */
+    event USDUpgradeHiddenChanged(bool hidden);
 }

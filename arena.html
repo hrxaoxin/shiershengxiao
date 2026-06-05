@@ -269,6 +269,9 @@
                                             积分模式
                                         </div>
                                     </div>
+                                    <div id="modeControlDisplay" class="text-xs text-gray-400 text-center mb-2">
+                                        固定模式
+                                    </div>
                                     <button id="challengeBtn" class="w-full btn-primary text-white font-semibold py-2 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled>
                                         发起挑战
                                     </button>
@@ -476,8 +479,8 @@
                         <div>• 前排3张，后排3张</div>
                         <div>• 优先攻击同排对手</div>
                         <div>• 前排全阵亡后攻击后排</div>
-                        <div>• 积分模式：战斗增减积分</div>
-                        <div>• 排名挑战：3局2胜换排名</div>
+                        <div>• <span class="text-blue-400">积分模式</span>：挑战成功/失败根据排名动态增减积分</div>
+                        <div>• <span class="text-purple-400">挑战模式</span>：挑战成功直接替换排名，失败排名不变</div>
                         <div>• <span class="text-green-400">每天免费3次挑战机会</span></div>
                         <div>• <span class="text-orange-400">销毁888代币可充值3次挑战机会</span></div>
                         <div>• <span class="text-yellow-400">战队NFT需质押，战斗期间不可转移</span></div>
@@ -957,12 +960,24 @@
             arenaUnsubscribeFunctions = [];
         }
 
-        function updateCurrentModeDisplay(mode) {
-            const modeText = mode === 0 ? '积分模式' : '排名挑战';
+        function updateCurrentModeDisplay(mode, controlType) {
+            const modeText = mode === 0 ? '积分模式' : '挑战模式';
             const modeColor = mode === 0 ? 'blue' : 'purple';
             document.getElementById('currentModeDisplay').textContent = modeText;
             document.getElementById('currentModeDisplay').className = `flex-1 py-2 px-3 rounded-lg border border-${modeColor}-500/50 bg-${modeColor}-500/10 text-${modeColor}-400 text-sm text-center font-medium`;
             document.getElementById('battleModeText').textContent = modeText;
+            
+            const controlTypeText = getControlTypeText(controlType);
+            document.getElementById('modeControlDisplay').textContent = controlTypeText;
+        }
+
+        function getControlTypeText(type) {
+            switch(type) {
+                case 0: return '固定模式';
+                case 1: return '随机模式';
+                case 2: return '轮换模式';
+                default: return '未知模式';
+            }
         }
 
         async function connectWallet() {
@@ -982,6 +997,7 @@
                     await loadMyTeam();
                     await loadRemainingAttempts();
                     await loadRewardPool();
+                    await loadArenaMode();
                 } catch (error) {
                     console.error('连接钱包失败:', error);
                     ZODIAC_UI.showToast('连接钱包失败: ' + (error.message || '未知错误'), 'error');
@@ -1495,6 +1511,16 @@
                 document.getElementById('remainingAttempts').textContent = attempts;
             } catch (error) {
                 console.error('加载挑战次数失败:', error);
+            }
+        }
+
+        async function loadArenaMode() {
+            try {
+                const mode = await arenaContract.methods.arenaMode().call();
+                const controlType = await arenaContract.methods.modeControlType().call();
+                updateCurrentModeDisplay(parseInt(mode, 10), parseInt(controlType, 10));
+            } catch (error) {
+                console.error('加载竞技场模式失败:', error);
             }
         }
 

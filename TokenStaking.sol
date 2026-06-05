@@ -17,10 +17,10 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     /** @dev 基础奖励比例（万分比，默认100 = 1%） */
     uint256 public rewardRate = 100;
-    /** @dev 最大奖励比例（万分比，默认100 = 1%） */
-    uint256 public maxRewardRate = 100;
-    /** @dev 每次上调比例（万分比，1 = 0.01%） */
-    uint256 public rateStep = 1;
+    /** @dev 最大奖励比例（万分比，默认200 = 2%） */
+    uint256 public maxRewardRate = 200;
+    /** @dev 每次上调比例（万分比，10 = 0.1%） */
+    uint256 public rateStep = 10;
     /** @dev 最小质押锁定时间（30分钟） */
     uint256 public constant MIN_STAKING_DURATION = 30 minutes;
     /** @dev 最大总质押数量（无限制） */

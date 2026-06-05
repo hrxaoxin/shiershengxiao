@@ -6,6 +6,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 
 
 /**
@@ -31,6 +32,14 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256[] battleTeam;
         bool hasTeam;
         uint256 seasonId;
+    }
+
+    struct MockPlayerInfo {
+        uint256[6] team;
+        uint256 score;
+        uint256 level;
+        uint256 growth;
+        uint256[] elementCounts;
     }
 
     struct SeasonInfo {
@@ -101,8 +110,35 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     uint8 public rewardType = 1;
     
+    /**
+     * @dev 竞技场模式：0 = 积分模式, 1 = 挑战模式（默认）
+     */
+    uint8 public arenaMode = 1;
+    
+    /**
+     * @dev 模式控制类型：
+     * 0 = 固定模式（使用arenaMode）
+     * 1 = 随机模式（每个赛季随机选择）
+     * 2 = 轮换模式（积分模式和挑战模式交替）
+     */
+    uint8 public modeControlType = 0;
+    
+    /**
+     * @dev 上一个赛季使用的模式（用于轮换模式）
+     */
+    uint8 public lastSeasonMode = 1;
+    
+    /**
+     * @dev Mock玩家奖励接收地址
+     */
+    address public mockRewardRecipient;
+    
     event RewardTypeUpdated(uint8 oldType, uint8 newType);
     event RewardRateUpdated(uint256 oldRate, uint256 newRate);
+    event ArenaModeUpdated(uint8 oldMode, uint8 newMode);
+    event ModeControlTypeUpdated(uint8 oldType, uint8 newType);
+    event MockRewardRecipientUpdated(address oldAddress, address newAddress);
+    event MockRewardDistributed(address indexed recipient, uint256 amount, uint256 seasonId);
     
     uint256 public constant DAILY_ATTEMPTS = 3;
     uint256 public constant MAX_RECHARGE_ATTEMPTS = 50;
@@ -113,6 +149,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public constant MAX_LEADERBOARD_SIZE = type(uint256).max;
     uint256 public constant MAX_SEASONS_TO_KEEP = 20;
     uint256 public constant PRECISION = 10000;
+    uint256 public constant MAX_MOCK_RANKING = 100;
     
     /**
      * @dev 每日流入奖励追踪（用于动态调整奖励率）
@@ -184,6 +221,41 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         seasonRewardRate = rate; 
     }
 
+    function setArenaMode(uint8 mode) external onlyOwner {
+        require(mode == 0 || mode == 1, "ArenaRanking: Invalid mode (0 or 1)");
+        uint8 oldMode = arenaMode;
+        arenaMode = mode;
+        emit ArenaModeUpdated(oldMode, mode);
+    }
+
+    function setMockRewardRecipient(address recipient) external onlyOwner {
+        require(recipient != address(0), "ArenaRanking: Invalid recipient");
+        address oldRecipient = mockRewardRecipient;
+        mockRewardRecipient = recipient;
+        emit MockRewardRecipientUpdated(oldRecipient, recipient);
+    }
+
+    function setModeControlType(uint8 controlType) external onlyOwner {
+        require(controlType <= 2, "ArenaRanking: Invalid control type (0-2)");
+        uint8 oldType = modeControlType;
+        modeControlType = controlType;
+        emit ModeControlTypeUpdated(oldType, controlType);
+    }
+
+    function configureArenaMode(uint8 controlType, uint8 preferredMode) external onlyOwner {
+        require(controlType <= 2, "ArenaRanking: Invalid control type (0-2)");
+        require(preferredMode == 0 || preferredMode == 1, "ArenaRanking: Invalid mode (0 or 1)");
+        
+        uint8 oldControlType = modeControlType;
+        uint8 oldMode = arenaMode;
+        
+        modeControlType = controlType;
+        arenaMode = preferredMode;
+        
+        emit ModeControlTypeUpdated(oldControlType, controlType);
+        emit ArenaModeUpdated(oldMode, preferredMode);
+    }
+
     modifier onlyAuthorized() {
         require(msg.sender == owner() || msg.sender == authorizer, "ArenaRanking: Not authorized");
         _;
@@ -215,7 +287,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external whenNotPaused returns (bool success) {
         require(nftContract != address(0), "ArenaRanking: NFT contract not set");
         require(battleContract != address(0), "ArenaRanking: Battle contract not set");
-        require(mockIndex < 10, "ArenaRanking: Invalid mock player index");
+        require(mockIndex < MAX_MOCK_RANKING, "ArenaRanking: Invalid mock player index");
         require(block.timestamp >= lastBattleTime[msg.sender] + BATTLE_COOLDOWN, "ArenaRanking: Battle cooldown");
 
         PlayerRecord storage record = players[msg.sender];
@@ -229,16 +301,28 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 battleId = block.timestamp;
         _lockNFTsForBattle(playerTeam, battleId);
 
+        uint256[6] memory mockTeam = _generateMockTeam(mockIndex);
+
         try IBattle(battleContract).challenge(
             playerTeam[0],
             uint256(mockIndex + 1) * 1000,
             playerTeam,
-            _generateMockTeam(mockIndex),
+            mockTeam,
             address(0)
         ) returns (bool success_, uint256 winner) {
             if (winner == 1) {
-                _updateScore(msg.sender, true);
-            } else if (winner == 0) {
+                if (arenaMode == 0) {
+                    _updateScorePointsMode(msg.sender, true, mockIndex);
+                } else {
+                    _updateScoreChallengeMode(msg.sender, true, mockIndex);
+                }
+            } else if (winner == 2) {
+                if (arenaMode == 0) {
+                    _updateScorePointsMode(msg.sender, false, mockIndex);
+                } else {
+                    _updateScoreChallengeMode(msg.sender, false, mockIndex);
+                }
+            } else {
                 _updateScoreOnDraw(msg.sender);
             }
             emit ChallengeResult(msg.sender, address(0), winner == 1, currentSeasonId);
@@ -346,6 +430,110 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         _updateRanking(player, record.score);
         emit ScoreUpdated(player, record.score, currentSeasonId);
+    }
+
+    function _updateScorePointsMode(address player, bool isWinner, uint256 mockIndex) internal {
+        SeasonInfo storage currentSeason = seasons[currentSeasonId];
+        require(currentSeason.isActive, "ArenaRanking: Season not active");
+
+        PlayerRecord storage record = players[player];
+        
+        if (record.seasonId != currentSeasonId) {
+            record.seasonId = currentSeasonId;
+            record.score = 1000;
+            record.wins = 0;
+            record.losses = 0;
+            record.draws = 0;
+            record.lastBattleTime = block.timestamp;
+            record.lastResetTime = block.timestamp;
+            record.remainingAttempts = DAILY_ATTEMPTS;
+            seasonRankings[currentSeasonId].push(player);
+            playerRankIndex[currentSeasonId][player] = seasonRankings[currentSeasonId].length - 1;
+            currentSeason.totalPlayers++;
+        }
+
+        uint256 points = _calculateDynamicPoints(mockIndex);
+
+        if (isWinner) {
+            record.score += points;
+            record.wins++;
+        } else {
+            if (record.score > points) record.score -= points;
+            else record.score = 0;
+            record.losses++;
+        }
+        record.lastBattleTime = block.timestamp;
+
+        _updateRanking(player, record.score);
+        emit ScoreUpdated(player, record.score, currentSeasonId);
+    }
+
+    function _updateScoreChallengeMode(address player, bool isWinner, uint256 mockIndex) internal {
+        SeasonInfo storage currentSeason = seasons[currentSeasonId];
+        require(currentSeason.isActive, "ArenaRanking: Season not active");
+
+        PlayerRecord storage record = players[player];
+        
+        if (record.seasonId != currentSeasonId) {
+            record.seasonId = currentSeasonId;
+            record.score = 1000;
+            record.wins = 0;
+            record.losses = 0;
+            record.draws = 0;
+            record.lastBattleTime = block.timestamp;
+            record.lastResetTime = block.timestamp;
+            record.remainingAttempts = DAILY_ATTEMPTS;
+            currentSeason.totalPlayers++;
+        }
+
+        if (isWinner) {
+            _insertPlayerAtRank(player, mockIndex);
+            record.wins++;
+        } else {
+            record.losses++;
+        }
+        record.lastBattleTime = block.timestamp;
+        record.score = 1000 + record.wins * 25 - record.losses * 10;
+        
+        emit ScoreUpdated(player, record.score, currentSeasonId);
+    }
+
+    function _calculateDynamicPoints(uint256 mockIndex) internal pure returns (uint256) {
+        if (mockIndex == 0) return 50;
+        if (mockIndex <= 2) return 40;
+        if (mockIndex <= 5) return 30;
+        if (mockIndex <= 10) return 25;
+        if (mockIndex <= 20) return 20;
+        if (mockIndex <= 50) return 15;
+        return 10;
+    }
+
+    function _insertPlayerAtRank(address player, uint256 targetRank) internal {
+        uint256 seasonId = currentSeasonId;
+        address[] storage rankings = seasonRankings[seasonId];
+        
+        uint256 currentIndex = playerRankIndex[seasonId][player];
+        
+        if (currentIndex > 0) {
+            for (uint256 i = rankings.length; i > currentIndex; i--) {
+                rankings[i] = rankings[i - 1];
+                playerRankIndex[seasonId][rankings[i]] = i;
+            }
+            rankings.pop();
+            playerRankIndex[seasonId][player] = 0;
+        }
+        
+        if (targetRank >= rankings.length) {
+            rankings.push(player);
+            playerRankIndex[seasonId][player] = rankings.length - 1;
+        } else {
+            for (uint256 i = rankings.length; i > targetRank; i--) {
+                rankings[i] = rankings[i - 1];
+                playerRankIndex[seasonId][rankings[i]] = i;
+            }
+            rankings[targetRank] = player;
+            playerRankIndex[seasonId][player] = targetRank;
+        }
     }
 
     function _updateScoreOnDraw(address player) internal {
@@ -461,14 +649,69 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public constant MOCK_ID_OFFSET = 10000;
     uint256 public constant MOCK_ID_MULTIPLIER = 1000;
 
-    function _generateMockTeam(uint256 mockIndex) internal pure returns (uint256[TEAM_SIZE] memory) {
+    function _generateMockTeam(uint256 mockIndex) internal view returns (uint256[TEAM_SIZE] memory) {
         require(mockIndex < MAX_MOCK_PLAYERS, "ArenaRanking: Invalid mock index");
+        
         uint256[TEAM_SIZE] memory team;
         uint256 baseId = (mockIndex + MOCK_ID_OFFSET) * MOCK_ID_MULTIPLIER;
+        
+        uint256 level = _calculateMockLevel(mockIndex);
+        uint256 growth = _calculateMockGrowth(mockIndex);
+        uint256 rareCount = _calculateRareElementCount(mockIndex);
+        
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
-            team[i] = baseId + i + 1;
+            uint256 element = i < rareCount ? _getRareElement(i) : _getCommonElement(i);
+            uint256 zodiac = (mockIndex + i) % 12;
+            uint256 gender = i % 2;
+            
+            uint256 zodiacType = element * 24 + zodiac * 2 + gender;
+            
+            team[i] = baseId + zodiacType;
         }
+        
         return team;
+    }
+
+    function _calculateMockLevel(uint256 mockIndex) internal pure returns (uint256) {
+        if (mockIndex == 0) return 5;
+        if (mockIndex <= 4) return 5;
+        if (mockIndex <= 9) return 4;
+        if (mockIndex <= 19) return 4;
+        if (mockIndex <= 39) return 3;
+        if (mockIndex <= 69) return 2;
+        return 1;
+    }
+
+    function _calculateMockGrowth(uint256 mockIndex) internal pure returns (uint256) {
+        if (mockIndex == 0) return 80;
+        if (mockIndex <= 4) return 78;
+        if (mockIndex <= 9) return 72;
+        if (mockIndex <= 19) return 66;
+        if (mockIndex <= 39) return 58;
+        if (mockIndex <= 69) return 48;
+        if (mockIndex <= 99) return 38;
+        return 28;
+    }
+
+    function _calculateRareElementCount(uint256 mockIndex) internal pure returns (uint256) {
+        if (mockIndex == 0) return 6;
+        if (mockIndex <= 2) return 5;
+        if (mockIndex <= 4) return 4;
+        if (mockIndex <= 7) return 3;
+        if (mockIndex <= 11) return 3;
+        if (mockIndex <= 17) return 2;
+        if (mockIndex <= 24) return 2;
+        if (mockIndex <= 34) return 1;
+        if (mockIndex <= 49) return 1;
+        return 0;
+    }
+
+    function _getRareElement(uint256 index) internal pure returns (uint256) {
+        return index % 2 == 0 ? 3 : 4;
+    }
+
+    function _getCommonElement(uint256 index) internal pure returns (uint256) {
+        return index % 3;
     }
 
     function stakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
@@ -584,11 +827,9 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function rechargeChallengeAttempts() external whenNotPaused {
         require(tokenContract != address(0), "ArenaRanking: Token contract not set");
-        require(rechargeCount[msg.sender] < maxRechargeAttempts, "ArenaRanking: Max recharge limit reached");
 
         PlayerRecord storage record = players[msg.sender];
         uint256 newAttempts = RECHARGE_ATTEMPTS;
-        require(record.remainingAttempts + newAttempts <= MAX_RECHARGE_ATTEMPTS, "ArenaRanking: Would exceed max attempts");
 
         uint256 burnAmount = RECHARGE_COST * 1e18;
         IERC20 token = IERC20(tokenContract);
@@ -640,6 +881,15 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function _startNewSeason() internal {
         currentSeasonId++;
+        
+        if (modeControlType == 1) {
+            uint256 rand = uint256(keccak256(abi.encodePacked(block.timestamp, currentSeasonId, tx.gasprice))) % 2;
+            arenaMode = uint8(rand);
+        } else if (modeControlType == 2) {
+            arenaMode = lastSeasonMode == 0 ? 1 : 0;
+            lastSeasonMode = arenaMode;
+        }
+        
         seasons[currentSeasonId] = SeasonInfo({
             seasonId: currentSeasonId,
             startTime: block.timestamp,
@@ -740,6 +990,19 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         
         uint256 totalPlayers = seasonRankings[seasonId].length;
         uint256 totalRealPlayers = _countRealPlayers(seasonId);
+        uint256 mockRewardTotal = 0;
+        
+        for (uint256 i = 0; i < totalPlayers; i++) {
+            address player = seasonRankings[seasonId][i];
+            
+            if (_isMockPlayer(player)) {
+                uint256 rank = i + 1;
+                uint256 reward = _calculateRankReward(rank, season.rewardPool, totalPlayers);
+                mockRewardTotal += reward;
+            }
+        }
+        
+        uint256 realPlayerRewardPool = season.rewardPool - mockRewardTotal;
         uint256 totalDistributed = 0;
         
         for (uint256 i = 0; i < totalPlayers; i++) {
@@ -750,9 +1013,19 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             }
             
             uint256 rank = _getRealPlayerRank(seasonId, i);
-            uint256 reward = _calculateRankReward(rank, season.rewardPool, totalRealPlayers);
+            uint256 reward = _calculateRankReward(rank, realPlayerRewardPool, totalRealPlayers);
             playerSeasonRewards[seasonId][player] = reward;
             totalDistributed += reward;
+        }
+        
+        if (mockRewardTotal > 0 && mockRewardRecipient != address(0)) {
+            if (rewardType == 0) {
+                (bool success, ) = payable(mockRewardRecipient).call{value: mockRewardTotal}("");
+                require(success, "ArenaRanking: Mock reward transfer failed");
+            } else {
+                IERC20(tokenContract).safeTransfer(mockRewardRecipient, mockRewardTotal);
+            }
+            emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonId);
         }
         
         season.pendingRewards += totalDistributed;
@@ -1095,7 +1368,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
                 points: record.score,
                 wins: record.wins,
                 losses: record.losses,
-                isMock: false
+                isMock: _isMockPlayer(player)
             });
         }
         return entries;
@@ -1240,11 +1513,24 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 totalReward = season.rewardPool;
         require(totalReward > 0, "ArenaRanking: No reward in pool");
         
+        uint256 totalPlayers = rankings.length;
         uint256 totalRealPlayers = _countRealPlayers(seasonNumber);
-        uint256 distributed = 0;
-        uint256 maxRank = rankings.length;
+        uint256 mockRewardTotal = 0;
         
-        for (uint256 i = 0; i < maxRank; i++) {
+        for (uint256 i = 0; i < totalPlayers; i++) {
+            address player = rankings[i];
+            
+            if (_isMockPlayer(player)) {
+                uint256 rank = i + 1;
+                uint256 reward = _calculateRankReward(rank, totalReward, totalPlayers);
+                mockRewardTotal += reward;
+            }
+        }
+        
+        uint256 realPlayerRewardPool = totalReward - mockRewardTotal;
+        uint256 distributed = 0;
+        
+        for (uint256 i = 0; i < totalPlayers; i++) {
             address player = rankings[i];
             
             if (_isMockPlayer(player)) {
@@ -1252,10 +1538,21 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             }
             
             uint256 rank = _getRealPlayerRank(seasonNumber, i);
-            uint256 rankReward = _calculateRankReward(rank, totalReward, totalRealPlayers);
+            uint256 rankReward = _calculateRankReward(rank, realPlayerRewardPool, totalRealPlayers);
             
             playerSeasonRewards[seasonNumber][player] = rankReward;
             distributed += rankReward;
+        }
+        
+        if (mockRewardTotal > 0 && mockRewardRecipient != address(0)) {
+            if (rewardType == 0) {
+                (bool success, ) = payable(mockRewardRecipient).call{value: mockRewardTotal}("");
+                require(success, "ArenaRanking: Mock reward transfer failed");
+            } else {
+                require(tokenContract != address(0), "ArenaRanking: Token contract not set");
+                IERC20(tokenContract).safeTransfer(mockRewardRecipient, mockRewardTotal);
+            }
+            emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonNumber);
         }
         
         season.pendingRewards += distributed;
@@ -1468,6 +1765,34 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             cooldownRemaining = playerLastBattleTime + BATTLE_COOLDOWN - block.timestamp;
         }
     }
+
+    /**
+     * @dev 紧急提取BNB（仅限合约所有者）
+     * @param amount 提取金额
+     */
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+        require(amount > 0, "ArenaRanking: Amount must be > 0");
+        require(amount <= address(this).balance, "ArenaRanking: Insufficient BNB balance");
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        require(success, "ArenaRanking: BNB transfer failed");
+        emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
+    }
+
+    /**
+     * @dev 紧急提取代币（仅限合约所有者）
+     * @param amount 提取金额
+     */
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+        require(amount > 0, "ArenaRanking: Amount must be > 0");
+        require(tokenContract != address(0), "ArenaRanking: Token contract not set");
+        IERC20 token = IERC20(tokenContract);
+        require(token.balanceOf(address(this)) >= amount, "ArenaRanking: Insufficient token balance");
+        require(token.transfer(owner(), amount), "ArenaRanking: Token transfer failed");
+        emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
+    }
+
+    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 }
 
 interface IBattle {

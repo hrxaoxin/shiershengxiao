@@ -169,7 +169,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     /**
      * @dev 滑点保护参数（千分比）
      */
-    uint256 public slippage = 50;  // 0.5%
+    uint256 public slippage = 100;  // 10%
     
     /**
      * @dev 当前活跃的DEX类型
@@ -286,7 +286,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 设置滑点保护
      */
     function setSlippage(uint256 _slippage) external onlyOwner {
-        require(_slippage <= 500, "RewardManager: Slippage too high (max 5%)");
+        require(_slippage <= 2000, "RewardManager: Slippage too high (max 20%)");
         slippage = _slippage;
     }
 
@@ -607,7 +607,6 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                 require(token.transfer(dividendPool, dividendAmount), "RewardManager: Dividend pool transfer failed");
                 // 同步 DividendManager 分红池，使转账的代币被正确计入分红计算
                 try IDividendManager(dividendPool).syncDividendPool() {} catch {}
-                emit RewardTransferFailed(0, dividendPool, dividendAmount);
             } catch {
                 emit RewardTransferFailed(0, dividendPool, dividendAmount);
             }

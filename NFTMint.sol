@@ -599,6 +599,45 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         emit Upgrade(ownerOf(tokenId), tokenId, oldLevel, uint8(newLevel));
     }
 
+    function mintAdmin(
+        address to,
+        uint256 element,
+        uint256 zodiac,
+        uint256 gender,
+        uint8 growth
+    ) external onlyOwner returns (uint256) {
+        require(to != address(0), "NFTMint: Cannot mint to zero address");
+        require(element < 5, "NFTMint: Invalid element (0-4)");
+        require(zodiac < 12, "NFTMint: Invalid zodiac (0-11)");
+        require(gender < 2, "NFTMint: Invalid gender (0-1)");
+        require(growth >= 10 && growth <= 100, "NFTMint: Invalid growth (10-100)");
+        
+        uint256 zodiacType = _calculateZodiacType(element, zodiac, gender);
+        uint256 tokenId = _nextCardId++;
+        _safeMint(to, tokenId);
+        tokenType[tokenId] = zodiacType;
+        tokenLevel[tokenId] = 1;
+        tokenGrowth[tokenId] = growth;
+        _syncNFTData(to, tokenId, zodiacType, 1, growth);
+        emit Mint(to, tokenId, zodiacType, growth);
+        return tokenId;
+    }
+
+    function mintForBreeding(address to, uint256 zodiacType, uint8 growth) external onlyAuthorized returns (uint256) {
+        require(to != address(0), "NFTMint: Cannot mint to zero address");
+        require(zodiacType < 120, "NFTMint: Invalid zodiac type");
+        require(growth >= 10 && growth <= 100, "NFTMint: Invalid growth (10-100)");
+        
+        uint256 tokenId = _nextCardId++;
+        _safeMint(to, tokenId);
+        tokenType[tokenId] = zodiacType;
+        tokenLevel[tokenId] = 1;
+        tokenGrowth[tokenId] = growth;
+        _syncNFTData(to, tokenId, zodiacType, 1, growth);
+        emit Mint(to, tokenId, zodiacType, growth);
+        return tokenId;
+    }
+
     function ownerOf(uint256 tokenId) public view override returns (address) {
         return super.ownerOf(tokenId);
     }

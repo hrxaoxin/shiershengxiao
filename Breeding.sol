@@ -446,8 +446,11 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         uint256 zodiacType = _getChildZodiacType(pair.fatherId, pair.motherId);
         require(zodiacType > 0, "Breeding: Invalid child zodiac type");
 
+        uint256 seed = uint256(keccak256(abi.encodePacked(block.timestamp, block.number, pairId, tx.gasprice)));
+        uint8 childGrowth = uint8((seed % 91) + 10);
+
         if (pair.breedingType == BREEDING_TYPE_SELF) {
-            uint256 childId = nft.mint(pair.femaleOwner, zodiacType);
+            uint256 childId = nft.mintForBreeding(pair.femaleOwner, zodiacType, childGrowth);
             require(childId > 0, "Breeding: NFT mint failed");
 
             pair.childId = childId;
@@ -470,10 +473,13 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
             emit BreedingCompleted(pairId, childId, zodiacType);
             return (childId, 0);
         } else {
-            uint256 childIdForFemale = nft.mint(pair.femaleOwner, zodiacType);
+            uint8 femaleChildGrowth = uint8((seed % 91) + 10);
+            uint8 maleChildGrowth = uint8(((seed + 1000) % 91) + 10);
+
+            uint256 childIdForFemale = nft.mintForBreeding(pair.femaleOwner, zodiacType, femaleChildGrowth);
             require(childIdForFemale > 0, "Breeding: Female child mint failed");
 
-            uint256 childIdForMale = nft.mint(pair.maleOwner, zodiacType);
+            uint256 childIdForMale = nft.mintForBreeding(pair.maleOwner, zodiacType, maleChildGrowth);
             require(childIdForMale > 0, "Breeding: Male child mint failed");
 
             pair.childId = childIdForFemale;
