@@ -6,8 +6,9 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 
-contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
      */
@@ -934,6 +935,28 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     function initSkills() external onlyOwner {
         _initSkills();
     }
+
+    /**
+     * @dev 暂停合约
+     * @param reason 暂停原因
+     */
+    function pause(string calldata reason) external onlyOwner {
+        _pause();
+        pauseReason = reason;
+        emit Paused(msg.sender, reason);
+    }
+
+    /**
+     * @dev 取消暂停合约
+     */
+    function unpause() external onlyOwner {
+        _unpause();
+        pauseReason = "";
+        emit Unpaused(msg.sender);
+    }
+
+    event Paused(address account, string reason);
+    event Unpaused(address account);
 
     /**
      * @dev 初始化技能（内部）

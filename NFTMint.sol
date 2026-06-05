@@ -750,4 +750,32 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     function upgradeToAndCall(address newImplementation, bytes memory data) external payable override onlyOwner {
         _upgradeToAndCall(newImplementation, data, true);
     }
+
+    /**
+     * @dev 紧急提取BNB
+     * @param amount 提取数量
+     */
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+        require(amount > 0, "NFTMint: Amount must be > 0");
+        require(amount <= address(this).balance, "NFTMint: Insufficient BNB balance");
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        require(success, "NFTMint: BNB transfer failed");
+        emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
+    }
+
+    /**
+     * @dev 紧急提取代币
+     * @param amount 提取数量
+     */
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+        require(amount > 0, "NFTMint: Amount must be > 0");
+        require(tokenContract != address(0), "NFTMint: Token contract not set");
+        IERC20 token = IERC20(tokenContract);
+        require(token.balanceOf(address(this)) >= amount, "NFTMint: Insufficient token balance");
+        require(token.transfer(owner(), amount), "NFTMint: Token transfer failed");
+        emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
+    }
+
+    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 }

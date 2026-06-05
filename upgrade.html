@@ -229,7 +229,7 @@
                             <li>• 4阶 → 5阶：消耗480000枚代币</li>
                         </ul>
                     </div>
-                    <div class="bg-gray-50 p-6 rounded-lg" id="usdUpgradeMethod">
+                    <div class="bg-gray-50 p-6 rounded-lg" id="usdUpgradeMethod" style="display: none;">
                         <h4 class="text-lg font-bold text-blue-600 mb-3">方式三：消耗USDT价值代币</h4>
                         <ul class="text-gray-700 space-y-2">
                             <li>• 1阶 → 2阶：消耗价值1 USDT的代币</li>
@@ -255,7 +255,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <button id="upgradeWithNftBtn" class="btn-primary w-full">使用NFT升阶</button>
                         <button id="upgradeWithTokenBtn" class="btn-secondary w-full">使用代币升阶</button>
-                        <div>
+                        <div id="usdUpgradeBtnContainer" style="display: none;">
                             <button id="upgradeWithUSDValueBtn" class="btn-secondary w-full">使用USDT价值代币升阶</button>
                             <p class="text-xs text-yellow-600 mt-2 text-center">⚠ 基于PancakeSwap实时价格，存在价格波动风险</p>
                         </div>
@@ -365,20 +365,18 @@
                 if (nftUpdateContract) {
                     const isHidden = await nftUpdateContract.methods.usdUpgradeHidden().call();
                     const usdMethodDiv = document.getElementById('usdUpgradeMethod');
-                    const usdBtnDiv = document.querySelector('#upgradeSection .grid div:last-child');
-                    const usdUpgradeBtn = document.getElementById('upgradeWithUSDValueBtn');
+                    const usdBtnContainer = document.getElementById('usdUpgradeBtnContainer');
                     
                     if (isHidden) {
                         usdMethodDiv.style.display = 'none';
                         document.getElementById('upgradeMethodsGrid').classList.remove('md:grid-cols-3');
                         document.getElementById('upgradeMethodsGrid').classList.add('md:grid-cols-2');
-                        
-                        if (usdBtnDiv) {
-                            usdBtnDiv.style.display = 'none';
-                        }
-                        if (usdUpgradeBtn) {
-                            usdUpgradeBtn.style.display = 'none';
-                        }
+                        usdBtnContainer.style.display = 'none';
+                    } else {
+                        usdMethodDiv.style.display = 'block';
+                        document.getElementById('upgradeMethodsGrid').classList.remove('md:grid-cols-2');
+                        document.getElementById('upgradeMethodsGrid').classList.add('md:grid-cols-3');
+                        usdBtnContainer.style.display = 'block';
                     }
                 }
             } catch (error) {
