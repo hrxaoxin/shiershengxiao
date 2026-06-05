@@ -443,63 +443,6 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     event BNBTransferFailed(uint256 poolType, address pool, uint256 amount);
 
     /**
-     * @dev 战斗类型对应的奖励金额映射
-     * battleType => rewardAmount
-     */
-    mapping(uint256 => uint256) public battleRewardAmounts;
-
-    /**
-     * @dev 默认战斗奖励金额（100个代币）
-     */
-    uint256 public constant DEFAULT_BATTLE_REWARD_AMOUNT = 100;
-    uint256 public defaultBattleReward = DEFAULT_BATTLE_REWARD_AMOUNT * 10**18;
-    
-    /**
-     * @dev 最大战斗类型值限制
-     */
-    uint256 public constant MAX_BATTLE_TYPE = 100;
-
-    /**
-     * @dev 设置特定战斗类型的奖励金额
-     * @param battleType 战斗类型
-     * @param amount 奖励金额
-     */
-    function setBattleRewardAmount(uint256 battleType, uint256 amount) external onlyOwner {
-        battleRewardAmounts[battleType] = amount;
-    }
-
-    /**
-     * @dev 分发战斗奖励到各资金池（分红池、质押池、竞技场奖励池）
-     * 注意：此函数不直接给赢家发奖励。竞技场积分模式胜利增加积分，排名模式通过排名替换。
-     * winner/loser 参数保留用于未来扩展，当前仅用于日志记录目的。
-     * @param winner 获胜者地址（当前未使用，预留扩展）
-     * @param loser 失败者地址（当前未使用，预留扩展）
-     * @param battleType 战斗类型
-     */
-    function distributeBattleReward(
-        address winner,
-        address loser,
-        uint256 battleType
-    ) external onlyAuthorized whenNotPaused {
-        // 验证 battleType 在合理范围内
-        require(battleType <= MAX_BATTLE_TYPE, "RewardManager: Invalid battle type");
-        
-        // 根据 battleType 动态计算奖励，未配置时使用默认值
-        uint256 reward = battleRewardAmounts[battleType];
-        if (reward == 0) {
-            reward = defaultBattleReward;
-        }
-        _distributeReward(reward);
-    }
-
-    /**
-     * @dev 设置默认战斗奖励金额
-     */
-    function setDefaultBattleReward(uint256 amount) external onlyOwner {
-        defaultBattleReward = amount;
-    }
-
-    /**
      * @dev 添加质押池奖励
      */
     function addStakingReward(uint256 amount, uint256 poolType) external onlyAuthorized whenNotPaused {

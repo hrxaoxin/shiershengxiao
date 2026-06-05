@@ -657,11 +657,12 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(mockIndex < MAX_MOCK_PLAYERS, "ArenaRanking: Invalid mock index");
         
         uint256[TEAM_SIZE] memory team;
-        uint256 baseId = (mockIndex + MOCK_ID_OFFSET) * MOCK_ID_MULTIPLIER;
-        
         uint256 level = _calculateMockLevel(mockIndex);
         uint256 growth = _calculateMockGrowth(mockIndex);
         uint256 rareCount = _calculateRareElementCount(mockIndex);
+        
+        uint256 baseId = (mockIndex + MOCK_ID_OFFSET) * MOCK_ID_MULTIPLIER;
+        uint256 growthMultiplier = (growth - 50) * MOCK_ID_MULTIPLIER * MAX_MOCK_PLAYERS;
         
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
             uint256 element = i < rareCount ? _getRareElement(i) : _getCommonElement(i);
@@ -670,7 +671,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             
             uint256 zodiacType = element * 24 + zodiac * 2 + gender;
             
-            team[i] = baseId + zodiacType;
+            team[i] = baseId + growthMultiplier + zodiacType;
         }
         
         return team;

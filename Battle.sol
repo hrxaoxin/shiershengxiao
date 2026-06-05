@@ -134,16 +134,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     }
 
     /**
-     * @dev 暂停合约
-     * @param reason 暂停原因
-     */
-    function pause(string memory reason) external onlyOwner {
-        paused = true;
-        pauseReason = reason;
-        emit Paused(msg.sender, reason);
-    }
-
-    /**
      * @dev 取消暂停
      */
     function unpause() external onlyOwner {
@@ -197,12 +187,41 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             traits.growth = uint8(growth);
             traits.power = _calculatePower(traits.level, traits.growth);
         } else {
-            uint256 zodiacType = tokenId % TOTAL_TYPE_COUNT;
-            traits.level = uint8((zodiacType / ZODIAC_TYPE_COUNT) + 1);
-            traits.element = uint8(zodiacType / ZODIAC_TYPE_COUNT);
-            traits.zodiac = uint8((zodiacType / GENDER_COUNT) % ZODIAC_COUNT);
-            traits.growth = uint8(MIN_GROWTH + (tokenId % GROWTH_RANGE));
-            traits.power = _calculatePower(traits.level, traits.growth);
+            uint256 mockMultiplier = 1000;
+            uint256 mockOffset = 10000;
+            uint256 mockIdRange = 1000;
+            
+            if (tokenId >= (mockOffset + 0) * mockMultiplier) {
+                uint256 temp = tokenId / mockMultiplier;
+                uint256 mockIndex = temp - mockOffset;
+                
+                uint256 growthPart = temp / mockIdRange;
+                uint256 growth = 50 + (growthPart % 51);
+                
+                uint256 level = 1;
+                if (mockIndex == 0) level = 5;
+                else if (mockIndex <= 4) level = 5;
+                else if (mockIndex <= 9) level = 4;
+                else if (mockIndex <= 19) level = 4;
+                else if (mockIndex <= 39) level = 3;
+                else if (mockIndex <= 69) level = 2;
+                else if (mockIndex <= 99) level = 1;
+                
+                uint256 zodiacType = tokenId % TOTAL_TYPE_COUNT;
+                
+                traits.level = uint8(level);
+                traits.element = uint8(zodiacType / ZODIAC_TYPE_COUNT);
+                traits.zodiac = uint8((zodiacType / GENDER_COUNT) % ZODIAC_COUNT);
+                traits.growth = uint8(growth);
+                traits.power = _calculatePower(traits.level, traits.growth);
+            } else {
+                uint256 zodiacType = tokenId % TOTAL_TYPE_COUNT;
+                traits.level = uint8((zodiacType / ZODIAC_TYPE_COUNT) + 1);
+                traits.element = uint8(zodiacType / ZODIAC_TYPE_COUNT);
+                traits.zodiac = uint8((zodiacType / GENDER_COUNT) % ZODIAC_COUNT);
+                traits.growth = uint8(MIN_GROWTH + (tokenId % GROWTH_RANGE));
+                traits.power = _calculatePower(traits.level, traits.growth);
+            }
         }
         return traits;
     }

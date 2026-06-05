@@ -320,6 +320,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _admin - 新管理员地址
      */
     function setAdmin(address _admin) external onlyOwner {
+        require(_admin != address(0), "Authorizer: Invalid admin address");
         admin = _admin;
     }
 

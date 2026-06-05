@@ -203,7 +203,8 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         breedingPairs[pairId] = BreedingPair({
             fatherId: fatherId, motherId: motherId, maleOwner: msg.sender, femaleOwner: msg.sender,
             maleCoOwnerId: coOwnerId, femaleCoOwnerId: coOwnerId, startTime: block.timestamp,
-            breedingType: 0, status: 0, childId: 0, maleChildId: 0, rewardsClaimed: false
+            breedingType: 0, status: 0, childId: 0, maleChildId: 0, rewardsClaimed: false,
+            cancelledAt: 0
         });
 
         bool fatherTransferred = false;
@@ -300,7 +301,8 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         breedingPairs[pairId] = BreedingPair({
             fatherId: fatherId, motherId: motherId, maleOwner: maleOwner, femaleOwner: femaleOwner,
             maleCoOwnerId: 0, femaleCoOwnerId: 0, startTime: block.timestamp,
-            breedingType: 1, status: 0, childId: 0, maleChildId: 0, rewardsClaimed: false
+            breedingType: 1, status: 0, childId: 0, maleChildId: 0, rewardsClaimed: false,
+            cancelledAt: 0
         });
 
         // 带 try-catch 的 NFT 转账，防止单方转账失败导致费用损失

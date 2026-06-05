@@ -7,6 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/Strings.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title NFTMint
@@ -69,6 +70,9 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     
     /// @dev NFT数据合约地址
     address public nftDataContract;
+    
+    /// @dev 代币合约地址
+    address public tokenContract;
     
     /// @dev 黑洞地址（用于销毁）
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
@@ -133,6 +137,11 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     function setNFTDataContract(address _nftData) external onlyAuthorized {
         require(_nftData != address(0), "NFTMint: Invalid NFT data contract address");
         nftDataContract = _nftData;
+    }
+    
+    function setTokenContract(address _tokenContract) external onlyAuthorized {
+        require(_tokenContract != address(0), "NFTMint: Invalid token contract address");
+        tokenContract = _tokenContract;
     }
     
     struct FailedSync {
