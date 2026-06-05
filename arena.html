@@ -1150,8 +1150,9 @@
                 const isCurrent = team[selectedSlot.index] && team[selectedSlot.index].tokenId === nft.tokenId;
                 
                 return `
-                    <div class="nft-card bg-white/5 rounded-lg p-3 border-2 cursor-pointer transition-all ${isDisabled ? 'opacity-50 cursor-not-allowed border-gray-600 grayscale' : isCurrent ? 'border-green-500' : 'hover:border-blue-500'}" 
-                         onclick="${isDisabled ? '' : `selectNftForSlot(${index})`}">
+                    <div class="nft-card nft-card-hover bg-white/5 rounded-lg p-3 border-2 cursor-pointer transition-all ${isDisabled ? 'opacity-50 cursor-not-allowed border-gray-600 grayscale' : isCurrent ? 'border-green-500' : 'hover:border-blue-500'}" 
+                         onclick="${isDisabled ? '' : `selectNftForSlot(${index})`}"
+                         data-nft-typeid="${nft.tokenType}" data-nft-tokenid="${nft.tokenId}" data-nft-level="${nft.level}">
                         <div class="flex flex-col items-center text-center">
                             <div class="relative">
                                 <img src="${nft.imagePath}" alt="${nft.name}" class="w-12 h-12 rounded-lg object-cover mb-2 ${isDisabled ? 'grayscale' : ''}">

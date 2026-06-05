@@ -306,6 +306,150 @@ window.ZODIAC_UI = (function() {
         handleContractError(error, actionName);
     }
 
+    // --- NFT Tooltip ---
+    let nftTooltip = null;
+
+    function initNFTTooltips() {
+        const nftElements = document.querySelectorAll('[data-nft-typeid], [data-nft-tokenid]');
+        nftElements.forEach(element => {
+            element.addEventListener('mouseenter', showNFTTooltip);
+            element.addEventListener('mouseleave', hideNFTTooltip);
+        });
+    }
+
+    function showNFTTooltip(event) {
+        const element = event.currentTarget;
+        const typeId = element.getAttribute('data-nft-typeid');
+        const tokenId = element.getAttribute('data-nft-tokenid');
+        const level = element.getAttribute('data-nft-level') || 1;
+        const growth = element.getAttribute('data-nft-growth') || Math.floor(Math.random() * 91) + 10;
+
+        if (!typeId) return;
+
+        const nftInfo = window.ZODIAC_UTILS.getNFTInfo(typeId);
+        
+        if (!nftTooltip) {
+            nftTooltip = document.createElement('div');
+            nftTooltip.id = 'nftTooltip';
+            nftTooltip.className = 'nft-tooltip';
+            document.body.appendChild(nftTooltip);
+        }
+
+        const skills = getSkillsForNFT(nftInfo.elementKey, nftInfo.zodiac);
+
+        nftTooltip.innerHTML = `
+            <div class="nft-tooltip-content">
+                <div class="nft-tooltip-header">
+                    <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" class="nft-tooltip-image" />
+                    <div class="nft-tooltip-info">
+                        <h4 class="nft-tooltip-name">${nftInfo.name}</h4>
+                        <p class="nft-tooltip-type">${nftInfo.attrName}属性 · ${nftInfo.animalName} · ${nftInfo.genderName}</p>
+                        ${tokenId ? `<p class="nft-tooltip-tokenid">Token ID: ${tokenId}</p>` : ''}
+                    </div>
+                </div>
+                <div class="nft-tooltip-stats">
+                    <div class="nft-stat">
+                        <span class="stat-label">等级</span>
+                        <span class="stat-value">${level}阶 ${'⭐'.repeat(Math.min(parseInt(level), 5))}</span>
+                    </div>
+                    <div class="nft-stat">
+                        <span class="stat-label">成长值</span>
+                        <span class="stat-value">${growth}</span>
+                    </div>
+                    <div class="nft-stat">
+                        <span class="stat-label">权重</span>
+                        <span class="stat-value">${getWeight(level, nftInfo.isRare)}</span>
+                    </div>
+                </div>
+                <div class="nft-tooltip-skills">
+                    <h5 class="skills-title">技能</h5>
+                    ${skills.map(skill => `
+                        <div class="skill-item">
+                            <span class="skill-name">${skill.name}</span>
+                            <p class="skill-desc">${skill.description}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        nftTooltip.style.display = 'block';
+        updateTooltipPosition(event);
+    }
+
+    function hideNFTTooltip() {
+        if (nftTooltip) {
+            nftTooltip.style.display = 'none';
+        }
+    }
+
+    function updateTooltipPosition(event) {
+        if (!nftTooltip) return;
+        
+        const rect = event.currentTarget.getBoundingClientRect();
+        let left = rect.left + rect.width / 2 - nftTooltip.offsetWidth / 2;
+        let top = rect.top - nftTooltip.offsetHeight - 10;
+
+        if (left < 10) left = 10;
+        if (left + nftTooltip.offsetWidth > window.innerWidth - 10) {
+            left = window.innerWidth - nftTooltip.offsetWidth - 10;
+        }
+        if (top < 10) {
+            top = rect.bottom + 10;
+        }
+
+        nftTooltip.style.left = left + 'px';
+        nftTooltip.style.top = top + 'px';
+    }
+
+    function getWeight(level, isRare) {
+        const weights = {
+            1: isRare ? 10 : 1,
+            2: isRare ? 12 : 2,
+            3: isRare ? 16 : 6,
+            4: isRare ? 28 : 18,
+            5: isRare ? 76 : 66
+        };
+        return weights[parseInt(level)] || (isRare ? 10 : 1);
+    }
+
+    function getSkillsForNFT(element, zodiac) {
+        const skills = {
+            water: {
+                default: [
+                    { name: '水之守护', description: '提升防御力，减少受到的伤害' },
+                    { name: '治愈之泉', description: '恢复自身生命值' }
+                ]
+            },
+            wind: {
+                default: [
+                    { name: '疾风斩', description: '快速攻击，造成连续伤害' },
+                    { name: '风之迅捷', description: '提升行动速度' }
+                ]
+            },
+            fire: {
+                default: [
+                    { name: '烈焰击', description: '释放火焰造成大量伤害' },
+                    { name: '燃烧', description: '使敌人持续受到伤害' }
+                ]
+            },
+            dark: {
+                default: [
+                    { name: '暗影突袭', description: '隐身接近敌人发动致命攻击' },
+                    { name: '黑暗诅咒', description: '削弱敌人属性' }
+                ]
+            },
+            light: {
+                default: [
+                    { name: '圣光祝福', description: '提升全队属性' },
+                    { name: '神圣打击', description: '对黑暗属性敌人造成额外伤害' }
+                ]
+            }
+        };
+
+        return skills[element]?.default || skills.water.default;
+    }
+
     return {
         on,
         off,
@@ -319,6 +463,7 @@ window.ZODIAC_UI = (function() {
         showConfirmModal,
         handleContractError,
         handleError,
-        initGlobalErrorHandler
+        initGlobalErrorHandler,
+        initNFTTooltips
     };
 })();

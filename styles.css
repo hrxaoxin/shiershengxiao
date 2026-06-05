@@ -14,6 +14,137 @@
     --card-hover-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
+/* NFT悬停提示样式 */
+.nft-tooltip {
+    position: fixed;
+    z-index: 9999;
+    display: none;
+    pointer-events: none;
+}
+
+.nft-tooltip-content {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 12px;
+    padding: 16px;
+    min-width: 300px;
+    max-width: 350px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nft-tooltip-header {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nft-tooltip-image {
+    width: 60px;
+    height: 60px;
+    border-radius: 8px;
+    object-fit: cover;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.nft-tooltip-info {
+    flex: 1;
+}
+
+.nft-tooltip-name {
+    margin: 0;
+    font-size: 16px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.nft-tooltip-type {
+    margin: 4px 0;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.nft-tooltip-tokenid {
+    margin: 0;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.nft-tooltip-stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.nft-stat {
+    flex: 1;
+    text-align: center;
+}
+
+.stat-label {
+    display: block;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-bottom: 4px;
+}
+
+.stat-value {
+    display: block;
+    font-size: 14px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.nft-tooltip-skills {
+    padding-top: 8px;
+}
+
+.skills-title {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.skill-item {
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+}
+
+.skill-item:last-child {
+    margin-bottom: 0;
+}
+
+.skill-name {
+    display: block;
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 2px;
+}
+
+.skill-desc {
+    margin: 0;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* NFT卡片悬停效果 */
+.nft-card-hover {
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.nft-card-hover:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
 body {
     font-family: 'Noto Sans SC', sans-serif;
     background-color: #f5f5f5;

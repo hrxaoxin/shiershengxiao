@@ -15,18 +15,18 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * 基于OpenZeppelin UUPS可升级合约实现
  */
 contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    /** @dev 基础奖励比例（万分比，默认10 = 0.1%） */
-    uint256 public rewardRate = 10;
-    /** @dev 最大奖励比例（万分比，默认20 = 0.2%） */
-    uint256 public maxRewardRate = 20;
+    /** @dev 基础奖励比例（万分比，默认100 = 1%） */
+    uint256 public rewardRate = 100;
+    /** @dev 最大奖励比例（万分比，默认100 = 1%） */
+    uint256 public maxRewardRate = 100;
     /** @dev 每次上调比例（万分比，1 = 0.01%） */
     uint256 public rateStep = 1;
     /** @dev 最小质押锁定时间（30分钟） */
     uint256 public constant MIN_STAKING_DURATION = 30 minutes;
-    /** @dev 最大总质押数量 */
-    uint256 public maxTotalStaked = 1000000 * 1e18;
-    /** @dev 单个用户最大质押数量 */
-    uint256 public maxUserStaked = 100000 * 1e18;
+    /** @dev 最大总质押数量（无限制） */
+    uint256 public maxTotalStaked = type(uint256).max;
+    /** @dev 单个用户最大质押数量（无限制） */
+    uint256 public maxUserStaked = type(uint256).max;
     /** @dev 今日已进入合约的BNB数量 */
     uint256 public todayIncomingBNB;
     /** @dev 今日奖励总量 */

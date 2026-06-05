@@ -278,7 +278,7 @@ window.ZODIAC_CONFIG = (function() {
         rare: 88888,
         normalTen: 88880,
         rareTen: 888880,
-        targeted: 8888 * 6 * 10 + 88888 * 4 * 10
+        targeted: (8888 * 6 + 88888 * 4) * 10
     };
 
     const UPGRADE_COSTS = {
@@ -396,7 +396,7 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[],"name":"rareMintCost","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"normalMintTenCost","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"rareMintTenCost","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[],"name":"targetedMintCost","outputs":[{"internalType":"uint256","name":"normalPart","type":"uint256"},{"internalType":"uint256","name":"rarePart","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"targetedMintCost","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"bool","name":"isRare","type":"bool"}],"name":"burnAndMint","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"bool","name":"isRare","type":"bool"}],"name":"burnAndMintTen","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint8","name":"zodiac","type":"uint8"}],"name":"burnAndMintTargeted","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}

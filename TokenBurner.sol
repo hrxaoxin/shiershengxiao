@@ -118,9 +118,8 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return rareMintCost * 10;
     }
 
-    function targetedMintCost() external view returns (uint256 normalPart, uint256 rarePart) {
-        normalPart = normalMintCost * 6 * 10;
-        rarePart = rareMintCost * 4 * 10;
+    function targetedMintCost() external view returns (uint256) {
+        return (normalMintCost * 6 + rareMintCost * 4) * 10;
     }
 
     function burnAndMint(address user, bool isRare) external onlyAuthorized nonReentrant whenNotPaused returns (bool) {
@@ -181,9 +180,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(zodiac < 12, "TokenBurner: Invalid zodiac type");
 
         IERC20 token = IERC20(tokenContract);
-        uint256 normalPart = normalMintCost * 6 * 10;
-        uint256 rarePart = rareMintCost * 4 * 10;
-        uint256 totalCost = normalPart + rarePart;
+        uint256 totalCost = (normalMintCost * 6 + rareMintCost * 4) * 10;
         require(token.balanceOf(user) >= totalCost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= totalCost, "TokenBurner: Insufficient allowance");
         require(token.transferFrom(user, BLACK_HOLE, totalCost), "TokenBurner: Token transfer failed");

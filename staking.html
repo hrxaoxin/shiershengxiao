@@ -681,7 +681,7 @@
                     const weight = stakeInfo.isRare ? document.getElementById('rareWeight').textContent : document.getElementById('normalWeight').textContent;
 
                     html += `
-                        <div class="stake-card">
+                        <div class="stake-card nft-card-hover" data-nft-typeid="${tokenType}" data-nft-tokenid="${tokenId}" data-nft-level="${tokenLevel}">
                             <div class="flex items-center gap-4 mb-4">
                                 <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" class="w-16 h-16 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
                                 <div class="flex-1">

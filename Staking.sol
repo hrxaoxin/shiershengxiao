@@ -28,8 +28,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     uint256 public minStakingDuration = 30 minutes;
-    uint256 public rewardRate = 10; // 万分比 (0.1% = 10/10000)
-    uint256 public maxRewardRate = 20;
+    uint256 public rewardRate = 100; // 万分比 (1% = 100/10000)
+    uint256 public maxRewardRate = 100;
     uint256 public rateStep = 1;
 
     uint256 public totalStakedNFTs;

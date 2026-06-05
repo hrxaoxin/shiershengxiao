@@ -87,7 +87,9 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     uint256 public currentSeasonId;
     uint256 public seasonDuration = 1 days;
-    uint256 public rewardRate = 10; // 0.1% (10/10000)
+    uint256 public rewardRate = 100; // 1% (100/10000)
+    uint256 public maxRewardRate = 200; // 最大奖励率 2%
+    uint256 public rateStep = 10; // 每次调整步长 0.1%
     
     address public authorizer;
     address public battleContract;
@@ -100,16 +102,24 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint8 public rewardType = 1;
     
     event RewardTypeUpdated(uint8 oldType, uint8 newType);
+    event RewardRateUpdated(uint256 oldRate, uint256 newRate);
     
     uint256 public constant DAILY_ATTEMPTS = 3;
     uint256 public constant MAX_RECHARGE_ATTEMPTS = 50;
-    uint256 public constant BATTLE_COOLDOWN = 60 seconds;
+    uint256 public constant BATTLE_COOLDOWN = 30 seconds;
     uint256 public constant TEAM_SIZE = 6;
     uint256 public constant RECHARGE_COST = 888;
     uint256 public constant RECHARGE_ATTEMPTS = 3;
-    uint256 public constant MAX_LEADERBOARD_SIZE = 1000;
+    uint256 public constant MAX_LEADERBOARD_SIZE = type(uint256).max;
     uint256 public constant MAX_SEASONS_TO_KEEP = 20;
     uint256 public constant PRECISION = 10000;
+    
+    /**
+     * @dev 每日流入奖励追踪（用于动态调整奖励率）
+     */
+    uint256 public todayIncomingReward;
+    uint256 public todayRewardAmount;
+    uint256 public todayStart;
     
     /**
      * @dev Mock玩家地址的特殊前缀和后缀
@@ -117,7 +127,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     address public constant MOCK_PLAYER_PREFIX = address(0x0000000000000000000000000000000000000000);
     address public constant MOCK_PLAYER_SUFFIX = address(0x000000000000000000000000000000000000DEAD);
-    uint256 public maxRechargeAttempts = 10;
+    uint256 public maxRechargeAttempts = type(uint256).max;
     uint256 public seasonRewardRate;
     mapping(address => uint256) public lastBattleTime;
     mapping(address => uint256) public rechargeCount;
@@ -675,18 +685,49 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         emit SeasonSettled(seasonId, block.timestamp);
     }
 
+    function _checkNewDay() internal {
+        uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
+
+        if (todayStart != currentDayStart) {
+            todayStart = currentDayStart;
+            todayIncomingReward = 0;
+            todayRewardAmount = 0;
+            _adjustRewardRate();
+        }
+    }
+
+    function _adjustRewardRate() internal {
+        if (todayRewardAmount > 0 && todayIncomingReward > todayRewardAmount) {
+            uint256 multiple = todayIncomingReward / todayRewardAmount;
+            uint256 maxSteps = (maxRewardRate - rewardRate) / rateStep;
+            uint256 steps = multiple - 1;
+
+            if (steps > maxSteps) {
+                steps = maxSteps;
+            }
+
+            uint256 newRate = rewardRate + (steps * rateStep);
+
+            if (newRate != rewardRate) {
+                uint256 oldRate = rewardRate;
+                rewardRate = newRate;
+                emit RewardRateUpdated(oldRate, rewardRate);
+            }
+        }
+    }
+
     function _calculateSeasonRewardsInternal(uint256 seasonId) internal {
         SeasonInfo storage season = seasons[seasonId];
         if (season.rewardCalculated) return;
         
+        _checkNewDay();
+        
         uint256 availableBalance = 0;
         if (rewardType == 0) {
-            // BNB奖励
             uint256 contractBalance = address(this).balance;
             uint256 totalPendingRewards = _getTotalPendingRewards();
             availableBalance = contractBalance > totalPendingRewards ? contractBalance - totalPendingRewards : 0;
         } else {
-            // ERC20代币奖励
             require(tokenContract != address(0), "ArenaRanking: Token contract not set");
             IERC20 token = IERC20(tokenContract);
             uint256 contractBalance = token.balanceOf(address(this));
@@ -694,7 +735,8 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             availableBalance = contractBalance > totalPendingRewards ? contractBalance - totalPendingRewards : 0;
         }
         
-        season.rewardPool = availableBalance * rewardRate / PRECISION;
+        todayRewardAmount = availableBalance * rewardRate / PRECISION;
+        season.rewardPool = todayRewardAmount;
         
         uint256 totalPlayers = seasonRankings[seasonId].length;
         uint256 totalRealPlayers = _countRealPlayers(seasonId);
@@ -1185,12 +1227,15 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(seasons[seasonNumber].isSettled, "ArenaRanking: Season not settled");
         require(!seasons[seasonNumber].rewardCalculated, "ArenaRanking: Already calculated");
         
+        _checkNewDay();
+        
         SeasonInfo storage season = seasons[seasonNumber];
         address[] storage rankings = seasonRankings[seasonNumber];
         
         uint256 contractBalance = address(this).balance;
         uint256 availableBalance = contractBalance - season.pendingRewards;
-        season.rewardPool = availableBalance * rewardRate / PRECISION;
+        todayRewardAmount = availableBalance * rewardRate / PRECISION;
+        season.rewardPool = todayRewardAmount;
         
         uint256 totalReward = season.rewardPool;
         require(totalReward > 0, "ArenaRanking: No reward in pool");
@@ -1225,6 +1270,8 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function addRewardToPool() external payable onlyAuthorized {
         require(msg.value > 0, "ArenaRanking: No BNB sent");
+        _checkNewDay();
+        todayIncomingReward += msg.value;
         seasons[currentSeasonId].rewardPool += msg.value;
     }
     
@@ -1237,8 +1284,14 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     // 接收 BNB
-    receive() external payable {}
-    fallback() external payable {}
+    receive() external payable {
+        _checkNewDay();
+        todayIncomingReward += msg.value;
+    }
+    fallback() external payable {
+        _checkNewDay();
+        todayIncomingReward += msg.value;
+    }
 
     /**
      * @dev 验证用户是否拥有战队中的所有NFT

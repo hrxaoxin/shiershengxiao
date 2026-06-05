@@ -20,6 +20,11 @@ window.ZODIAC_INIT = (function() {
                 await window.ZODIAC_WEB3.initWeb3();
             }
 
+            // 初始化全局错误处理
+            if (window.ZODIAC_UI && window.ZODIAC_UI.initGlobalErrorHandler) {
+                window.ZODIAC_UI.initGlobalErrorHandler();
+            }
+
             window.ZODIAC_WEB3.on('connect', async (data) => {
                 console.log('Wallet connected:', data);
                 await ZODIAC_STATE.updateFromWeb3(data.account, data.chainId);
@@ -67,6 +72,19 @@ window.ZODIAC_INIT = (function() {
                 onBattleEnded: handleBattleEnded,
                 onChallengeResult: handleChallengeResult
             });
+
+            // 初始化NFT悬停提示
+            if (window.ZODIAC_UI && window.ZODIAC_UI.initNFTTooltips) {
+                window.ZODIAC_UI.initNFTTooltips();
+                
+                // 监听DOM变化，动态初始化新添加的NFT元素
+                const observer = new MutationObserver(() => {
+                    if (window.ZODIAC_UI && window.ZODIAC_UI.initNFTTooltips) {
+                        window.ZODIAC_UI.initNFTTooltips();
+                    }
+                });
+                observer.observe(document.body, { childList: true, subtree: true });
+            }
 
             initialized = true;
             console.log('App initialization completed');

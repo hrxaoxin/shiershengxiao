@@ -52,9 +52,9 @@ interface IDividendManager {
  *
  * 奖励分配：
  * - 50% 进入分红池
- * - 25% 进入NFT质押池
+ * - 20% 进入NFT质押池
  * - 15% 进入代币质押池
- * - 10% 进入竞技场奖励池
+ * - 15% 进入竞技场奖励池
  */
 contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     /**
@@ -180,12 +180,12 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     uint8 public activeDEX;
 
     /**
-     * @dev 奖励分配比例（精度4位小数）
+     * @dev 奖励分配比例（精度4位小数，万分比）
      */
-    uint256 public dividendPercent = 5000;    // 50%
-    uint256 public nftStakingPercent = 2500;  // 25%
-    uint256 public tokenStakingPercent = 1500; // 15%
-    uint256 public arenaRewardPercent = 1000;   // 10%
+    uint256 public dividendPercent = 5000;     // 50%
+    uint256 public nftStakingPercent = 2000;   // 20%
+    uint256 public tokenStakingPercent = 1500;  // 15%
+    uint256 public arenaRewardPercent = 1500;   // 15%
 
     /**
      * @dev 精度

@@ -530,7 +530,9 @@
                 const count = userToken ? userToken.count : 0;
                 
                 html += `
-                    <div class="zodiac-card ${isOwned ? 'has-item' : 'locked'}" onclick="${isOwned ? `showCardModal(${typeId}, ${level})` : ''}">
+                    <div class="zodiac-card nft-card-hover ${isOwned ? 'has-item' : 'locked'}" 
+                         onclick="${isOwned ? `showCardModal(${typeId}, ${level})` : ''}"
+                         data-nft-typeid="${typeId}" data-nft-level="${level}">
                         ${count > 1 ? `<span class="collection-badge">x${count}</span>` : ''}
                         <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
                         <h4>${nftInfo.name}</h4>
@@ -567,7 +569,8 @@
                 const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
 
                 html += `
-                    <div class="zodiac-card" onclick="showCardModal(${typeId}, ${level})">
+                    <div class="zodiac-card nft-card-hover" onclick="showCardModal(${typeId}, ${level})"
+                         data-nft-typeid="${typeId}" data-nft-tokenid="${token.tokenId}" data-nft-level="${level}">
                         <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
                         <h4>${nftInfo.name}</h4>
                         <p>等级: ${getStars(level)}</p>
