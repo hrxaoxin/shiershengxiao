@@ -190,3 +190,101 @@ interface INFT {
      */
     function isApprovedForAll(address owner, address operator) external view returns (bool);
 }
+
+/**
+ * @title IBattle
+ * @dev 战斗合约接口，提供战斗挑战功能
+ */
+interface IBattle {
+    /**
+     * @dev 发起挑战
+     * @param challengerId 挑战者代表NFT ID
+     * @param challengedId 被挑战者代表NFT ID
+     * @param challengerTeam 挑战者队伍（6个NFT）
+     * @param challengedTeam 被挑战者队伍（6个NFT）
+     * @param challengedAddress 被挑战者地址（address(0)表示模拟战斗）
+     * @return success 是否成功
+     * @return winner 获胜方（1=挑战者，2=被挑战者，0=平局）
+     */
+    function challenge(
+        uint256 challengerId,
+        uint256 challengedId,
+        uint256[6] calldata challengerTeam,
+        uint256[6] calldata challengedTeam,
+        address challengedAddress
+    ) external returns (bool, uint256);
+}
+
+/**
+ * @title IStaking
+ * @dev NFT质押合约接口，提供质押信息查询功能
+ */
+interface IStaking {
+    /**
+     * @dev 获取NFT质押信息
+     * @param tokenId NFT ID
+     * @return owner 所有者地址
+     * @return stakeTime 质押时间
+     * @return lastClaimTime 上次领取时间
+     * @return accumulatedReward 累积奖励
+     * @return isRare 是否稀有NFT
+     */
+    function stakingInfo(uint256 tokenId) external view returns (address, uint256, uint256, uint256, bool);
+}
+
+/**
+ * @title IBreeding
+ * @dev NFT繁殖合约接口，提供繁殖状态查询功能
+ */
+interface IBreeding {
+    /**
+     * @dev 检查NFT是否正在繁殖中
+     * @param tokenId NFT ID
+     * @return 是否正在繁殖中
+     */
+    function isNFTInActiveBreeding(uint256 tokenId) external view returns (bool);
+}
+
+/**
+ * @title IERC20Extended
+ * @dev 扩展ERC20代币接口，提供额外功能
+ */
+interface IERC20Extended {
+    /**
+     * @dev 转移代币
+     * @param from 转出地址
+     * @param to 转入地址
+     * @param amount 转移数量
+     * @return 是否成功
+     */
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+
+    /**
+     * @dev 销毁代币
+     * @param account 账户地址
+     * @param amount 销毁数量
+     */
+    function burnFrom(address account, uint256 amount) external;
+
+    /**
+     * @dev 查询授权额度
+     * @param owner 所有者地址
+     * @param spender 花费者地址
+     * @return 授权额度
+     */
+    function allowance(address owner, address spender) external view returns (uint256);
+
+    /**
+     * @dev 安全转移代币
+     * @param to 转入地址
+     * @param amount 转移数量
+     */
+    function safeTransfer(address to, uint256 amount) external;
+
+    /**
+     * @dev 查询余额
+     * @param account 账户地址
+     * @return 余额
+     */
+    function balanceOf(address account) external view returns (uint256);
+}

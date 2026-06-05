@@ -7,6 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "./NFTInterface.sol";
 
 
 /**
@@ -1795,26 +1796,4 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
-}
-
-interface IBattle {
-    function challenge(
-        uint256 challengerId,
-        uint256 challengedId,
-        uint256[6] calldata challengerTeam,
-        uint256[6] calldata challengedTeam,
-        address challengedAddress
-    ) external returns (bool, uint256);
-}
-
-interface INFT {
-    function ownerOf(uint256 tokenId) external view returns (address);
-    function safeTransferFrom(address from, address to, uint256 tokenId) external;
-    function isApprovedForAll(address owner, address operator) external view returns (bool);
-}
-
-interface IERC20 {
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-    function burnFrom(address account, uint256 amount) external;
-    function allowance(address owner, address spender) external view returns (uint256);
 }
