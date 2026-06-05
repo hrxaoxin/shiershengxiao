@@ -55,7 +55,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     BattleState[] public battleHistory;
     uint256 public battleHistoryIndex = 0;
 
-    uint256 public constant MAX_ROUNDS = 50;
+    uint256 public constant MAX_ROUNDS = 10;
     uint256 public constant ZODIAC_COUNT = 12;
     uint256 public constant GENDER_COUNT = 2;
     uint256 public constant ELEMENT_COUNT = 5;
@@ -441,8 +441,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             randomSeed++;
 
             for (uint i = 0; i < 6; i++) {
-                if (skillCooldown1[i] > 0) skillCooldown1[i]--;
-                if (skillCooldown2[i] > 0) skillCooldown2[i]--;
+                if (skillCooldown1[i] > 0) {
+                    unchecked { skillCooldown1[i]--; }
+                }
+                if (skillCooldown2[i] > 0) {
+                    unchecked { skillCooldown2[i]--; }
+                }
             }
 
             uint256[6] memory speedOrder1 = _getSpeedOrder(state1, randomSeed);
@@ -973,80 +977,90 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @dev 初始化水属性技能
      */
     function _initWaterSkills() private {
-        _setSkill(0, 1, 125, 3, 0, false); _setSkill(12, 6, 110, 4, 0, false);
-        _setSkill(1, 0, 145, 5, 0, false); _setSkill(13, 8, 95, 4, 0, true);
-        _setSkill(2, 0, 165, 5, 0, false); _setSkill(14, 5, 85, 4, 0, true);
-        _setSkill(3, 0, 130, 3, 0, false); _setSkill(15, 2, 80, 3, 0, false);
-        _setSkill(4, 3, 220, 6, 0, true); _setSkill(16, 8, 120, 5, 0, true);
-        _setSkill(5, 7, 115, 4, 0, false); _setSkill(17, 6, 125, 4, 0, false);
-        for (uint i = 6; i < 12; i++) {
-            skills[i] = skills[i - 6];
-            skills[i + 12] = skills[i + 6];
-        }
+        _setSkill(0, 1, 125, 3, 0, false);
+        _setSkill(1, 0, 145, 5, 0, false);
+        _setSkill(2, 0, 165, 5, 0, false);
+        _setSkill(3, 0, 130, 3, 0, false);
+        _setSkill(4, 3, 220, 6, 0, true);
+        _setSkill(5, 7, 115, 4, 0, false);
+        _setSkill(12, 6, 110, 4, 0, false);
+        _setSkill(13, 8, 95, 4, 0, true);
+        _setSkill(14, 5, 85, 4, 0, true);
+        _setSkill(15, 2, 80, 3, 0, false);
+        _setSkill(16, 8, 120, 5, 0, true);
+        _setSkill(17, 6, 125, 4, 0, false);
     }
 
     /**
      * @dev 初始化风属性技能
      */
     function _initWindSkills() private {
-        _setSkill(24, 1, 135, 3, 0, false); _setSkill(36, 6, 115, 4, 0, false);
-        _setSkill(25, 0, 130, 5, 0, false); _setSkill(37, 8, 105, 4, 0, true);
-        _setSkill(26, 0, 155, 5, 0, false); _setSkill(38, 5, 90, 4, 0, true);
-        _setSkill(27, 0, 140, 3, 0, false); _setSkill(39, 2, 100, 3, 0, false);
-        _setSkill(28, 3, 210, 6, 0, true); _setSkill(40, 8, 115, 5, 0, true);
-        _setSkill(29, 7, 125, 4, 0, false); _setSkill(41, 6, 120, 4, 0, false);
-        for (uint i = 30; i < 36; i++) {
-            skills[i] = skills[i - 6];
-            skills[i + 12] = skills[i + 6];
-        }
+        _setSkill(24, 1, 135, 3, 0, false);
+        _setSkill(25, 0, 130, 5, 0, false);
+        _setSkill(26, 0, 155, 5, 0, false);
+        _setSkill(27, 0, 140, 3, 0, false);
+        _setSkill(28, 3, 210, 6, 0, true);
+        _setSkill(29, 7, 125, 4, 0, false);
+        _setSkill(36, 6, 115, 4, 0, false);
+        _setSkill(37, 8, 105, 4, 0, true);
+        _setSkill(38, 5, 90, 4, 0, true);
+        _setSkill(39, 2, 100, 3, 0, false);
+        _setSkill(40, 8, 115, 5, 0, true);
+        _setSkill(41, 6, 120, 4, 0, false);
     }
 
     /**
      * @dev 初始化火属性技能
      */
     function _initFireSkills() private {
-        _setSkill(48, 1, 120, 3, 0, false); _setSkill(60, 6, 105, 4, 0, false);
-        _setSkill(49, 0, 140, 5, 0, false); _setSkill(61, 8, 110, 4, 0, true);
-        _setSkill(50, 0, 160, 5, 0, false); _setSkill(62, 5, 85, 4, 0, true);
-        _setSkill(51, 0, 145, 3, 0, false); _setSkill(63, 2, 95, 3, 0, false);
-        _setSkill(52, 3, 200, 6, 0, true); _setSkill(64, 8, 110, 5, 0, true);
-        _setSkill(53, 7, 120, 4, 0, false); _setSkill(65, 6, 115, 4, 0, false);
-        for (uint i = 54; i < 60; i++) {
-            skills[i] = skills[i - 6];
-            skills[i + 12] = skills[i + 6];
-        }
+        _setSkill(48, 1, 120, 3, 0, false);
+        _setSkill(49, 0, 140, 5, 0, false);
+        _setSkill(50, 0, 160, 5, 0, false);
+        _setSkill(51, 0, 145, 3, 0, false);
+        _setSkill(52, 3, 200, 6, 0, true);
+        _setSkill(53, 7, 120, 4, 0, false);
+        _setSkill(60, 6, 105, 4, 0, false);
+        _setSkill(61, 8, 110, 4, 0, true);
+        _setSkill(62, 5, 85, 4, 0, true);
+        _setSkill(63, 2, 95, 3, 0, false);
+        _setSkill(64, 8, 110, 5, 0, true);
+        _setSkill(65, 6, 115, 4, 0, false);
     }
 
     /**
      * @dev 初始化暗属性技能
      */
     function _initDarkSkills() private {
-        _setSkill(72, 1, 145, 3, 0, false); _setSkill(84, 6, 135, 4, 0, false);
-        _setSkill(73, 0, 150, 5, 0, false); _setSkill(85, 8, 115, 4, 0, true);
-        _setSkill(74, 0, 165, 5, 0, false); _setSkill(86, 5, 90, 4, 0, true);
-        _setSkill(75, 0, 160, 3, 0, false); _setSkill(87, 2, 100, 3, 0, false);
-        _setSkill(76, 3, 245, 6, 0, true); _setSkill(88, 8, 140, 5, 0, true);
-        _setSkill(77, 7, 145, 4, 0, false); _setSkill(89, 6, 130, 4, 0, false);
-        for (uint i = 78; i < 84; i++) {
-            skills[i] = skills[i - 6];
-            skills[i + 12] = skills[i + 6];
-        }
+        _setSkill(72, 1, 145, 3, 0, false);
+        _setSkill(73, 0, 150, 5, 0, false);
+        _setSkill(74, 0, 165, 5, 0, false);
+        _setSkill(75, 0, 160, 3, 0, false);
+        _setSkill(76, 3, 245, 6, 0, true);
+        _setSkill(77, 7, 145, 4, 0, false);
+        _setSkill(84, 6, 135, 4, 0, false);
+        _setSkill(85, 8, 115, 4, 0, true);
+        _setSkill(86, 5, 90, 4, 0, true);
+        _setSkill(87, 2, 100, 3, 0, false);
+        _setSkill(88, 8, 140, 5, 0, true);
+        _setSkill(89, 6, 130, 4, 0, false);
     }
 
     /**
      * @dev 初始化光属性技能
      */
     function _initLightSkills() private {
-        _setSkill(96, 1, 150, 3, 0, false); _setSkill(108, 6, 140, 4, 0, false);
-        _setSkill(97, 0, 155, 5, 0, false); _setSkill(109, 8, 110, 4, 0, true);
-        _setSkill(98, 0, 170, 5, 0, false); _setSkill(110, 5, 100, 4, 0, true);
-        _setSkill(99, 0, 165, 3, 0, false); _setSkill(111, 2, 105, 3, 0, false);
-        _setSkill(100, 3, 255, 6, 0, true); _setSkill(112, 8, 130, 5, 0, true);
-        _setSkill(101, 7, 150, 4, 0, false); _setSkill(113, 6, 135, 4, 0, false);
-        for (uint i = 102; i < 108; i++) {
-            skills[i] = skills[i - 6];
-            skills[i + 12] = skills[i + 6];
-        }
+        _setSkill(96, 1, 150, 3, 0, false);
+        _setSkill(97, 0, 155, 5, 0, false);
+        _setSkill(98, 0, 170, 5, 0, false);
+        _setSkill(99, 0, 165, 3, 0, false);
+        _setSkill(100, 3, 255, 6, 0, true);
+        _setSkill(101, 7, 150, 4, 0, false);
+        _setSkill(108, 6, 140, 4, 0, false);
+        _setSkill(109, 8, 110, 4, 0, true);
+        _setSkill(110, 5, 100, 4, 0, true);
+        _setSkill(111, 2, 105, 3, 0, false);
+        _setSkill(112, 8, 130, 5, 0, true);
+        _setSkill(113, 6, 135, 4, 0, false);
     }
 
     /**

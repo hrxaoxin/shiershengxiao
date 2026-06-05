@@ -9,10 +9,6 @@ import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 
-interface IStaking {
-    function stakingInfo(uint256 tokenId) external view returns (address, uint256, uint256, uint256, bool);
-}
-
 contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
@@ -460,15 +456,8 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
 
             _burnFee(pair.breedingType);
 
-            try nft.safeTransferFrom(address(this), pair.maleOwner, pair.fatherId) {
-            } catch {
-                emit EmergencyNFTLocked(pair.fatherId, pair.maleOwner);
-            }
-            
-            try nft.safeTransferFrom(address(this), pair.femaleOwner, pair.motherId) {
-            } catch {
-                emit EmergencyNFTLocked(pair.motherId, pair.femaleOwner);
-            }
+            _returnNFT(nft, pair.fatherId, pair.maleOwner);
+            _returnNFT(nft, pair.motherId, pair.femaleOwner);
 
             emit BreedingCompleted(pairId, childId, zodiacType);
             return (childId, 0);
@@ -488,22 +477,22 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
             isNFTInActiveBreeding[pair.fatherId] = false;
             isNFTInActiveBreeding[pair.motherId] = false;
 
-            try nft.safeTransferFrom(address(this), pair.maleOwner, pair.fatherId) {
-            } catch {
-                emit EmergencyNFTLocked(pair.fatherId, pair.maleOwner);
-            }
-            
-            try nft.safeTransferFrom(address(this), pair.femaleOwner, pair.motherId) {
-            } catch {
-                emit EmergencyNFTLocked(pair.motherId, pair.femaleOwner);
-            }
-
             _burnFee(pair.breedingType);
+
+            _returnNFT(nft, pair.fatherId, pair.maleOwner);
+            _returnNFT(nft, pair.motherId, pair.femaleOwner);
 
             emit BreedingCompleted(pairId, childIdForFemale, zodiacType);
             emit MaleChildGenerated(pairId, childIdForMale);
             emit FemaleChildGenerated(pairId, childIdForFemale);
             return (childIdForFemale, childIdForMale);
+        }
+    }
+
+    function _returnNFT(INFTMint nft, uint256 tokenId, address owner) internal {
+        try nft.safeTransferFrom(address(this), owner, tokenId) {
+        } catch {
+            emit EmergencyNFTLocked(tokenId, owner);
         }
     }
 

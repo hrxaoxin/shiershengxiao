@@ -9,10 +9,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 
-interface IBreeding {
-    function isNFTInActiveBreeding(uint256 tokenId) external view returns (bool);
-}
-
 /**
  * @title Staking
  * @dev NFT质押合约（优化版：支持大规模用户，实时奖励计算）
@@ -39,9 +35,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     // 每次 calculateDailyReward 时增加，用户领取时做差值计算
     uint256 public globalRewardPerWeight;
     
-    // 溢出保护阈值：当globalRewardPerWeight接近最大值的90%时触发重置
-    uint256 public constant REWARD_OVERFLOW_THRESHOLD = 158456325028528675187087900672; // ~90% of 2^256
+    uint256 public constant REWARD_OVERFLOW_THRESHOLD = 0x8000000000000000000000000000000000000000000000000000000000000000; // ~50% of 2^256
     uint256 public rewardResetCount;
+
+    uint256 public emergencyWithdrawTimelock = 48 hours;
+    uint256 public emergencyWithdrawUnlockTime;
 
     mapping(address => uint256) public pendingRewards;
     uint256 public todayIncomingTokens;
@@ -170,9 +168,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             // 更新用户级别累计跟踪
             userStakedWeight[msg.sender] += weight;
             
-            // 用户级别累计快照溢出检查
-            require(_userSnapshotWeight[msg.sender] < USER_SNAPSHOT_OVERFLOW_THRESHOLD, "Staking: User snapshot overflow imminent");
-            _userSnapshotWeight[msg.sender] += globalRewardPerWeight * weight;
+            uint256 snapshotIncrement = globalRewardPerWeight * weight;
+            require(_userSnapshotWeight[msg.sender] <= USER_SNAPSHOT_OVERFLOW_THRESHOLD - snapshotIncrement, "Staking: User snapshot overflow imminent");
+            _userSnapshotWeight[msg.sender] += snapshotIncrement;
         }
         emit Staked(msg.sender, tokenIds);
     }
@@ -542,19 +540,32 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+        require(block.timestamp >= emergencyWithdrawUnlockTime, "Staking: Timelock not expired");
         require(amount > 0, "Staking: Amount must be > 0");
         require(amount <= address(this).balance, "Staking: Insufficient balance");
         (bool success, ) = payable(owner()).call{value: amount}("");
         require(success, "Staking: BNB transfer failed");
+        emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+        require(block.timestamp >= emergencyWithdrawUnlockTime, "Staking: Timelock not expired");
         require(amount > 0, "Staking: Amount must be > 0");
         require(rewardTokenContract != address(0), "Staking: Token contract not set");
         IERC20 token = IERC20(rewardTokenContract);
         require(token.balanceOf(address(this)) >= amount, "Staking: Insufficient token balance");
         token.safeTransfer(owner(), amount);
+        emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
+    }
+
+    function setEmergencyWithdrawTimelock(uint256 _timelock) external onlyOwner {
+        require(_timelock >= 24 hours, "Staking: Timelock must be at least 24 hours");
+        emergencyWithdrawTimelock = _timelock;
+    }
+
+    function scheduleEmergencyWithdraw() external onlyOwner {
+        emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
     }
 }

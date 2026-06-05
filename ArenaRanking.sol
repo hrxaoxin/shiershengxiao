@@ -994,19 +994,13 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         
         uint256 totalPlayers = seasonRankings[seasonId].length;
         uint256 totalRealPlayers = _countRealPlayers(seasonId);
-        uint256 mockRewardTotal = 0;
         
-        for (uint256 i = 0; i < totalPlayers; i++) {
-            address player = seasonRankings[seasonId][i];
-            
-            if (_isMockPlayer(player)) {
-                uint256 rank = i + 1;
-                uint256 reward = _calculateRankReward(rank, season.rewardPool, totalPlayers);
-                mockRewardTotal += reward;
-            }
+        if (totalRealPlayers == 0) {
+            season.rewardCalculated = true;
+            return;
         }
         
-        uint256 realPlayerRewardPool = season.rewardPool - mockRewardTotal;
+        uint256 realPlayerRewardPool = season.rewardPool;
         uint256 totalDistributed = 0;
         
         for (uint256 i = 0; i < totalPlayers; i++) {
@@ -1020,16 +1014,6 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             uint256 reward = _calculateRankReward(rank, realPlayerRewardPool, totalRealPlayers);
             playerSeasonRewards[seasonId][player] = reward;
             totalDistributed += reward;
-        }
-        
-        if (mockRewardTotal > 0 && mockRewardRecipient != address(0)) {
-            if (rewardType == 0) {
-                (bool success, ) = payable(mockRewardRecipient).call{value: mockRewardTotal}("");
-                require(success, "ArenaRanking: Mock reward transfer failed");
-            } else {
-                IERC20(tokenContract).safeTransfer(mockRewardRecipient, mockRewardTotal);
-            }
-            emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonId);
         }
         
         season.pendingRewards += totalDistributed;
@@ -1622,6 +1606,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         for (uint256 i = 0; i < 6; i++) {
             uint256 tokenId = team[i];
             if (tokenId > 0) {
+                require(nftBattleLocked[tokenId] == 0, "ArenaRanking: NFT already locked");
                 nftBattleLocked[tokenId] = battleId;
             }
         }

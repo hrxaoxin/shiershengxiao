@@ -275,7 +275,11 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
         uint256 perWeightDividendIncrement = 0;
         if (totalWeight > 0) {
-            perWeightDividendIncrement = amount * 1e18 / totalWeight;
+            unchecked {
+                perWeightDividendIncrement = (amount * 1e18) / totalWeight;
+            }
+            require(cumulativePerWeightDividend <= type(uint256).max - perWeightDividendIncrement, 
+                "DividendManager: Overflow imminent");
             cumulativePerWeightDividend += perWeightDividendIncrement;
         }
 
@@ -614,7 +618,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
         DividendSnapshot[] memory result = new DividendSnapshot[](endIndex - startIndex);
         for (uint256 i = startIndex; i < endIndex; i++) {
-            uint256 actualIndex = (snapshotStartIndex + i) % totalCount;
+            uint256 actualIndex = _getActualIndex(i);
             result[i - startIndex] = snapshots[actualIndex];
         }
 

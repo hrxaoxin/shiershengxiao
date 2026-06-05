@@ -394,6 +394,10 @@
                 filterMarketplace();
             });
 
+            document.getElementById('filterPrice').addEventListener('change', () => {
+                filterMarketplace();
+            });
+
             document.getElementById('refreshUserNfts').addEventListener('click', () => {
                 userNftCache = null;
                 loadUserNftsForListing();
@@ -788,6 +792,7 @@
 
         function filterMarketplace() {
             const filterType = document.getElementById('filterType').value;
+            const filterPrice = document.getElementById('filterPrice').value;
             
             if (!originalListings || originalListings.length === 0) {
                 loadMarketplace();
@@ -800,11 +805,19 @@
                 const attrIndexes = { water: 0, wind: 1, fire: 2, dark: 3, light: 4 };
                 const targetAttrIndex = attrIndexes[filterType];
                 if (targetAttrIndex !== undefined) {
-                    filteredListings = originalListings.filter(item => {
+                    filteredListings = filteredListings.filter(item => {
                         const typeId = parseInt(item.type, 10);
                         const itemAttrIndex = Math.floor(typeId / 24);
                         return itemAttrIndex === targetAttrIndex;
                     });
+                }
+            }
+            
+            if (filterPrice !== 'all') {
+                if (filterPrice === 'low') {
+                    filteredListings.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+                } else if (filterPrice === 'high') {
+                    filteredListings.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
                 }
             }
             
