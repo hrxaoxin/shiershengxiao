@@ -351,13 +351,15 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     
     /**
      * @dev 重置 dailyRewardPerToken（当接近溢出时调用）
+     * 注意：调用此函数前必须确保所有用户已领取奖励，否则会导致奖励丢失
      */
     function resetDailyRewardPerToken() external onlyOwner {
+        require(totalPendingRewards == 0, "TokenStaking: There are pending rewards");
         dailyRewardPerToken = 0;
-        // 重置所有用户的累积奖励率记录
-        // 注意：此操作会导致用户已累积但未领取的奖励丢失
-        // 应在奖励发放周期结束后调用
+        emit DailyRewardPerTokenReset();
     }
+
+    event DailyRewardPerTokenReset();
 
     /**
      * @dev 领取奖励

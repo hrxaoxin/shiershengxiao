@@ -159,11 +159,14 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public todayStart;
     
     /**
-     * @dev Mock玩家地址的特殊前缀和后缀
-     * 格式: 0x000000000000000000000000000000000000DEAD
+     * @dev Mock玩家地址的基础地址
+     * Mock玩家地址格式为: MOCK_PLAYER_BASE + index (0-999)
      */
-    address public constant MOCK_PLAYER_PREFIX = address(0x0000000000000000000000000000000000000000);
-    address public constant MOCK_PLAYER_SUFFIX = address(0x000000000000000000000000000000000000DEAD);
+    address public constant MOCK_PLAYER_BASE = address(0x000000000000000000000000000000000000DEAD);
+    /**
+     * @dev Mock玩家最大数量
+     */
+    uint256 public constant MAX_MOCK_PLAYERS_COUNT = 1000;
     uint256 public maxRechargeAttempts = type(uint256).max;
     uint256 public seasonRewardRate;
     mapping(address => uint256) public lastBattleTime;
@@ -1061,15 +1064,14 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
     
     /**
-     * @dev 检查是否是Mock玩家（使用特殊地址范围
-     * Mock玩家地址格式为: 0x000000000000000000000000000000000000DEAD + index
+     * @dev 检查是否是Mock玩家（使用特殊地址范围）
+     * Mock玩家地址格式为: MOCK_PLAYER_BASE + index (0-999)
      */
     function _isMockPlayer(address player) internal pure returns (bool) {
-        // Mock玩家地址必须在特殊范围内：
-        // 前缀: 0x000000000000000000000000000000000000DEAD 
-        // 到: 0x000000000000000000000000000000000000DEAD + 999
-        return uint256(uint160(player)) >= 0x000000000000000000000000000000000000DEAD && 
-               uint256(uint160(player)) <= 0x000000000000000000000000000000000000DEAD + 999;
+        uint256 playerAddress = uint256(uint160(player));
+        uint256 baseAddress = uint256(uint160(MOCK_PLAYER_BASE));
+        return playerAddress >= baseAddress && 
+               playerAddress < baseAddress + MAX_MOCK_PLAYERS_COUNT;
     }
     
     /**
