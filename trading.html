@@ -326,8 +326,8 @@
         }
 
         document.addEventListener('DOMContentLoaded', async function() {
-            initWalletUI();
             ZODIAC_COMPONENTS.injectNavigation('trading');
+            initWalletUI();
             await initWeb3();
 
             document.getElementById('browseTab').addEventListener('click', () => {
