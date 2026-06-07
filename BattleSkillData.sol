@@ -12,13 +12,46 @@ import "./BattleSkills.sol";
  * @title BattleSkillData
  * @dev 战斗技能数据合约，存储和管理所有NFT的战斗技能
  *
- * 技能数据结构：
- * - 三维映射: fullSkills[element][zodiac][gender] => FullSkill
- * - element: 属性类型 (0-4: 水、风、火、暗、光)
- * - zodiac: 生肖类型 (0-11: 鼠到猪)
- * - gender: 性别 (0-1: 母、公)
+ * 核心职责：
+ * 1. 技能数据存储：为每种 zodiacType（共 120 种）存储对应的技能配置
+ * 2. 技能初始化：部署时通过 initAllSkills() 从 BattleSkills 库初始化所有默认技能
+ * 3. 技能查询：为 Battle 合约提供 getSkill(tokenType) 接口读取技能
  *
- * 技能包含：ID、类型、伤害值、冷却时间、AOE标志
+ * 技能数据结构（基于 BattleLib.FullSkill）：
+ * - 每个 zodiacType 对应一套完整技能（普攻 + 3 个技能 + 终极技）
+ * - 属性影响技能伤害（火→高爆发、水→控制、风→速攻、暗→吸血、光→治疗）
+ * - 等级影响技能强度（升级时由 Battle 合约读取伤害倍率加成）
+ *
+ * 三维映射存储（为了减少索引开销，使用两层嵌套 mapping）：
+ *   fullSkills[elementIndex][zodiacIndex][genderIndex] = FullSkill
+ * - elementIndex: 0=水, 1=风, 2=火, 3=暗, 4=光
+ * - zodiacIndex: 0-11 (鼠到猪)
+ * - genderIndex: 0=母, 1=公
+ *
+ * 也可以直接使用一维 tokenType（0-119）查询：
+ *   getSkill(tokenType) = fullSkills[tokenType/24][(tokenType%24)/2][tokenType%2]
+ *
+ * 初始化流程（两步确认，防止恶意注入）：
+ * 1. 部署时调用 initialize() → skillsInitializationPending = true
+ * 2. owner 调用 confirmSkillInitialization() → 执行 _initAllSkills()，
+ *    调用 BattleSkills.initAllSkills(fullSkills) 填充 120 种类型技能
+ *    → skillsInitializationPending = false, skillsInitialized = true
+ * 3. owner 可调用 initAllSkills() 再次覆盖（更新技能平衡）
+ *
+ * 访问权限：
+ * - onlyOwner：可调用 initAllSkills 重新初始化或更新技能
+ * - 任何地址：可公开 view 读取 getSkill / getSkillByIndexes（只读查询免费）
+ *
+ * 与其他合约联动：
+ * - Battle.sol：战斗时读取技能配置，计算伤害、冷却、触发效果
+ * - BattleSkills.sol：技能初始化逻辑（library，无状态）
+ * - NFTMint / NFTData：根据 zodiacType 获取对应 NFT 的技能信息在前端展示
+ *
+ * 升级与治理：
+ * - UUPS 可升级：未来可扩展新技能类型、调整伤害公式、增加被动技能
+ * - owner 可重新初始化技能以做平衡性调整（nerf/buff）
+ *
+ * 注意：本合约不直接参与战斗结算，仅提供只读数据，战斗逻辑由 Battle 合约负责。
  */
 contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**

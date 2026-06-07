@@ -11,27 +11,57 @@ import "./NFTInterface.sol";
  * @title NFTData
  * @dev NFT数据存储合约
  *
- * 本合约采用分离存储模式，将NFT的元数据（类型、等级、铸造时间）
- * 与ERC721代币数据分离存储，以提高存储效率和合约升级灵活性
+ * 本合约采用"分离存储"模式，将NFT的元数据（类型、等级、成长值、铸造时间）
+ * 与ERC721代币所有权数据（由 NFTMint 管理）分离存储，以提高存储效率和合约升级灵活性。
+ *
+ * 设计动机：
+ * - ERC721 主合约（NFTMint）负责所有权转移和铸造，不可轻易替换
+ * - 元数据可以在不影响代币所有权的情况下扩展（例如新增成长值字段）
+ * - 前端可以只查询本合约获取 NFT 详情，减轻主合约负担
  *
  * 存储结构：
- * - _nftInfo: mapping(tokenId => NFTInfo) - 存储每个NFT的元数据
- * - _nftTypeOwners: mapping(nftType => address[]) - 每种NFT类型的持有者列表
- * - _userNFTs: mapping(user => tokenId[]) - 每个用户持有的NFT列表
+ * - _nftInfo[tokenId] → NFTInfo { tokenId, zodiacType, level, growth, mintTime }
+ *   每一个 NFT 的完整信息，供 Battle、Staking、Breeding 等业务合约读取
+ * - _nftTypeOwners[zodiacType] → address[] 每种类型的持有者列表（用于市场统计）
+ * - _userNFTs[owner] → tokenId[] 每个用户持有的 NFT 列表（用于前端分页）
+ * - _userNFTsByType[owner][zodiacType] → tokenId[] 每个用户按类型分组的 NFT（用于快速计算权重）
  *
- * NFTInfo包含：
- * - tokenId: NFT唯一标识符
- * - zodiacType: 生肖类型（0-119）
- * - level: 等级（1-5）
- * - mintTime: 铸造时间戳
+ * 数据模型说明：
+ * - RARE_TYPE_START = 72：zodiacType >= 72 为稀有属性（暗/光）
+ * - MAX_ZODIAC_TYPE = 119：最大合法 zodiacType（共 120 种，0-119）
+ * - level ∈ [1, 5]：等级由 NFTUpdate 升级，影响战斗属性和权重
+ * - growth ∈ [10, 100]：成长值，铸造时随机生成，影响基础属性加成
  *
- * 数据访问模式：
- * - 读取NFT信息：直接查询_nftInfo
- * - 遍历用户NFT：遍历_userNFTs[user]
- * - 统计某类型NFT：遍历_nftTypeOwners[nftType]
+ * 数据写入权限（严格隔离，防止篡改）：
+ * - onlyMintContract：NFTMint 调用 setNFTInfo() 写入新铸造的 NFT
+ * - onlyUpdateContract：NFTUpdate 调用 updateLevel() 更新等级
+ * - onlyTradingContract / onlyStakingContract / onlyBreedingContract：
+ *   各自在 NFT 转入转出时维护 _userNFTs 和 _nftTypeOwners 的索引
  *
- * 升级支持：
- * - 支持UUPS代理升级模式
+ * 数据读取（全部公开 view，Gas 免费）：
+ * - getNFTInfo(tokenId)：返回完整 NFTInfo
+ * - getNFTLevel(tokenId)：返回等级（供 Battle/Staking 快速查询）
+ * - getNFTType(tokenId)：返回生肖类型（供属性克制判断）
+ * - getUserAllTokens(owner)：返回用户的全部 NFT ID 数组
+ * - getUserTokensByPage(owner, page, pageSize)：分页返回，优化前端加载
+ * - getUserWeight(owner)：计算用户加权权重（供分红池使用）
+ *
+ * 与其他合约的联动：
+ * - NFTMint.mintForUser → NFTData.setNFTInfo（新增记录）
+ * - NFTUpdate.upgradeWithNFT → NFTData.updateLevel（更新等级）
+ * - NFTTrading.buyNFT → NFTData.transferOwnership（在买卖双方间转移索引）
+ * - Staking.stakeNFT → NFTData.staked(tokenId) 标记（如果实现）
+ * - WeightManager / DividendManager 通过 getUserWeight 计算分红
+ *
+ * 升级与迁移支持：
+ * - UUPS 可升级：未来可在不改变代币地址的情况下替换数据访问逻辑
+ * - 所有 mapping 使用 storage，代理升级后数据完整保留
+ *
+ * 典型数据查询流程：
+ * 1. 用户打开"我的 NFT"页面
+ * 2. 前端调用 getUserTokensByPage(user, 0, 20) 获得第一页 ID
+ * 3. 前端逐个 ID 调用 getNFTInfo 获取详情（或批量查询）
+ * 4. 前端展示等级、属性、成长值，并调用 Battle/Staking 等其他合约获取附加信息
  */
 contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     using NFTDataTypes for uint256;
@@ -121,6 +151,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _authorizer 授权合约地址
      */
     function initialize(address _authorizer) external initializer {
+        require(_authorizer != address(0), "NFTData: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         authorizer = _authorizer;
@@ -136,6 +167,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param a 授权合约地址
      */
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "NFTData: Invalid authorizer address");
         authorizer = a;
     }
 

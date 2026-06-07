@@ -12,6 +12,51 @@ import "./NFTInterface.sol";
 /**
  * @title Staking
  * @dev NFT质押合约（优化版：支持大规模用户，实时奖励计算）
+ *
+ * 核心功能：
+ * 1. NFT质押（stakeNFT）：用户将NFT转入合约，进入质押池开始产生奖励
+ * 2. 奖励领取（claimReward）：用户领取累计奖励，基于全局累积奖励快照计算
+ * 3. 解除质押（unstakeNFT）：取出质押的NFT，需经过最小锁仓期（minStakingDuration）
+ * 4. 紧急提取（emergencyWithdraw）：经过 timelock 后可强制提取，防止合约异常锁死资金
+ *
+ * 奖励机制设计（O(1) 计算，Gas 优化版）：
+ * - 核心思想：用一个全局累积变量（globalRewardPerWeight）记录"每单位权重的历史累积奖励"
+ * - 每个 NFT 记录质押时的 globalRewardPerWeight 快照（accumulatedReward）
+ * - 用户领取时：(当前 globalRewardPerWeight - NFT快照值) × NFT权重 = 该NFT应得奖励
+ * - 这样无论多少用户质押，每次新增奖励池只需更新全局变量，无需遍历所有用户
+ *
+ * 权重系统：
+ * - 普通NFT（水/风/火属性，type < 72）：根据等级赋予权重 1/2/6/18/66
+ * - 稀有NFT（暗/光属性，type >= 72）：根据等级赋予权重 10/12/16/28/76
+ * - 等级越高，权重越大，奖励比例越高
+ * - 权重同时会更新到 WeightManager / DividendManager，用于分红池分配
+ *
+ * 动态奖励率调整：
+ * - 基础奖励率（rewardRate）：默认1%（100/10000）
+ * - 最大奖励率（maxRewardRate）：默认2%
+ * - 根据每日流入资金自动调整，激励长期持有者
+ *
+ * 溢出保护：
+ * - globalRewardPerWeight 使用 uint256，设置 REWARD_OVERFLOW_THRESHOLD 预警
+ * - 用户快照权重（_userSnapshotWeight）同样有溢出阈值保护
+ * - 达到阈值时触发 rewardResetCount，重置累积变量防止溢出
+ *
+ * 安全限制：
+ * - 最小质押持续时间（minStakingDuration = 30分钟）：防止刷奖励
+ * - 重入保护（ReentrancyGuard）：防止 claimReward 时的重入攻击
+ * - 紧急提取 timelock（emergencyWithdrawTimelock = 48小时）：防止恶意 owner 提取
+ * - 暂停机制（paused）：紧急情况下暂停全部用户操作
+ *
+ * 典型用户流程：
+ * 1. 授权合约转移NFT（approve/setApprovalForAll）
+ * 2. 调用 stakeNFT(tokenId) 质押NFT
+ * 3. 等待若干时间（合约持续更新 globalRewardPerWeight）
+ * 4. 调用 claimReward() 领取累计奖励
+ * 5. 30分钟锁仓期后调用 unstakeNFT(tokenId) 解除质押
+ *
+ * 合约升级：
+ * - UUPS 可升级模式，由 onlyOwner 授权升级
+ * - 所有状态变量均为 storage 存储，升级后保留
  */
 contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
@@ -315,10 +360,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         }
         
         if (totalWeightedNFTs > 0 && dailyReward > 0) {
-            uint256 increment = dailyReward * STAKING_REWARD_PRECISION / totalWeightedNFTs;
-            // 在累加前检查溢出
+            uint256 increment;
+            unchecked {
+                increment = (dailyReward * STAKING_REWARD_PRECISION) / totalWeightedNFTs;
+            }
             require(globalRewardPerWeight <= type(uint256).max - increment, "Staking: Reward overflow imminent");
-            // 检查是否需要重置
             if (globalRewardPerWeight + increment >= REWARD_OVERFLOW_THRESHOLD) {
                 _resetRewardTracking();
             }
@@ -449,17 +495,23 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     /**
      * @dev 内部函数：O(1) 计算用户总待领取奖励
      * 公式：Σ(G - Ai) * Wi / P = (G * ΣWi - Σ(Ai * Wi)) / PRECISION
+     * 采用先乘后除方式，避免早期除法导致精度损失
      */
     function _calcUserPending(address user) internal view returns (uint256) {
         uint256 totalWeight = userStakedWeight[user];
         if (totalWeight == 0) return pendingRewards[user];
 
         uint256 snapshotBase = _userSnapshotWeight[user];
+        uint256 rewardBase;
+        unchecked {
+            rewardBase = globalRewardPerWeight * totalWeight;
+        }
 
-        uint256 rewardBase = globalRewardPerWeight * totalWeight;
-
-        uint256 earnedReward = rewardBase <= snapshotBase ? 0 : (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
-        
+        if (rewardBase <= snapshotBase) return pendingRewards[user];
+        uint256 earnedReward;
+        unchecked {
+            earnedReward = (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
+        }
         return earnedReward + pendingRewards[user];
     }
 
@@ -539,7 +591,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         return index + 1;
     }
 
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
         require(block.timestamp >= emergencyWithdrawUnlockTime, "Staking: Timelock not expired");
         require(amount > 0, "Staking: Amount must be > 0");
         require(amount <= address(this).balance, "Staking: Insufficient balance");
@@ -549,7 +601,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(block.timestamp >= emergencyWithdrawUnlockTime, "Staking: Timelock not expired");
         require(amount > 0, "Staking: Amount must be > 0");
         require(rewardTokenContract != address(0), "Staking: Token contract not set");

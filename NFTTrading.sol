@@ -11,11 +11,54 @@ import "./NFTInterface.sol";
  * @title NFTTrading
  * @dev NFT交易市场合约，支持NFT的挂牌、购买和下架
  *
+ * 核心功能：
+ * 1. 挂牌（listNFT）：NFT所有者将其NFT以固定价格（BNB）挂牌出售
+ * 2. 购买（buyNFT）：买家支付 BNB 获得 NFT，卖家获得扣除手续费后的 BNB
+ * 3. 下架（delistNFT）：卖家在未售出前可随时下架，取回 NFT
+ * 4. 批量挂牌 / 下架（可选前端批量调用）
+ *
  * 交易规则：
- * 1. NFT所有者可以挂牌出售
- * 2. 购买者支付BNB购买NFT
- * 3. 卖家收到BNB（扣除手续费）
- * 4. 5%手续费全部进入手续费接收地址
+ * - 挂牌者必须是 NFT 所有者（ERC721 ownerOf 验证）
+ * - 挂牌者必须授权本合约转移 NFT（approve / setApprovalForAll）
+ * - 价格以 BNB（原生代币）计价，不可为 0
+ * - 手续费率 feePercent（默认 5%），以 BNB 形式扣除
+ * - 5% 手续费全部转入 feeReceiver 地址（由 owner 设置）
+ * - 手续费中的部分会进一步分配到 PoolManager 供质押/分红使用
+ *
+ * 数据结构：
+ * - listings[tokenId] → Listing { seller, priceWei, listTime }
+ *   记录每个被挂牌 NFT 的卖家和价格信息
+ * - listedNFTs[] → 当前在售的 NFT ID 列表，供前端快速获取在售列表
+ *
+ * 价格更新：
+ * - updatePrice(tokenId, newPrice)：卖家可调整挂牌价格
+ * - 必须高于某个最小价格（防止误操作设为 0）
+ *
+ * 与其他合约联动：
+ * - NFTMint / NFTData：读取 NFT 类型和等级，前端展示并判断稀有度
+ * - WeightManager / DividendManager：NFT 所有权转移后更新权重，影响分红计算
+ * - PoolManager：手续费中部分比例作为游戏生态奖励池资金
+ * - Authorizer：通过 Authorizer 设置 feeReceiver 等地址
+ *
+ * 权限控制：
+ * - onlyOwner：设置 feePercent、feeReceiver、paused
+ * - onlySeller：只有卖家才能下架或调整自己的挂牌
+ * - 任何人（非卖家）可调用 buyNFT 购买（需发送足够 BNB）
+ *
+ * 安全限制：
+ * - ReentrancyGuard：购买流程的 BNB 转账 + NFT 转账需防止重入
+ * - Pausable：可暂停新挂牌和购买（用于维护/安全事件）
+ * - 价格校验：> 0 且 < 某个上限（防止 overflow）
+ * - 所有权校验：购买时再次验证卖家仍是 NFT 拥有者（防止已转移后被购买）
+ * - 未授权的购买金额不足：直接回滚并退款
+ *
+ * 典型交易流程：
+ * 1. 卖家在 NFTMint 合约授权 NFTTrading 转移 NFT
+ * 2. 卖家调用 listNFT(tokenId, priceWei) → NFT 被转入合约，加入 listedNFTs
+ * 3. 买家浏览市场，选中 NFT 调用 buyNFT(tokenId) 并附带 BNB
+ * 4. 合约验证金额 ≥ priceWei → 转 BNB 给卖家（扣 5% 手续费），转 NFT 给买家
+ * 5. emit NFTTraded 事件，前端刷新页面
+ * 6. 若卖家取消：调用 delistNFT(tokenId) → NFT 返回卖家，从 listedNFTs 移除
  */
 contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
@@ -78,6 +121,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @param _authorizer 授权合约地址
      */
     function initialize(address _authorizer) external initializer {
+        require(_authorizer != address(0), "NFTTrading: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -94,6 +138,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @param a 授权合约地址
      */
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "NFTTrading: Invalid authorizer address");
         authorizer = a;
     }
 
@@ -416,7 +461,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         }
     }
 
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "NFTTrading: Amount must be > 0");
         require(amount <= address(this).balance, "NFTTrading: Insufficient balance");
         (bool success, ) = payable(owner()).call{value: amount}("");
@@ -424,7 +469,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    function emergencyWithdrawNFT(uint256 tokenId) external onlyOwner {
+    function emergencyWithdrawNFT(uint256 tokenId) external onlyOwner nonReentrant {
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         INFTMint nft = INFTMint(nftContract);
         nft.safeTransferFrom(address(this), owner(), tokenId);

@@ -7,17 +7,38 @@ import "./BattleLib.sol";
  * @title BattleSkills
  * @dev 战斗技能初始化库，负责初始化所有属性的技能数据
  *
- * 属性编号：
- * - 0: 水属性
- * - 1: 风属性
- * - 2: 火属性
- * - 3: 暗属性
- * - 4: 光属性
+ * 本合约为纯逻辑库（library），无状态，仅提供技能配置初始化函数。
+ * 由 BattleSkillData 合约在部署 / 平衡调整时调用，将技能数据写入其 storage 中。
  *
- * 技能数据结构：
- * - 每个属性有12个生肖（0-11）
- * - 每个生肖有2个技能（0-1）
- * - 技能包含：ID、类型、伤害值、冷却时间、AOE标志
+ * 属性编号映射：
+ * - 0: 水属性（WATER）→ initWaterSkills
+ * - 1: 风属性（WIND）→ initWindSkills
+ * - 2: 火属性（FIRE）→ initFireSkills
+ * - 3: 暗属性（DARK）→ initDarkSkills
+ * - 4: 光属性（LIGHT）→ initLightSkills
+ *
+ * 技能数据结构（基于 BattleLib.FullSkill）：
+ * - 每个属性 × 12 生肖 × 2 性别 = 120 套完整技能配置
+ * - 每套 FullSkill 包括：普攻、技能1、技能2、技能3、终极技能
+ * - 每个技能包含：技能 ID、类型、基础伤害值、冷却回合数、是否 AOE
+ *
+ * 属性技能特性（基础设定，可由 owner 调整平衡）：
+ * - 水属性：冰冻/减速类技能，偏控制与持续伤害
+ * - 风属性：高暴击/多段攻击，偏快速进攻
+ * - 火属性：高爆发/AOE 灼烧，偏群体输出
+ * - 暗属性：吸血/减益，偏续航与削弱敌方
+ * - 光属性：治疗/护盾，偏辅助与团队增益
+ *
+ * 使用流程：
+ * 1. BattleSkillData 初始化时，调用 initAllSkills(skills)
+ * 2. 内部依次调用 initWaterSkills / initWindSkills / initFireSkills /
+ *    initDarkSkills / initLightSkills，填充 120 套技能
+ * 3. 战斗时 Battle 合约从 BattleSkillData.getSkill(tokenType) 读取
+ *
+ * 平衡性调整：
+ * - 可由 owner 重新执行 initAllSkills 覆盖全部技能（版本升级）
+ * - 可新增单独函数更新特定属性技能（精细调整）
+ * - 调整建议在测试网测试战斗数值后再上线主网
  */
 library BattleSkills {
     /**

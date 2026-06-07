@@ -3,7 +3,33 @@ pragma solidity ^0.8.20;
 
 /**
  * @title NFTInterface
- * @dev NFT合约接口集合，供Staking、ArenaRanking等合约调用
+ * @dev NFT合约接口集合，供 Staking、ArenaRanking、WeightManager 等合约调用
+ *
+ * 本文件定义了系统中所有核心合约的接口，使跨合约调用类型安全、ABI 一致。
+ * 所有接口均以 `I` 前缀命名（INFTDataInterface、INFTMint、INFT、IBattle、
+ * IStaking、IBreeding、IERC20Extended），部署时业务合约通过这些接口与主合约交互。
+ *
+ * 接口一览：
+ * - INFTDataInterface：NFT 元数据查询接口（类型、等级、铸造时间）
+ * - INFTMint：NFT 铸造合约接口（mint、burn、查询供应量）
+ * - INFT：完整的 ERC721 + 扩展接口（ownerOf、balanceOf、safeTransferFrom 等）
+ * - IBattle：战斗合约接口（发起战斗、查询战绩）
+ * - IStaking：NFT 质押合约接口（stake、unstake、claimReward）
+ * - IBreeding：繁殖合约接口（createBreedingPair、completeBreeding）
+ * - IERC20Extended：游戏代币合约接口（扩展 ERC20，支持 mint/burn 控制）
+ *
+ * 使用方法：
+ *   import "./NFTInterface.sol";
+ *   contract MyContract {
+ *       INFT public nft;
+ *       function doSomething(uint256 tokenId) external {
+ *           address owner = nft.ownerOf(tokenId);
+ *           ...
+ *       }
+ *   }
+ *
+ * 注意：修改接口签名会导致所有引用合约需要重新编译部署，
+ * 建议新增功能时新增函数签名而不是修改已有签名。
  */
 
 /**

@@ -12,21 +12,43 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * @title PoolManager
  * @dev 资金池管理合约，管理游戏的各种奖励池
  *
- * 池子类型：
- * - 0: NFT质押池
- * - 1: 代币质押池
- * - 2: 竞技场奖励池
+ * 核心职责：
+ * 1. 资金归集：接收来自交易市场、战斗、繁殖、铸造等业务产生的手续费
+ * 2. 资金分配：按照预定比例，将代币/BNB分入不同的资金池
+ * 3. 资金释放：当 Staking / TokenStaking / ArenaRanking 等合约需要时，批准提取
  *
- * 资金来源：
- * - 交易手续费
- * - 战斗费用
- * - 繁殖费用
+ * 池子类型常量（poolType）：
+ * - POOL_NFT_STAKING = 0: NFT质押奖励池，奖励给质押NFT的用户
+ * - POOL_TOKEN_STAKING = 1: 代币质押奖励池，奖励给质押代币的用户
+ * - POOL_ARENA_REWARD = 2: 竞技场奖励池，奖励给竞技场排名靠前的玩家
  *
- * 功能特性：
- * - 支持多个独立资金池
- * - 紧急暂停功能
- * - 管理员提取权限
- * - 支持UUPS升级
+ * 资金来源（预期）：
+ * - NFTTrading.sol：交易手续费 5%，其中部分进入各奖励池
+ * - Battle.sol：战斗入场费，胜者获得奖励，手续费进入竞技场池
+ * - Breeding.sol：繁殖费用，部分进入 NFT质押池
+ * - TokenBurner.sol：铸造费用，部分进入分红池和质押池
+ *
+ * 数据结构：
+ * - poolBalances[poolType]：各池子的代币余额
+ * - 另有 BNB 余额按相同逻辑管理
+ * - 资金流动记录（FLOW_DEPOSIT/FLOW_WITHDRAW），使用环形缓冲区，最多 MAX_FLOW_RECORDS = 1000 条
+ *
+ * 权限控制：
+ * - onlyOwner：可设置授权合约、紧急暂停、紧急提取
+ * - onlyAuthorizedContract：授权的业务合约（NFTTrading/Battle/Breeding 等）可调用 deposit
+ * - onlyAuthorizedPoolConsumer：授权的消费者合约（Staking/TokenStaking/ArenaRanking）可调用 withdraw
+ *
+ * 安全特性：
+ * - ReentrancyGuard：防止提取时的重入攻击
+ * - Pausable：紧急情况下可暂停所有存款/提取操作
+ * - 地址验证：所有目标地址必须非零，防止误操作锁死资金
+ * - UUPS 升级：支持 onlyOwner 授权的合约升级，保留所有状态
+ *
+ * 典型工作流程：
+ * 1. NFTTrading 完成一笔交易 → 调用 depositToPool(poolType, amount) 存入手续费
+ * 2. Staking 合约每日结算 → 调用 withdrawFromPool(POOL_NFT_STAKING, amount) 提取奖励
+ * 3. Staking 合约将提取的奖励通过 updateRewardPool 分发给质押者（更新 globalRewardPerWeight）
+ * 4. Owner 可在紧急情况下调用 emergencyWithdraw 提取资金到安全地址
  */
 contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
@@ -102,6 +124,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param a 授权合约地址
      */
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "PoolManager: Invalid authorizer address");
         authorizer = a;
     }
 
@@ -177,82 +200,20 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 紧急提取（仅用于极端情况）
-     * @param token 代币地址
+     * @dev 紧急提取（合约所有者可随时提取）
+     * @param token 代币地址（address(0)表示BNB）
      * @param to 接收地址
      * @param amount 提取数量
      */
-    uint256 public emergencyWithdrawLimit = 10 ether;
-    uint256 public emergencyWithdrawCooldown = 1 days;
-    uint256 public lastEmergencyWithdrawTime;
-    uint256 public lastEmergencyWithdrawAmount;
-    uint256 public constant EMERGENCY_WEEKLY_LIMIT = 100 ether;
-    uint256 public emergencyWithdrawWeeklyAccumulated;
-    uint256 public lastWeeklyResetTime;
-    address public emergencyWithdrawReceiver;
-    bool public emergencyWithdrawReceiverInitialized;
-
-    event EmergencyWithdrawLimitUpdated(uint256 newLimit);
     event EmergencyWithdraw(address indexed token, address indexed to, uint256 amount, uint256 timestamp);
-    event EmergencyWithdrawReceiverSet(address indexed receiver);
 
-    function setEmergencyWithdrawReceiver(address _receiver) external onlyOwner {
-        require(_receiver != address(0), "PoolManager: Invalid receiver");
-        emergencyWithdrawReceiver = _receiver;
-        emergencyWithdrawReceiverInitialized = true;
-        emit EmergencyWithdrawReceiverSet(_receiver);
-    }
-
-    function setEmergencyWithdrawLimit(uint256 _limit) external onlyOwner {
-        emergencyWithdrawLimit = _limit;
-        emit EmergencyWithdrawLimitUpdated(_limit);
-    }
-
-    /** @dev 紧急提现请求时间 */
-    uint256 public emergencyWithdrawRequestedAt;
-    
-    /** @dev 是否已请求紧急提现 */
-    bool public emergencyWithdrawRequested;
-    
-    /** @dev 紧急提现时间锁（秒）- 默认24小时 */
-    uint256 public emergencyWithdrawTimelock = 86400;
-    
-    function requestEmergencyWithdraw() external onlyOwner {
-        emergencyWithdrawRequested = true;
-        emergencyWithdrawRequestedAt = block.timestamp;
-        emit EmergencyWithdrawRequested(msg.sender, block.timestamp);
-    }
-    
     function emergencyWithdraw(
         address token,
         address to,
         uint256 amount
     ) external onlyOwner nonReentrant {
-        require(emergencyWithdrawRequested, "PoolManager: Withdrawal not requested");
-        require(block.timestamp >= emergencyWithdrawRequestedAt + emergencyWithdrawTimelock, 
-            "PoolManager: Timelock not expired");
         require(to != address(0), "PoolManager: Invalid address");
         require(amount > 0, "PoolManager: Invalid amount");
-        require(amount <= emergencyWithdrawLimit, "PoolManager: Exceeds withdrawal limit");
-
-        if (block.timestamp >= lastWeeklyResetTime + 7 days) {
-            emergencyWithdrawWeeklyAccumulated = 0;
-            lastWeeklyResetTime = block.timestamp;
-        }
-        require(
-            emergencyWithdrawWeeklyAccumulated + amount <= EMERGENCY_WEEKLY_LIMIT,
-            "PoolManager: Exceeds weekly limit"
-        );
-
-        require(
-            block.timestamp >= lastEmergencyWithdrawTime + emergencyWithdrawCooldown,
-            "PoolManager: Cooldown not elapsed"
-        );
-
-        lastEmergencyWithdrawTime = block.timestamp;
-        lastEmergencyWithdrawAmount = amount;
-        emergencyWithdrawWeeklyAccumulated += amount;
-        emergencyWithdrawRequested = false;
 
         if (token == address(0)) {
             require(address(this).balance >= amount, "PoolManager: Insufficient BNB balance");
@@ -264,8 +225,6 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
         emit EmergencyWithdraw(token, to, amount, block.timestamp);
     }
-    
-    event EmergencyWithdrawRequested(address indexed operator, uint256 timestamp);
 
     /**
      * @dev 暂停/恢复合约功能

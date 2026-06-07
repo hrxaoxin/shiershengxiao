@@ -10,9 +10,43 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 
 /**
  * @title TokenStaking
- * @dev 代币质押合约
- * 允许用户质押代币获取BNB奖励，支持弹性奖励释放机制
- * 基于OpenZeppelin UUPS可升级合约实现
+ * @dev 代币质押合约，允许用户质押原生代币以获取BNB奖励
+ *
+ * 核心功能：
+ * 1. 代币质押（stakeTokens）：用户存入代币，进入质押池
+ * 2. 奖励领取（claimRewards）：根据用户质押份额分配合约收到的BNB
+ * 3. 解除质押（unstakeTokens）：取出质押的代币，需经过最小锁仓期
+ *
+ * 奖励机制设计：
+ * - 全局累积奖励/代币（rewardPerToken）持续累积
+ * - 用户领取时计算其快照与当前值的差值 × 质押数量 = 应得奖励
+ * - 用户快照（lastAccumulatedRate）记录上次领取时的累积值，防止重复计算
+ * - 每日奖励计算：计算当前合约BNB余额 × rewardRate（万分比）作为当日奖励池
+ *
+ * 动态奖励率调整：
+ * - 基础奖励率（rewardRate）：默认1%（100/10000）
+ * - 最大奖励率（maxRewardRate）：默认2%（200/10000）
+ * - 当每日流入BNB超过每日奖励时，奖励率自动上调（rateStep步长）
+ * - 目的：在高流入期回馈更多给质押者，激励长期持有
+ *
+ * 安全限制：
+ * - 最小质押持续时间（MIN_STAKING_DURATION = 30分钟）：防止瞬间进出刷奖励
+ * - 最大总质押量（maxTotalStaked）：防止系统风险
+ * - 最大单用户质押量（maxUserStaked）：防止巨鲸控制奖励池
+ * - 暂停机制（Pausable）：紧急情况下可暂停全部用户操作
+ * - 重入保护（ReentrancyGuard）：防止领取奖励时的重入攻击
+ *
+ * 合约升级：
+ * - UUPS 可升级模式，由 onlyOwner 授权升级
+ * - 所有状态变量均为 storage 存储，升级后保留
+ * - 预留 __gap 存储间隙，便于未来新增变量
+ *
+ * 典型用户流程：
+ * 1. 授权合约使用代币（approve）
+ * 2. 调用 stakeTokens(amount) 质押代币
+ * 3. 等待若干时间（收取BNB奖励）
+ * 4. 调用 claimRewards() 领取累计奖励
+ * 5. 30分钟锁仓期后调用 unstakeTokens(amount) 解除质押
  */
 contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     /** @dev 基础奖励比例（万分比，默认100 = 1%） */
@@ -196,10 +230,12 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
     
     function setMaxTotalStaked(uint256 _maxTotalStaked) external onlyOwner {
+        require(_maxTotalStaked > 0, "TokenStaking: Max total must be greater than 0");
         maxTotalStaked = _maxTotalStaked;
     }
     
     function setMaxUserStaked(uint256 _maxUserStaked) external onlyOwner {
+        require(_maxUserStaked > 0, "TokenStaking: Max user must be greater than 0");
         maxUserStaked = _maxUserStaked;
     }
 
@@ -430,8 +466,12 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @param _tokenContract 代币合约地址
      */
     function setTokenContract(address _tokenContract) external onlyOwner {
+        require(_tokenContract != address(0), "TokenStaking: Invalid token contract address");
         tokenContract = _tokenContract;
+        emit TokenContractUpdated(_tokenContract);
     }
+    
+    event TokenContractUpdated(address newTokenContract);
 
     /**
      * @dev 设置代币合约地址（Authorizer 调用接口，与 ISetTokenAddress 匹配）
@@ -443,6 +483,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "TokenStaking: Invalid authorizer address");
         authorizer = a;
     }
 

@@ -191,16 +191,11 @@ window.ZODIAC_WEB3 = (function() {
         'breeding': ABIS.breedingABI,
         'rewardManager': ABIS.rewardManagerABI,
         'dividendManager': ABIS.dividendManagerABI,
-        'poolManager': ABIS.poolManagerABI,
         'tokenBurner': ABIS.tokenBurnerABI,
         'nftUpdate': ABIS.nftUpdateABI,
         'battle': ABIS.battleABI,
         'arena': ABIS.arenaABI,
-        'battleHistory': ABIS.battleHistoryABI,
-        'priceOracle': ABIS.priceOracleABI,
-        'nftData': ABIS.nftDataABI,
-        'weightManager': ABIS.weightManagerABI,
-        'authorizer': ABIS.authorizerABI
+        'priceOracle': ABIS.priceOracleABI
     };
 
     function initContracts() {
@@ -267,6 +262,14 @@ window.ZODIAC_WEB3 = (function() {
 
     // --- Staking Methods ---
     async function stakeNFTs(tokenIds) {
+        if (!tokenIds || !Array.isArray(tokenIds) || tokenIds.length === 0) {
+            throw new Error('[ZODIAC_WEB3] stakeNFTs requires a non-empty array of tokenIds');
+        }
+        for (let i = 0; i < tokenIds.length; i++) {
+            if (!tokenIds[i] || tokenIds[i] <= 0) {
+                throw new Error(`[ZODIAC_WEB3] Invalid tokenId at index ${i}`);
+            }
+        }
         try {
             const contract = await getContract('staking');
             const receipt = await sendAndTrackTransaction(contract, 'stake', [tokenIds]);
@@ -278,6 +281,14 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function unstakeNFTs(tokenIds) {
+        if (!tokenIds || !Array.isArray(tokenIds) || tokenIds.length === 0) {
+            throw new Error('[ZODIAC_WEB3] unstakeNFTs requires a non-empty array of tokenIds');
+        }
+        for (let i = 0; i < tokenIds.length; i++) {
+            if (!tokenIds[i] || tokenIds[i] <= 0) {
+                throw new Error(`[ZODIAC_WEB3] Invalid tokenId at index ${i}`);
+            }
+        }
         try {
             const contract = await getContract('staking');
             const receipt = await sendAndTrackTransaction(contract, 'unstake', [tokenIds]);
@@ -291,6 +302,10 @@ window.ZODIAC_WEB3 = (function() {
     async function claimStakingReward() {
         try {
             const contract = await getContract('staking');
+            const pendingReward = await contract.methods.getPendingReward(account).call();
+            if (!pendingReward || pendingReward === '0' || pendingReward.toString() === '0') {
+                throw new Error('[ZODIAC_WEB3] No pending reward to claim');
+            }
             const receipt = await sendAndTrackTransaction(contract, 'claimReward', []);
             return receipt;
         } catch (e) {
@@ -373,6 +388,14 @@ window.ZODIAC_WEB3 = (function() {
 
     // --- Token Staking Methods ---
     async function stakeTokens(amount) {
+        if (!amount || amount <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid staking amount: must be greater than 0');
+        }
+        const web3Instance = getWeb3();
+        const amountBN = web3Instance.utils.toBN(amount);
+        if (amountBN.isZero() || amountBN.isNeg()) {
+            throw new Error('[ZODIAC_WEB3] Staking amount must be positive');
+        }
         try {
             const contract = await getContract('tokenStaking');
             const receipt = await sendAndTrackTransaction(contract, 'stakeTokens', [amount]);
@@ -384,6 +407,14 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function unstakeTokens(amount) {
+        if (!amount || amount <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid unstaking amount: must be greater than 0');
+        }
+        const web3Instance = getWeb3();
+        const amountBN = web3Instance.utils.toBN(amount);
+        if (amountBN.isZero() || amountBN.isNeg()) {
+            throw new Error('[ZODIAC_WEB3] Unstaking amount must be positive');
+        }
         try {
             const contract = await getContract('tokenStaking');
             const receipt = await sendAndTrackTransaction(contract, 'unstakeTokens', [amount]);
@@ -418,6 +449,14 @@ window.ZODIAC_WEB3 = (function() {
         }
         try {
             const contract = await getContract('tokenContract');
+            const currentAllowance = await contract.methods.allowance(account, spender).call();
+            if (currentAllowance >= amount) {
+                console.log(`[ZODIAC_WEB3] Already approved ${amount} tokens for ${spender}`);
+                return { status: true, alreadyApproved: true };
+            }
+            if (currentAllowance > 0) {
+                await sendAndTrackTransaction(contract, 'approve', [spender, 0]);
+            }
             const receipt = await sendAndTrackTransaction(contract, 'approve', [spender, amount]);
             return receipt;
         } catch (e) {
@@ -511,6 +550,8 @@ window.ZODIAC_WEB3 = (function() {
     // --- Event Listening ---
     let activeEventSubscriptions = [];
     const MAX_EVENT_SUBSCRIPTIONS = 100;
+    const EVENT_SUBSCRIPTION_RETRY_LIMIT = 5;
+    const EVENT_SUBSCRIPTION_RETRY_DELAY_MS = 3000;
 
     function cleanupOldestSubscription() {
         if (activeEventSubscriptions.length === 0) return;
@@ -537,7 +578,7 @@ window.ZODIAC_WEB3 = (function() {
         activeEventSubscriptions.splice(oldestIndex, 1);
     }
 
-    function listenToEvent(contractName, eventName, callback, options) {
+    async function listenToEvent(contractName, eventName, callback, options) {
         if (!web3 || !account) {
             console.warn('[ZODIAC_WEB3] Web3 not initialized or account not connected');
             return;
@@ -546,32 +587,62 @@ window.ZODIAC_WEB3 = (function() {
         if (activeEventSubscriptions.length >= MAX_EVENT_SUBSCRIPTIONS) {
             cleanupOldestSubscription();
         }
+
+        let lastError = null;
         
-        getContract(contractName).then(contract => {
-            if (!contract) return;
-            
-            const eventOptions = { fromBlock: 'latest' };
-            
-            if (options) {
-                if (options.filter) {
-                    eventOptions.filter = options.filter;
+        for (let attempt = 0; attempt < EVENT_SUBSCRIPTION_RETRY_LIMIT; attempt++) {
+            try {
+                const contract = await getContract(contractName);
+                if (!contract) {
+                    throw new Error(`Contract ${contractName} not available`);
                 }
-                if (options.topics) {
-                    eventOptions.topics = options.topics;
+                
+                const eventOptions = { fromBlock: 'latest' };
+                
+                if (options) {
+                    if (options.filter) {
+                        eventOptions.filter = options.filter;
+                    }
+                    if (options.topics) {
+                        eventOptions.topics = options.topics;
+                    }
+                    if (options.fromBlock !== undefined) {
+                        eventOptions.fromBlock = options.fromBlock;
+                    }
+                    if (options.toBlock !== undefined) {
+                        eventOptions.toBlock = options.toBlock;
+                    }
                 }
-                if (options.fromBlock !== undefined) {
-                    eventOptions.fromBlock = options.fromBlock;
+                
+                // Check that event exists on the contract ABI
+                if (!contract.events || !contract.events[eventName]) {
+                    console.warn(`[ZODIAC_WEB3] Event "${eventName}" not found on contract "${contractName}" ABI`);
+                    return;
                 }
-                if (options.toBlock !== undefined) {
-                    eventOptions.toBlock = options.toBlock;
-                }
+
+                const subscription = contract.events[eventName](eventOptions, callback);
+                activeEventSubscriptions.push({
+                    contractName,
+                    eventName,
+                    subscription,
+                    timestamp: Date.now(),
+                    filter: options?.filter
+                });
+                return;
+            } catch (e) {
+                lastError = e;
+                console.warn(`[ZODIAC_WEB3] Event subscription attempt ${attempt + 1} failed for ${contractName}.${eventName}:`, e.message);
+                
+                // If this was the final retry, stop
+                if (attempt === EVENT_SUBSCRIPTION_RETRY_LIMIT - 1) break;
+                
+                // Exponential backoff: wait before retrying
+                const waitTime = EVENT_SUBSCRIPTION_RETRY_DELAY_MS * Math.pow(2, attempt);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
             }
-            
-            const subscription = contract.events[eventName](eventOptions, callback);
-            activeEventSubscriptions.push({ contractName, eventName, subscription, timestamp: Date.now(), filter: options?.filter });
-        }).catch(e => {
-            console.warn(`[ZODIAC_WEB3] Failed to subscribe to ${contractName}.${eventName}:`, e);
-        });
+        }
+        
+        console.error(`[ZODIAC_WEB3] Event subscription for ${contractName}.${eventName} failed after ${EVENT_SUBSCRIPTION_RETRY_LIMIT} attempts:`, lastError);
     }
     
     function clearOldSubscriptions(maxAge = 3600000) {
@@ -587,10 +658,10 @@ window.ZODIAC_WEB3 = (function() {
         });
     }
 
-    function listenToEvents(events) {
-        events.forEach(ev => {
-            listenToEvent(ev.contract, ev.event, ev.callback, ev.options);
-        });
+    async function listenToEvents(events) {
+        for (const ev of events) {
+            await listenToEvent(ev.contract, ev.event, ev.callback, ev.options);
+        }
     }
 
     let eventCleanupInterval = null;
@@ -610,7 +681,7 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
-    function listenToAllEvents(callbacks) {
+    async function listenToAllEvents(callbacks) {
         startEventCleanup();
         
         const events = [];
@@ -630,7 +701,7 @@ window.ZODIAC_WEB3 = (function() {
             events.push({ contract: 'breeding', event: 'BreedingCompleted', callback: callbacks.onBreedingCompleted });
         }
         if (callbacks.onBreedingStarted) {
-            events.push({ contract: 'breeding', event: 'BreedingStarted', callback: callbacks.onBreedingStarted });
+            events.push({ contract: 'breeding', event: 'BreedingPairCreated', callback: callbacks.onBreedingStarted });
         }
         if (callbacks.onRewardClaimed) {
             events.push({ contract: 'arena', event: 'RewardClaimed', callback: callbacks.onRewardClaimed });
@@ -641,7 +712,7 @@ window.ZODIAC_WEB3 = (function() {
         if (callbacks.onUnstaked) {
             events.push({ contract: 'staking', event: 'Unstaked', callback: callbacks.onUnstaked });
         }
-        listenToEvents(events);
+        await listenToEvents(events);
     }
 
     function clearAllEventListeners() {
@@ -1052,34 +1123,100 @@ window.ZODIAC_WEB3 = (function() {
 
     // --- Trading Methods ---
     async function listNFT(tokenId, priceWei) {
+        if (!tokenId || tokenId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid token ID');
+        }
+        if (!priceWei || priceWei <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid price');
+        }
         const contract = await getContract('nftTrading');
         const receipt = await sendAndTrackTransaction(contract, 'listNFT', [tokenId, priceWei]);
         return receipt;
     }
 
     async function buyNFT(tokenId) {
+        if (!tokenId || tokenId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid token ID');
+        }
         const contract = await getContract('nftTrading');
         const listing = await contract.methods.listings(tokenId).call();
+        
+        const seller = listing.seller || listing['0'];
         const price = listing.priceWei || listing['1'];
         
-        const receipt = await sendAndTrackTransaction(contract, 'buyNFT', [tokenId], { value: price });
+        if (!seller || seller === '0x0000000000000000000000000000000000000000') {
+            throw new Error('[ZODIAC_WEB3] NFT is not listed for sale');
+        }
+        if (!price || price === '0' || price.toString() === '0') {
+            throw new Error('[ZODIAC_WEB3] Invalid listing price');
+        }
+        if (seller.toLowerCase() === account.toLowerCase()) {
+            throw new Error('[ZODIAC_WEB3] Cannot buy your own NFT');
+        }
         
+        const web3Instance = getWeb3();
+        const balance = await web3Instance.eth.getBalance(account);
+        const priceBN = web3Instance.utils.toBN(price);
+        const balanceBN = web3Instance.utils.toBN(balance);
+        
+        if (balanceBN.lt(priceBN)) {
+            throw new Error(`[ZODIAC_WEB3] Insufficient BNB balance. Need ${web3Instance.utils.fromWei(price, 'ether')} BNB, have ${web3Instance.utils.fromWei(balance, 'ether')} BNB`);
+        }
+
+        const receipt = await sendAndTrackTransaction(contract, 'buyNFT', [tokenId], { value: price });
+
         return receipt;
     }
 
     async function delistNFT(tokenId) {
+        if (!tokenId || tokenId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid token ID');
+        }
         const contract = await getContract('nftTrading');
         const receipt = await sendAndTrackTransaction(contract, 'delistNFT', [tokenId]);
         return receipt;
     }
 
     async function setNFTApprovalForAll(operator, approved) {
+        if (!operator || operator === '0x0000000000000000000000000000000000000000') {
+            throw new Error('[ZODIAC_WEB3] Invalid operator address');
+        }
+        if (approved === undefined || approved === null) {
+            throw new Error('[ZODIAC_WEB3] Invalid approved flag');
+        }
         const contract = await getContract('nftMint');
         const receipt = await sendAndTrackTransaction(contract, 'setApprovalForAll', [operator, approved]);
         return receipt;
     }
 
     async function listNFTBatch(tokenIds, prices, options = {}) {
+        if (!tokenIds || !Array.isArray(tokenIds)) {
+            throw new Error('[ZODIAC_WEB3] listNFTBatch requires an array of tokenIds');
+        }
+        if (!prices || !Array.isArray(prices)) {
+            throw new Error('[ZODIAC_WEB3] listNFTBatch requires an array of prices');
+        }
+        if (tokenIds.length === 0) {
+            throw new Error('[ZODIAC_WEB3] listNFTBatch requires at least 1 NFT');
+        }
+        if (tokenIds.length !== prices.length) {
+            throw new Error(`[ZODIAC_WEB3] listNFTBatch tokenIds length (${tokenIds.length}) does not match prices length (${prices.length})`);
+        }
+        for (let i = 0; i < tokenIds.length; i++) {
+            if (!tokenIds[i] || tokenIds[i] <= 0) {
+                throw new Error(`[ZODIAC_WEB3] listNFTBatch invalid tokenId at index ${i}`);
+            }
+            if (!prices[i] || prices[i] <= 0) {
+                throw new Error(`[ZODIAC_WEB3] listNFTBatch invalid price at index ${i}`);
+            }
+        }
+        const seenIds = new Set();
+        for (let i = 0; i < tokenIds.length; i++) {
+            if (seenIds.has(tokenIds[i])) {
+                throw new Error(`[ZODIAC_WEB3] listNFTBatch duplicate tokenId ${tokenIds[i]} at index ${i}`);
+            }
+            seenIds.add(tokenIds[i]);
+        }
         const { atomic = false } = options;
         
         if (atomic) {
@@ -1102,10 +1239,43 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     // --- Token Burner Methods (Mint) ---
+    async function checkTokenBalanceAndAllowance(requiredAmount) {
+        const tokenContract = await getContract('tokenContract');
+        const burnerAddress = CONTRACT_ADDRESSES.tokenBurner;
+        
+        if (!burnerAddress || burnerAddress === '0x0000000000000000000000000000000000000000') {
+            throw new Error('[ZODIAC_WEB3] TokenBurner address not configured');
+        }
+        
+        const balance = await tokenContract.methods.balanceOf(account).call();
+        const balanceBN = getWeb3().utils.toBN(balance);
+        const requiredBN = getWeb3().utils.toBN(requiredAmount);
+        
+        if (balanceBN.lt(requiredBN)) {
+            throw new Error(`[ZODIAC_WEB3] Insufficient token balance. Need ${requiredAmount}, have ${balance.toString()}`);
+        }
+        
+        const allowance = await tokenContract.methods.allowance(account, burnerAddress).call();
+        const allowanceBN = getWeb3().utils.toBN(allowance);
+        
+        if (allowanceBN.lt(requiredBN)) {
+            console.log('[ZODIAC_WEB3] Auto-approving token spending...');
+            await sendAndTrackTransaction(tokenContract, 'approve', [burnerAddress, requiredAmount]);
+        }
+        
+        return true;
+    }
+
     async function burnAndMint(isRare) {
         try {
-            const contract = await getContract('tokenBurner');
-            const receipt = await sendAndTrackTransaction(contract, 'burnAndMint', [account, isRare]);
+            const burnerContract = await getContract('tokenBurner');
+            const mintCost = isRare 
+                ? await burnerContract.methods.rareMintCost().call()
+                : await burnerContract.methods.normalMintCost().call();
+            
+            await checkTokenBalanceAndAllowance(mintCost);
+            
+            const receipt = await sendAndTrackTransaction(burnerContract, 'burnAndMint', [account, isRare]);
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMint failed:', e);
@@ -1115,8 +1285,14 @@ window.ZODIAC_WEB3 = (function() {
 
     async function burnAndMintTen(isRare) {
         try {
-            const contract = await getContract('tokenBurner');
-            const receipt = await sendAndTrackTransaction(contract, 'burnAndMintTen', [account, isRare]);
+            const burnerContract = await getContract('tokenBurner');
+            const mintCost = isRare 
+                ? await burnerContract.methods.rareMintTenCost().call()
+                : await burnerContract.methods.normalMintTenCost().call();
+            
+            await checkTokenBalanceAndAllowance(mintCost);
+            
+            const receipt = await sendAndTrackTransaction(burnerContract, 'burnAndMintTen', [account, isRare]);
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMintTen failed:', e);
@@ -1125,9 +1301,16 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function burnAndMintTargeted(zodiac) {
+        if (zodiac === undefined || zodiac === null || zodiac < 0 || zodiac > 11) {
+            throw new Error('[ZODIAC_WEB3] Invalid zodiac index (0-11)');
+        }
         try {
-            const contract = await getContract('tokenBurner');
-            const receipt = await sendAndTrackTransaction(contract, 'burnAndMintTargeted', [account, zodiac]);
+            const burnerContract = await getContract('tokenBurner');
+            const mintCost = await burnerContract.methods.targetedMintCost().call();
+            
+            await checkTokenBalanceAndAllowance(mintCost);
+            
+            const receipt = await sendAndTrackTransaction(burnerContract, 'burnAndMintTargeted', [account, zodiac]);
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMintTargeted failed:', e);
@@ -1143,12 +1326,42 @@ window.ZODIAC_WEB3 = (function() {
         if (tokenIds.length === 0 || tokenIds.length > 6) {
             throw new Error(`[ZODIAC_WEB3] stakeArenaNFTs requires 1-6 NFTs, got ${tokenIds.length}`);
         }
+        for (let i = 0; i < tokenIds.length; i++) {
+            if (!tokenIds[i] || tokenIds[i] <= 0) {
+                throw new Error(`[ZODIAC_WEB3] stakeArenaNFTs invalid tokenId at index ${i}`);
+            }
+        }
+        const seen = new Set();
+        for (let i = 0; i < tokenIds.length; i++) {
+            if (seen.has(tokenIds[i])) {
+                throw new Error(`[ZODIAC_WEB3] stakeArenaNFTs duplicate tokenId at index ${i}`);
+            }
+            seen.add(tokenIds[i]);
+        }
         const contract = await getContract('arena');
         const receipt = await sendAndTrackTransaction(contract, 'stakeNFTs', [tokenIds]);
         return receipt;
     }
 
     async function unstakeArenaNFTs(tokenIds) {
+        if (!tokenIds || !Array.isArray(tokenIds)) {
+            throw new Error('[ZODIAC_WEB3] unstakeArenaNFTs requires an array of tokenIds');
+        }
+        if (tokenIds.length === 0 || tokenIds.length > 6) {
+            throw new Error(`[ZODIAC_WEB3] unstakeArenaNFTs requires 1-6 NFTs, got ${tokenIds.length}`);
+        }
+        for (let i = 0; i < tokenIds.length; i++) {
+            if (!tokenIds[i] || tokenIds[i] <= 0) {
+                throw new Error(`[ZODIAC_WEB3] unstakeArenaNFTs invalid tokenId at index ${i}`);
+            }
+        }
+        const seen = new Set();
+        for (let i = 0; i < tokenIds.length; i++) {
+            if (seen.has(tokenIds[i])) {
+                throw new Error(`[ZODIAC_WEB3] unstakeArenaNFTs duplicate tokenId at index ${i}`);
+            }
+            seen.add(tokenIds[i]);
+        }
         const contract = await getContract('arena');
         const receipt = await sendAndTrackTransaction(contract, 'unstakeNFTs', [tokenIds]);
         return receipt;
@@ -1161,6 +1374,18 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function challengeMockPlayer(playerTeam, mockIndex) {
+        if (!playerTeam || !Array.isArray(playerTeam)) {
+            throw new Error('[ZODIAC_WEB3] challengeMockPlayer requires an array of team tokenIds');
+        }
+        if (playerTeam.length !== 6) {
+            throw new Error(`[ZODIAC_WEB3] challengeMockPlayer requires exactly 6 NFTs, got ${playerTeam.length}`);
+        }
+        if (mockIndex === undefined || mockIndex === null) {
+            throw new Error('[ZODIAC_WEB3] Invalid mock player index');
+        }
+        if (typeof mockIndex === 'number' && mockIndex < 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid mock player index');
+        }
         try {
             const contract = await getContract('arena');
             const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [playerTeam, mockIndex]);
@@ -1172,6 +1397,15 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function challengeRealPlayer(challengedPlayer, playerTeam) {
+        if (!challengedPlayer || challengedPlayer === '0x0000000000000000000000000000000000000000') {
+            throw new Error('[ZODIAC_WEB3] Invalid challenged player address');
+        }
+        if (!playerTeam || !Array.isArray(playerTeam)) {
+            throw new Error('[ZODIAC_WEB3] challengeRealPlayer requires an array of team tokenIds');
+        }
+        if (playerTeam.length !== 6) {
+            throw new Error(`[ZODIAC_WEB3] challengeRealPlayer requires exactly 6 NFTs, got ${playerTeam.length}`);
+        }
         try {
             const contract = await getContract('arena');
             const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer, playerTeam]);
@@ -1182,10 +1416,13 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
-    async function claimSeasonReward() {
+    async function claimSeasonReward(seasonNumber) {
+        if (seasonNumber === undefined || seasonNumber === null || seasonNumber < 0) {
+            throw new Error('Invalid season number');
+        }
         try {
             const contract = await getContract('arena');
-            const receipt = await sendAndTrackTransaction(contract, 'claimReward', []);
+            const receipt = await sendAndTrackTransaction(contract, 'claimReward', [seasonNumber]);
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] claimSeasonReward failed:', e);
@@ -1194,6 +1431,12 @@ window.ZODIAC_WEB3 = (function() {
     }
     
     async function setArenaRewardType(rewardType) {
+        if (rewardType === undefined || rewardType === null) {
+            throw new Error('[ZODIAC_WEB3] setArenaRewardType requires a reward type');
+        }
+        if (rewardType !== 0 && rewardType !== 1) {
+            throw new Error(`[ZODIAC_WEB3] Invalid reward type ${rewardType}, must be 0 (BNB) or 1 (Token)`);
+        }
         try {
             const contract = await getContract('arena');
             const receipt = await sendAndTrackTransaction(contract, 'setRewardType', [rewardType]);
@@ -1216,6 +1459,18 @@ window.ZODIAC_WEB3 = (function() {
 
     // --- Breeding Methods ---
     async function createSelfBreedingPair(fatherId, motherId, coOwnerId) {
+        if (!fatherId || fatherId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid father ID');
+        }
+        if (!motherId || motherId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid mother ID');
+        }
+        if (fatherId === motherId) {
+            throw new Error('[ZODIAC_WEB3] Father and mother must be different');
+        }
+        if (!coOwnerId || coOwnerId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid co-owner ID');
+        }
         try {
             const contract = await getContract('breeding');
             const receipt = await sendAndTrackTransaction(contract, 'createSelfBreedingPair', [fatherId, motherId, coOwnerId]);
@@ -1227,6 +1482,9 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function completeBreeding(pairId) {
+        if (!pairId || pairId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid pair ID');
+        }
         try {
             const contract = await getContract('breeding');
             const receipt = await sendAndTrackTransaction(contract, 'completeBreeding', [pairId]);
@@ -1252,6 +1510,9 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function cancelBreeding(pairId) {
+        if (!pairId || pairId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid pair ID');
+        }
         try {
             const contract = await getContract('breeding');
             const receipt = await sendAndTrackTransaction(contract, 'cancelBreeding', [pairId]);
@@ -1263,6 +1524,9 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function listForMarketBreeding(tokenId) {
+        if (!tokenId || tokenId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid token ID');
+        }
         try {
             const contract = await getContract('breeding');
             const receipt = await sendAndTrackTransaction(contract, 'listForMarketBreeding', [tokenId]);
@@ -1274,6 +1538,15 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function createMarketBreedingPairPublic(fatherId, motherId) {
+        if (!fatherId || fatherId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid father ID');
+        }
+        if (!motherId || motherId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid mother ID');
+        }
+        if (fatherId === motherId) {
+            throw new Error('[ZODIAC_WEB3] Father and mother must be different');
+        }
         try {
             const contract = await getContract('breeding');
             const receipt = await sendAndTrackTransaction(contract, 'createMarketBreedingPairPublic', [fatherId, motherId]);
@@ -1284,10 +1557,13 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
-    async function delistFromMarketBreeding(orderId) {
+    async function delistFromMarketBreeding(tokenId) {
+        if (!tokenId || tokenId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid token ID');
+        }
         try {
             const contract = await getContract('breeding');
-            const receipt = await sendAndTrackTransaction(contract, 'delistFromMarketBreeding', [orderId]);
+            const receipt = await sendAndTrackTransaction(contract, 'delistFromMarketBreeding', [tokenId]);
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] delistFromMarketBreeding failed:', e);
@@ -1297,6 +1573,9 @@ window.ZODIAC_WEB3 = (function() {
 
     // --- Upgrade Methods ---
     async function upgradeWithNFT(nftId) {
+        if (!nftId || nftId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid NFT ID');
+        }
         try {
             const contract = await getContract('nftUpdate');
             const receipt = await sendAndTrackTransaction(contract, 'upgradeWithNFT', [nftId]);
@@ -1308,6 +1587,9 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function upgradeWithToken(nftId) {
+        if (!nftId || nftId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid NFT ID');
+        }
         try {
             const contract = await getContract('nftUpdate');
             const receipt = await sendAndTrackTransaction(contract, 'upgradeWithToken', [nftId]);
@@ -1319,6 +1601,9 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function upgradeWithUSDValue(nftId) {
+        if (!nftId || nftId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid NFT ID');
+        }
         try {
             const contract = await getContract('nftUpdate');
             const receipt = await sendAndTrackTransaction(contract, 'upgradeWithUSDValue', [nftId]);

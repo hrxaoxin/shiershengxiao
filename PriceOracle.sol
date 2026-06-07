@@ -19,20 +19,60 @@ interface IDEXRouter {
  * @title PriceOracle
  * @dev 价格预言机合约，提供代币和ETH的USD价格查询
  *
- * 功能：
- * 1. 获取代币的USD价格
- * 2. 获取ETH的USD价格
- * 3. 计算代币与USDT的兑换比例
+ * 核心功能：
+ * 1. 代币USD价格管理：存储和更新代币相对USD的价格
+ * 2. ETH/BNB USD价格管理：存储和更新原生代币的USD价格
+ * 3. 价值换算：代币数量 ↔ USDT数量的换算
+ * 4. 多DEX价格抓取：从 FlapSwap、PancakeSwap、Uniswap 读取价格并取平均
  *
- * 价格精度：
- * - 所有价格使用18位精度
- * - USDT使用6位精度
- * - 代币使用18位精度
+ * 价格精度体系：
+ * - 代币价格（tokenPriceUSD）：18位精度，表示 1 token = X USD（X 10^18）
+ * - ETH价格（ethPriceUSD）：18位精度，表示 1 ETH = X USD
+ * - TOKEN_PRECISION = 10^18（代币数量精度）
+ * - USDT_PRECISION = 10^6（USDT数量精度）
  *
- * 用途：
- * - 升级费用计算（代币 → USDT）
- * - 铸造费用验证
- * - NFT定价参考
+ * 价格更新方式（三种模式，从高信任到低信任）：
+ * 1. 提议-执行两阶段（proposeTokenPrice → executePendingTokenPrice）：
+ *    - Owner 先提议新价格，等待 priceUpdateCooldown（默认5分钟）后执行
+ *    - 价格变动不得超过 maxPriceChangePercent（默认50%）
+ *    - 防止 Owner 瞬间大幅篡改价格
+ * 2. 授权合约直接更新（updateTokenPrice / updatePrices）：
+ *    - 由 authorizer 授权的可信合约（如 Chainlink 集成或官方喂价机器人）直接设置
+ *    - 变动同样受 maxPriceChangePercent 限制
+ * 3. DEX 自动抓取（fetchPriceFromDEX / fetchPriceFromAllDEX）：
+ *    - 通过 UniswapV2 风格的 pair 获取现货价格
+ *    - fetchPriceFromAllDEX 从多个 DEX 取平均，减少单个 DEX 被操纵的影响
+ *    - 需要 autoPriceEnabled = true
+ *
+ * 价格有效性检查：
+ * - priceValidityPeriod（默认24小时）：价格更新后超过此时间视为失效
+ * - isTokenPriceValid() / isETHPriceValid() / isPriceValid() 供外部检查
+ *
+ * 价格历史记录：
+ * - 使用环形缓冲区（priceHistory / priceHistoryStartIndex），最多 MAX_HISTORY_LENGTH = 100 条
+ * - 通过 getPriceHistory() / getLastNPrices() / getLatestPriceRecord() 查询
+ *
+ * 依赖的外部合约：
+ * - IDEXRouter（UniswapV2 风格）：通过 getAmountsOut 获取价格
+ *   - 路径：token → WBNB → USDT 用于代币价格
+ *   - 路径：WBNB → USDT 用于 ETH/BNB 价格
+ * - tokenContract：需正确设置以识别代币
+ * - usdtContract：需正确设置以识别 USDT
+ *
+ * 典型业务调用场景：
+ * - NFTUpdate.sol：升级费用 = tokenAmount × tokenPriceUSD（把代币换算成USD价值验证）
+ * - NFTTrading.sol：可选择将 BNB 价格作为 NFT 挂牌价的参考
+ * - RewardManager.sol：用 USD 价值评估奖励金额
+ *
+ * 安全考虑：
+ * - 价格更新冷却期（priceUpdateCooldown）：防止高频恶意更新
+ * - 价格变更幅度限制（maxPriceChangePercent）：防止单次价格剧烈变动
+ * - 重入保护：防止价格更新时的外部调用攻击
+ * - 暂停机制：可在被操纵时暂停自动喂价
+ * - UUPS 可升级：未来可替换为 Chainlink 喂价或更高级算法
+ *
+ * 注意：本价格预言机仅用于游戏内部经济计算，不保证与真实市场价格完全一致。
+ * 主网部署时建议结合 Chainlink 或多签验证机制以增强安全性。
  */
 contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     /**
@@ -89,6 +129,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     event Unpaused(address account);
     
     function initialize(address _authorizer) external initializer {
+        require(_authorizer != address(0), "PriceOracle: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -122,6 +163,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param a 授权合约地址
      */
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "PriceOracle: Invalid authorizer address");
         authorizer = a;
     }
 
@@ -338,6 +380,10 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param _uniswapRouter Uniswap Router 地址
      */
     function setDEXRouters(address _flapSwapRouter, address _pancakeSwapRouter, address _uniswapRouter) external onlyOwner {
+        require(
+            _flapSwapRouter != address(0) || _pancakeSwapRouter != address(0) || _uniswapRouter != address(0),
+            "PriceOracle: At least one DEX router must be valid"
+        );
         flapSwapRouter = _flapSwapRouter;
         pancakeSwapRouter = _pancakeSwapRouter;
         uniswapRouter = _uniswapRouter;

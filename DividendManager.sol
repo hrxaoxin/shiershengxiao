@@ -11,28 +11,73 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * @title DividendManager
  * @dev 分红管理合约，管理NFT持有者的分红分发
  *
- * 分红来源：
- * 1. 交易手续费（3%进入分红池）
- * 2. 战斗胜利奖励
- * 3. 其他游戏收益
+ * 核心职责：
+ * 1. 维护每个地址的"分红权重"（基于持有 NFT 的等级和稀有度）
+ * 2. 接收来自游戏生态的手续费（交易、战斗、繁殖、铸造）作为分红资金
+ * 3. 允许用户按比例领取累计分红（代币和 BNB 两种分红池）
  *
- * 分红计算：
- * - 用户分红 = 总分红 × (用户权重 / 总权重)
- * - 权重由用户持有的NFT等级和稀有度决定
+ * 分红资金来源：
+ * - NFTTrading.sol：交易手续费的 3% 进入分红池
+ * - Battle.sol：战斗入场费的部分进入分红池
+ * - Breeding.sol：繁殖费用的部分进入分红池
+ * - TokenBurner.sol：铸造费用的部分进入分红池
+ * - 其他游戏收益（如限时活动、付费宝箱）
  *
- * 权重表（普通NFT）：
- * - 1级: 1
- * - 2级: 2
- * - 3级: 6
- * - 4级: 18
- * - 5级: 66
+ * 权重体系（决定每位用户在分红池中的份额）：
+ * 普通 NFT（水/风/火属性，zodiacType < 72）：
+ *   - 1级: 权重 1
+ *   - 2级: 权重 2
+ *   - 3级: 权重 6
+ *   - 4级: 权重 18
+ *   - 5级: 权重 66
+ * 稀有 NFT（暗/光属性，zodiacType >= 72）：
+ *   - 1级: 权重 10
+ *   - 2级: 权重 12
+ *   - 3级: 权重 16
+ *   - 4级: 权重 28
+ *   - 5级: 权重 76
+ * 注意：用户总权重 = Σ(其每张 NFT 的权重)；质押中的 NFT 同样计入权重
  *
- * 权重表（稀有NFT）：
- * - 1级: 10
- * - 2级: 12
- * - 3级: 16
- * - 4级: 28
- * - 5级: 76
+ * 分红计算公式：
+ * 用户应得分红 = 分红池总余额 × (用户权重 / 全网总权重)
+ * - 通过 WeightManager 获取用户实时权重
+ * - 用户领取时按比例从池中扣除对应金额
+ * - 支持按周期（每日/每周）结算，也支持累计随时领取
+ *
+ * 两种分红池：
+ * 1. 代币分红池（tokenDividendPool）：接收代币形式的手续费
+ * 2. BNB 分红池（bnbDividendPool）：接收 BNB 形式的手续费
+ * 用户可分别调用 claimTokenDividend() / claimBnbDividend() 领取
+ *
+ * 分红事件与提醒：
+ * - DividendClaimed(user, amount)：用户领取分红时触发
+ * - DividendClaimWarning(user, daysSinceLastClaim)：当用户超过 30 天未领取时触发
+ *   （供前端提醒用户及时领取分红）
+ *
+ * 权重更新流程：
+ * - NFTMint 铸造 → addWeight(user, type)
+ * - NFTTrading 交易 → removeWeight(oldUser) + addWeight(newUser)
+ * - NFTUpdate 升级 → 先 remove 旧等级权重，再 add 新等级权重
+ * - Staking 质押 → 权重保留（仍计入用户分红）
+ * - Breeding 繁殖 → 新 NFT 给用户，增加权重
+ *
+ * 安全限制：
+ * - ReentrancyGuard：领取分红时外部转账需防止重入
+ * - Pausable：可暂停分红领取（维护/攻击时）
+ * - 最小领取金额：防止微小金额领取浪费 Gas
+ * - 地址校验：零地址校验，防止资金误转入黑洞
+ *
+ * 典型分红流程：
+ * 1. 游戏中产生手续费 → NFTTrading/Battle/Breeding 转账给 DividendManager
+ * 2. DividendManager 将资金计入 tokenDividendPool / bnbDividendPool
+ * 3. 用户在前端点击"领取分红"按钮
+ * 4. 前端调用 claimTokenDividend() 或 claimBnbDividend()
+ * 5. 合约按用户当前权重比例计算分红，转账给用户
+ * 6. 事件 DividendClaimed 被触发，前端展示领取成功
+ *
+ * 升级与治理：
+ * - UUPS 可升级：未来可调整权重表 / 分红比例 / 增加新资金来源
+ * - 仅 owner 可调整权重表和分红分配参数
  */
 contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
@@ -132,6 +177,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @param a 授权合约地址
      */
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "DividendManager: Invalid authorizer address");
         authorizer = a;
     }
 
@@ -290,10 +336,10 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
             timestamp: block.timestamp
         });
 
-        // 使用环形缓冲区添加快照
         if (snapshots.length < MAX_SNAPSHOTS) {
             snapshots.push(newSnapshot);
         } else {
+            require(snapshotStartIndex < MAX_SNAPSHOTS, "DividendManager: Invalid snapshot index");
             snapshots[snapshotStartIndex] = newSnapshot;
             snapshotStartIndex = (snapshotStartIndex + 1) % MAX_SNAPSHOTS;
         }
@@ -690,7 +736,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         emit EmergencyWithdrawRequested(msg.sender, block.timestamp);
     }
     
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
         require(emergencyWithdrawRequested, "DividendManager: Withdrawal not requested");
         require(block.timestamp >= emergencyWithdrawRequestedAt + emergencyWithdrawTimelock, 
             "DividendManager: Timelock not expired");
@@ -702,7 +748,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(emergencyWithdrawRequested, "DividendManager: Withdrawal not requested");
         require(block.timestamp >= emergencyWithdrawRequestedAt + emergencyWithdrawTimelock, 
             "DividendManager: Timelock not expired");

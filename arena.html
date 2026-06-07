@@ -1338,8 +1338,8 @@
                 
                 const stakingContract = await ZODIAC_WEB3.getContract('staking');
                 for (const tokenId of tokenIds) {
-                    const stakedInfo = await stakingContract.methods.stakedNFTs(tokenId).call();
-                    if (stakedInfo.staked) {
+                    const stakedInfo = await stakingContract.methods.stakingInfo(tokenId).call();
+                    if (stakedInfo && stakedInfo.owner !== '0x0000000000000000000000000000000000000000') {
                         ZODIAC_UI.hideLoading();
                         ZODIAC_UI.showToast(`NFT #${tokenId} 已被质押，无法加入战队`, 'error');
                         return;

@@ -3,6 +3,31 @@
  * 提供 Toast 通知、Loading 遮罩、钱包按钮绑定、事件系统等 UI 功能
  */
 window.ZODIAC_UI = (function() {
+    // --- Utility: extract error message from various error formats ---
+    function extractErrorMessage(error) {
+        if (!error) return '未知错误';
+        if (typeof error === 'string') return error;
+        
+        if (error.message) {
+            const revertMatch = error.message.match(/revert(ed)?:\s*(.*)/i);
+            if (revertMatch && revertMatch[2]) return revertMatch[2].trim();
+            
+            const reasonMatch = error.message.match(/reason=['"`]([^'"`]+)['"`]/i);
+            if (reasonMatch && reasonMatch[1]) return reasonMatch[1];
+            
+            if (error.message.includes('\"message\":')) {
+                try {
+                    const jsonMatch = error.message.match(/\{[\s\S]*"message"[:\s]*"([^"]+)"[\s\S]*\}/);
+                    if (jsonMatch && jsonMatch[1]) return jsonMatch[1];
+                } catch (e) {}
+            }
+            return error.message;
+        }
+        if (error.reason) return String(error.reason);
+        if (error.data && error.data.message) return String(error.data.message);
+        return '未知错误';
+    }
+
     // --- Global Error Handling ---
     let isGlobalErrorHandlerInitialized = false;
 
@@ -23,7 +48,8 @@ window.ZODIAC_UI = (function() {
                 if (error.message.includes('cancelled') || error.message.includes('User rejected')) {
                     showToast('用户取消了操作', 'info');
                 } else {
-                    showToast('发生错误: ' + error.message.substring(0, 50), 'error');
+                    const msg = extractErrorMessage(error);
+                    showToast('发生错误: ' + (msg.length > 200 ? msg.substring(0, 200) + '...' : msg), 'error');
                 }
             } else {
                 showToast('发生未知错误', 'error');
@@ -39,8 +65,12 @@ window.ZODIAC_UI = (function() {
                 if (event.reason.message.includes('cancelled') || event.reason.message.includes('User rejected')) {
                     showToast('用户取消了操作', 'info');
                 } else {
-                    showToast('发生错误: ' + event.reason.message.substring(0, 50), 'error');
+                    const msg = extractErrorMessage(event.reason);
+                    showToast('发生错误: ' + (msg.length > 200 ? msg.substring(0, 200) + '...' : msg), 'error');
                 }
+            } else if (event.reason && typeof event.reason === 'string') {
+                const msg = event.reason;
+                showToast('发生错误: ' + (msg.length > 200 ? msg.substring(0, 200) + '...' : msg), 'error');
             } else {
                 showToast('发生未知错误', 'error');
             }
@@ -287,16 +317,25 @@ window.ZODIAC_UI = (function() {
         let errorMsg = actionName + '失败';
         if (error.code === 4001) {
             errorMsg = '用户取消了操作';
-        } else if (error.message) {
-            const msg = error.message.toLowerCase();
+        } else if (error.message || error.reason) {
+            const extracted = extractErrorMessage(error);
+            const msg = extracted.toLowerCase();
             if (msg.includes('insufficient funds')) {
                 errorMsg = '余额不足';
             } else if (msg.includes('reverted')) {
-                errorMsg = '合约执行失败';
+                // 从reverted错误中抽取更精确的原因
+                const detail = extractErrorMessage(error);
+                errorMsg = detail !== error.message ? detail : '合约执行失败';
             } else if (msg.includes('gas')) {
                 errorMsg = 'Gas不足或Gas价格过低';
+            } else if (msg.includes('user denied')) {
+                errorMsg = '用户拒绝了操作';
+            } else if (msg.includes('transaction underpriced')) {
+                errorMsg = 'Gas价格过低，请重试';
+            } else if (msg.includes('nonce')) {
+                errorMsg = '交易Nonce错误，请稍后重试';
             } else {
-                errorMsg += ': ' + error.message.substring(0, 100);
+                errorMsg += ': ' + (extracted.length > 300 ? extracted.substring(0, 300) + '...' : extracted);
             }
         }
         showToast(errorMsg, 'error');

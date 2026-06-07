@@ -12,17 +12,59 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 /**
  * @title NFTMint
  * @dev 十二生肖NFT铸造合约
- * 
- * 功能：
- * - 支持普通铸造（水/风/火属性）
- * - 支持稀有铸造（光/暗属性）
- * - 支持批量铸造（十连抽）
- * - 支持指定生肖铸造
- * - 与NFTData合约同步数据
- * 
- * NFT类型计算：
- * - 属性(5种) × 生肖(12种) × 性别(2种) = 120种NFT
+ *
+ * 核心功能：
+ * 1. 普通铸造（mintForUser）：消耗代币，随机获得 120 种 NFT 之一
+ * 2. 批量铸造（mintTenForUser / mintTenAdmin）：一次性铸造十张 NFT（"十连抽"）
+ * 3. 稀有铸造（mintRareForUser）：消耗更多代币，只从暗/光属性 48 种中随机
+ * 4. 指定铸造（mintTargetedForUser）：指定具体生肖类型，消耗更高代币
+ * 5. 管理铸造（mintAdmin / mintTenAdmin）：owner 免费铸造，用于活动奖励/空投
+ * 6. 繁殖铸造（mintForBreeding）：由 Breeding 合约调用，继承父母属性
+ *
+ * NFT 类型体系（共 120 种）：
+ * - 5 种属性 × 12 种生肖 × 2 种性别 = 120 种类型
  * - tokenType = element × 24 + zodiac × 2 + gender
+ * - 普通属性（水/风/火，0-71）：铸造概率高，约各 32%
+ * - 稀有属性（暗/光，72-119）：铸造概率低，约各 2%
+ * - 等级：1-5 级，初始为 1 级，升级需消耗 NFT 或代币（由 NFTUpdate 处理）
+ * - 成长值（growth）：10-100，铸造时随机生成，影响战斗属性加成
+ *
+ * 随机性实现：
+ * - 随机源：block.timestamp + block.prevrandao + mintCounter + msg.sender
+ * - 使用多重哈希（keccak256）混合生成伪随机数
+ * - mintCounter 每铸造一次递增，增加熵值
+ * - lastMintBlock 记录区块号，防止同一区块内多次铸造产生相同随机值
+ *
+ * 数据同步：
+ * - 本合约自身维护 tokenType[tokenId]、tokenLevel[tokenId]、tokenGrowth[tokenId]
+ * - 同时调用 NFTData 合约写入 _nftInfo，确保两个数据层一致
+ * - 若同步失败，触发 NFTDataSyncFailed 事件，供链下服务重试/告警
+ *
+ * 权限控制：
+ * - onlyOwner：可设置各合约地址、开关公开铸造、暂停
+ * - onlyTokenBurner：TokenBurner 合约通过 burnAndMint 系列接口间接调用本合约 mint
+ * - onlyBreeding：Breeding 合约调用 mintForBreeding 产生后代 NFT
+ * - onlyAuthorized：授权的前端/后端服务调用用户铸造接口
+ *
+ * 代币流转：
+ * - 用户铸造前需 approve 代币给 TokenBurner 合约
+ * - TokenBurner 先 burn（转入 BLACK_HOLE）部分代币
+ * - 其余转入手续费/质押池
+ * - 铸造本身不直接收取代币，由 TokenBurner 统一管理销毁逻辑
+ *
+ * 安全考虑：
+ * - 重入保护（ReentrancyGuard）：防止 mint 时的外部调用重入
+ * - 暂停机制（paused）：可紧急暂停所有铸造
+ * - allowPublicMinting：owner 可控制是否允许任何人调用铸造
+ * - mintCounter 溢出预警：接近 uint256 最大值时触发告警事件
+ * - ERC721Enumerable 升级：支持按索引查询用户 NFT，方便前端分页展示
+ *
+ * 典型用户流程：
+ * 1. 用户批准 TokenBurner 使用代币（ERC20 approve）
+ * 2. 前端调用 TokenBurner.burnAndMint(msg.sender)
+ * 3. TokenBurner 销毁部分代币 → 调用 NFTMint.mintForUser(to)
+ * 4. mintForUser 生成随机 type 并 mint ERC721 → 写入 NFTData
+ * 5. 用户收到 Mint 事件，在前端展示新获得的 NFT
  */
 contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
 
@@ -108,6 +150,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     event MintCounterWarning(uint256 currentCount);
 
     function initialize(address _authorizer) external initializer {
+        require(_authorizer != address(0), "NFTMint: Invalid authorizer address");
         __ERC721_init("Zodiac NFT", "ZNFT");
         __ERC721Enumerable_init();
         __Ownable2Step_init();
@@ -614,7 +657,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         uint256 zodiac,
         uint256 gender,
         uint8 growth
-    ) external onlyOwner returns (uint256) {
+    ) external onlyOwner nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         require(element < 5, "NFTMint: Invalid element (0-4)");
         require(zodiac < 12, "NFTMint: Invalid zodiac (0-11)");
@@ -632,7 +675,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenId;
     }
 
-    function mintForBreeding(address to, uint256 zodiacType, uint8 growth) external onlyAuthorized returns (uint256) {
+    function mintForBreeding(address to, uint256 zodiacType, uint8 growth) external onlyAuthorized nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         require(zodiacType < 120, "NFTMint: Invalid zodiac type");
         require(growth >= 10 && growth <= 100, "NFTMint: Invalid growth (10-100)");
@@ -764,7 +807,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
      * @dev 紧急提取BNB
      * @param amount 提取数量
      */
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "NFTMint: Amount must be > 0");
         require(amount <= address(this).balance, "NFTMint: Insufficient BNB balance");
         (bool success, ) = payable(owner()).call{value: amount}("");
@@ -776,7 +819,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
      * @dev 紧急提取代币
      * @param amount 提取数量
      */
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "NFTMint: Amount must be > 0");
         require(tokenContract != address(0), "NFTMint: Token contract not set");
         IERC20 token = IERC20(tokenContract);

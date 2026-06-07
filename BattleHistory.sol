@@ -10,18 +10,52 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * @title BattleHistory
  * @dev 战斗历史记录合约，记录所有战斗的结果和详情
  *
- * 功能：
- * 1. 存储战斗记录（战斗ID => 战斗结果）
- * 2. 仅允许战斗合约写入记录
- * 3. 提供战斗记录查询接口
+ * 核心职责：
+ * 1. 战斗记录存储：记录每一场战斗的双方、使用的 NFT 队伍、战斗结果、得分
+ * 2. 历史查询接口：供前端查询玩家历史战绩（可按玩家、按赛季、按时间分页查询）
+ * 3. 排行榜数据来源：为 ArenaRanking 提供胜场/败场/积分统计依据
  *
- * 战斗记录包含：
- * - 战斗ID
- * - 战斗时间戳
- * - 双方玩家地址
- * - 双方NFT队伍
- * - 战斗结果
- * - 双方得分
+ * 战斗记录数据结构（基于 BattleLib.SingleBattleResult）：
+ * - battleId：战斗唯一 ID（从 1 自增）
+ * - timestamp：战斗发生时间（秒）
+ * - player1 / player2：双方玩家地址
+ * - team1 / team2：双方使用的 NFT 队伍 ID 数组
+ * - result：战斗结果（TEAM1_WIN / TEAM2_WIN / DRAW）
+ * - score1 / score2：双方得分（用于排名积分）
+ *
+ * 存储设计：
+ * - battleHistory[battleId] → SingleBattleResult 完整记录
+ * - battleCount：当前总战斗数（也是下一个要分配的 battleId）
+ * - earliestBattleId：最早可用 ID（环形缓冲区清理时使用）
+ * - battleIdToIndex / indexToBattleId：索引映射，支持分页查询
+ * - MAX_BATTLE_RECORDS = 10000：限制总记录数，防止存储无限膨胀
+ *
+ * 写入权限（严格保护，防止伪造历史）：
+ * - onlyBattleContract：仅 Battle 合约可以通过 addBattle(...) 写入
+ * - 其他合约或外部调用均不可篡改历史记录
+ *
+ * 典型查询流程：
+ * 1. 前端展示"我的战斗记录"→ 调用 getBattlesByPlayer(player, page, pageSize)
+ * 2. 前端展示"赛季排行榜"→ ArenaRanking 调用 getBattlesBySeason(seasonId)
+ * 3. 前端查看具体战斗：调用 getBattleDetail(battleId) 展示队伍与得分
+ *
+ * 与其他合约的联动：
+ * - Battle.sol：战斗结束后调用 addBattle 写入历史
+ * - ArenaRanking.sol：读取战斗统计，计算玩家积分和排名
+ * - WeightManager.sol：胜场数可用于权重加成（可选功能）
+ *
+ * 性能优化：
+ * - 使用环形缓冲区（circular buffer）限制总记录数
+ * - 超出 MAX_BATTLE_RECORDS 时覆盖最旧的记录
+ * - 前端应将结果缓存，避免频繁链上读取
+ *
+ * 安全限制：
+ * - onlyBattleContract 修饰器防止外部篡改
+ * - owner 可设置 authorizer 以支持多合约写入（未来扩展）
+ * - Pausable：紧急情况下可暂停写入
+ *
+ * 升级与治理：
+ * - UUPS 可升级，未来可扩展更多字段（如战斗回放、技能触发日志）
  */
 contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
@@ -86,6 +120,7 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @param _authorizer 授权合约地址
      */
     function initialize(address _authorizer) external initializer {
+        require(_authorizer != address(0), "BattleHistory: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         authorizer = _authorizer;
@@ -102,6 +137,7 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @param a 授权合约地址
      */
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "BattleHistory: Invalid authorizer address");
         authorizer = a;
     }
 

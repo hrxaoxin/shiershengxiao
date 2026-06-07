@@ -13,6 +13,38 @@ import "./NFTInterface.sol";
 /**
  * @title ArenaRanking
  * @dev 竞技场排名与赛季管理合约（优化版：支持自动化结算）
+ *
+ * 核心功能：
+ * 1. 赛季管理：创建、启动、结算赛季，控制赛季时长和奖励分配
+ * 2. 战斗系统：玩家与模拟玩家对战（PvE）、玩家间对战（PvP）
+ * 3. 积分排名：根据战斗结果计算积分，维护赛季排行榜
+ * 4. NFT质押：玩家质押NFT用于战斗，解除质押可回收
+ * 5. 奖励分配：赛季结束后按排名分配代币或BNB奖励
+ * 6. 每日挑战：限制每日挑战次数，支持消耗代币重置挑战次数
+ *
+ * 数据结构：
+ * - PlayerRecord: 玩家战斗记录（积分、胜负、队伍等）
+ * - SeasonInfo: 赛季信息（时间、状态、奖励池）
+ * - LeaderboardEntry: 排行榜条目（地址、积分、胜负）
+ * - MockPlayerInfo: 模拟玩家信息（用于PvE战斗）
+ *
+ * 战斗流程：
+ * 1. 玩家质押NFT并设置战斗队伍（6个NFT）
+ * 2. 选择挑战模拟玩家或真实玩家
+ * 3. 调用Battle合约执行战斗逻辑
+ * 4. 根据战斗结果更新积分和排名
+ * 5. 赛季结束后结算并领取奖励
+ *
+ * 权限设计：
+ * - onlyOwner: 合约所有者，可配置参数和升级合约
+ * - onlyAuthorized: 所有者或授权器，可启动和结算赛季
+ * - 公开函数: 玩家可执行的操作（挑战、质押、领取等）
+ *
+ * 安全机制：
+ * - nonReentrant: 防止重入攻击（涉及代币转账的函数）
+ * - whenNotPaused: 紧急暂停功能
+ * - 冷却时间: 限制战斗频率，防止刷分
+ * - 挑战次数限制: 每日挑战次数限制，防止刷分
  */
 contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     /**
@@ -22,6 +54,20 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _disableInitializers();
     }
 
+    /**
+     * @dev 玩家战斗记录结构体
+     * 存储玩家在当前赛季的所有战斗相关数据
+     * @param score 当前积分（决定排名）
+     * @param wins 胜利次数
+     * @param losses 失败次数
+     * @param draws 平局次数
+     * @param lastBattleTime 上次战斗时间戳（用于冷却判断）
+     * @param lastResetTime 上次重置挑战次数的时间
+     * @param remainingAttempts 剩余挑战次数
+     * @param battleTeam 战斗队伍（NFT ID数组，6个）
+     * @param hasTeam 是否已设置战斗队伍
+     * @param seasonId 当前赛季ID
+     */
     struct PlayerRecord {
         uint256 score;
         uint256 wins;
@@ -35,6 +81,15 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 seasonId;
     }
 
+    /**
+     * @dev 模拟玩家信息结构体
+     * 用于PvE战斗模式，存储模拟玩家的属性
+     * @param team 模拟玩家的NFT队伍（6个ID）
+     * @param score 模拟玩家积分（用于难度分级）
+     * @param level NFT等级（影响战力）
+     * @param growth NFT成长值（影响属性）
+     * @param elementCounts 各属性NFT计数（用于多样化队伍）
+     */
     struct MockPlayerInfo {
         uint256[6] team;
         uint256 score;
@@ -43,6 +98,20 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256[] elementCounts;
     }
 
+    /**
+     * @dev 赛季信息结构体
+     * 存储赛季的完整信息，包括时间、状态和奖励配置
+     * @param seasonId 赛季唯一ID
+     * @param startTime 赛季开始时间戳
+     * @param endTime 赛季结束时间戳
+     * @param isActive 赛季是否进行中
+     * @param isSettled 是否已结算（积分锁定）
+     * @param rewardCalculated 是否已计算奖励分配
+     * @param totalPlayers 参与赛季的玩家总数
+     * @param rewardPool 通用奖励池（BNB或代币）
+     * @param tokenRewardPool ERC20代币奖励池（备用）
+     * @param pendingRewards 待领取奖励总额
+     */
     struct SeasonInfo {
         uint256 seasonId;
         uint256 startTime;
@@ -51,11 +120,20 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         bool isSettled;
         bool rewardCalculated;
         uint256 totalPlayers;
-        uint256 rewardPool; // 通用奖励池，根据rewardType使用
-        uint256 tokenRewardPool; // ERC20代币奖励池（备用）
+        uint256 rewardPool;
+        uint256 tokenRewardPool;
         uint256 pendingRewards;
     }
 
+    /**
+     * @dev 排行榜条目结构体
+     * 用于前端展示排行榜数据
+     * @param playerAddress 玩家钱包地址
+     * @param points 当前积分
+     * @param wins 胜利次数
+     * @param losses 失败次数
+     * @param isMock 是否为模拟玩家
+     */
     struct LeaderboardEntry {
         address playerAddress;
         uint256 points;
@@ -64,11 +142,31 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         bool isMock;
     }
 
+    /**
+     * @dev 玩家记录映射（address => PlayerRecord）
+     * 存储每个玩家在当前赛季的战斗数据
+     */
     mapping(address => PlayerRecord) public players;
+    /**
+     * @dev 赛季信息映射（seasonId => SeasonInfo）
+     * 存储所有历史赛季的信息
+     */
     mapping(uint256 => SeasonInfo) public seasons;
     
+    /**
+     * @dev 赛季排名映射（seasonId => address[]）
+     * 按积分从高到低存储玩家地址数组
+     */
     mapping(uint256 => address[]) public seasonRankings;
+    /**
+     * @dev 玩家排名索引映射（seasonId => address => rankIndex）
+     * 存储玩家在赛季排行榜中的位置（索引从0开始）
+     */
     mapping(uint256 => mapping(address => uint256)) public playerRankIndex;
+    /**
+     * @dev 玩家赛季奖励映射（seasonId => address => rewardAmount）
+     * 存储赛季结算后每个玩家的奖励金额
+     */
     mapping(uint256 => mapping(address => uint256)) public playerSeasonRewards;
     
     /**
@@ -221,8 +319,9 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(a != address(0), "ArenaRanking: Invalid token contract address");
         tokenContract = a;
     }
-    function setSeasonRewardRate(uint256 rate) external onlyOwner { 
-        seasonRewardRate = rate; 
+    function setSeasonRewardRate(uint256 rate) external onlyOwner {
+        require(rate > 0, "ArenaRanking: Reward rate must be greater than 0");
+        seasonRewardRate = rate;
     }
 
     function setArenaMode(uint8 mode) external onlyOwner {
@@ -282,13 +381,13 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function _checkAndResetAttempts(address player) internal {
         PlayerRecord storage record = players[player];
-        if (block.timestamp >= record.lastResetTime + 24 hours) {
+        if (block.timestamp > record.lastResetTime + 24 hours) {
             _resetAttempts(player);
             rechargeCount[player] = 0;
         }
     }
 
-    function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external whenNotPaused returns (bool success) {
+    function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external nonReentrant whenNotPaused returns (bool success) {
         require(nftContract != address(0), "ArenaRanking: NFT contract not set");
         require(battleContract != address(0), "ArenaRanking: Battle contract not set");
         require(mockIndex < MAX_MOCK_RANKING, "ArenaRanking: Invalid mock player index");
@@ -309,7 +408,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         try IBattle(battleContract).challenge(
             playerTeam[0],
-            uint256(mockIndex + 1) * 1000,
+            (mockIndex + MOCK_ID_OFFSET) * MOCK_ID_MULTIPLIER,
             playerTeam,
             mockTeam,
             address(0)
@@ -338,7 +437,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return success;
     }
 
-    function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external whenNotPaused returns (bool success) {
+    function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external nonReentrant whenNotPaused returns (bool success) {
         require(nftContract != address(0), "ArenaRanking: NFT contract not set");
         require(battleContract != address(0), "ArenaRanking: Battle contract not set");
         require(challengedPlayer != address(0), "ArenaRanking: Invalid challenged address");
@@ -517,21 +616,27 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         address[] storage rankings = seasonRankings[seasonId];
         
         uint256 currentIndex = playerRankIndex[seasonId][player];
-        
+
+        // Step 1: Remove from current position if already ranked
         if (currentIndex > 0) {
-            for (uint256 i = rankings.length; i > currentIndex; i--) {
-                rankings[i] = rankings[i - 1];
+            // Shift elements left to fill the gap at currentIndex
+            for (uint256 i = currentIndex; i + 1 < rankings.length; i++) {
+                rankings[i] = rankings[i + 1];
                 playerRankIndex[seasonId][rankings[i]] = i;
             }
             rankings.pop();
             playerRankIndex[seasonId][player] = 0;
         }
-        
+
+        // Step 2: Insert at targetRank
         if (targetRank >= rankings.length) {
             rankings.push(player);
             playerRankIndex[seasonId][player] = rankings.length - 1;
         } else {
-            for (uint256 i = rankings.length; i > targetRank; i--) {
+            // First push to grow the array
+            rankings.push(address(0));
+            // Shift elements right from targetRank to the end
+            for (uint256 i = rankings.length - 1; i > targetRank; i--) {
                 rankings[i] = rankings[i - 1];
                 playerRankIndex[seasonId][rankings[i]] = i;
             }
@@ -790,7 +895,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         emit NFTsUnstaked(msg.sender, tokenIds);
     }
 
-    function setBattleTeam(uint256[6] calldata tokenIds) external {
+    function setBattleTeam(uint256[6] calldata tokenIds) external nonReentrant {
         require(nftContract != address(0), "ArenaRanking: NFT contract not set");
         
         PlayerRecord storage record = players[msg.sender];
@@ -814,7 +919,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         emit BattleTeamSet(msg.sender, tokenIds);
     }
 
-    function clearBattleTeam() external {
+    function clearBattleTeam() external nonReentrant {
         PlayerRecord storage record = players[msg.sender];
         
         _clearSeasonData(msg.sender);
@@ -830,7 +935,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return userStakedNFTs[user];
     }
 
-    function rechargeChallengeAttempts() external whenNotPaused {
+    function rechargeChallengeAttempts() external nonReentrant whenNotPaused {
         require(tokenContract != address(0), "ArenaRanking: Token contract not set");
 
         PlayerRecord storage record = players[msg.sender];
@@ -895,10 +1000,15 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             lastSeasonMode = arenaMode;
         }
         
+        uint256 effectiveDuration = seasonDuration;
+        if (effectiveDuration < 1 hours) {
+            effectiveDuration = 1 hours;
+        }
+        
         seasons[currentSeasonId] = SeasonInfo({
             seasonId: currentSeasonId,
             startTime: block.timestamp,
-            endTime: block.timestamp + seasonDuration,
+            endTime: block.timestamp + effectiveDuration,
             isActive: true,
             isSettled: false,
             rewardCalculated: false,
@@ -1072,6 +1182,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
     
     function claimReward(uint256 seasonNumber) external nonReentrant {
+        require(seasonNumber <= currentSeasonId, "ArenaRanking: Invalid season number");
         require(seasons[seasonNumber].isSettled, "ArenaRanking: Season not settled");
         require(!seasonRewardsClaimed[seasonNumber][msg.sender], "ArenaRanking: Already claimed");
 
@@ -1108,7 +1219,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         emit RewardClaimed(msg.sender, reward, seasonNumber);
     }
 
-    function claimSeasonReward() external {
+    function claimSeasonReward() external nonReentrant {
         claimReward(currentSeasonId);
     }
 
@@ -1759,7 +1870,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @dev 紧急提取BNB（仅限合约所有者）
      * @param amount 提取金额
      */
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "ArenaRanking: Amount must be > 0");
         require(amount <= address(this).balance, "ArenaRanking: Insufficient BNB balance");
         (bool success, ) = payable(owner()).call{value: amount}("");
@@ -1771,7 +1882,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @dev 紧急提取代币（仅限合约所有者）
      * @param amount 提取金额
      */
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "ArenaRanking: Amount must be > 0");
         require(tokenContract != address(0), "ArenaRanking: Token contract not set");
         IERC20 token = IERC20(tokenContract);

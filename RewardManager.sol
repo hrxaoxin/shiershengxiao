@@ -45,16 +45,63 @@ interface IDividendManager {
  * @title RewardManager
  * @dev 奖励管理合约，统一管理所有游戏奖励的分发
  *
- * 奖励来源：
- * 1. 战斗胜利奖励
- * 2. 交易手续费（5%）
- * 3. 铸造费用
+ * 核心职责：
+ * 1. 资金路由：接收游戏中产生的所有手续费、入场费、铸造费用统一归集
+ *    → 按预设比例路由到四大奖励池
+ * 2. 与 DividendManager、Staking、TokenStaking、ArenaRanking 的资金分发
+ * 3. 提供 owner 应急操作：在特殊活动奖励、VIP 空投、活动奖励池注入等
  *
- * 奖励分配：
- * - 50% 进入分红池
- * - 20% 进入NFT质押池
- * - 15% 进入代币质押池
- * - 15% 进入竞技场奖励池
+ * 奖励资金来源：
+ * - NFTTrading.sol：交易手续费 5% 转入 RewardManager
+ * - Battle.sol：战斗入场费的部分
+ * - Breeding.sol：繁殖费用的部分
+ * - TokenBurner.sol：铸造费用的部分
+ * - PoolManager.sol：按 owner 可从池中注入
+ *
+ * 默认分配比例（可由 owner 调整）：
+ * - 50% 进入分红池（DividendManager）
+ * - 20% 进入 NFT 质押池（Staking）
+ * - 15% 进入代币质押池（TokenStaking）
+ * - 15% 进入竞技场奖励池（ArenaRanking）
+ *
+ * 资金流转模型：
+ * - 外部合约 depositToken(address, amount) → 接收并分配
+ * 1. 接收代币（ERC20）→ 按比例分配给四大奖励池
+ *    - 50% 转账到 DividendManager.tokenDividendPool
+ *    - 20% 转账到 Staking.poolBalances[POOL_NFT_STAKING]
+ *    - 15% 转账到 TokenStaking.stakingPool
+ *    - 15% 转账到 ArenaRanking.seasonPrizePool
+ * 2. 接收 BNB（receive 回退函数）→ 同上分配
+ *
+ * 主要功能：
+ * - depositToken / depositBNB：接收游戏手续费并按比例分配
+ * - distributeRewards：手动触发分配（可选）
+ * - claimDividend：用户领取分红（内部调用 DividendManager）
+ * - setMinSwapAmount：设置最小金额（防止小额不分配，集中到池）
+ * - emergencyWithdraw：紧急提取（owner only）
+ *
+ * 数据结构：
+ * - dividendShare / stakingShare / tokenStakingShare / arenaShare
+ * 分别记录各自池的历史流入流出
+ *
+ * 与其他合约联动：
+ * - Authorizer：通过 Authorizer 管理 address 验证
+ * - PriceOracle：读取当前价格以分配时用于奖励金额
+ *
+ * 安全限制：
+ * - ReentrancyGuard：防止 claimDividend 时防止重入
+ * - Pausable：暂停所有分配操作（维护）
+ * - onlyOwner：设置分配比例、暂停等
+ * - 最小金额 minSwapAmount：防止微小金额
+ *
+ * 典型流程：
+ * 1. NFTTrading 产生 5% 手续费转入 RewardManager
+ * 2. RewardManager 按比例分配到四个奖励池
+ * 3. 用户领取时自动同步各池
+ * 4. 前端同步各池分配给用户（质押/分红/竞技场奖励）
+ *
+ * 升级与治理：
+ * - UUPS 可升级：未来可调整分配比例、新增奖励池
  */
 contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     /**
@@ -102,6 +149,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @param _authorizer 授权合约地址
      */
     function initialize(address _authorizer) external initializer {
+        require(_authorizer != address(0), "RewardManager: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -113,6 +161,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @param a 授权合约地址
      */
     function setAuthorizer(address a) external onlyOwner {
+        require(a != address(0), "RewardManager: Invalid authorizer address");
         authorizer = a;
     }
 
@@ -248,6 +297,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 设置资金池管理合约地址
      */
     function setPoolManager(address _poolManager) external onlyAuthorized {
+        require(_poolManager != address(0), "RewardManager: Invalid pool manager address");
         poolManager = _poolManager;
     }
 
@@ -279,6 +329,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 设置最小兑换金额
      */
     function setMinSwapAmount(uint256 amount) external onlyOwner {
+        require(amount > 0, "RewardManager: Amount must be greater than 0");
         minSwapAmount = amount;
     }
 
@@ -358,6 +409,20 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             if (tokenAmount > 0) {
                 // 分配兑换后的代币到NFT质押池和竞技场奖励池
                 _distributeSwappedTokens(tokenAmount, 0, nftStakingAmount, arenaRewardAmount, totalSwapAmount);
+            } else {
+                // 兑换失败时，将未兑换的BNB退回至分红池作为安全回退
+                if (dividendPool != address(0)) {
+                    (bool success, ) = payable(dividendPool).call{value: totalSwapAmount}("");
+                    if (success) {
+                        try IDividendManager(dividendPool).syncDividendPool() {} catch {}
+                        emit SwapFailedFallback(totalSwapAmount);
+                    } else {
+                        // 最后安全回退：保留在合约中
+                        emit SwapFailed(totalSwapAmount);
+                    }
+                } else {
+                    emit SwapFailed(totalSwapAmount);
+                }
             }
         }
 
@@ -439,6 +504,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     event DEXRouterUpdated(address indexed router, uint8 indexed dexType);
     event BNBConverted(uint256 bnbAmount, uint256 tokenAmount);
     event SwapFailed(uint256 bnbAmount);
+    event SwapFailedFallback(uint256 bnbAmount);
     event BNBDistributed(address indexed from, uint256 totalAmount, uint256 dividendAmount, uint256 nftStakingAmount, uint256 tokenStakingAmount, uint256 arenaRewardAmount);
     event BNBTransferFailed(uint256 poolType, address pool, uint256 amount);
 
@@ -481,7 +547,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     /**
      * @dev 领取分红
      */
-    function claimDividend(address user) external whenNotPaused returns (uint256) {
+    function claimDividend(address user) external whenNotPaused nonReentrant returns (uint256) {
         require(
             msg.sender == user || msg.sender == owner() || msg.sender == authorizer,
             "RewardManager: Not authorized to claim for other users"
@@ -773,7 +839,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         }
     }
 
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner {
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "RewardManager: Amount must be > 0");
         require(amount <= address(this).balance, "RewardManager: Insufficient balance");
         (bool success, ) = payable(owner()).call{value: amount}("");
@@ -781,7 +847,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner {
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "RewardManager: Amount must be > 0");
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);

@@ -8,14 +8,65 @@ import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 
+/**
+ * @title Battle
+ * @dev 核心战斗合约，负责十二生肖NFT之间的战斗逻辑执行
+ *
+ * 核心功能：
+ * 1. 战斗执行：处理两队6v6的NFT战斗，包括攻击、技能、闪避、暴击等
+ * 2. 属性克制：五行相克关系影响伤害（火→风→水→火，光↔暗）
+ * 3. 技能系统：每个NFT类型有独特技能（范围攻击/单体攻击）
+ * 4. 速度排序：根据NFT速度决定攻击顺序
+ * 5. 战斗历史：记录最近1000场战斗结果（环形缓冲区）
+ * 6. 模拟战斗：提供只读接口用于前端预览战斗结果
+ *
+ * 战斗流程：
+ * 1. 战斗发起：外部合约（如ArenaRanking）调用 challenge() 发起战斗
+ * 2. 队伍验证：检查NFT所有权和队伍有效性（非零，无重复）
+ * 3. 属性计算：根据NFT等级和成长值计算HP、攻击、防御、速度
+ * 4. 回合执行：最多10回合，每回合按速度顺序攻击
+ *    - 有几率使用技能（技能冷却期间不可用）
+ *    - 优先攻击HP最低的敌方单位
+ *    - 有几率暴击（12%概率，伤害×1.8）
+ *    - 有几率闪避（5%-25%，根据成长值）
+ * 5. 结算：一方全灭或超过最大回合数则结束
+ * 6. 记录：写入战斗历史，发出 BattleEnded 事件
+ *
+ * 权限设计：
+ * - onlyOwner: 合约所有者，可配置参数、暂停合约、升级合约
+ * - onlyAuthorized: 所有者或授权器，可设置NFT合约地址
+ * - onlyBattleCaller: 所有者或战斗调用者（如ArenaRanking），可发起战斗
+ *
+ * 安全机制：
+ * - nonReentrant: 防止重入攻击
+ * - whenNotPaused: 紧急暂停
+ * - NFT所有权验证：确保战斗双方确实拥有其NFT
+ * - 随机种子：结合多熵源（blockhash、timestamp、prevrandao等）
+ *
+ * 使用说明：
+ * - 部署后需调用 initialize() 初始化
+ * - 通过 setNFTContract() 关联 NFT 合约
+ * - 通过 setBattleCaller() 授权战斗发起合约（如 ArenaRanking）
+ */
 contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
+     * OpenZeppelin UUPS 模式要求在实现合约构造函数中禁用初始化
      */
     constructor() {
         _disableInitializers();
     }
 
+    /**
+     * @dev NFT战斗属性结构体
+     * 存储一个NFT在战斗中的核心属性，影响攻击、防御、速度等
+     * @param tokenId NFT的唯一标识符
+     * @param level NFT等级（1-5），等级越高属性越强
+     * @param element 属性类型（0=水, 1=风, 2=火, 3=暗, 4=光）
+     * @param power 战力值，由等级和成长值计算得出
+     * @param growth 成长值（50-100），影响属性加成
+     * @param zodiac 生肖索引（0-11，对应鼠牛虎兔龙蛇马羊猴鸡狗猪）
+     */
     struct NFTTraits {
         uint256 tokenId;
         uint8 level;
@@ -25,6 +76,18 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint8 zodiac;
     }
 
+    /**
+     * @dev 战斗状态结构体
+     * 记录一场战斗的完整状态，用于战斗历史查询
+     * @param battleId 战斗的唯一标识符
+     * @param startTime 战斗开始时间戳
+     * @param status 战斗状态（1=进行中，2=已结束）
+     * @param winner 获胜方（1=挑战者，2=被挑战者，0=平局）
+     * @param challengerId 挑战者代表NFT ID
+     * @param challengedId 被挑战者代表NFT ID
+     * @param challenger 挑战者钱包地址
+     * @param challenged 被挑战者钱包地址
+     */
     struct BattleState {
         uint256 battleId;
         uint256 startTime;
@@ -36,6 +99,14 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         address challenged;
     }
 
+    /**
+     * @dev 队伍状态结构体
+     * 记录一个队伍（6个NFT）在战斗中的实时状态
+     * @param traits 6个NFT的属性数组
+     * @param hp 6个NFT的当前生命值
+     * @param alive 6个NFT的存活状态（true=存活）
+     * @param maxHp 6个NFT的最大生命值
+     */
     struct TeamState {
         NFTTraits[6] traits;
         uint256[6] hp;
@@ -43,6 +114,16 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint256[6] maxHp;
     }
 
+    /**
+     * @dev 技能数据结构体
+     * 每个NFT类型关联一个独特技能，影响战斗策略
+     * @param skillId 技能ID（通常等于tokenType）
+     * @param skillType 技能类型（0=普攻强化，1-8=不同类型技能）
+     * @param damage 技能伤害倍率（百分比，125表示125%伤害）
+     * @param cooldown 技能冷却回合数（使用后需等待的回合）
+     * @param duration 技能持续回合数（当前未使用，保留）
+     * @param isAoe 是否范围攻击（true=对所有敌方造成伤害）
+     */
     struct Skill {
         uint256 skillId;
         uint8 skillType;
@@ -52,38 +133,66 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         bool isAoe;
     }
 
+    /**
+     * @dev 战斗历史数组（环形缓冲区，最多保存MAX_BATTLE_HISTORY场战斗）
+     */
     BattleState[] public battleHistory;
+    /**
+     * @dev 战斗历史环形缓冲区当前写入索引
+     */
     uint256 public battleHistoryIndex = 0;
 
-    uint256 public constant MAX_ROUNDS = 10;
-    uint256 public constant ZODIAC_COUNT = 12;
-    uint256 public constant GENDER_COUNT = 2;
-    uint256 public constant ELEMENT_COUNT = 5;
-    uint256 public constant ZODIAC_TYPE_COUNT = ZODIAC_COUNT * GENDER_COUNT;
-    uint256 public constant TOTAL_TYPE_COUNT = ELEMENT_COUNT * ZODIAC_TYPE_COUNT;
-    uint256 public constant MAX_BATTLE_HISTORY = 1000;
-    uint256 public constant MIN_GROWTH = 50;
-    uint256 public constant GROWTH_RANGE = 51;
-    uint256 public constant TEAM_SIZE = 6;
-    uint256 public constant SKILL_USE_CHANCE_DENOMINATOR = 5;
+    /**
+     * @dev 战斗常量配置
+     */
+    uint256 public constant MAX_ROUNDS = 10;          // 最大战斗回合数
+    uint256 public constant ZODIAC_COUNT = 12;        // 十二生肖总数
+    uint256 public constant GENDER_COUNT = 2;         // 性别数量（公/母）
+    uint256 public constant ELEMENT_COUNT = 5;        // 属性数量（水风火暗光）
+    uint256 public constant ZODIAC_TYPE_COUNT = ZODIAC_COUNT * GENDER_COUNT; // 24
+    uint256 public constant TOTAL_TYPE_COUNT = ELEMENT_COUNT * ZODIAC_TYPE_COUNT; // 120种NFT类型
+    uint256 public constant MAX_BATTLE_HISTORY = 1000; // 最大战斗历史记录数
+    uint256 public constant MIN_GROWTH = 50;          // 最小成长值
+    uint256 public constant GROWTH_RANGE = 51;         // 成长值范围（50-100）
+    uint256 public constant TEAM_SIZE = 6;             // 每队NFT数量
+    uint256 public constant SKILL_USE_CHANCE_DENOMINATOR = 5; // 1/5概率触发技能
 
+    /**
+     * @dev NFT合约地址（用于查询NFT属性和所有权）
+     */
     address public nftContract;
+    /**
+     * @dev 授权器地址（Authorizer 合约）
+     */
     address public authorizer;
+    /**
+     * @dev 战斗调用者地址（通常为 ArenaRanking 合约）
+     */
     address public battleCaller;
 
-    bool public paused;
-    string public pauseReason;
+    /**
+     * @dev 属性类型常量
+     */
+    uint8 public constant ELEMENT_WATER = 0; // 水属性
+    uint8 public constant ELEMENT_WIND = 1;  // 风属性
+    uint8 public constant ELEMENT_FIRE = 2;  // 火属性
+    uint8 public constant ELEMENT_DARK = 3;  // 暗属性
+    uint8 public constant ELEMENT_LIGHT = 4; // 光属性
 
-    uint8 public constant ELEMENT_WATER = 0;
-    uint8 public constant ELEMENT_WIND = 1;
-    uint8 public constant ELEMENT_FIRE = 2;
-    uint8 public constant ELEMENT_DARK = 3;
-    uint8 public constant ELEMENT_LIGHT = 4;
-
+    /**
+     * @dev 技能映射：tokenType => Skill
+     * 共120种NFT类型，每种对应一个独特技能
+     */
     mapping(uint256 => Skill) public skills;
 
-    event Paused(address account, string reason);
-    event Unpaused(address account);
+    /**
+     * @dev 战斗开始事件（供前端/后端监听以更新UI）
+     * @param battleId 战斗ID
+     * @param challenger 挑战者地址
+     * @param challenged 被挑战者地址
+     * @param challengerTeam 挑战者NFT队伍
+     * @param challengedTeam 被挑战者NFT队伍
+     */
     event BattleStarted(
         uint256 indexed battleId,
         address indexed challenger,
@@ -91,21 +200,29 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint256[6] challengerTeam,
         uint256[6] challengedTeam
     );
+    /**
+     * @dev 战斗结束事件
+     * @param battleId 战斗ID
+     * @param winner 获胜方（1=挑战者，2=被挑战者，0=平局）
+     */
     event BattleEnded(
         uint256 indexed battleId,
         uint8 winner
     );
 
-    modifier whenNotPaused() {
-        require(!paused, "Battle: Paused");
-        _;
-    }
-
+    /**
+     * @dev 修饰器：仅所有者或授权器可调用
+     * 用于配置类函数（如设置NFT合约地址）
+     */
     modifier onlyAuthorized() {
         require(msg.sender == owner() || msg.sender == authorizer, "Battle: Not authorized");
         _;
     }
 
+    /**
+     * @dev 修饰器：仅所有者或战斗调用者可调用
+     * 用于战斗发起类函数（如 challenge）
+     */
     modifier onlyBattleCaller() {
         require(msg.sender == owner() || msg.sender == battleCaller, "Battle: Only authorized caller");
         _;
@@ -131,15 +248,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      */
     function reinitializeSkills() external onlyOwner {
         _initSkills();
-    }
-
-    /**
-     * @dev 取消暂停
-     */
-    function unpause() external onlyOwner {
-        paused = false;
-        pauseReason = "";
-        emit Unpaused(msg.sender);
     }
 
     /**
@@ -190,14 +298,14 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             uint256 mockMultiplier = 1000;
             uint256 mockOffset = 10000;
             uint256 mockIdRange = 1000;
-            
+
             if (tokenId >= (mockOffset + 0) * mockMultiplier) {
                 uint256 temp = tokenId / mockMultiplier;
                 uint256 mockIndex = temp - mockOffset;
-                
+
                 uint256 growthPart = temp / mockIdRange;
                 uint256 growth = 50 + (growthPart % 51);
-                
+
                 uint256 level = 1;
                 if (mockIndex == 0) level = 5;
                 else if (mockIndex <= 4) level = 5;
@@ -206,9 +314,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 else if (mockIndex <= 39) level = 3;
                 else if (mockIndex <= 69) level = 2;
                 else if (mockIndex <= 99) level = 1;
-                
+
                 uint256 zodiacType = tokenId % TOTAL_TYPE_COUNT;
-                
+
                 traits.level = uint8(level);
                 traits.element = uint8(zodiacType / ZODIAC_TYPE_COUNT);
                 traits.zodiac = uint8((zodiacType / GENDER_COUNT) % ZODIAC_COUNT);
@@ -349,7 +457,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
 
         uint256 battleId = battleHistoryIndex + 1;
-        
+
         if (battleHistory.length < MAX_BATTLE_HISTORY) {
             battleHistory.push(BattleState({
                 battleId: battleId,
@@ -373,7 +481,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 challenged: challengedAddress
             });
         }
-        
+
         battleHistoryIndex = (battleHistoryIndex + 1) % MAX_BATTLE_HISTORY;
 
         emit BattleStarted(battleId, msg.sender, challengedAddress, challengerTeam, challengedTeam);
@@ -474,12 +582,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             for (uint i = 0; i < 6; i++) {
                 uint attackerIndex = speedOrder1[i];
                 if (!state1.alive[attackerIndex] || !team1Alive) continue;
-                
+
                 NFTTraits memory attackerTrait = state1.traits[attackerIndex];
                 uint256 skillKey = attackerTrait.element * ZODIAC_TYPE_COUNT + attackerTrait.zodiac;
                 Skill memory skill = skills[skillKey];
                 bool useSkill = skillCooldown1[attackerIndex] == 0 && (randomSeed % SKILL_USE_CHANCE_DENOMINATOR == 0 || _shouldUseSkill(state1, attackerIndex));
-                
+
                 if (useSkill && skill.skillId > 0) {
                     state2 = _applySkill(attackerTrait, state2, attackerIndex, skill);
                     skillCooldown1[attackerIndex] = skill.cooldown;
@@ -505,12 +613,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             for (uint i = 0; i < 6; i++) {
                 uint attackerIndex = speedOrder2[i];
                 if (!state2.alive[attackerIndex] || !team2Alive) continue;
-                
+
                 NFTTraits memory attackerTrait = state2.traits[attackerIndex];
                 uint256 skillKey = attackerTrait.element * ZODIAC_TYPE_COUNT + attackerTrait.zodiac;
                 Skill memory skill = skills[skillKey];
                 bool useSkill = skillCooldown2[attackerIndex] == 0 && (randomSeed % SKILL_USE_CHANCE_DENOMINATOR == 0 || _shouldUseSkill(state2, attackerIndex));
-                
+
                 if (useSkill && skill.skillId > 0) {
                     state1 = _applySkill(attackerTrait, state1, attackerIndex, skill);
                     skillCooldown2[attackerIndex] = skill.cooldown;
@@ -560,14 +668,14 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint256 baseDamage = 0;
         uint256 targetIndex = 6;
         uint256 validTargetIndex = 6;
-        
+
         for (uint i = 0; i < 6; i++) {
             if (defenderState.alive[i]) {
                 validTargetIndex = i;
                 break;
             }
         }
-        
+
         if (validTargetIndex < 6) {
             targetIndex = skill.isAoe ? validTargetIndex : _findTarget(defenderState.alive, defenderState.traits, defenderState.hp);
             if (targetIndex >= 6) {
@@ -592,7 +700,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 defenderState.alive[targetIndex] = false;
             }
         }
-        
+
         return defenderState;
     }
 
@@ -633,7 +741,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint256 baseSpeed = 60;
         uint256 levelBonus = uint256(traits.level) * 5;
         uint256 growthBonus = ((traits.level - 1) * uint256(traits.growth) * 3) / 100;
-        
+
         uint256[12] memory zodiacSpeedBonus = [
             uint256(5), 25, 15, 5, 12, 8, 30, 20, 35, 5, 20, 22
         ];
@@ -653,13 +761,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     }
 
     /**
-     * @dev 生成随机种子 - 使用更安全的随机数生成方式
-     * 结合多个链上数据源，增加预测难度
-     * 
-     * 注意：当前实现使用链上数据源组合生成随机数，虽然增加了预测难度，
-     * 但在验证者节点仍可能存在一定的可预测性。
-     * 建议在主网部署时引入 Chainlink VRF 或其他去中心化预言机随机数方案。
-     * 
+     * @dev 生成随机种子 - 使用多重链上熵源增强随机性
+     * 结合 blockhash、timestamp、coinbase、gasleft 等多个数据源
+     * 在高价值场景下建议配合 Commit-Reveal 方案使用
      * @param battleId 战斗ID
      * @return 随机种子
      */
@@ -681,58 +785,8 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, battleId))),
             uint256(keccak256(abi.encodePacked(block.prevrandao, tx.gasprice, gasleft())))
         ));
-        
+
         return uint256(entropy);
-    }
-    
-    /**
-     * @dev Chainlink VRF 请求ID映射（预留接口）
-     * requestId => battleId
-     */
-    mapping(bytes32 => uint256) public vrfRequestToBattleId;
-    
-    /**
-     * @dev 是否已启用Chainlink VRF（默认关闭）
-     */
-    bool public vrfEnabled;
-    
-    /**
-     * @dev Chainlink VRF协调器地址
-     */
-    address public vrfCoordinator;
-    
-    /**
-     * @dev Chainlink VRF密钥哈希
-     */
-    bytes32 public vrfKeyHash;
-    
-    /**
-     * @dev Chainlink VRF订阅ID
-     */
-    uint64 public vrfSubscriptionId;
-    
-    /**
-     * @dev 启用Chainlink VRF随机数
-     * @param _vrfCoordinator VRF协调器地址
-     * @param _vrfKeyHash VRF密钥哈希
-     * @param _subscriptionId VRF订阅ID
-     */
-    function enableVRF(address _vrfCoordinator, bytes32 _vrfKeyHash, uint64 _subscriptionId) external onlyOwner {
-        require(_vrfCoordinator != address(0), "Battle: Invalid VRF coordinator");
-        require(_vrfKeyHash != bytes32(0), "Battle: Invalid VRF key hash");
-        require(_subscriptionId > 0, "Battle: Invalid subscription ID");
-        
-        vrfCoordinator = _vrfCoordinator;
-        vrfKeyHash = _vrfKeyHash;
-        vrfSubscriptionId = _subscriptionId;
-        vrfEnabled = true;
-    }
-    
-    /**
-     * @dev 禁用Chainlink VRF，回退到链上随机数
-     */
-    function disableVRF() external onlyOwner {
-        vrfEnabled = false;
     }
 
     /**
@@ -791,7 +845,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     function _findTarget(bool[6] memory alive, NFTTraits[6] memory traits, uint256[6] memory currentHp) internal pure returns (uint) {
         uint minHpIndex = 6;
         uint256 minHpPercent = type(uint256).max;
-        
+
         for (uint i = 0; i < 6; i++) {
             if (alive[i]) {
                 uint256 maxHp = _calculateMaxHP(traits[i]);
@@ -802,9 +856,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 }
             }
         }
-        
+
         if (minHpIndex != 6) return minHpIndex;
-        
+
         for (uint i = 0; i < 3; i++) {
             if (alive[i]) return i;
         }
@@ -851,7 +905,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint256 dodgeChance = 15 + (uint256(defender.growth) - 50) / 10;
         if (dodgeChance > 25) dodgeChance = 25;
         if (dodgeChance < 5) dodgeChance = 5;
-        
+
         if (dodgeCheck < dodgeChance) {
             return 0;
         }
@@ -871,7 +925,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     function _validateTeam(uint256[6] memory team) internal pure returns (bool) {
         for (uint256 i = 0; i < 6; i++) {
             if (team[i] == 0) return false;
-            // 检查是否有重复的NFT
             for (uint256 j = i + 1; j < 6; j++) {
                 if (team[i] == team[j]) return false;
             }
@@ -892,10 +945,10 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     ) external view returns (bool, uint256) {
         require(_validateTeam(attackerTeam), "Battle: Invalid attacker team");
         require(_validateTeam(defenderTeam), "Battle: Invalid defender team");
-        
+
         uint256 battleId = block.timestamp % 1000 + 1;
         uint8 winner = _executeBattleView(attackerTeam, defenderTeam, battleId);
-        
+
         return (true, winner);
     }
 
@@ -965,7 +1018,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      */
     function pause(string calldata reason) external onlyOwner {
         _pause();
-        pauseReason = reason;
         emit Paused(msg.sender, reason);
     }
 
@@ -974,12 +1026,8 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      */
     function unpause() external onlyOwner {
         _unpause();
-        pauseReason = "";
         emit Unpaused(msg.sender);
     }
-
-    event Paused(address account, string reason);
-    event Unpaused(address account);
 
     /**
      * @dev 初始化技能（内部）

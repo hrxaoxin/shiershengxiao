@@ -83,7 +83,57 @@ interface ISetPoolManager {
 /**
  * @title Authorizer
  * @dev 合约授权管理器，负责管理系统中所有合约地址和权限控制
- * 合约地址更新立即生效，无需等待时间锁
+ *
+ * 核心职责：
+ * 1. 地址注册表：集中维护系统所有核心合约的地址，供其他合约查询
+ * 2. 授权控制：通过 onlyAuthorized / onlyOwner 等修饰器，
+ *    限定业务合约（铸造、战斗、交易、繁殖）可调用"受保护函数"
+ * 3. 地址更新：当某个合约升级或迁移时，由 owner 更新注册表，
+ *    所有依赖合约立即生效（无需逐个合约调用 setAddress）
+ *
+ * 注册的地址（每个地址通过 setXxxContract 形式的接口写入）：
+ * - nftContract / nftMintAddress：ERC721 NFT 主合约（NFTMint）
+ * - nftDataAddress：NFT 元数据合约（NFTData）
+ * - nftUpdateAddress：NFT 升级合约（NFTUpdate）
+ * - metadataAddress / mintModuleAddress / upgradeModuleAddress：铸造/升级模块地址
+ * - priceOracleAddress：价格预言机合约（PriceOracle）
+ * - battleAddress：战斗合约（Battle）
+ * - breedingAddress：繁殖合约（Breeding）
+ * - stakingAddress：NFT 质押合约（Staking）
+ * - tokenStakingAddress：代币质押合约（TokenStaking）
+ * - rewardManagerAddress：奖励管理器（RewardManager）
+ * - dividendManagerAddress：分红管理器（DividendManager）
+ * - poolManagerAddress：资金池管理器（PoolManager）
+ * - arenaRankingAddress：竞技场排名合约（ArenaRanking）
+ * - tradingAddress：交易市场合约（NFTTrading）
+ * - tokenBurnerAddress：代币销毁合约（TokenBurner）
+ * - feeReceiver：手续费接收地址（通常为 owner 或多签钱包）
+ * - tokenAddress：游戏代币合约地址（ERC20）
+ * - usdtAddress：USDT 稳定币地址
+ * - pancakeSwapPair：PancakeSwap 流动池地址（用于价格验证）
+ * - authorizer：本合约自身地址
+ *
+ * 权限模型：
+ * - onlyOwner：可以更新任意地址（部署时的部署者或多签钱包）
+ * - 授权业务合约：在业务合约内部通过 ISetXxx 接口写入地址时
+ *   由其自身的 onlyOwner 或授权修饰器保护
+ *
+ * 使用示例（在业务合约中）：
+ *   address public authorizer;
+ *   modifier onlyBattleContract() {
+ *       require(msg.sender == Authorizer(authorizer).battleAddress(),
+ *           "only battle");
+ *       _;
+ *   }
+ *
+ * 安全注意：
+ * - owner 应使用多签钱包或时间锁（Timelock），以防止单点故障
+ * - 地址更新应在前端/后端广播前进行充分测试，错误地址可能导致系统瘫痪
+ * - 建议在测试网完成全流程后再在主网设置最终地址
+ *
+ * 升级与治理：
+ * - UUPS 可升级：未来可以扩展新的地址字段或引入角色权限（Role-Based Access Control）
+ * - 所有状态均为 storage，代理升级后数据保留
  */
 contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
