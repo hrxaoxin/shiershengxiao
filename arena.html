@@ -462,11 +462,11 @@
                             <span class="mr-2">🎯</span> 属性克制
                         </h3>
                         <div class="space-y-2 text-sm">
-                            <div class="flex items-center text-orange-400">🔥火 → 🪁风 (+50%)</div>
-                            <div class="flex items-center text-green-400">🪁风 → 💧水 (+50%)</div>
-                            <div class="flex items-center text-blue-400">💧水 → 🔥火 (+50%)</div>
-                            <div class="flex items-center text-yellow-400">✨光 → 🌑暗 (+50%)</div>
-                            <div class="flex items-center text-purple-400">🌑暗 → ✨光 (+50%)</div>
+                            <div class="flex items-center text-orange-400">🔥火 → 🪁风 (+<span id="elementBonus">50</span>%)</div>
+                            <div class="flex items-center text-green-400">🪁风 → 💧水 (+<span id="elementBonus2">50</span>%)</div>
+                            <div class="flex items-center text-blue-400">💧水 → 🔥火 (+<span id="elementBonus3">50</span>%)</div>
+                            <div class="flex items-center text-yellow-400">✨光 → 🌑暗 (+<span id="elementBonus4">50</span>%)</div>
+                            <div class="flex items-center text-purple-400">🌑暗 → ✨光 (+<span id="elementBonus5">50</span>%)</div>
                         </div>
                     </div>
 
@@ -481,8 +481,8 @@
                         <div>• 前排全阵亡后攻击后排</div>
                         <div>• <span class="text-blue-400">积分模式</span>：挑战成功/失败根据排名动态增减积分</div>
                         <div>• <span class="text-purple-400">挑战模式</span>：挑战成功直接替换排名，失败排名不变</div>
-                        <div>• <span class="text-green-400">每天免费3次挑战机会</span></div>
-                        <div>• <span class="text-orange-400">销毁888代币可充值3次挑战机会</span></div>
+                        <div>• <span class="text-green-400">每天免费<span id="freeChallenges">3</span>次挑战机会</span></div>
+                        <div>• <span class="text-orange-400">销毁<span id="rechargeCostDisplay">888</span>代币可充值<span id="rechargeAttempts">3</span>次挑战机会</span></div>
                         <div>• <span class="text-yellow-400">战队NFT需质押，战斗期间不可转移</span></div>
                         <div>• 清空战队后NFT自动解除质押</div>
                     </div>
@@ -1012,6 +1012,45 @@
             battleContract = new web3.eth.Contract(config.ABIS.battleABI, config.CONTRACT_ADDRESSES.battle);
             arenaContract = new web3.eth.Contract(config.ABIS.arenaABI, config.CONTRACT_ADDRESSES.arena);
             nftContract = new web3.eth.Contract(config.ABIS.nftMintABI, config.CONTRACT_ADDRESSES.nftMint);
+            await loadArenaConfig();
+        }
+
+        async function loadArenaConfig() {
+            try {
+                const config = ZODIAC_CONFIG;
+                
+                // 从合约读取充值费用
+                try {
+                    const rechargeCost = await arenaContract.methods.rechargeCost().call();
+                    const cost = (parseInt(rechargeCost) / 10**18).toFixed(0);
+                    document.getElementById('rechargeCostDisplay').textContent = cost;
+                } catch (e) {
+                    console.warn('Failed to load recharge cost:', e);
+                }
+                
+                // 从配置读取免费挑战次数和充值次数（这些通常在配置中）
+                try {
+                    document.getElementById('freeChallenges').textContent = config.freeChallenges || '3';
+                    document.getElementById('rechargeAttempts').textContent = config.rechargeAttempts || '3';
+                } catch (e) {
+                    console.warn('Failed to load challenge config:', e);
+                }
+                
+                // 从合约读取属性克制加成
+                try {
+                    const bonus = await battleContract.methods.ELEMENT_BONUS().call();
+                    const bonusPercent = (parseInt(bonus) / 100).toFixed(0);
+                    document.getElementById('elementBonus').textContent = bonusPercent;
+                    document.getElementById('elementBonus2').textContent = bonusPercent;
+                    document.getElementById('elementBonus3').textContent = bonusPercent;
+                    document.getElementById('elementBonus4').textContent = bonusPercent;
+                    document.getElementById('elementBonus5').textContent = bonusPercent;
+                } catch (e) {
+                    console.warn('Failed to load element bonus:', e);
+                }
+            } catch (error) {
+                console.error('Load arena config failed:', error);
+            }
         }
 
         async function loadMyNfts() {

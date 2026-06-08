@@ -258,8 +258,8 @@
                 <h3 class="text-xl font-bold text-gray-800 mb-4">🌟 代币质押规则</h3>
                 <ul class="text-gray-600 space-y-2">
                     <li>• 质押代币获得BNB奖励</li>
-                    <li>• 最低质押时长30分钟</li>
-                    <li>• 每日释放比例15%，支持弹性增量机制</li>
+                    <li>• 最低质押时长 <span id="tokenMinDuration">30</span> 分钟</li>
+                    <li>• 当前每日释放比例 <span id="dailyReleaseRatioDisplay">1.0</span>%，支持弹性增量机制</li>
                     <li>• 赎回时自动领取累积奖励</li>
                     <li>• 奖励以BNB形式发放</li>
                 </ul>
@@ -978,20 +978,34 @@
                 document.getElementById('totalStakedTokens').textContent = web3.utils.fromWei(totalStakedAll, 'ether').substring(0, 10);
 
                 let releaseRatio = '0';
+                let releaseRatioDisplay = '15';
                 try {
                     const rate = await tokenStakingContract.methods.rewardRate().call();
                     const rateNum = parseInt(rate, 10);
                     if (rateNum > 0) {
                         if (rateNum > 1000) {
                             releaseRatio = rateNum.toString();
+                            releaseRatioDisplay = rateNum.toString();
                         } else {
                             releaseRatio = (rateNum / 100).toFixed(2);
+                            releaseRatioDisplay = (rateNum / 100).toFixed(2);
                         }
                     }
                 } catch (e) {
                     releaseRatio = '15';
+                    releaseRatioDisplay = '15';
                 }
                 document.getElementById('currentReleaseRatio').textContent = releaseRatio + '%';
+                document.getElementById('dailyReleaseRatioDisplay').textContent = releaseRatioDisplay;
+                
+                // 读取最低质押时长
+                try {
+                    const minDuration = await tokenStakingContract.methods.MIN_STAKING_DURATION().call();
+                    const minDurationMinutes = Math.floor(parseInt(minDuration, 10) / 60);
+                    document.getElementById('tokenMinDuration').textContent = minDurationMinutes;
+                } catch (e) {
+                    document.getElementById('tokenMinDuration').textContent = '30';
+                }
 
                 document.getElementById('tokenStakeBtn').disabled = false;
                 document.getElementById('tokenUnstakeBtn').disabled = parsedStakeInfo.amount == 0;

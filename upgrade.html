@@ -223,19 +223,19 @@
                     <div class="bg-gray-50 p-6 rounded-lg">
                         <h4 class="text-lg font-bold text-blue-600 mb-3">方式二：消耗代币</h4>
                         <ul class="text-gray-700 space-y-2">
-                            <li>• 1阶 → 2阶：消耗10000枚代币</li>
-                            <li>• 2阶 → 3阶：消耗40000枚代币</li>
-                            <li>• 3阶 → 4阶：消耗120000枚代币</li>
-                            <li>• 4阶 → 5阶：消耗480000枚代币</li>
+                            <li>• 1阶 → 2阶：消耗<span id="tokenCost1">10000</span>枚代币</li>
+                            <li>• 2阶 → 3阶：消耗<span id="tokenCost2">40000</span>枚代币</li>
+                            <li>• 3阶 → 4阶：消耗<span id="tokenCost3">120000</span>枚代币</li>
+                            <li>• 4阶 → 5阶：消耗<span id="tokenCost4">480000</span>枚代币</li>
                         </ul>
                     </div>
                     <div class="bg-gray-50 p-6 rounded-lg" id="usdUpgradeMethod" style="display: none;">
                         <h4 class="text-lg font-bold text-blue-600 mb-3">方式三：消耗USDT价值代币</h4>
                         <ul class="text-gray-700 space-y-2">
-                            <li>• 1阶 → 2阶：消耗价值1 USDT的代币</li>
-                            <li>• 2阶 → 3阶：消耗价值4 USDT的代币</li>
-                            <li>• 3阶 → 4阶：消耗价值12 USDT的代币</li>
-                            <li>• 4阶 → 5阶：消耗价值48 USDT的代币</li>
+                            <li>• 1阶 → 2阶：消耗价值<span id="usdCost1">1</span> USDT的代币</li>
+                            <li>• 2阶 → 3阶：消耗价值<span id="usdCost2">4</span> USDT的代币</li>
+                            <li>• 3阶 → 4阶：消耗价值<span id="usdCost3">12</span> USDT的代币</li>
+                            <li>• 4阶 → 5阶：消耗价值<span id="usdCost4">48</span> USDT的代币</li>
                         </ul>
                     </div>
                 </div>
@@ -358,6 +358,40 @@
             tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
             nftUpdateContract = await window.ZODIAC_WEB3.getContract('nftUpdate');
             await checkUSDUpgradeHidden();
+            await loadUpgradeCosts();
+        }
+
+        async function loadUpgradeCosts() {
+            try {
+                if (!nftUpdateContract) {
+                    console.warn('NFTUpdate contract not available, using default costs');
+                    return;
+                }
+                
+                // 从合约读取代币升级费用
+                try {
+                    const level1Cost = await nftUpdateContract.methods.level1UpgradeCost().call();
+                    const level2Cost = await nftUpdateContract.methods.level2UpgradeCost().call();
+                    const level3Cost = await nftUpdateContract.methods.level3UpgradeCost().call();
+                    const level4Cost = await nftUpdateContract.methods.level4UpgradeCost().call();
+                    
+                    const cost1 = (parseInt(level1Cost) / 10**18).toLocaleString();
+                    const cost2 = (parseInt(level2Cost) / 10**18).toLocaleString();
+                    const cost3 = (parseInt(level3Cost) / 10**18).toLocaleString();
+                    const cost4 = (parseInt(level4Cost) / 10**18).toLocaleString();
+                    
+                    document.getElementById('tokenCost1').textContent = cost1;
+                    document.getElementById('tokenCost2').textContent = cost2;
+                    document.getElementById('tokenCost3').textContent = cost3;
+                    document.getElementById('tokenCost4').textContent = cost4;
+                    
+                    console.log('Upgrade costs loaded from contract:', { cost1, cost2, cost3, cost4 });
+                } catch (e) {
+                    console.error('Failed to load upgrade costs:', e);
+                }
+            } catch (error) {
+                console.error('Load upgrade costs failed:', error);
+            }
         }
 
         async function checkUSDUpgradeHidden() {
