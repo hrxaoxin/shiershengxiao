@@ -85,79 +85,30 @@ interface INFTDataInterface {
  * @dev NFT铸造接口，提供铸造和查询功能
  */
 interface INFTMint {
-    /**
-     * @dev 铸造指定生肖类型的NFT
-     * @param to 接收地址
-     * @param zodiacType 生肖类型
-     * @return 铸造的NFT ID
-     */
     function mint(address to, uint256 zodiacType) external returns (uint256);
-
-    /**
-     * @dev 铸造普通NFT（随机生肖类型）
-     * @param to 接收地址
-     * @return 铸造的NFT ID
-     */
     function mintNormal(address to) external returns (uint256);
-
-    /**
-     * @dev 铸造稀有NFT（随机稀有生肖类型）
-     * @param to 接收地址
-     * @return 铸造的NFT ID
-     */
     function mintRare(address to) external returns (uint256);
-
-    /**
-     * @dev 获取NFT的生肖类型
-     * @param tokenId NFT ID
-     * @return 生肖类型值
-     */
     function tokenType(uint256 tokenId) external view returns (uint256);
-
-    /**
-     * @dev 获取NFT的等级
-     * @param tokenId NFT ID
-     * @return 等级值
-     */
     function tokenLevel(uint256 tokenId) external view returns (uint8);
-
-    /**
-     * @dev 获取NFT的成长值
-     * @param tokenId NFT ID
-     * @return 成长值（影响属性成长）
-     */
     function tokenGrowth(uint256 tokenId) external view returns (uint8);
-
-    /**
-     * @dev 获取NFT的所有者
-     * @param tokenId NFT ID
-     * @return 所有者地址
-     */
     function ownerOf(uint256 tokenId) external view returns (address);
-
-    /**
-     * @dev 检查NFT是否为稀有NFT
-     * @param tokenId NFT ID
-     * @return 是否为稀有NFT
-     */
     function isRare(uint256 tokenId) external view returns (bool);
-
-    /**
-     * @dev 转移NFT（需授权）
-     * @param from 转出地址
-     * @param to 转入地址
-     * @param tokenId NFT ID
-     */
     function transferFrom(address from, address to, uint256 tokenId) external;
-
-    /**
-     * @dev 繁殖铸造NFT（由Breeding合约调用）
-     * @param to 接收地址
-     * @param zodiacType 生肖类型
-     * @param growth 成长值
-     * @return 铸造的NFT ID
-     */
     function mintForBreeding(address to, uint256 zodiacType, uint8 growth) external returns (uint256);
+}
+
+interface INFTMintCore {
+    function elementProbabilities() external view returns (uint256[5] memory);
+    function rareElementProbabilities() external view returns (uint256[2] memory);
+    function tokenType(uint256 tokenId) external view returns (uint256);
+    function tokenLevel(uint256 tokenId) external view returns (uint8);
+    function tokenGrowth(uint256 tokenId) external view returns (uint8);
+    function _exists(uint256 tokenId) external view returns (bool);
+    function owner() external view returns (address);
+    function tokenBurnerContract() external view returns (address);
+    function mint(address to, uint256 zodiacType) external returns (uint256);
+    function mintWithGrowth(address to, uint256 zodiacType, uint8 growth) external returns (uint256);
+    function generateSecureRandom() external returns (uint256);
 }
 
 /**
