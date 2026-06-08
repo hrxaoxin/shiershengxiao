@@ -742,7 +742,9 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"calculateDividend","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"getCurrentSnapshot","outputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"emergencyWithdrawBNB","outputs":[],"stateMutability":"nonpayable","type":"function"},
-            {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"emergencyWithdrawTokens","outputs":[],"stateMutability":"nonpayable","type":"function"}
+            {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"emergencyWithdrawTokens","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"level","type":"uint256"},{"internalType":"bool","name":"isRare","type":"bool"}],"name":"getNFTWeight","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"pure","type":"function"},
+            {"inputs":[],"name":"getWeightConfig","outputs":[{"internalType":"uint256[5]","name":"normalWeights","type":"uint256[5]"},{"internalType":"uint256[5]","name":"rareWeights","type":"uint256[5]"}],"stateMutability":"pure","type":"function"}
         ],
         priceOracleABI: [
             {"inputs":[{"internalType":"address","name":"_authorizer","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},

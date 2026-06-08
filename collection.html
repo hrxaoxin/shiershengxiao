@@ -583,7 +583,7 @@
             lazyLoadImages();
         }
 
-        function showCardModal(typeId, level) {
+        async function showCardModal(typeId, level) {
             const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
             const isOwned = ownedTypes.has(typeId);
             const userToken = userTokens.find(t => t.typeId === typeId);
@@ -594,7 +594,7 @@
             const rarityText = isRare ? '稀有' : '普通';
             const rarityColor = isRare ? 'text-purple-600' : 'text-gray-600';
             
-            const weight = isRare ? (ZODIAC_CONFIG.WEIGHTS.rare[level] || 76) : (ZODIAC_CONFIG.WEIGHTS.normal[level] || 1);
+            const weight = await ZODIAC_UTILS.getWeight(level, isRare);
             const canBreed = level >= 5;
             const canBattle = level >= 1;
             const canStake = level >= 1;

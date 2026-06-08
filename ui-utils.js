@@ -441,7 +441,19 @@ window.ZODIAC_UI = (function() {
         nftTooltip.style.top = top + 'px';
     }
 
-    function getWeight(level, isRare) {
+    async function getWeight(level, isRare) {
+        // 尝试从合约读取
+        try {
+            const contract = await window.ZODIAC_WEB3.getContract('dividendManager');
+            if (contract) {
+                const weight = await contract.methods.getNFTWeight(level, isRare).call();
+                return parseInt(weight);
+            }
+        } catch (e) {
+            console.warn('Failed to get weight from contract, using fallback:', e);
+        }
+        
+        // 回退到硬编码值
         const weights = {
             1: isRare ? 10 : 1,
             2: isRare ? 12 : 2,

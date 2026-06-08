@@ -615,6 +615,40 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
+     * @dev 公开获取NFT权重（根据等级和是否稀有）
+     * @param level NFT等级
+     * @param isRare 是否稀有
+     * @return uint256 权重值
+     */
+    function getNFTWeight(uint256 level, bool isRare) external pure returns (uint256) {
+        if (level == 0) return 0;
+        
+        if (isRare) {
+            uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
+            if (level <= MAX_NFT_LEVEL) {
+                return weights[level - 1];
+            }
+            return weights[MAX_NFT_LEVEL - 1];
+        } else {
+            uint256[5] memory weights = [uint256(1), 2, 6, 18, 66];
+            if (level <= MAX_NFT_LEVEL) {
+                return weights[level - 1];
+            }
+            return weights[MAX_NFT_LEVEL - 1];
+        }
+    }
+
+    /**
+     * @dev 获取所有权重配置
+     * @return normalWeights 普通NFT权重数组 [level1, level2, level3, level4, level5]
+     * @return rareWeights 稀有NFT权重数组 [level1, level2, level3, level4, level5]
+     */
+    function getWeightConfig() external pure returns (uint256[5] memory normalWeights, uint256[5] memory rareWeights) {
+        normalWeights = [uint256(1), 2, 6, 18, 66];
+        rareWeights = [uint256(10), 12, 16, 28, 76];
+    }
+
+    /**
      * @dev 批量更新用户权重（原子性操作）
      */
     function updateUserWeightsBatch(

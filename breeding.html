@@ -631,8 +631,17 @@
             try {
                 selfBreedingCooldown = parseInt(await breedingContract.methods.selfBreedingCooldown().call(), 10);
                 marketBreedingCooldown = parseInt(await breedingContract.methods.marketBreedingCooldown().call(), 10);
+                
+                // 从合约读取繁育费用
+                const selfFeeWei = await breedingContract.methods.selfBreedingFee().call();
+                const marketFeeWei = await breedingContract.methods.marketBreedingFee().call();
+                const selfFee = (parseInt(selfFeeWei) / 10**18).toFixed(0);
+                const marketFee = (parseInt(marketFeeWei) / 10**18).toFixed(0);
+                
                 document.getElementById('selfBreedingCooldown').textContent = formatDuration(selfBreedingCooldown);
                 document.getElementById('marketBreedingCooldown').textContent = formatDuration(marketBreedingCooldown);
+                document.getElementById('selfBreedingFee').textContent = selfFee;
+                document.getElementById('marketBreedingFee').textContent = marketFee;
             } catch (error) {
                 console.error('加载孕育常量失败:', error);
             }

@@ -447,12 +447,12 @@
             nftGrid.innerHTML = html;
         }
 
-        function selectNFT(id, type, level, name, image) {
+        async function selectNFT(id, type, level, name, image) {
             selectedNft = { id, type, level, name, image };
             const selectedNftInfo = document.getElementById('selectedNftInfo');
             const upgradeSection = document.getElementById('upgradeSection');
 
-            const requiredTokens = level < 5 ? getRequiredTokens(level) : 0;
+            const requiredTokens = level < 5 ? await getRequiredTokens(level) : 0;
             const requiredNFTs = level < 5 ? parseInt(level, 10) : 0;
             
             selectedNftInfo.innerHTML = `
@@ -544,7 +544,7 @@
                 return;
             }
 
-            const requiredTokens = getRequiredTokens(selectedNft.level);
+            const requiredTokens = await getRequiredTokens(selectedNft.level);
             const confirmed = await ZODIAC_UI.showConfirmModal(
                 '升级确认',
                 `确认使用代币升阶？\n\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level} → ${selectedNft.level + 1}\n将消耗 ${requiredTokens.toLocaleString()} 枚代币`
@@ -618,13 +618,38 @@
 
 
 
-        function getRequiredTokens(level) {
-            switch (level) {
-                case 1: return 10000;
-                case 2: return 40000;
-                case 3: return 120000;
-                case 4: return 480000;
-                default: return 0;
+        async function getRequiredTokens(level) {
+            if (!nftUpdateContract) {
+                // 回退到硬编码值
+                switch (level) {
+                    case 1: return 10000;
+                    case 2: return 40000;
+                    case 3: return 120000;
+                    case 4: return 480000;
+                    default: return 0;
+                }
+            }
+            try {
+                const costWei = level == 1 
+                    ? await nftUpdateContract.methods.level1UpgradeCost().call()
+                    : level == 2
+                    ? await nftUpdateContract.methods.level2UpgradeCost().call()
+                    : level == 3
+                    ? await nftUpdateContract.methods.level3UpgradeCost().call()
+                    : level == 4
+                    ? await nftUpdateContract.methods.level4UpgradeCost().call()
+                    : '0';
+                return parseInt(costWei) / 10**18;
+            } catch (e) {
+                console.error('Failed to get upgrade cost from contract:', e);
+                // 回退到硬编码值
+                switch (level) {
+                    case 1: return 10000;
+                    case 2: return 40000;
+                    case 3: return 120000;
+                    case 4: return 480000;
+                    default: return 0;
+                }
             }
         }
 
