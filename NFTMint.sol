@@ -175,22 +175,22 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         _;
     }
 
-    function setTokenBurner(address _tokenBurner) external onlyAuthorized {
+    function setTokenBurner(address _tokenBurner) external onlyOwner {
         require(_tokenBurner != address(0), "NFTMint: Invalid token burner address");
         tokenBurnerContract = _tokenBurner;
     }
 
-    function setNFTDataContract(address _nftData) external onlyAuthorized {
+    function setNFTDataContract(address _nftData) external onlyOwner {
         require(_nftData != address(0), "NFTMint: Invalid NFT data contract address");
         nftDataContract = _nftData;
     }
     
-    function setTokenContract(address _tokenContract) external onlyAuthorized {
+    function setTokenContract(address _tokenContract) external onlyOwner {
         require(_tokenContract != address(0), "NFTMint: Invalid token contract address");
         tokenContract = _tokenContract;
     }
     
-    function setBreedingContract(address _breedingContract) external onlyAuthorized {
+    function setBreedingContract(address _breedingContract) external onlyOwner {
         require(_breedingContract != address(0), "NFTMint: Invalid breeding contract address");
         breedingContract = _breedingContract;
     }
@@ -656,6 +656,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     }
 
     function adminSetNFTLevel(uint256 tokenId, uint256 newLevel) external whenNotPaused onlyAuthorized {
+        require(_ownerOf(tokenId) != address(0), "NFTMint: Token does not exist");
         require(newLevel <= 5 && newLevel >= 1, "NFTMint: Invalid level");
         uint8 oldLevel = tokenLevel[tokenId];
         tokenLevel[tokenId] = uint8(newLevel);
@@ -810,12 +811,16 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     /**
      * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
      */
-    receive() external payable {}
+    receive() external payable {
+        emit BNBDeposited(msg.sender, msg.value);
+    }
 
     /**
      * @dev Fallback 函数 - 处理未匹配的调用
      */
-    fallback() external payable {}
+    fallback() external payable {
+        emit BNBDeposited(msg.sender, msg.value);
+    }
 
     function getNFTInfoBatch(uint256[] calldata tokenIds) external view returns (uint256[] memory) {
         uint256[] memory result = new uint256[](tokenIds.length);
@@ -898,4 +903,5 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
 
     event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    event BNBDeposited(address indexed sender, uint256 amount);
 }
