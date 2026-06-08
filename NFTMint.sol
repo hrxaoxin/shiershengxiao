@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "./NFTLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
@@ -303,7 +304,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     function retryAllFailedSyncs() external onlyAuthorized {
         for (uint256 i = 1; i <= failedSyncCount; i++) {
             if (failedSyncs[i].tokenId != 0) {
-                retryFailedSync(i);
+                this.retryFailedSync(i);
             }
         }
     }
@@ -316,7 +317,6 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             emit MintCounterWarning(mintCounter);
         }
         
-        // 自动重置机制：当计数器接近最大值时自动重置为1
         if (mintCounter >= type(uint256).max - MINT_COUNTER_WARNING_THRESHOLD) {
             mintCounter = 1;
             mintCounterWarningTriggered = false;
@@ -324,19 +324,25 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
             mintCounter++;
         }
         
-        bytes32 entropy = keccak256(
-            abi.encodePacked(
-                blockhash(block.number > 1 ? block.number - 1 : block.number),
-                msg.sender,
-                block.timestamp,
-                mintCounter,
-                gasleft(),
-                address(this),
-                block.coinbase,
-                block.prevrandao
-            )
-        );
-        return uint256(entropy);
+        return _computeEntropy(mintCounter);
+    }
+
+    function _computeEntropy(uint256 counter) internal view returns (uint256) {
+        bytes32 part1 = keccak256(abi.encodePacked(
+            blockhash(block.number > 1 ? block.number - 1 : block.number),
+            msg.sender
+        ));
+        bytes32 part2 = keccak256(abi.encodePacked(
+            block.timestamp,
+            counter,
+            gasleft()
+        ));
+        bytes32 part3 = keccak256(abi.encodePacked(
+            address(this),
+            block.coinbase,
+            block.prevrandao
+        ));
+        return uint256(keccak256(abi.encodePacked(part1, part2, part3)));
     }
     
     /**
@@ -345,11 +351,6 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     function resetMintCounter() external onlyOwner {
         mintCounter = 1;
         mintCounterWarningTriggered = false;
-    }
-
-    function _generateGrowthValue(uint256 randomSeed) internal pure returns (uint8) {
-        uint256 roll = randomSeed % 91;
-        return uint8(roll + 10); // 范围 [10, 100]
     }
 
     function _chooseElement(uint256 randomVal) internal view returns (uint256) {
@@ -375,22 +376,18 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return 4;
     }
 
-    function _calculateZodiacType(uint256 element, uint256 zodiac, uint256 gender) internal pure returns (uint256) {
-        return element * 24 + zodiac * 2 + gender;
-    }
-
     function _mintNormal(uint256 randomSeed) internal view returns (uint256) {
         uint256 element = _chooseElement(randomSeed % 100);
         uint256 zodiac = (randomSeed / 100) % 12;
         uint256 gender = (randomSeed / 100 / 12) % 2;
-        return _calculateZodiacType(element, zodiac, gender);
+        return NFTLib.calculateZodiacType(element, zodiac, gender);
     }
 
     function _mintRare(uint256 randomSeed) internal view returns (uint256) {
         uint256 element = _chooseRareElement(randomSeed % 100);
         uint256 zodiac = (randomSeed / 100) % 12;
         uint256 gender = (randomSeed / 100 / 12) % 2;
-        return _calculateZodiacType(element, zodiac, gender);
+        return NFTLib.calculateZodiacType(element, zodiac, gender);
     }
 
     /**
@@ -406,7 +403,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         require(zodiacType < 120, "NFTMint: Invalid zodiac type");
         uint256 tokenId = _nextCardId++;
-        uint8 growth = _generateGrowthValue(_generateSecureRandom());
+        uint8 growth = NFTLib.generateGrowthValue(_generateSecureRandom());
         _safeMint(to, tokenId);
         tokenType[tokenId] = zodiacType;
         tokenLevel[tokenId] = 1;
@@ -425,7 +422,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         for (uint256 i = 0; i < zodiacTypes.length; i++) {
             require(zodiacTypes[i] < 120, "NFTMint: Invalid zodiac type");
             uint256 tokenId = _nextCardId++;
-            uint8 growth = _generateGrowthValue(baseSeed + i * 1000003);
+            uint8 growth = NFTLib.generateGrowthValue(baseSeed + i * 1000003);
             _safeMint(to, tokenId);
             tokenType[tokenId] = zodiacTypes[i];
             tokenLevel[tokenId] = 1;
@@ -441,7 +438,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256 randomSeed = _generateSecureRandom();
         uint256 zodiacType = _mintNormal(randomSeed);
-        uint8 growth = _generateGrowthValue(randomSeed);
+        uint8 growth = NFTLib.generateGrowthValue(randomSeed);
         uint256 tokenId = _nextCardId++;
         _safeMint(to, tokenId);
         tokenType[tokenId] = zodiacType;
@@ -456,7 +453,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256 randomSeed = _generateSecureRandom();
         uint256 zodiacType = _mintRare(randomSeed);
-        uint8 growth = _generateGrowthValue(randomSeed);
+        uint8 growth = NFTLib.generateGrowthValue(randomSeed);
         uint256 tokenId = _nextCardId++;
         _safeMint(to, tokenId);
         tokenType[tokenId] = zodiacType;
@@ -474,7 +471,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         for (uint256 i = 0; i < 10; i++) {
             uint256 seed = baseSeed + i * 7919;
             uint256 zodiacType = _mintNormal(seed);
-            uint8 growth = _generateGrowthValue(seed);
+            uint8 growth = NFTLib.generateGrowthValue(seed);
             uint256 tokenId = _nextCardId++;
             _safeMint(to, tokenId);
             tokenType[tokenId] = zodiacType;
@@ -494,7 +491,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         for (uint256 i = 0; i < 10; i++) {
             uint256 seed = baseSeed + i * 7919;
             uint256 zodiacType = _mintRare(seed);
-            uint8 growth = _generateGrowthValue(seed);
+            uint8 growth = NFTLib.generateGrowthValue(seed);
             uint256 tokenId = _nextCardId++;
             _safeMint(to, tokenId);
             tokenType[tokenId] = zodiacType;
@@ -518,8 +515,8 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         for (uint256 element = 0; element < 5; element++) {
             for (uint256 gender = 0; gender < 2; gender++) {
                 uint256 index = element * 2 + gender;
-                uint256 zodiacType = _calculateZodiacType(element, baseZodiac, gender);
-                uint8 growth = _generateGrowthValue(baseSeed + index * 9973);
+                uint256 zodiacType = NFTLib.calculateZodiacType(element, baseZodiac, gender);
+                uint8 growth = NFTLib.generateGrowthValue(baseSeed + index * 9973);
                 uint256 tokenId = _nextCardId++;
                 _safeMint(to, tokenId);
                 tokenType[tokenId] = zodiacType;
@@ -550,6 +547,42 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenGrowth[tokenId];
     }
 
+    struct NFTDataResult {
+        uint256 tokenType_;
+        uint256 attack;
+        uint256 defense;
+        uint256 health;
+        uint256 speed;
+        uint256 level;
+        uint256 rank;
+        string name;
+        string imageUrl;
+    }
+
+    function _getNFTDataInternal(uint256 tokenId) internal view returns (NFTDataResult memory) {
+        uint256 t = tokenType[tokenId];
+        uint8 l = tokenLevel[tokenId];
+        
+        (uint256 attack, uint256 defense, uint256 health, uint256 speed) = NFTLib.computeAttributes(l, tokenGrowth[tokenId]);
+        int256 zodiacBonus = NFTLib.getZodiacBonus(t);
+        string memory tokenName = NFTLib.buildNFTName(t);
+        
+        uint256 finalSpeed = zodiacBonus >= 0 ? speed + uint256(zodiacBonus) : 
+                             (speed > uint256(-zodiacBonus) ? speed - uint256(-zodiacBonus) : 0);
+        
+        return NFTDataResult({
+            tokenType_: t,
+            attack: attack,
+            defense: defense,
+            health: health,
+            speed: finalSpeed,
+            level: uint256(l),
+            rank: uint256(l),
+            name: tokenName,
+            imageUrl: string(abi.encodePacked("ipfs://metadata/", Strings.toString(t), ".json"))
+        });
+    }
+
     function getNFTData(uint256 tokenId) external view returns (
         uint256 tokenType_,
         uint256 attack,
@@ -561,66 +594,17 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         string memory name,
         string memory imageUrl
     ) {
-        uint256 t = tokenType[tokenId];
-        uint8 l = tokenLevel[tokenId];
-        uint8 g = tokenGrowth[tokenId];
-        
-        uint256 baseAttack = 10;
-        uint256 baseDefense = 10;
-        uint256 baseHealth = 100;
-        uint256 baseSpeed = 60;
-        
-        uint256 attackIncrement = 0;
-        uint256 defenseIncrement = 0;
-        uint256 healthIncrement = 0;
-        uint256 speedIncrement = 0;
-        
-        if (l > 1) {
-            uint256 growthMultiplier = uint256(g);
-            
-            for (uint256 i = 2; i <= l; i++) {
-                attackIncrement += (5 * growthMultiplier) / 100;
-                defenseIncrement += (4 * growthMultiplier) / 100;
-                healthIncrement += (20 * growthMultiplier) / 100;
-                speedIncrement += (3 * growthMultiplier) / 100;
-            }
-        }
-        
-        uint256 zodiac = (t / 2) % 12;
-        uint256[12] memory zodiacSpeedBase = [
-            uint256(65), 45, 75, 85, 78, 82, 90, 40, 95, 55, 60, 38
-        ];
-        uint256 zodiacSpeedBonus = zodiacSpeedBase[zodiac] - 60;
-
-        uint256 element = t / 24;
-        uint8 gender = uint8(t % 2);
-
-        string memory elementName;
-        string memory zodiacName;
-        if (element == 0) elementName = unicode"\u6C34";
-        else if (element == 1) elementName = unicode"\u98CE";
-        else if (element == 2) elementName = unicode"\u706B";
-        else if (element == 3) elementName = unicode"\u6697";
-        else elementName = unicode"\u5149";
-
-        string[12] memory zodiacNames = [unicode"\u9F20", unicode"\u725B", unicode"\u864E", unicode"\u5154", unicode"\u9F99", unicode"\u86C7", unicode"\u99AC", unicode"\u592A", unicode"\u5B81", unicode"\u91D1", unicode"\u72D7", unicode"\u8C61"];
-        zodiacName = zodiacNames[zodiac];
-
-        string memory genderName = gender == 0 ? unicode"\u516C" : unicode"\u6BCD";
-        string memory tokenName = string(abi.encodePacked(elementName, unicode"\u00B7", zodiacName, unicode"\u00B7", genderName));
-
-        string memory imageUrl = string(abi.encodePacked("ipfs://metadata/", Strings.toString(t), ".json"));
-
+        NFTDataResult memory result = _getNFTDataInternal(tokenId);
         return (
-            t,
-            baseAttack + attackIncrement,
-            baseDefense + defenseIncrement,
-            baseHealth + healthIncrement,
-            baseSpeed + speedIncrement + zodiacSpeedBonus,
-            uint256(l),
-            l,
-            tokenName,
-            imageUrl
+            result.tokenType_,
+            result.attack,
+            result.defense,
+            result.health,
+            result.speed,
+            result.level,
+            result.rank,
+            result.name,
+            result.imageUrl
         );
     }
     
@@ -677,7 +661,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         require(gender < 2, "NFTMint: Invalid gender (0-1)");
         require(growth >= 10 && growth <= 100, "NFTMint: Invalid growth (10-100)");
         
-        uint256 zodiacType = _calculateZodiacType(element, zodiac, gender);
+        uint256 zodiacType = NFTLib.calculateZodiacType(element, zodiac, gender);
         uint256 tokenId = _nextCardId++;
         _safeMint(to, tokenId);
         tokenType[tokenId] = zodiacType;
@@ -703,7 +687,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenId;
     }
 
-    function ownerOf(uint256 tokenId) public view override returns (address) {
+    function ownerOf(uint256 tokenId) public view override(ERC721Upgradeable, IERC721Upgradeable) returns (address) {
         return super.ownerOf(tokenId);
     }
 
@@ -724,7 +708,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         address to,
         uint256 firstTokenId,
         uint256 batchSize
-    ) internal virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) {
+    ) internal virtual override(ERC721EnumerableUpgradeable) {
         super._beforeTokenTransfer(from, to, firstTokenId, batchSize);
 
         if (nftDataContract != address(0)) {
@@ -758,8 +742,46 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         }
     }
 
-    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721EnumerableUpgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
+    }
+
+    function _buildTokenURIJson(uint256 tokenId, uint256 tokenType_, uint8 level) internal pure returns (string memory) {
+        uint256 element = tokenType_ / 24;
+        uint256 zodiac = (tokenType_ % 24 / 2) % 12;
+        uint8 gender = uint8(tokenType_ % 2);
+        
+        string memory elementName = NFTLib.getElementNameCN(element);
+        string memory zodiacName = NFTLib.getZodiacNameCN(zodiac);
+        string memory genderName = gender == 0 ? unicode"\u516C" : unicode"\u6BCD";
+        string memory rarity = tokenType_ >= 72 ? unicode"\u7A00\u6709" : unicode"\u666E\u901A";
+        string memory levelStr = Strings.toString(level);
+        string memory tokenIdStr = Strings.toString(tokenId);
+        
+        string memory namePart = NFTLib.concat5(
+            '{"name":"Zodiac NFT #', tokenIdStr, ' - ',
+            NFTLib.concat2(elementName, NFTLib.concat2(zodiacName, unicode"\u00B7")),
+            NFTLib.concat2(genderName, '"')
+        );
+        
+        string memory descPart = NFTLib.concat5(
+            NFTLib.concat2(',"description":"', unicode"\u5341\u4E8C\u751F\u8096NFT - \u5C5E\u6027\uFF1A"),
+            NFTLib.concat2(elementName, unicode"\u00B7\u751F\u8096\uFF1A"),
+            NFTLib.concat2(zodiacName, unicode"\u00B7\u6027\u522B\uFF1A"),
+            NFTLib.concat2(genderName, unicode"\u00B7\u7B49\u7EA7\uFF1A"),
+            NFTLib.concat2(levelStr, unicode"\u00B7\u6301\u6709\u53EF\u4EB2\u53D7\u751F\u6001\u5206\u5143\"")
+        );
+        
+        string memory attrs = NFTLib.concat5(
+            NFTLib.buildAttr(unicode"\u5C5E\u6027", elementName),
+            NFTLib.buildAttr(unicode"\u751F\u8096", zodiacName),
+            NFTLib.buildAttr(unicode"\u6027\u522B", genderName),
+            NFTLib.buildAttr(unicode"\u7B49\u7EA7", levelStr),
+            NFTLib.buildAttrLast(unicode"\u7C7B\u578B", rarity)
+        );
+        string memory attrPart = NFTLib.concat2(',"attributes":[', NFTLib.concat2(attrs, ']}'));
+        
+        return NFTLib.concat5(namePart, descPart, attrPart, "", "");
     }
 
     /**
@@ -769,42 +791,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
      */
     function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
         require(_ownerOf(tokenId) != address(0), "NFTMint: URI query for nonexistent token");
-        uint256 t = tokenType[tokenId];
-        uint8 lv = tokenLevel[tokenId];
-
-        string[5] memory attrNames = [unicode"\u6C34", unicode"\u98CE", unicode"\u706B", unicode"\u6697", unicode"\u5149"];
-        string[12] memory zodiacNames = [unicode"\u9F20", unicode"\u725B", unicode"\u864E", unicode"\u5154", unicode"\u9F99", unicode"\u86C7", unicode"\u99AC", unicode"\u592A", unicode"\u5B81", unicode"\u91D1", unicode"\u72D7", unicode"\u8C61"];
-        string[2] memory genderNames = [unicode"\u516C", unicode"\u6BCD"];
-
-        uint256 element = t / 24;
-        uint256 zodiac = (t % 24 / 2) % 12;
-        uint8 gender = uint8(t % 2);
-
-        string memory nftName = string(abi.encodePacked(
-            "Zodiac NFT #", 
-            Strings.toString(tokenId), 
-            " - ", 
-            attrNames[element], zodiacNames[zodiac], "·", genderNames[gender]
-        ));
-
-        string memory description = string(abi.encodePacked(
-            "十二生肖NFT - 属性：", attrNames[element], " · 生肖：", zodiacNames[zodiac], 
-            " · 性别：", genderNames[gender], " · 等级：", Strings.toString(lv), 
-            " · 持有可享受生态分红"
-        ));
-
-        string memory json = string(abi.encodePacked(
-            '{"name":"', nftName,
-            '","description":"', description,
-            '","attributes":[',
-            '{"trait_type":"属性","value":"', attrNames[element], '"},',
-            '{"trait_type":"生肖","value":"', zodiacNames[zodiac], '"},',
-            '{"trait_type":"性别","value":"', genderNames[gender], '"},',
-            '{"trait_type":"等级","value":"', Strings.toString(lv), '"},',
-            '{"trait_type":"类型","value":"', (t >= 72 ? "稀有" : "普通"), '"}',
-            ']}'
-        ));
-
+        string memory json = _buildTokenURIJson(tokenId, tokenType[tokenId], tokenLevel[tokenId]);
         return string(abi.encodePacked("data:application/json;utf8,", json));
     }
 
@@ -868,11 +855,11 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         emit Unpaused(msg.sender);
     }
 
-    function upgradeTo(address newImplementation) external override onlyOwner {
+    function upgradeTo(address newImplementation) public override onlyOwner {
         _upgradeToAndCall(newImplementation, "", true);
     }
 
-    function upgradeToAndCall(address newImplementation, bytes memory data) external payable override onlyOwner {
+    function upgradeToAndCall(address newImplementation, bytes memory data) public payable override onlyOwner {
         _upgradeToAndCall(newImplementation, data, true);
     }
 

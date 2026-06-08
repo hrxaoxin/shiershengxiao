@@ -492,4 +492,101 @@ library NFTLib {
         require(b <= a, "NFTLib: Subtraction underflow");
         return a - b;
     }
+
+    function getElementNameCN(uint256 element) internal pure returns (string memory) {
+        if (element == 0) return unicode"\u6C34";
+        if (element == 1) return unicode"\u98CE";
+        if (element == 2) return unicode"\u706B";
+        if (element == 3) return unicode"\u6697";
+        return unicode"\u5149";
+    }
+
+    function getZodiacNameCN(uint256 zodiac) internal pure returns (string memory) {
+        if (zodiac == 0) return unicode"\u9F20";
+        if (zodiac == 1) return unicode"\u725B";
+        if (zodiac == 2) return unicode"\u864E";
+        if (zodiac == 3) return unicode"\u5154";
+        if (zodiac == 4) return unicode"\u9F99";
+        if (zodiac == 5) return unicode"\u86C7";
+        if (zodiac == 6) return unicode"\u99AC";
+        if (zodiac == 7) return unicode"\u592A";
+        if (zodiac == 8) return unicode"\u5B81";
+        if (zodiac == 9) return unicode"\u91D1";
+        if (zodiac == 10) return unicode"\u72D7";
+        return unicode"\u8C61";
+    }
+
+    function concat2(string memory a, string memory b) internal pure returns (string memory) {
+        return string(abi.encodePacked(a, b));
+    }
+
+    function concat5(string memory a, string memory b, string memory c, string memory d, string memory e) internal pure returns (string memory) {
+        string memory ab = string(abi.encodePacked(a, b));
+        string memory cd = string(abi.encodePacked(c, d));
+        return string(abi.encodePacked(ab, cd, e));
+    }
+
+    function buildAttr(string memory traitType, string memory value) internal pure returns (string memory) {
+        return string(abi.encodePacked('{"trait_type":"', traitType, '","value":"', value, '"},'));
+    }
+
+    function buildAttrLast(string memory traitType, string memory value) internal pure returns (string memory) {
+        return string(abi.encodePacked('{"trait_type":"', traitType, '","value":"', value, '"}'));
+    }
+
+    function generateGrowthValue(uint256 randomSeed) internal pure returns (uint8) {
+        uint256 roll = randomSeed % 91;
+        return uint8(roll + 10);
+    }
+
+    function calculateZodiacType(uint256 element, uint256 zodiac, uint256 gender) internal pure returns (uint256) {
+        return element * 24 + zodiac * 2 + gender;
+    }
+
+    function computeAttributes(uint8 level, uint8 growth) internal pure returns (uint256, uint256, uint256, uint256) {
+        uint256 attack = 10;
+        uint256 defense = 10;
+        uint256 health = 100;
+        uint256 speed = 60;
+        
+        if (level > 1) {
+            uint256 growthMultiplier = uint256(growth);
+            for (uint256 i = 2; i <= level; i++) {
+                attack += (5 * growthMultiplier) / 100;
+                defense += (4 * growthMultiplier) / 100;
+                health += (20 * growthMultiplier) / 100;
+                speed += (3 * growthMultiplier) / 100;
+            }
+        }
+        
+        return (attack, defense, health, speed);
+    }
+
+    function getZodiacBonus(uint256 tokenType_) internal pure returns (int256) {
+        uint256 zodiac = (tokenType_ / 2) % 12;
+        if (zodiac == 0) return 5;
+        if (zodiac == 1) return -15;
+        if (zodiac == 2) return 15;
+        if (zodiac == 3) return 25;
+        if (zodiac == 4) return 18;
+        if (zodiac == 5) return 22;
+        if (zodiac == 6) return 30;
+        if (zodiac == 7) return -20;
+        if (zodiac == 8) return 35;
+        if (zodiac == 9) return -5;
+        if (zodiac == 10) return 0;
+        return -22;
+    }
+
+    function buildNFTName(uint256 tokenType_) internal pure returns (string memory) {
+        uint256 element = tokenType_ / 24;
+        uint256 zodiac = (tokenType_ / 2) % 12;
+        uint8 gender = uint8(tokenType_ % 2);
+        
+        string memory elementName = getElementNameCN(element);
+        string memory zodiacName = getZodiacNameCN(zodiac);
+        string memory genderName = gender == 0 ? unicode"\u516C" : unicode"\u6BCD";
+        
+        return concat2(elementName, concat2(zodiacName, concat2(unicode"\u00B7", genderName)));
+    }
 }

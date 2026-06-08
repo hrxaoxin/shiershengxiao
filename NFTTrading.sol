@@ -472,7 +472,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
     function emergencyWithdrawNFT(uint256 tokenId) external onlyOwner nonReentrant {
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
-        INFTMint nft = INFTMint(nftContract);
+        INFT nft = INFT(nftContract);
         nft.safeTransferFrom(address(this), owner(), tokenId);
         emit EmergencyNFTWithdrawn(msg.sender, owner(), tokenId);
     }

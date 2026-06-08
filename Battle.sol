@@ -532,23 +532,43 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return success && data.length >= 32 && abi.decode(data, (address)) != address(0);
     }
 
-    struct SkillCheckResult {
-        bool canUse;
-        Skill skill;
+    
+
+    struct BattleResult {
+        bool targetAlive;
+        TeamState targetState;
     }
 
-    function _checkSkillUsage(
-        TeamState memory state,
-        uint attackerIndex,
-        uint256[] memory cooldowns,
-        uint256 seed
-    ) internal view returns (SkillCheckResult memory) {
-        SkillCheckResult memory result;
-        NFTTraits memory trait = state.traits[attackerIndex];
-        uint256 skillKey = trait.element * ZODIAC_TYPE_COUNT + trait.zodiac;
-        result.skill = skills[skillKey];
-        result.canUse = cooldowns[attackerIndex] == 0 && 
-            (seed % SKILL_USE_CHANCE_DENOMINATOR == 0 || _shouldUseSkill(state, attackerIndex));
+    function _executeSingleAttack(
+        NFTTraits memory attacker,
+        TeamState memory target,
+        uint256 seed,
+        uint attackerIdx,
+        bool canUseSkill,
+        Skill memory skill
+    ) internal view returns (BattleResult memory) {
+        BattleResult memory result;
+        result.targetAlive = true;
+        result.targetState = target;
+
+        if (canUseSkill && skill.skillId > 0) {
+            result.targetState = _applySkill(attacker, result.targetState, attackerIdx, skill);
+        } else {
+            uint defenderIdx = _findTarget(result.targetState.alive, result.targetState.traits, result.targetState.hp);
+            if (defenderIdx == 6) {
+                result.targetAlive = false;
+                return result;
+            }
+            uint damage = _calculateDamage(attacker, result.targetState.traits[defenderIdx], seed);
+            result.targetState.hp[defenderIdx] = result.targetState.hp[defenderIdx] > damage 
+                ? result.targetState.hp[defenderIdx] - damage : 0;
+            if (result.targetState.hp[defenderIdx] == 0) {
+                result.targetState.alive[defenderIdx] = false;
+                if (!_hasAnyAlive(result.targetState.alive)) {
+                    result.targetAlive = false;
+                }
+            }
+        }
         return result;
     }
 
@@ -578,87 +598,56 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             state2.alive[i] = true;
         }
 
-        uint256[] memory skillCooldown1 = new uint256[](TEAM_SIZE);
-        uint256[] memory skillCooldown2 = new uint256[](TEAM_SIZE);
-
         bool team1Alive = true;
         bool team2Alive = true;
 
         for (uint256 round = 0; round < MAX_ROUNDS && team1Alive && team2Alive; round++) {
             randomSeed++;
 
-            for (uint i = 0; i < 6; i++) {
-                if (skillCooldown1[i] > 0) {
-                    unchecked { skillCooldown1[i]--; }
-                }
-                if (skillCooldown2[i] > 0) {
-                    unchecked { skillCooldown2[i]--; }
-                }
-            }
-
             uint256[6] memory speedOrder1 = _getSpeedOrder(state1, randomSeed);
             uint256[6] memory speedOrder2 = _getSpeedOrder(state2, randomSeed + 1000);
 
-            for (uint i = 0; i < 6; i++) {
-                uint attackerIndex = speedOrder1[i];
-                if (!state1.alive[attackerIndex] || !team1Alive) continue;
-
-                NFTTraits memory attackerTrait = state1.traits[attackerIndex];
-                SkillCheckResult memory skillResult = _checkSkillUsage(state1, attackerIndex, skillCooldown1, randomSeed);
-
-                if (skillResult.canUse && skillResult.skill.skillId > 0) {
-                    state2 = _applySkill(attackerTrait, state2, attackerIndex, skillResult.skill);
-                    skillCooldown1[attackerIndex] = skillResult.skill.cooldown;
-                } else {
-                    uint defenderIndex = _findTarget(state2.alive, state2.traits, state2.hp);
-                    if (defenderIndex == 6) {
-                        team2Alive = false;
-                        break;
-                    }
-                    uint damage = _calculateDamage(state1.traits[attackerIndex], state2.traits[defenderIndex], randomSeed + i);
-                    state2.hp[defenderIndex] = state2.hp[defenderIndex] > damage ? state2.hp[defenderIndex] - damage : 0;
-                    if (state2.hp[defenderIndex] == 0) {
-                        state2.alive[defenderIndex] = false;
-                        if (!_hasAnyAlive(state2.alive)) {
-                            team2Alive = false;
-                        }
-                    }
-                }
+            team1Alive = _executeTeamAttacks(speedOrder1, state1, state2, randomSeed, team1Alive);
+            
+            if (!team1Alive) {
+                break;
             }
 
-            if (!team2Alive) break;
-
-            for (uint i = 0; i < 6; i++) {
-                uint attackerIndex = speedOrder2[i];
-                if (!state2.alive[attackerIndex] || !team2Alive) continue;
-
-                NFTTraits memory attackerTrait = state2.traits[attackerIndex];
-                SkillCheckResult memory skillResult = _checkSkillUsage(state2, attackerIndex, skillCooldown2, randomSeed);
-
-                if (skillResult.canUse && skillResult.skill.skillId > 0) {
-                    state1 = _applySkill(attackerTrait, state1, attackerIndex, skillResult.skill);
-                    skillCooldown2[attackerIndex] = skillResult.skill.cooldown;
-                } else {
-                    uint defenderIndex = _findTarget(state1.alive, state1.traits, state1.hp);
-                    if (defenderIndex == 6) {
-                        team1Alive = false;
-                        break;
-                    }
-                    uint damage = _calculateDamage(state2.traits[attackerIndex], state1.traits[defenderIndex], randomSeed + 1000 + i);
-                    state1.hp[defenderIndex] = state1.hp[defenderIndex] > damage ? state1.hp[defenderIndex] - damage : 0;
-                    if (state1.hp[defenderIndex] == 0) {
-                        state1.alive[defenderIndex] = false;
-                        if (!_hasAnyAlive(state1.alive)) {
-                            team1Alive = false;
-                        }
-                    }
-                }
-            }
+            team2Alive = _executeTeamAttacks(speedOrder2, state2, state1, randomSeed + 1000, team2Alive);
         }
 
-        if (team1Alive && !team2Alive) return 1;
-        if (team2Alive && !team1Alive) return 2;
-        return 0;
+        if (team1Alive && team2Alive) {
+            return 0;
+        } else if (team1Alive) {
+            return 1;
+        } else {
+            return 2;
+        }
+    }
+
+    function _executeTeamAttacks(
+        uint256[6] memory speedOrder,
+        TeamState memory attackerState,
+        TeamState memory targetState,
+        uint256 seed,
+        bool attackerAlive
+    ) internal view returns (bool) {
+        for (uint i = 0; i < 6; i++) {
+            uint attackerIdx = speedOrder[i];
+            if (!attackerState.alive[attackerIdx] || !attackerAlive) continue;
+
+            NFTTraits memory attacker = attackerState.traits[attackerIdx];
+            uint256 skillKey = attacker.element * ZODIAC_TYPE_COUNT + attacker.zodiac;
+            Skill memory skill = skills[skillKey];
+            bool canUseSkill = (seed % SKILL_USE_CHANCE_DENOMINATOR == 0 || _shouldUseSkill(attackerState, attackerIdx));
+
+            BattleResult memory result = _executeSingleAttack(attacker, targetState, seed + i, attackerIdx, canUseSkill, skill);
+            targetState = result.targetState;
+            if (!result.targetAlive) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -784,23 +773,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @return 随机种子
      */
     function _generateRandomSeed(uint256 battleId) internal view returns (uint256) {
-        bytes32 entropy = keccak256(abi.encodePacked(
-            battleId,
-            block.timestamp,
-            block.number,
-            blockhash(block.number > 0 ? block.number - 1 : block.number),
-            msg.sender,
-            address(this),
-            block.coinbase,
-            block.prevrandao,
-            gasleft(),
-            tx.gasprice,
-            block.basefee,
-            block.difficulty,
-            uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, battleId))),
-            uint256(keccak256(abi.encodePacked(block.prevrandao, tx.gasprice, gasleft())))
-        ));
-
+        bytes32 part1 = keccak256(abi.encodePacked(battleId, block.timestamp, block.number));
+        bytes32 part2 = keccak256(abi.encodePacked(msg.sender, address(this), block.coinbase));
+        bytes32 part3 = keccak256(abi.encodePacked(block.prevrandao, tx.gasprice, gasleft()));
+        bytes32 part4 = keccak256(abi.encodePacked(block.basefee, block.difficulty));
+        
+        bytes32 entropy = keccak256(abi.encodePacked(part1, part2, part3, part4));
         return uint256(entropy);
     }
 
