@@ -204,11 +204,11 @@
         <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-8">
             <h3 class="text-lg font-bold text-yellow-800 mb-2">温馨提示</h3>
             <ul class="space-y-2 text-yellow-700">
-                <li>• <strong>普通铸造</strong>：消耗8888枚代币，随机获得生肖NFT</li>
-                <li>• <strong>光暗铸造</strong>：消耗88888枚代币，必定获得光/暗属性NFT</li>
-                <li>• <strong>普通十连</strong>：消耗88880枚代币，随机获得10张生肖NFT（普通铸造概率）</li>
-                <li>• <strong>光暗十连</strong>：消耗888880枚代币，随机获得10张光/暗属性NFT</li>
-                <li>• <strong>指定铸造</strong>：消耗(6x普通+4x光暗)×10代币，获得指定生肖所有属性NFT（10张）</li>
+                <li>• <strong>普通铸造</strong>：消耗<span id="normalMintCostDisplay">8888</span>枚代币，随机获得生肖NFT</li>
+                <li>• <strong>光暗铸造</strong>：消耗<span id="rareMintCostDisplay">88888</span>枚代币，必定获得光/暗属性NFT</li>
+                <li>• <strong>普通十连</strong>：消耗<span id="normalTenCostDisplay">88880</span>枚代币，随机获得10张生肖NFT（普通铸造概率）</li>
+                <li>• <strong>光暗十连</strong>：消耗<span id="rareTenCostDisplay">888880</span>枚代币，随机获得10张光/暗属性NFT</li>
+                <li>• <strong>指定铸造</strong>：消耗<span id="targetedCostDisplay">(6x普通+4x光暗)×10</span>代币，获得指定生肖所有属性NFT（10张）</li>
                 <li>• 普通铸造概率：水/风/火属性各约32%，暗/光属性各2%</li>
                 <li>• 持有生肖NFT即可享受对应的税收分红</li>
                 <li>• 首次铸造需要授权代币，之后无需重复授权</li>
@@ -366,6 +366,17 @@
                 document.getElementById('mintNormalTenBtn').innerHTML = `<i class="fas fa-layer-group mr-2"></i> 普通十连（消耗${normalTenEth}代币）`;
                 document.getElementById('mintRareTenBtn').innerHTML = `<i class="fas fa-fire mr-2"></i> 光暗十连（消耗${rareTenEth}代币）`;
                 document.getElementById('mintTargetedBtn').innerHTML = `<i class="fas fa-bullseye mr-2"></i> 指定铸造（消耗${targetedEth}代币）`;
+                
+                // 更新温馨提示部分的费用显示
+                const normalCost = parseFloat(mintPriceEth).toLocaleString();
+                const rareCost = parseFloat(lightDarkEth).toLocaleString();
+                const normalTenCost = parseFloat(normalTenEth).toLocaleString();
+                const rareTenCost = parseFloat(rareTenEth).toLocaleString();
+                document.getElementById('normalMintCostDisplay').textContent = normalCost;
+                document.getElementById('rareMintCostDisplay').textContent = rareCost;
+                document.getElementById('normalTenCostDisplay').textContent = normalTenCost;
+                document.getElementById('rareTenCostDisplay').textContent = rareTenCost;
+                document.getElementById('targetedCostDisplay').textContent = `${normalCost}`;
             } catch (error) {
                 console.log('获取铸造费用失败，使用默认值:', error);
             }

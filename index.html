@@ -405,28 +405,28 @@
                         <h4 class="text-xl font-bold text-blue-200 mb-3">3% 代币交易税</h4>
                         <ul class="text-white/90 space-y-2">
                             <li>• 代币交易时扣除3%作为税收</li>
-                            <li>• 1.0%进入分红池，按权重分配给NFT持有者</li>
-                            <li>• 1.0%用于销毁代币实现通缩</li>
-                            <li>• 0.4%兑换成代币进入NFT质押矿池，用于挖矿产出</li>
-                            <li>• 0.3%用于竞技场排名奖励</li>
-                            <li>• 0.3%进入代币质押矿池，用于挖矿产出</li>
+                            <li>• <span id="dividendPercent"></span>1.0</span>%进入分红池，按权重分配给NFT持有者</li>
+                            <li>• <span id="burnPercent">1.0</span>%用于销毁代币实现通缩</li>
+                            <li>• <span id="nftStakingPercent">0.4</span>%兑换成代币进入NFT质押矿池，用于挖矿产出</li>
+                            <li>• <span id="arenaPercent">0.3</span>%用于竞技场排名奖励</li>
+                            <li>• <span id="tokenStakingPercent">0.3</span>%进入代币质押矿池，用于挖矿产出</li>
                         </ul>
                     </div>
                     <div class="bg-white/10 p-6 rounded-xl backdrop-blur-md">
                         <h4 class="text-xl font-bold text-blue-200 mb-3">权重计算规则</h4>
                         <ul class="text-white/90 space-y-1">
                             <li class="text-cyan-300 font-medium">🌊 水/风/火属性（普通）：</li>
-                            <li>• 1阶NFT权重：1</li>
-                            <li>• 2阶NFT权重：2</li>
-                            <li>• 3阶NFT权重：6</li>
-                            <li>• 4阶NFT权重：18</li>
-                            <li>• 5阶NFT权重：66</li>
+                            <li>• 1阶NFT权重：<span id="normalWeight1">1</span></li>
+                            <li>• 2阶NFT权重：<span id="normalWeight2">2</span></li>
+                            <li>• 3阶NFT权重：<span id="normalWeight3">6</span></li>
+                            <li>• 4阶NFT权重：<span id="normalWeight4">18</span></li>
+                            <li>• 5阶NFT权重：<span id="normalWeight5">66</span></li>
                             <li class="text-purple-300 font-medium mt-3">✨ 光/暗属性（稀有）：</li>
-                            <li>• 1阶NFT权重：10</li>
-                            <li>• 2阶NFT权重：12</li>
-                            <li>• 3阶NFT权重：16</li>
-                            <li>• 4阶NFT权重：28</li>
-                            <li>• 5阶NFT权重：76</li>
+                            <li>• 1阶NFT权重：<span id="rareWeight1">10</span></li>
+                            <li>• 2阶NFT权重：<span id="rareWeight2">12</span></li>
+                            <li>• 3阶NFT权重：<span id="rareWeight3">16</span></li>
+                            <li>• 4阶NFT权重：<span id="rareWeight4">28</span></li>
+                            <li>• 5阶NFT权重：<span id="rareWeight5">76</span></li>
                             <li class="text-yellow-300 text-sm mt-2">💡 稀有属性（光/暗）各等级权重不同</li>
                             <li>• 用户总权重 = 所有NFT权重之和</li>
                             <li>• 分红 = 分红池 × (用户权重 ÷ 全网总权重)</li>
@@ -653,6 +653,77 @@
             }
         }
 
+        async function loadWeightConfig() {
+            try {
+                const dividendManager = await ZODIAC_WEB3.getContract('dividendManager');
+                if (!dividendManager) {
+                    console.warn('DividendManager contract not available, using default weights');
+                } else {
+                    // 从合约读取权重配置
+                    try {
+                        const config = await dividendManager.methods.getWeightConfig().call();
+                        const normalWeights = config[0];
+                        const rareWeights = config[1];
+                        
+                        // 更新页面显示
+                        document.getElementById('normalWeight1').textContent = normalWeights[0] || '1';
+                        document.getElementById('normalWeight2').textContent = normalWeights[1] || '2';
+                        document.getElementById('normalWeight3').textContent = normalWeights[2] || '6';
+                        document.getElementById('normalWeight4').textContent = normalWeights[3] || '18';
+                        document.getElementById('normalWeight5').textContent = normalWeights[4] || '66';
+                        
+                        document.getElementById('rareWeight1').textContent = rareWeights[0] || '10';
+                        document.getElementById('rareWeight2').textContent = rareWeights[1] || '12';
+                        document.getElementById('rareWeight3').textContent = rareWeights[2] || '16';
+                        document.getElementById('rareWeight4').textContent = rareWeights[3] || '28';
+                        document.getElementById('rareWeight5').textContent = rareWeights[4] || '76';
+                        
+                        console.log('Weight config loaded from contract:', { normalWeights, rareWeights });
+                    } catch (e) {
+                        console.error('Failed to load weight config:', e);
+                    }
+                }
+                
+                // 从 RewardManager 读取分配比例
+                try {
+                    const rewardManager = await ZODIAC_WEB3.getContract('rewardManager');
+                    if (!rewardManager) {
+                        console.warn('RewardManager contract not available, using default distribution');
+                    } else {
+                        try {
+                            const percents = await rewardManager.methods.getDistributionPercents().call();
+                            // percents[0] = dividendPercent (分红池)
+                            // percents[1] = nftStakingPercent (NFT质押)
+                            // percents[2] = tokenStakingPercent (代币质押)
+                            // percents[3] = arenaRewardPercent (竞技场奖励)
+                            
+                            const dividendPercent = (parseInt(percents[0]) / 100).toFixed(2);
+                            const nftStakingPercent = (parseInt(percents[1]) / 100).toFixed(2);
+                            const tokenStakingPercent = (parseInt(percents[2]) / 100).toFixed(2);
+                            const arenaPercent = (parseInt(percents[3]) / 100).toFixed(2);
+                            
+                            // 销毁比例 = 3% - 其他所有比例之和
+                            const burnPercent = (3 - (parseInt(percents[0]) + parseInt(percents[1]) + parseInt(percents[2]) + parseInt(percents[3])) / 100).toFixed(2);
+                            
+                            document.getElementById('dividendPercent').textContent = dividendPercent;
+                            document.getElementById('nftStakingPercent').textContent = nftStakingPercent;
+                            document.getElementById('tokenStakingPercent').textContent = tokenStakingPercent;
+                            document.getElementById('arenaPercent').textContent = arenaPercent;
+                            document.getElementById('burnPercent').textContent = burnPercent;
+                            
+                            console.log('Distribution config loaded from contract:', { dividendPercent, nftStakingPercent, tokenStakingPercent, arenaPercent, burnPercent });
+                        } catch (e) {
+                            console.error('Failed to load distribution config:', e);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Load distribution config failed:', error);
+                }
+            } catch (error) {
+                console.error('Load config failed:', error);
+            }
+        }
+
         function openMobileMenu() {
             ZODIAC_COMPONENTS.openMobileMenu();
         }
@@ -705,6 +776,7 @@
             });
 
             loadFenHongData();
+            loadWeightConfig();
 
             document.getElementById('menuBtn').addEventListener('click', openMobileMenu);
         });
