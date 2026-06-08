@@ -261,6 +261,9 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _ownerOf[tokenId] = to;
         _balanceOf[to]++;
         
+        _ownedTokensIndex[tokenId] = _ownedTokens[to].length;
+        _ownedTokens[to].push(tokenId);
+        
         emit Transfer(address(0), to, tokenId);
         
         _afterTokenTransfer(address(0), to, tokenId, 1);
@@ -268,6 +271,9 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     
     mapping(uint256 => address) internal _ownerOf;
     mapping(address => uint256) internal _balanceOf;
+    mapping(address => mapping(address => bool)) internal _operatorApprovals;
+    mapping(address => uint256[]) internal _ownedTokens;
+    mapping(uint256 => uint256) internal _ownedTokensIndex;
     
     function _exists(uint256 tokenId) public view returns (bool) {
         return _ownerOf[tokenId] != address(0);
@@ -302,13 +308,76 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _balanceOf[from]--;
         _balanceOf[to]++;
         
+        _removeTokenFromOwnerEnumeration(from, tokenId);
+        _addTokenToOwnerEnumeration(to, tokenId);
+        
         emit Transfer(from, to, tokenId);
         
         _afterTokenTransfer(from, to, tokenId, 1);
+    }
+    
+    function _removeTokenFromOwnerEnumeration(address from, uint256 tokenId) private {
+        uint256 lastTokenIndex = _ownedTokens[from].length - 1;
+        uint256 tokenIndex = _ownedTokensIndex[tokenId];
+        
+        if (tokenIndex != lastTokenIndex) {
+            uint256 lastTokenId = _ownedTokens[from][lastTokenIndex];
+            _ownedTokens[from][tokenIndex] = lastTokenId;
+            _ownedTokensIndex[lastTokenId] = tokenIndex;
+        }
+        
+        delete _ownedTokensIndex[tokenId];
+        _ownedTokens[from].pop();
+    }
+    
+    function _addTokenToOwnerEnumeration(address to, uint256 tokenId) private {
+        _ownedTokensIndex[tokenId] = _ownedTokens[to].length;
+        _ownedTokens[to].push(tokenId);
+    }
+    
+    function isApprovedForAll(address owner, address operator) external view returns (bool) {
+        return _operatorApprovals[owner][operator];
+    }
+    
+    function setApprovalForAll(address operator, bool approved) external {
+        _operatorApprovals[msg.sender][operator] = approved;
+    }
+    
+    function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256) {
+        require(index < _ownedTokens[owner].length, "ERC721: owner index out of bounds");
+        return _ownedTokens[owner][index];
+    }
+    
+    function nextCardId() external view returns (uint256) {
+        return _nextCardId;
     }
     
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     
     function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal virtual {}
     function _afterTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal virtual {}
+    
+    function safeTransferFrom(address from, address to, uint256 tokenId) external {
+        transferFrom(from, to, tokenId);
+    }
+    
+    function adminSetNFTLevel(uint256 tokenId, uint256 newLevel) external onlyOwner {
+        require(_exists(tokenId), "NFTMint: Token not exists");
+        require(newLevel >= 1 && newLevel <= 5, "NFTMint: Invalid level");
+        tokenLevel[tokenId] = uint8(newLevel);
+    }
+    
+    function getTokenIdsByOwner(address owner) external view returns (uint256[] memory) {
+        uint256 balance = _balanceOf[owner];
+        uint256[] memory tokenIds = new uint256[](balance);
+        uint256 index = 0;
+        
+        for (uint256 i = 1; i < _nextCardId && index < balance; i++) {
+            if (_ownerOf[i] == owner) {
+                tokenIds[index++] = i;
+            }
+        }
+        
+        return tokenIds;
+    }
 }

@@ -94,7 +94,10 @@ interface INFTMint {
     function ownerOf(uint256 tokenId) external view returns (address);
     function isRare(uint256 tokenId) external view returns (bool);
     function transferFrom(address from, address to, uint256 tokenId) external;
+    function safeTransferFrom(address from, address to, uint256 tokenId) external;
     function mintForBreeding(address to, uint256 zodiacType, uint8 growth) external returns (uint256);
+    function adminSetNFTLevel(uint256 tokenId, uint256 newLevel) external;
+    function getTokenIdsByOwner(address owner) external view returns (uint256[] memory);
 }
 
 interface INFTMintCore {
