@@ -1120,4 +1120,14 @@ contract Breeding is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Re
         nft.safeTransferFrom(address(this), owner(), tokenId);
         emit EmergencyNFTWithdrawn(msg.sender, owner(), tokenId);
     }
+
+    /**
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
+     */
+    receive() external payable {}
+
+    /**
+     * @dev Fallback 函数 - 处理未匹配的调用
+     */
+    fallback() external payable {}
 }

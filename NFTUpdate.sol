@@ -80,6 +80,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
      */
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }
@@ -149,9 +150,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[49] private __gap;
-
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() { _disableInitializers(); }
 
     /** @dev 初始化函数
      * @param initialOwner 初始所有者地址
@@ -735,4 +733,14 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
+
+    /**
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
+     */
+    receive() external payable {}
+
+    /**
+     * @dev Fallback 函数 - 处理未匹配的调用
+     */
+    fallback() external payable {}
 }

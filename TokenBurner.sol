@@ -286,7 +286,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param isRare 是否铸造稀有NFT（true=稀有，false=普通）
      * @return 操作是否成功，成功返回true
      */
-    function burnAndMint(address user, bool isRare) external onlyAuthorized nonReentrant whenNotPaused returns (bool) {
+    function burnAndMint(address user, bool isRare) external nonReentrant whenNotPaused returns (bool) {
         require(tokenContract != address(0), "TokenBurner: tokenContract not set");
         require(nftMintContract != address(0), "TokenBurner: nftMintContract not set");
         require(user != address(0), "TokenBurner: Zero user address");
@@ -321,7 +321,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param isRare 是否铸造稀有NFT（true=稀有，false=普通）
      * @return 操作是否成功，成功返回true
      */
-    function burnAndMintTen(address user, bool isRare) external onlyAuthorized nonReentrant whenNotPaused returns (bool) {
+    function burnAndMintTen(address user, bool isRare) external nonReentrant whenNotPaused returns (bool) {
         require(tokenContract != address(0), "TokenBurner: tokenContract not set");
         require(nftMintContract != address(0), "TokenBurner: nftMintContract not set");
         require(user != address(0), "TokenBurner: Zero user address");
@@ -351,7 +351,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param zodiac 目标生肖类型（0-11，对应十二生肖）
      * @return 操作是否成功，成功返回true
      */
-    function burnAndMintTargeted(address user, uint8 zodiac) external onlyAuthorized nonReentrant whenNotPaused returns (bool) {
+    function burnAndMintTargeted(address user, uint8 zodiac) external nonReentrant whenNotPaused returns (bool) {
         require(tokenContract != address(0), "TokenBurner: tokenContract not set");
         require(nftMintContract != address(0), "TokenBurner: nftMintContract not set");
         require(user != address(0), "TokenBurner: Zero user address");
@@ -403,4 +403,14 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function getAllCosts() external view returns (uint256, uint256) {
         return (normalMintCost, rareMintCost);
     }
+
+    /**
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
+     */
+    receive() external payable {}
+
+    /**
+     * @dev Fallback 函数 - 处理未匹配的调用
+     */
+    fallback() external payable {}
 }

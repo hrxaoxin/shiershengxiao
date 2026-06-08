@@ -573,4 +573,14 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             nfts[i] = allNFTs[offset + i];
         }
     }
+
+    /**
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
+     */
+    receive() external payable {}
+
+    /**
+     * @dev Fallback 函数 - 处理未匹配的调用
+     */
+    fallback() external payable {}
 }

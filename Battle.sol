@@ -1165,4 +1165,14 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         Skill memory skill = skills[tokenType];
         return (skill.skillId, skill.skillType, skill.damage, skill.cooldown, skill.duration, skill.isAoe);
     }
+
+    /**
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
+     */
+    receive() external payable {}
+
+    /**
+     * @dev Fallback 函数 - 处理未匹配的调用
+     */
+    fallback() external payable {}
 }

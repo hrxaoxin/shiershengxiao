@@ -80,6 +80,18 @@ interface ISetPoolManager {
     function setPoolManager(address _poolManager) external;
 }
 
+interface ISetNFTUpdateContract {
+    function setNFTUpdateContract(address _nftUpdate) external;
+}
+
+interface ISetRewardManagerContract {
+    function setRewardManagerContract(address _rewardManager) external;
+}
+
+interface ISetBreedingContract {
+    function setBreedingContract(address _breedingContract) external;
+}
+
 /**
  * @title Authorizer
  * @dev 合约授权管理器，负责管理系统中所有合约地址和权限控制
@@ -428,6 +440,16 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             } catch {
                 emit ContractSetupFailed("Breeding-Token", "Unknown error");
             }
+
+            if (_nftMintAddress != address(0)) {
+                try ISetBreedingContract(_nftMintAddress).setBreedingContract(_breedingAddress) {
+                    emit ContractSetupSuccess("NFTMint-Breeding");
+                } catch Error(string memory reason) {
+                    emit ContractSetupFailed("NFTMint-Breeding", reason);
+                } catch {
+                    emit ContractSetupFailed("NFTMint-Breeding", "Unknown error");
+                }
+            }
         }
     }
 
@@ -463,6 +485,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
         if (_dividendManagerAddress != address(0)) {
             ISetTokenContract(_dividendManagerAddress).setTokenContract(_tokenAddress);
+            ISetRewardManagerContract(_dividendManagerAddress).setRewardManagerContract(_rewardManagerAddress);
         }
         if (_poolManagerAddress != address(0)) {
             ISetPoolManager(_rewardManagerAddress).setPoolManager(_poolManagerAddress);
@@ -513,6 +536,9 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             ISetMetadataContract(_nftUpdateAddress).setMetadataContract(_metadataContractAddress);
             ISetTokenContract(_nftUpdateAddress).setTokenContract(tokenAddress);
             ISetPancakeSwapPair(_nftUpdateAddress).setPancakeSwapPair(_pancakeSwapPairAddress);
+            if (dividendManagerAddress != address(0)) {
+                ISetNFTUpdateContract(dividendManagerAddress).setNFTUpdateContract(_nftUpdateAddress);
+            }
         }
         if (_tokenBurnerAddress != address(0)) {
             ISetNFTContract(_tokenBurnerAddress).setNFTContract(_nftMintAddress);
@@ -658,4 +684,14 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _setupNFTContracts(nftUpdateAddress, tokenBurnerAddress, nftMintAddress, metadataContractAddress, pancakeSwapPairAddress);
         _setupOtherContracts(weightManagerAddress, battleHistoryAddress, nftTradingAddress, feeReceiverAddress, arenaRankingAddress, rewardManagerAddress);
     }
+
+    /**
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
+     */
+    receive() external payable {}
+
+    /**
+     * @dev Fallback 函数 - 处理未匹配的调用
+     */
+    fallback() external payable {}
 }

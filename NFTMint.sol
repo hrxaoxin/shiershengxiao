@@ -116,6 +116,9 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     /// @dev 代币合约地址
     address public tokenContract;
     
+    /// @dev 繁殖合约地址
+    address public breedingContract;
+    
     /// @dev 黑洞地址（用于销毁）
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
     
@@ -168,7 +171,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     }
 
     modifier onlyAuthorized() {
-        require(msg.sender == owner() || msg.sender == authorizer, "NFTMint: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == breedingContract, "NFTMint: Not authorized");
         _;
     }
 
@@ -185,6 +188,11 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     function setTokenContract(address _tokenContract) external onlyAuthorized {
         require(_tokenContract != address(0), "NFTMint: Invalid token contract address");
         tokenContract = _tokenContract;
+    }
+    
+    function setBreedingContract(address _breedingContract) external onlyAuthorized {
+        require(_breedingContract != address(0), "NFTMint: Invalid breeding contract address");
+        breedingContract = _breedingContract;
     }
     
     struct FailedSync {
@@ -385,12 +393,16 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return _calculateZodiacType(element, zodiac, gender);
     }
 
-    modifier whenPublicMintingAllowed() {
-        require(allowPublicMinting || msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Unauthorized");
+    /**
+     * @dev 仅允许 TokenBurner 合约调用的修饰器
+     * 铸造相关函数必须通过 TokenBurner 进行代币销毁后才能调用，防止免费铸造
+     */
+    modifier onlyTokenBurner() {
+        require(msg.sender == tokenBurnerContract || msg.sender == owner(), "NFTMint: Only TokenBurner or owner");
         _;
     }
 
-    function mint(address to, uint256 zodiacType) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256) {
+    function mint(address to, uint256 zodiacType) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         require(zodiacType < 120, "NFTMint: Invalid zodiac type");
         uint256 tokenId = _nextCardId++;
@@ -404,7 +416,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenId;
     }
 
-    function mintBatch(address to, uint256[] calldata zodiacTypes) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
+    function mintBatch(address to, uint256[] calldata zodiacTypes) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         require(zodiacTypes.length > 0, "NFTMint: No zodiac types provided");
         require(zodiacTypes.length <= 100, "NFTMint: Too many tokens to mint");
@@ -425,7 +437,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenIds;
     }
 
-    function mintNormal(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256) {
+    function mintNormal(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256 randomSeed = _generateSecureRandom();
         uint256 zodiacType = _mintNormal(randomSeed);
@@ -440,7 +452,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenId;
     }
 
-    function mintRare(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256) {
+    function mintRare(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256 randomSeed = _generateSecureRandom();
         uint256 zodiacType = _mintRare(randomSeed);
@@ -455,7 +467,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenId;
     }
 
-    function mintNormalTen(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
+    function mintNormalTen(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256[] memory tokenIds = new uint256[](10);
         uint256 baseSeed = _generateSecureRandom();
@@ -475,7 +487,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenIds;
     }
 
-    function mintRareTen(address to) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
+    function mintRareTen(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         uint256[] memory tokenIds = new uint256[](10);
         uint256 baseSeed = _generateSecureRandom();
@@ -495,7 +507,7 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         return tokenIds;
     }
 
-    function mintTargeted(address to, uint8 baseZodiac) external whenNotPaused whenPublicMintingAllowed nonReentrant returns (uint256[] memory) {
+    function mintTargeted(address to, uint8 baseZodiac) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Cannot mint to zero address");
         require(baseZodiac < 12, "NFTMint: Invalid zodiac");
         
@@ -748,6 +760,62 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721Upgradeable, ERC721EnumerableUpgradeable) returns (bool) {
         return super.supportsInterface(interfaceId);
     }
+
+    /**
+     * @dev 返回 NFT 的元数据 URI（用于 OpenSea 等市场显示）
+     * @param tokenId NFT 的 tokenId
+     * @return string 元数据 URI（JSON 格式字符串
+     */
+    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
+        require(_ownerOf(tokenId) != address(0), "NFTMint: URI query for nonexistent token");
+        uint256 t = tokenType[tokenId];
+        uint8 lv = tokenLevel[tokenId];
+
+        string[5] memory attrNames = ["水", "风", "火", "暗", "光"];
+        string[12] memory zodiacNames = ["鼠", "牛", "虎", "兔", "龙", "蛇", "马", "羊", "猴", "鸡", "狗", "猪"];
+        string[2] memory genderNames = ["公", "母"];
+
+        uint256 element = t / 24;
+        uint256 zodiac = (t % 24 / 2) % 12;
+        uint8 gender = uint8(t % 2);
+
+        string memory nftName = string(abi.encodePacked(
+            "Zodiac NFT #", 
+            Strings.toString(tokenId), 
+            " - ", 
+            attrNames[element], zodiacNames[zodiac], "·", genderNames[gender]
+        ));
+
+        string memory description = string(abi.encodePacked(
+            "十二生肖NFT - 属性：", attrNames[element], " · 生肖：", zodiacNames[zodiac], 
+            " · 性别：", genderNames[gender], " · 等级：", Strings.toString(lv), 
+            " · 持有可享受生态分红"
+        ));
+
+        string memory json = string(abi.encodePacked(
+            '{"name":"', nftName,
+            '","description":"', description,
+            '","attributes":[',
+            '{"trait_type":"属性","value":"', attrNames[element], '"},',
+            '{"trait_type":"生肖","value":"', zodiacNames[zodiac], '"},',
+            '{"trait_type":"性别","value":"', genderNames[gender], '"},',
+            '{"trait_type":"等级","value":"', Strings.toString(lv), '"},',
+            '{"trait_type":"类型","value":"', (t >= 72 ? "稀有" : "普通"), '"}',
+            ']}'
+        ));
+
+        return string(abi.encodePacked("data:application/json;utf8,", json));
+    }
+
+    /**
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
+     */
+    receive() external payable {}
+
+    /**
+     * @dev Fallback 函数 - 处理未匹配的调用
+     */
+    fallback() external payable {}
 
     function getNFTInfoBatch(uint256[] calldata tokenIds) external view returns (uint256[] memory) {
         uint256[] memory result = new uint256[](tokenIds.length);

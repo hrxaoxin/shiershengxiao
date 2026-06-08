@@ -135,6 +135,16 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     address public authorizer;
 
     /**
+     * @dev NFT 升级合约地址（NFTUpdate），有权调用 updateUserWeight
+     */
+    address public nftUpdateContract;
+
+    /**
+     * @dev 奖励管理合约地址（RewardManager），有权调用 syncDividendPool
+     */
+    address public rewardManagerContract;
+
+    /**
      * @dev 用户权重映射
      * user => weight
      */
@@ -182,10 +192,28 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 检查是否为授权调用者（owner或authorizer）
+     * @dev 设置 NFT 升级合约地址（NFTUpdate）
+     * @param a NFT 升级合约地址
+     */
+    function setNFTUpdateContract(address a) external onlyOwner {
+        require(a != address(0), "DividendManager: Invalid NFT update address");
+        nftUpdateContract = a;
+    }
+
+    /**
+     * @dev 设置奖励管理合约地址（RewardManager）
+     * @param a 奖励管理合约地址
+     */
+    function setRewardManagerContract(address a) external onlyOwner {
+        require(a != address(0), "DividendManager: Invalid reward manager address");
+        rewardManagerContract = a;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner、authorizer、nftUpdateContract 或 rewardManagerContract）
      */
     modifier onlyAuthorized() {
-        require(msg.sender == owner() || msg.sender == authorizer, "DividendManager: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == nftUpdateContract || msg.sender == rewardManagerContract, "DividendManager: Not authorized");
         _;
     }
 
@@ -508,18 +536,23 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @param isAdd 是否增加权重（true=增加，false=减少）
      * @param element 元素类型（0-4对应水风火暗光）
      */
-    /** @dev 最小权重更新间隔（秒）- 防止频繁操作，默认60秒 */
-    uint256 public minWeightUpdateInterval = 60;
+    /** @dev 最小权重更新间隔（秒）- 防止频繁操作，默认0秒（不限制）
+     * 可由 owner 调整以控制更新频率
+     */
+    uint256 public minWeightUpdateInterval = 0;
     
     /** @dev 用户上次权重更新时间 */
     mapping(address => uint256) public lastWeightUpdateTime;
 
     function updateUserWeight(address user, uint256 level, bool isAdd, uint8 element) external onlyAuthorized {
+        require(user != address(0), "DividendManager: Zero user address");
         uint256 weight = _calculateWeight(level, element);
-        
-        // 检查最小更新间隔
-        require(block.timestamp >= lastWeightUpdateTime[user] + minWeightUpdateInterval, 
-            "DividendManager: Weight update too frequent");
+
+        // 检查最小更新间隔（仅当设置了大于0的值时才检查）
+        if (minWeightUpdateInterval > 0) {
+            require(block.timestamp >= lastWeightUpdateTime[user] + minWeightUpdateInterval, 
+                "DividendManager: Weight update too frequent");
+        }
         
         // 先结算用户当前未领取的分红
         if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
@@ -543,6 +576,14 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         
         userCumulativeSnapshots[user] = cumulativePerWeightDividend;
         lastWeightUpdateTime[user] = block.timestamp;
+    }
+
+    /**
+     * @dev 设置最小权重更新间隔
+     * @param seconds_ 间隔秒数
+     */
+    function setMinWeightUpdateInterval(uint256 seconds_) external onlyOwner {
+        minWeightUpdateInterval = seconds_;
     }
 
     uint256 public constant MAX_NFT_LEVEL = 5;
