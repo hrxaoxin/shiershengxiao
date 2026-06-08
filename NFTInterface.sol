@@ -1,6 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+interface IBEP20 {
+    function decimals() external view returns (uint8);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+}
+
+interface IToken is IBEP20 {
+    function mint(address to, uint256 amount) external;
+    function burn(address from, uint256 amount) external;
+}
+
 /**
  * @title NFTInterface
  * @dev NFT合约接口集合，供 Staking、ArenaRanking、WeightManager 等合约调用
@@ -135,6 +149,15 @@ interface INFTMint {
      * @param tokenId NFT ID
      */
     function transferFrom(address from, address to, uint256 tokenId) external;
+
+    /**
+     * @dev 繁殖铸造NFT（由Breeding合约调用）
+     * @param to 接收地址
+     * @param zodiacType 生肖类型
+     * @param growth 成长值
+     * @return 铸造的NFT ID
+     */
+    function mintForBreeding(address to, uint256 zodiacType, uint8 growth) external returns (uint256);
 }
 
 /**
@@ -269,6 +292,542 @@ interface IBreeding {
      * @return 是否正在繁殖中
      */
     function isNFTInActiveBreeding(uint256 tokenId) external view returns (bool);
+}
+
+interface IBreedingCore {
+    /**
+     * @dev 检查NFT是否在冷却期
+     * @param tokenId NFT ID
+     * @return 是否在冷却期
+     */
+    function isInCooldown(uint256 tokenId) external view returns (bool);
+
+    /**
+     * @dev 检查NFT是否正在繁殖中
+     * @param tokenId NFT ID
+     * @return 是否正在繁殖中
+     */
+    function isNFTInActiveBreeding(uint256 tokenId) external view returns (bool);
+}
+
+/**
+ * @title IArenaRanking
+ * @dev 竞技场排名合约接口，提供排名和奖励相关数据查询
+ */
+
+struct LeaderboardEntry {
+    address playerAddress;
+    uint256 points;
+    uint256 wins;
+    uint256 losses;
+    bool isMock;
+}
+
+struct SeasonInfo {
+    uint256 seasonId;
+    uint256 startTime;
+    uint256 endTime;
+    bool isActive;
+    bool isSettled;
+    uint256 totalPlayers;
+    uint256 rewardPool;
+}
+
+interface IArenaRanking {
+    /**
+     * @dev 获取赛季奖励数据
+     * @param seasonId 赛季ID
+     * @return rewardPool BNB奖励池
+     * @return tokenRewardPool 代币奖励池
+     * @return totalPlayers 总玩家数
+     */
+    function getSeasonRewardData(uint256 seasonId) external view returns (uint256, uint256, uint256);
+
+    /**
+     * @dev 获取赛季排名列表
+     * @param seasonId 赛季ID
+     * @return 玩家地址数组
+     */
+    function getSeasonRankings(uint256 seasonId) external view returns (address[] memory);
+
+    /**
+     * @dev 判断是否为模拟玩家
+     * @param player 玩家地址
+     * @return 是否为模拟玩家
+     */
+    function isMockPlayer(address player) external pure returns (bool);
+
+    /**
+     * @dev 统计真实玩家数量
+     * @param seasonId 赛季ID
+     * @return 真实玩家数量
+     */
+    function countRealPlayers(uint256 seasonId) external view returns (uint256);
+
+    /**
+     * @dev 获取真实玩家排名
+     * @param seasonId 赛季ID
+     * @param index 排名索引
+     * @return 真实排名
+     */
+    function getRealPlayerRank(uint256 seasonId, uint256 index) external view returns (uint256);
+
+    /**
+     * @dev 获取当前赛季ID
+     * @return 当前赛季ID
+     */
+    function getCurrentSeasonId() external view returns (uint256);
+
+    function getLeaderboard(uint256 seasonId, uint256 limit) external view returns (LeaderboardEntry[] memory);
+    function getLeaderboardByPage(uint256 seasonId, uint256 page, uint256 pageSize) external view returns (LeaderboardEntry[] memory, uint256, uint256);
+    function getLeaderboardPageCount(uint256 seasonId, uint256 pageSize) external view returns (uint256);
+    function getPlayersByRankRange(uint256 seasonId, uint256 startRank, uint256 endRank) external view returns (address[] memory, uint256[] memory);
+    function getTopPlayers(uint256 seasonId, uint256 count) external view returns (address[] memory, uint256[] memory);
+    function getSeasonHistory(uint256 startSeasonId, uint256 count) external view returns (SeasonInfo[] memory);
+    function getRecentSeasons(uint256 count) external view returns (SeasonInfo[] memory);
+    function getPlayerRecord(address player) external view returns (uint256, uint256, uint256, uint256);
+    function getPlayerSeasonStats(address player, uint256 seasonId) external view returns (uint256, uint256, uint256, uint256, uint256, bool);
+    function getSeasonInfo(uint256 seasonId) external view returns (uint256, uint256, bool, bool, uint256);
+    function getPlayerRank(address player) external view returns (uint256);
+    function getTotalPlayersInSeason(uint256 seasonId) external view returns (uint256);
+    function getCurrentSeasonInfo() external view returns (uint256, uint256, uint256, bool, uint256, uint256);
+    function getPlayerChallengeStatus(address player) external view returns (uint256, uint256, uint256, uint256);
+}
+
+/**
+ * @title IArenaReward
+ * @dev 竞技场奖励合约接口，提供奖励计算和领取功能
+ */
+interface IArenaReward {
+    /**
+     * @dev 计算赛季奖励
+     * @param seasonId 赛季ID
+     */
+    function calculateSeasonRewards(uint256 seasonId) external;
+
+    /**
+     * @dev 领取奖励
+     * @param seasonId 赛季ID
+     */
+    function claimReward(uint256 seasonId) external;
+
+    /**
+     * @dev 查询待领取奖励
+     * @param player 玩家地址
+     * @param seasonId 赛季ID
+     * @return 待领取奖励金额
+     */
+    function getPendingRewardsByPlayer(address player, uint256 seasonId) external view returns (uint256);
+
+    /**
+     * @dev 查询奖励是否已领取
+     * @param player 玩家地址
+     * @param seasonId 赛季ID
+     * @return 是否已领取
+     */
+    function isRewardClaimed(address player, uint256 seasonId) external view returns (bool);
+
+    /**
+     * @dev 设置奖励类型
+     * @param _rewardType 奖励类型
+     */
+    function setRewardType(uint8 _rewardType) external;
+
+    /**
+     * @dev 检查新的一天
+     */
+    function checkNewDay() external;
+
+    /**
+     * @dev 更新今日奖励金额
+     * @param amount 金额
+     */
+    function updateTodayRewardAmount(uint256 amount) external;
+
+    /**
+     * @dev 更新今日流入奖励
+     * @param amount 金额
+     */
+    function updateTodayIncomingReward(uint256 amount) external;
+
+    /**
+     * @dev 计算排名奖励
+     * @param rank 排名
+     * @return 奖励金额
+     */
+    function calculateRewardForRank(uint256 rank) external view returns (uint256);
+
+    /**
+     * @dev 获取排名奖励
+     * @param rank 排名
+     * @return 奖励金额
+     */
+    function getRewardForRank(uint256 rank) external view returns (uint256);
+
+    /**
+     * @dev 设置奖励率
+     * @param rate 奖励率
+     */
+    function setRewardRate(uint256 rate) external;
+
+    /**
+     * @dev 设置最大奖励率
+     * @param maxRate 最大奖励率
+     */
+    function setMaxRewardRate(uint256 maxRate) external;
+
+    /**
+     * @dev 设置奖励率步长
+     * @param step 步长
+     */
+    function setRateStep(uint256 step) external;
+}
+
+/**
+ * @title IArenaLeaderboard
+ * @dev 竞技场排行榜合约接口，提供排行榜查询和玩家数据查询功能
+ */
+interface IArenaLeaderboard {
+    /**
+     * @dev 获取排行榜
+     * @param seasonId 赛季ID
+     * @param limit 限制数量
+     * @return 排行榜条目数组
+     */
+    function getLeaderboard(uint256 seasonId, uint256 limit) external view returns (LeaderboardEntry[] memory);
+
+    /**
+     * @dev 分页获取排行榜
+     * @param seasonId 赛季ID
+     * @param page 页码
+     * @param pageSize 每页大小
+     * @return entries 排行榜条目数组
+     * @return totalPages 总页数
+     * @return totalPlayers 总玩家数
+     */
+    function getLeaderboardByPage(uint256 seasonId, uint256 page, uint256 pageSize) external view returns (LeaderboardEntry[] memory entries, uint256 totalPages, uint256 totalPlayers);
+
+    /**
+     * @dev 获取排行榜页数
+     * @param seasonId 赛季ID
+     * @param pageSize 每页大小
+     * @return 总页数
+     */
+    function getLeaderboardPageCount(uint256 seasonId, uint256 pageSize) external view returns (uint256);
+
+    /**
+     * @dev 获取排名范围内的玩家
+     * @param seasonId 赛季ID
+     * @param startRank 起始排名
+     * @param endRank 结束排名
+     * @return playerAddrs 玩家地址数组
+     * @return scores 分数数组
+     */
+    function getPlayersByRankRange(uint256 seasonId, uint256 startRank, uint256 endRank) external view returns (
+        address[] memory playerAddrs,
+        uint256[] memory scores
+    );
+
+    /**
+     * @dev 获取顶级玩家
+     * @param seasonId 赛季ID
+     * @param count 数量
+     * @return playerAddrs 玩家地址数组
+     * @return scores 分数数组
+     */
+    function getTopPlayers(uint256 seasonId, uint256 count) external view returns (
+        address[] memory playerAddrs,
+        uint256[] memory scores
+    );
+
+    /**
+     * @dev 获取赛季历史
+     * @param startSeasonId 起始赛季ID
+     * @param count 数量
+     * @return 赛季信息数组
+     */
+    function getSeasonHistory(uint256 startSeasonId, uint256 count) external view returns (SeasonInfo[] memory);
+
+    /**
+     * @dev 获取最近赛季
+     * @param count 数量
+     * @return 赛季信息数组
+     */
+    function getRecentSeasons(uint256 count) external view returns (SeasonInfo[] memory);
+
+    /**
+     * @dev 判断是否为Mock玩家
+     * @param player 玩家地址
+     * @return 是否为Mock玩家
+     */
+    function isMockPlayer(address player) external view returns (bool);
+
+    /**
+     * @dev 获取Mock玩家排名
+     * @param player 玩家地址
+     * @return 排名
+     */
+    function getMockPlayerRank(address player) external view returns (uint256);
+
+    /**
+     * @dev 获取赛季信息
+     * @param seasonId 赛季ID
+     * @return startTime 开始时间
+     * @return endTime 结束时间
+     * @return isActive 是否活跃
+     * @return isSettled 是否结算
+     * @return totalPlayers 总玩家数
+     */
+    function getSeasonInfo(uint256 seasonId) external view returns (
+        uint256 startTime,
+        uint256 endTime,
+        bool isActive,
+        bool isSettled,
+        uint256 totalPlayers
+    );
+
+    /**
+     * @dev 获取玩家赛季统计
+     * @param player 玩家地址
+     * @param seasonId 赛季ID
+     * @return score 分数
+     * @return wins 胜场
+     * @return losses 败场
+     * @return rank 排名
+     * @return rewardClaimed 奖励是否领取
+     */
+    function getPlayerSeasonStats(address player, uint256 seasonId) external view returns (
+        uint256 score,
+        uint256 wins,
+        uint256 losses,
+        uint256 rank,
+        bool rewardClaimed
+    );
+
+    /**
+     * @dev 获取玩家记录
+     * @param player 玩家地址
+     * @return score 分数
+     * @return wins 胜场
+     * @return losses 败场
+     * @return seasonId 赛季ID
+     */
+    function getPlayerRecord(address player) external view returns (
+        uint256 score,
+        uint256 wins,
+        uint256 losses,
+        uint256 seasonId
+    );
+
+    /**
+     * @dev 获取当前赛季信息
+     * @return seasonId 赛季ID
+     * @return startTime 开始时间
+     * @return endTime 结束时间
+     * @return isActive 是否活跃
+     */
+    function getCurrentSeasonInfo() external view returns (
+        uint256 seasonId,
+        uint256 startTime,
+        uint256 endTime,
+        bool isActive
+    );
+
+    /**
+     * @dev 获取玩家挑战状态
+     * @param player 玩家地址
+     * @return remainingAttempts 剩余挑战次数
+     * @return lastBattleTime 上次战斗时间
+     * @return hasTeam 是否有战队
+     */
+    function getPlayerChallengeStatus(address player) external view returns (
+        uint256 remainingAttempts,
+        uint256 lastBattleTime,
+        bool hasTeam
+    );
+
+    /**
+     * @dev 获取玩家排名
+     * @param player 玩家地址
+     * @param seasonId 赛季ID
+     * @return 排名
+     */
+    function getPlayerRank(address player, uint256 seasonId) external view returns (uint256);
+
+    /**
+     * @dev 获取赛季总玩家数
+     * @param seasonId 赛季ID
+     * @return 总玩家数
+     */
+    function getTotalPlayersInSeason(uint256 seasonId) external view returns (uint256);
+
+    /**
+     * @dev 获取玩家战斗力
+     * @param player 玩家地址
+     * @return 战斗力
+     */
+    function getPlayerPower(address player) external view returns (uint256);
+}
+
+/**
+ * @title IArenaPlayer
+ * @dev 竞技场玩家合约接口，提供玩家和战队管理功能
+ */
+interface IArenaPlayer {
+    /**
+     * @dev 设置战斗队伍
+     * @param tokenIds NFT ID数组（固定6个）
+     */
+    function setBattleTeam(uint256[6] calldata tokenIds) external;
+
+    /**
+     * @dev 清空战斗队伍
+     */
+    function clearBattleTeam() external;
+
+    /**
+     * @dev 获取玩家战斗队伍
+     * @param player 玩家地址
+     * @return 队伍NFT ID数组
+     */
+    function getPlayerBattleTeam(address player) external view returns (uint256[] memory);
+
+    /**
+     * @dev 质押NFT
+     * @param tokenIds NFT ID数组
+     */
+    function stakeNFTs(uint256[] calldata tokenIds) external;
+
+    /**
+     * @dev 解除质押NFT
+     * @param tokenIds NFT ID数组
+     */
+    function unstakeNFTs(uint256[] calldata tokenIds) external;
+
+    /**
+     * @dev 获取用户质押的NFT
+     * @param user 用户地址
+     * @return NFT ID数组
+     */
+    function getUserStakedNFTs(address user) external view returns (uint256[] memory);
+
+    /**
+     * @dev 充值挑战次数
+     */
+    function rechargeChallengeAttempts() external payable;
+
+    /**
+     * @dev 获取剩余挑战次数
+     * @param player 玩家地址
+     * @return 剩余次数
+     */
+    function getRemainingAttempts(address player) external view returns (uint256);
+
+    /**
+     * @dev 获取玩家挑战状态
+     * @param player 玩家地址
+     * @return remainingAttempts 剩余挑战次数
+     * @return lastBattleTime 上次战斗时间
+     * @return hasTeam 是否有队伍
+     */
+    function getPlayerChallengeStatus(address player) external view returns (
+        uint256 remainingAttempts,
+        uint256 lastBattleTime,
+        bool hasTeam
+    );
+
+    /**
+     * @dev 设置最大充值次数
+     * @param _maxRechargeAttempts 最大次数
+     */
+    function setMaxRechargeAttempts(uint256 _maxRechargeAttempts) external;
+
+    /**
+     * @dev 设置充值费用
+     * @param _rechargeCost 充值费用
+     */
+    function setRechargeCost(uint256 _rechargeCost) external;
+
+    /**
+     * @dev 更新玩家战斗时间
+     * @param player 玩家地址
+     * @param timestamp 时间戳
+     */
+    function updatePlayerBattleTime(address player, uint256 timestamp) external;
+
+    /**
+     * @dev 更新玩家挑战次数
+     * @param player 玩家地址
+     * @param attempts 次数
+     */
+    function updatePlayerAttempts(address player, uint256 attempts) external;
+
+    /**
+     * @dev 生成Mock队伍
+     * @param seed 种子
+     * @return Mock队伍
+     */
+    function generateMockTeam(uint256 seed) external view returns (uint256[6] memory);
+
+    /**
+     * @dev 获取NFT质押的所有者
+     * @param tokenId NFT ID
+     * @return 质押者地址
+     */
+    function getNFTStakedOwner(uint256 tokenId) external view returns (address);
+}
+
+/**
+ * @title IArenaBattle
+ * @dev 竞技场战斗合约接口，提供战斗执行功能
+ */
+interface IArenaBattle {
+    /**
+     * @dev 执行Mock战斗
+     * @param playerTeam 玩家队伍
+     * @param mockIndex Mock索引
+     * @return success 是否成功
+     * @return winner 获胜方（1=玩家，2=Mock，0=平局）
+     * @return battleId 战斗ID
+     */
+    function executeMockBattle(uint256[6] calldata playerTeam, uint256 mockIndex) external returns (bool success, uint256 winner, uint256 battleId);
+
+    /**
+     * @dev 执行真实战斗
+     * @param challengedPlayer 被挑战玩家
+     * @param playerTeam 玩家队伍
+     * @param challengedTeam 被挑战者队伍
+     * @return success 是否成功
+     * @return winner 获胜方（1=挑战者，2=被挑战者，0=平局）
+     * @return battleId 战斗ID
+     */
+    function executeRealBattle(address challengedPlayer, uint256[6] calldata playerTeam, uint256[6] calldata challengedTeam) external returns (bool success, uint256 winner, uint256 battleId);
+
+    /**
+     * @dev 锁定NFT用于战斗
+     * @param team 队伍
+     * @param battleId 战斗ID
+     */
+    function lockNFTsForBattle(uint256[6] calldata team, uint256 battleId) external;
+
+    /**
+     * @dev 解锁NFT
+     * @param team 队伍
+     */
+    function unlockNFTsFromBattle(uint256[6] memory team) external;
+
+    /**
+     * @dev 检查NFT是否锁定
+     * @param tokenId NFT ID
+     * @return 是否锁定
+     */
+    function isNFTLocked(uint256 tokenId) external view returns (bool);
+
+    /**
+     * @dev 设置基础奖励
+     * @param _baseRewardPerWin 每胜奖励
+     */
+    function setBaseRewardPerWin(uint256 _baseRewardPerWin) external;
 }
 
 /**

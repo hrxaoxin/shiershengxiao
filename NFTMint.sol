@@ -597,17 +597,17 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
 
         string memory elementName;
         string memory zodiacName;
-        if (element == 0) elementName = "水";
-        else if (element == 1) elementName = "风";
-        else if (element == 2) elementName = "火";
-        else if (element == 3) elementName = "暗";
-        else elementName = "光";
+        if (element == 0) elementName = unicode"\u6C34";
+        else if (element == 1) elementName = unicode"\u98CE";
+        else if (element == 2) elementName = unicode"\u706B";
+        else if (element == 3) elementName = unicode"\u6697";
+        else elementName = unicode"\u5149";
 
-        string[12] memory zodiacNames = ["鼠", "牛", "虎", "兔", "龙", "蛇", "马", "羊", "猴", "鸡", "狗", "猪"];
+        string[12] memory zodiacNames = [unicode"\u9F20", unicode"\u725B", unicode"\u864E", unicode"\u5154", unicode"\u9F99", unicode"\u86C7", unicode"\u99AC", unicode"\u592A", unicode"\u5B81", unicode"\u91D1", unicode"\u72D7", unicode"\u8C61"];
         zodiacName = zodiacNames[zodiac];
 
-        string memory genderName = gender == 0 ? "公" : "母";
-        string memory tokenName = string(abi.encodePacked(elementName, "·", zodiacName, "·", genderName));
+        string memory genderName = gender == 0 ? unicode"\u516C" : unicode"\u6BCD";
+        string memory tokenName = string(abi.encodePacked(elementName, unicode"\u00B7", zodiacName, unicode"\u00B7", genderName));
 
         string memory imageUrl = string(abi.encodePacked("ipfs://metadata/", Strings.toString(t), ".json"));
 
@@ -772,9 +772,9 @@ contract NFTMint is ERC721EnumerableUpgradeable, Ownable2StepUpgradeable, UUPSUp
         uint256 t = tokenType[tokenId];
         uint8 lv = tokenLevel[tokenId];
 
-        string[5] memory attrNames = ["水", "风", "火", "暗", "光"];
-        string[12] memory zodiacNames = ["鼠", "牛", "虎", "兔", "龙", "蛇", "马", "羊", "猴", "鸡", "狗", "猪"];
-        string[2] memory genderNames = ["公", "母"];
+        string[5] memory attrNames = [unicode"\u6C34", unicode"\u98CE", unicode"\u706B", unicode"\u6697", unicode"\u5149"];
+        string[12] memory zodiacNames = [unicode"\u9F20", unicode"\u725B", unicode"\u864E", unicode"\u5154", unicode"\u9F99", unicode"\u86C7", unicode"\u99AC", unicode"\u592A", unicode"\u5B81", unicode"\u91D1", unicode"\u72D7", unicode"\u8C61"];
+        string[2] memory genderNames = [unicode"\u516C", unicode"\u6BCD"];
 
         uint256 element = t / 24;
         uint256 zodiac = (t % 24 / 2) % 12;

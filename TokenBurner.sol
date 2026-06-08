@@ -336,9 +336,13 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
         INFTMint nftMint = INFTMint(nftMintContract);
         if (isRare) {
-            nftMint.mintRareTen(user);
+            for (uint256 i = 0; i < 10; i++) {
+                nftMint.mintRare(user);
+            }
         } else {
-            nftMint.mintNormalTen(user);
+            for (uint256 i = 0; i < 10; i++) {
+                nftMint.mintNormal(user);
+            }
         }
 
         return true;
@@ -366,7 +370,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit TokenBurned(user, totalCost, block.timestamp);
 
         INFTMint nftMint = INFTMint(nftMintContract);
-        nftMint.mintTargeted(user, zodiac);
+        nftMint.mintNormal(user);
 
         return true;
     }

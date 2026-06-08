@@ -24,35 +24,47 @@ pragma solidity ^0.8.20;
  * - 暗克光：暗属性攻击光属性时伤害×1.5
  */
 library NFTLib {
-    uint256[12] internal constant BASE_HP = [
-        uint256(1200), uint256(2000), uint256(1600), uint256(1000), uint256(1800), uint256(1400),
-        uint256(1500), uint256(900), uint256(1100), uint256(800), uint256(1300), uint256(700)
-    ];
+    function getBASE_HP() internal pure returns (uint256[12] memory) {
+        return [
+            uint256(1200), uint256(2000), uint256(1600), uint256(1000), uint256(1800), uint256(1400),
+            uint256(1500), uint256(900), uint256(1100), uint256(800), uint256(1300), uint256(700)
+        ];
+    }
 
-    uint256[12] internal constant BASE_ATTACK = [
-        uint256(120), uint256(80), uint256(150), uint256(90), uint256(180), uint256(140),
-        uint256(130), uint256(60), uint256(160), uint256(70), uint256(100), uint256(50)
-    ];
+    function getBASE_ATTACK() internal pure returns (uint256[12] memory) {
+        return [
+            uint256(120), uint256(80), uint256(150), uint256(90), uint256(180), uint256(140),
+            uint256(130), uint256(60), uint256(160), uint256(70), uint256(100), uint256(50)
+        ];
+    }
 
-    uint256[12] internal constant BASE_DEFENSE = [
-        uint256(80), uint256(120), uint256(100), uint256(70), uint256(130), uint256(110),
-        uint256(90), uint256(60), uint256(100), uint256(50), uint256(110), uint256(40)
-    ];
+    function getBASE_DEFENSE() internal pure returns (uint256[12] memory) {
+        return [
+            uint256(80), uint256(120), uint256(100), uint256(70), uint256(130), uint256(110),
+            uint256(90), uint256(60), uint256(100), uint256(50), uint256(110), uint256(40)
+        ];
+    }
 
-    uint256[12] internal constant BASE_CRITICAL = [
-        uint256(800), uint256(500), uint256(900), uint256(600), uint256(850), uint256(750),
-        uint256(700), uint256(400), uint256(950), uint256(550), uint256(650), uint256(350)
-    ];
+    function getBASE_CRITICAL() internal pure returns (uint256[12] memory) {
+        return [
+            uint256(800), uint256(500), uint256(900), uint256(600), uint256(850), uint256(750),
+            uint256(700), uint256(400), uint256(950), uint256(550), uint256(650), uint256(350)
+        ];
+    }
 
-    uint256[12] internal constant BASE_DODGE = [
-        uint256(600), uint256(200), uint256(500), uint256(800), uint256(300), uint256(700),
-        uint256(400), uint256(250), uint256(900), uint256(550), uint256(450), uint256(350)
-    ];
+    function getBASE_DODGE() internal pure returns (uint256[12] memory) {
+        return [
+            uint256(600), uint256(200), uint256(500), uint256(800), uint256(300), uint256(700),
+            uint256(400), uint256(250), uint256(900), uint256(550), uint256(450), uint256(350)
+        ];
+    }
 
-    uint256[12] internal constant BASE_SPEED = [
-        uint256(95), uint256(40), uint256(70), uint256(90), uint256(80), uint256(85),
-        uint256(100), uint256(35), uint256(110), uint256(55), uint256(60), uint256(30)
-    ];
+    function getBASE_SPEED() internal pure returns (uint256[12] memory) {
+        return [
+            uint256(95), uint256(40), uint256(70), uint256(90), uint256(80), uint256(85),
+            uint256(100), uint256(35), uint256(110), uint256(55), uint256(60), uint256(30)
+        ];
+    }
 
     /**
      * @dev 战斗属性结构体
@@ -107,7 +119,7 @@ library NFTLib {
      */
     function getBaseSpeed(uint256 zodiacType) internal pure returns (uint256) {
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
-        return BASE_SPEED[zodiacType];
+        return getBASE_SPEED()[zodiacType];
     }
 
     /**
@@ -154,12 +166,12 @@ library NFTLib {
         uint256 multiplier = getLevelMultiplier(level);
 
         BattleAttributes memory attrs;
-        attrs.hp = BASE_HP[zodiacType] * multiplier / 100;
-        attrs.attack = BASE_ATTACK[zodiacType] * multiplier / 100;
-        attrs.defense = BASE_DEFENSE[zodiacType] * multiplier / 100;
-        attrs.speed = BASE_SPEED[zodiacType] * multiplier / 100;
-        attrs.critical = BASE_CRITICAL[zodiacType] + (level * 150);
-        attrs.dodge = BASE_DODGE[zodiacType] + (level * 80);
+        attrs.hp = getBASE_HP()[zodiacType] * multiplier / 100;
+        attrs.attack = getBASE_ATTACK()[zodiacType] * multiplier / 100;
+        attrs.defense = getBASE_DEFENSE()[zodiacType] * multiplier / 100;
+        attrs.speed = getBASE_SPEED()[zodiacType] * multiplier / 100;
+        attrs.critical = getBASE_CRITICAL()[zodiacType] + (level * 150);
+        attrs.dodge = getBASE_DODGE()[zodiacType] + (level * 80);
 
         if (attrs.critical > 3000) attrs.critical = 3000;
         if (attrs.dodge > 1800) attrs.dodge = 1800;
@@ -260,7 +272,7 @@ library NFTLib {
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         require(level >= 1 && level <= 5, "NFTLib: Invalid level");
         uint256 multiplier = getLevelMultiplier(level);
-        return BASE_ATTACK[zodiacType] * multiplier / 100;
+        return getBASE_ATTACK()[zodiacType] * multiplier / 100;
     }
 
     /**
@@ -274,7 +286,7 @@ library NFTLib {
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         require(level >= 1 && level <= 5, "NFTLib: Invalid level");
         uint256 multiplier = getLevelMultiplier(level);
-        return BASE_DEFENSE[zodiacType] * multiplier / 100;
+        return getBASE_DEFENSE()[zodiacType] * multiplier / 100;
     }
 
     /**
@@ -288,7 +300,7 @@ library NFTLib {
         require(zodiacType < 12, "NFTLib: Invalid zodiac type");
         require(level >= 1 && level <= 5, "NFTLib: Invalid level");
         uint256 multiplier = getLevelMultiplier(level);
-        return BASE_HP[zodiacType] * multiplier / 100;
+        return getBASE_HP()[zodiacType] * multiplier / 100;
     }
 
     /**

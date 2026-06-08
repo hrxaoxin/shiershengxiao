@@ -353,7 +353,7 @@
             MARKET: '1'
         };
         
-        let nftContract, breedingContract;
+        let nftContract, breedingCoreContract, breedingMarketContract;
         let currentTab = 'self';
         let selectedMaleNFT = null;
         let selectedFemaleNFT = null;
@@ -456,7 +456,7 @@
                 const cleanupFns = [];
 
                 try {
-                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'BreedingCompleted', async (event) => {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breedingCore', 'BreedingCompleted', async (event) => {
                         console.log('BreedingCompleted event:', event.returnValues);
                         ZODIAC_UI.showToast('恭喜！NFT孕育完成！', 'success');
                         await loadNFTs();
@@ -468,7 +468,7 @@
                 }
 
                 try {
-                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'BreedingCancelled', async (event) => {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breedingCore', 'BreedingCancelled', async (event) => {
                         console.log('BreedingCancelled event:', event.returnValues);
                         ZODIAC_UI.showToast('繁殖已取消', 'info');
                         await loadNFTs();
@@ -480,7 +480,7 @@
                 }
 
                 try {
-                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'MaleChildGenerated', async (event) => {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breedingCore', 'MaleChildGenerated', async (event) => {
                         console.log('MaleChildGenerated event:', event.returnValues);
                         const childId = event.returnValues.childId;
                         ZODIAC_UI.showToast(`🎉 父方获得新NFT #${childId}！`, 'success');
@@ -491,7 +491,7 @@
                 }
 
                 try {
-                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'FemaleChildGenerated', async (event) => {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breedingCore', 'FemaleChildGenerated', async (event) => {
                         console.log('FemaleChildGenerated event:', event.returnValues);
                         const childId = event.returnValues.childId;
                         ZODIAC_UI.showToast(`🎉 母方获得新NFT #${childId}！`, 'success');
@@ -502,7 +502,7 @@
                 }
 
                 try {
-                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'MarketListingCreated', async (event) => {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breedingMarket', 'MarketListingCreated', async (event) => {
                         console.log('MarketListingCreated event:', event.returnValues);
                         await loadMarketOrders();
                         await loadMyMarketOrders();
@@ -512,7 +512,7 @@
                 }
 
                 try {
-                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breeding', 'MarketListingRemoved', async (event) => {
+                    cleanupFns.push(await window.ZODIAC_WEB3.listenToEvent('breedingMarket', 'MarketListingRemoved', async (event) => {
                         console.log('MarketListingRemoved event:', event.returnValues);
                         await loadMarketOrders();
                         await loadMyMarketOrders();
@@ -617,10 +617,12 @@
 
         async function initContracts() {
             nftContract = null;
-            breedingContract = null;
+            breedingCoreContract = null;
+            breedingMarketContract = null;
             try {
                 nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
-                breedingContract = await window.ZODIAC_WEB3.getContract('breeding');
+                breedingCoreContract = await window.ZODIAC_WEB3.getContract('breedingCore');
+                breedingMarketContract = await window.ZODIAC_WEB3.getContract('breedingMarket');
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
                 ZODIAC_UI.showToast('合约初始化失败，请刷新重试', 'error');
@@ -629,12 +631,11 @@
 
         async function loadBreedingConstants() {
             try {
-                selfBreedingCooldown = parseInt(await breedingContract.methods.selfBreedingCooldown().call(), 10);
-                marketBreedingCooldown = parseInt(await breedingContract.methods.marketBreedingCooldown().call(), 10);
+                selfBreedingCooldown = parseInt(await breedingCoreContract.methods.selfBreedingCooldown().call(), 10);
+                marketBreedingCooldown = parseInt(await breedingCoreContract.methods.marketBreedingCooldown().call(), 10);
                 
-                // 从合约读取繁育费用
-                const selfFeeWei = await breedingContract.methods.selfBreedingFee().call();
-                const marketFeeWei = await breedingContract.methods.marketBreedingFee().call();
+                const selfFeeWei = await breedingCoreContract.methods.selfBreedingFee().call();
+                const marketFeeWei = await breedingCoreContract.methods.marketBreedingFee().call();
                 const selfFee = (parseInt(selfFeeWei) / 10**18).toFixed(0);
                 const marketFee = (parseInt(marketFeeWei) / 10**18).toFixed(0);
                 
@@ -666,9 +667,9 @@
                     let cooldownEndTime = null;
                     let isOnCooldown = false;
                     try {
-                        isOnCooldown = await breedingContract.methods.isInCooldown(tokenId).call();
+                        isOnCooldown = await breedingCoreContract.methods.isInCooldown(tokenId).call();
                         if (isOnCooldown) {
-                            cooldownEndTime = await breedingContract.methods.getCooldownEndTime(tokenId).call();
+                            cooldownEndTime = await breedingCoreContract.methods.getCooldownEndTime(tokenId).call();
                         }
                     } catch (error) {
                         console.warn('检查NFT冷却期失败:', error);
@@ -899,16 +900,44 @@
             try {
                 const account = getAccount();
                 
-                if (breedingContract.methods.getUserActiveOrders) {
-                    try {
-                        const activeOrderIds = await breedingContract.methods.getUserActiveOrders(account).call();
-                        if (activeOrderIds.length > 0) {
-                            for (const orderId of activeOrderIds) {
-                                const order = await breedingContract.methods.breedingPairs(orderId).call();
-                                if (order.status === BREEDING_STATUS.ACTIVE && 
-                                    order.breedingType === BREEDING_TYPE.SELF) {
+                if (breedingCoreContract.methods.getUserActiveOrders) {
+                            try {
+                                const activeOrderIds = await breedingCoreContract.methods.getUserActiveOrders(account).call();
+                                if (activeOrderIds.length > 0) {
+                                    for (const orderId of activeOrderIds) {
+                                        const order = await breedingCoreContract.methods.breedingPairs(orderId).call();
+                                        if (order.status === BREEDING_STATUS.ACTIVE && 
+                                            order.breedingType === BREEDING_TYPE.SELF) {
+                                            activeSelfOrder = {
+                                                id: parseInt(orderId, 10),
+                                                fatherId: order.fatherId ? order.fatherId.toString() : '0',
+                                                motherId: order.motherId ? order.motherId.toString() : '0',
+                                                maleOwner: order.maleOwner,
+                                                femaleOwner: order.femaleOwner,
+                                                startTime: order.startTime ? order.startTime.toString() : '0',
+                                                status: order.status
+                                            };
+                                            showSelfBreedingStatus();
+                                            return;
+                                        }
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('getUserActiveOrders API call failed, falling back to iteration:', e);
+                            }
+                        }
+                        
+                        const pairCount = parseInt(await breedingCoreContract.methods.breedingPairCount().call(), 10);
+                        const maxCheck = Math.min(pairCount, 100);
+                        for (let i = pairCount; i >= Math.max(1, pairCount - maxCheck + 1); i--) {
+                            try {
+                                const order = await breedingCoreContract.methods.breedingPairs(i).call();
+                                if (order.maleOwner.toLowerCase() === account.toLowerCase() && 
+                                    order.femaleOwner.toLowerCase() === account.toLowerCase() && 
+                                    order.status === BREEDING_STATUS.ACTIVE && 
+                                    order.breedingType === BREEDING_TYPE.SELF) { 
                                     activeSelfOrder = {
-                                        id: parseInt(orderId, 10),
+                                        id: i,
                                         fatherId: order.fatherId ? order.fatherId.toString() : '0',
                                         motherId: order.motherId ? order.motherId.toString() : '0',
                                         maleOwner: order.maleOwner,
@@ -919,38 +948,10 @@
                                     showSelfBreedingStatus();
                                     return;
                                 }
+                            } catch (error) {
+                                continue;
                             }
                         }
-                    } catch (e) {
-                        console.warn('getUserActiveOrders API call failed, falling back to iteration:', e);
-                    }
-                }
-                
-                const pairCount = parseInt(await breedingContract.methods.breedingPairCount().call(), 10);
-                const maxCheck = Math.min(pairCount, 100);
-                for (let i = pairCount; i >= Math.max(1, pairCount - maxCheck + 1); i--) {
-                    try {
-                        const order = await breedingContract.methods.breedingPairs(i).call();
-                        if (order.maleOwner.toLowerCase() === account.toLowerCase() && 
-                            order.femaleOwner.toLowerCase() === account.toLowerCase() && 
-                            order.status === BREEDING_STATUS.ACTIVE && 
-                            order.breedingType === BREEDING_TYPE.SELF) { 
-                            activeSelfOrder = {
-                                id: i,
-                                fatherId: order.fatherId ? order.fatherId.toString() : '0',
-                                motherId: order.motherId ? order.motherId.toString() : '0',
-                                maleOwner: order.maleOwner,
-                                femaleOwner: order.femaleOwner,
-                                startTime: order.startTime ? order.startTime.toString() : '0',
-                                status: order.status
-                            };
-                            showSelfBreedingStatus();
-                            return;
-                        }
-                    } catch (error) {
-                        continue;
-                    }
-                }
                 activeSelfOrder = null;
                 document.getElementById('selfBreedingStatus').classList.add('hidden');
             } catch (error) {
@@ -1147,8 +1148,7 @@
                 currentMarketPage = 1;
                 
                 const account = getAccount();
-                // 从链上获取所有挂单
-                const listedIds = await breedingContract.methods.getMarketListingIds().call();
+                const listedIds = await breedingMarketContract.methods.getMarketListingIds().call();
                 totalMarketOrders = listedIds.length;
                 
                 const startIndex = (currentMarketPage - 1) * marketPageSize;
@@ -1157,12 +1157,10 @@
                 
                 for (const tokenId of pageListedIds) {
                     try {
-                        const listing = await breedingContract.methods.getMarketListing(tokenId).call();
-                        // 只显示其他人的活跃挂单
+                        const listing = await breedingMarketContract.methods.getMarketListing(tokenId).call();
                         if (!listing.isActive) continue;
                         if (listing.owner.toLowerCase() === account.toLowerCase()) continue;
                         
-                        // 获取 NFT 信息
                         const nftType = await nftContract.methods.tokenType(tokenId).call();
                         const nftLevel = await nftContract.methods.tokenLevel(tokenId).call();
                         
@@ -1269,11 +1267,11 @@
                 
                 const account = getAccount();
                 // 从链上获取所有挂单
-                const listedIds = await breedingContract.methods.getMarketListingIds().call();
+                const listedIds = await breedingMarketContract.methods.getMarketListingIds().call();
                 
                 for (const tokenId of listedIds) {
                     try {
-                        const listing = await breedingContract.methods.getMarketListing(tokenId).call();
+                        const listing = await breedingMarketContract.methods.getMarketListing(tokenId).call();
                         // 只显示自己的活跃挂单
                         if (!listing.isActive) continue;
                         if (listing.owner.toLowerCase() !== account.toLowerCase()) continue;
@@ -1339,13 +1337,13 @@
         async function checkActivePairOrders() {
             try {
                 const account = getAccount();
-                const pairCount = parseInt(await breedingContract.methods.breedingPairCount().call(), 10);
+                const pairCount = parseInt(await breedingCoreContract.methods.breedingPairCount().call(), 10);
                 activePairOrders = [];
                 
                 const maxCheck = Math.min(pairCount, 100);
                 for (let i = pairCount; i > pairCount - maxCheck && i > 0; i--) {
                     try {
-                        const order = await breedingContract.methods.breedingPairs(i).call();
+                        const order = await breedingCoreContract.methods.breedingPairs(i).call();
                         if (order.status === BREEDING_STATUS.ACTIVE && order.breedingType === BREEDING_TYPE.MARKET) {
                             if (order.maleOwner.toLowerCase() === account.toLowerCase() ||
                                 order.femaleOwner.toLowerCase() === account.toLowerCase()) {
@@ -1426,7 +1424,7 @@
             let orderValid = true;
             
             // 从链上获取挂单信息
-            const listing = await breedingContract.methods.getMarketListing(orderId).call();
+            const listing = await breedingMarketContract.methods.getMarketListing(orderId).call();
             if (!listing.isActive) {
                 ZODIAC_UI.showToast('订单不存在或已过期', 'error');
                 orderValid = false;
@@ -1531,7 +1529,7 @@
         if (!selectedJoinOrderId || !selectedJoinNFT) return;
 
         // 从链上获取挂单信息
-        const listing = await breedingContract.methods.getMarketListing(selectedJoinOrderId).call();
+        const listing = await breedingMarketContract.methods.getMarketListing(selectedJoinOrderId).call();
         if (!listing.isActive) {
             ZODIAC_UI.showToast('订单已失效', 'error');
             closeJoinModal();
@@ -1541,7 +1539,7 @@
         
         // 检查对方NFT是否在冷却期
         try {
-            const isInCooldown = await breedingContract.methods.isInCooldown(selectedJoinOrderId).call();
+            const isInCooldown = await breedingCoreContract.methods.isInCooldown(selectedJoinOrderId).call();
             if (isInCooldown) {
                 ZODIAC_UI.showToast('对方NFT正在冷却中，无法参与孕育', 'warning');
                 closeJoinModal();
@@ -1554,7 +1552,7 @@
         
         // 检查用户选择的NFT是否也在冷却期
         try {
-            const userNftInCooldown = await breedingContract.methods.isInCooldown(selectedJoinNFT.id).call();
+            const userNftInCooldown = await breedingCoreContract.methods.isInCooldown(selectedJoinNFT.id).call();
             if (userNftInCooldown) {
                 ZODIAC_UI.showToast('您选择的NFT正在冷却中', 'warning');
                 closeJoinModal();

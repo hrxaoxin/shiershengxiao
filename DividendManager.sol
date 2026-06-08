@@ -443,7 +443,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 领取分红并转账（供前端直接调用，委托给 claim() 以消除代码重复）
      */
     function claimDividend() external nonReentrant whenNotPaused {
-        claim();
+        this.claim();
     }
 
     /**
@@ -452,7 +452,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @return 可领取分红金额和用户权重
      */
     function calcUserDividend(address user) external view returns (uint256, uint256) {
-        uint256 claimable = getClaimableDividend(user);
+        uint256 claimable = this.getClaimableDividend(user);
         return (claimable, userWeights[user]);
     }
 
@@ -786,7 +786,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         if (tokenContract != address(0)) {
             currentPool = IERC20(tokenContract).balanceOf(address(this));
         }
-        totalWeight = this.totalWeight;
+        totalWeight = this.totalWeight();
         snapshotCount = snapshots.length;
         if (snapshots.length > 0) {
             uint256 latestIndex = snapshots.length < MAX_SNAPSHOTS 

@@ -70,8 +70,8 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     /**
      * @dev 资金流动类型常量
      */
-    uint256 public constant FLOW_DEPOSIT = 1;
-    uint256 public constant FLOW_WITHDRAW = 2;
+    uint8 public constant FLOW_DEPOSIT = 1;
+    uint8 public constant FLOW_WITHDRAW = 2;
     
     uint256 public constant MAX_FLOW_RECORDS = 1000;
 
@@ -403,8 +403,8 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return nftStakingBalance NFT质押池余额
      * @return tokenStakingBalance 代币质押池余额
      * @return arenaRewardBalance 竞技场奖励池余额
-     * @return totalDeposited 总存入
-     * @return totalWithdrawn 总提取
+     * @return totalDeposited_ 总存入
+     * @return totalWithdrawn_ 总提取
      */
     function getPoolStats() external view returns (
         uint256 nftStakingBalance,

@@ -477,8 +477,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
         // 分配到NFT质押池
         if (nftStakingPool != address(0) && nftStakingTokenAmount > 0) {
-            try {
-                require(token.transfer(nftStakingPool, nftStakingTokenAmount), "RewardManager: NFT staking pool transfer failed");
+            try token.transfer(nftStakingPool, nftStakingTokenAmount) {
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToNFTStakingPool(nftStakingTokenAmount) {} catch {}
                 }
@@ -489,8 +488,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
         // 分配到竞技场奖励池
         if (arenaRewardPool != address(0) && arenaRewardTokenAmount > 0) {
-            try {
-                require(token.transfer(arenaRewardPool, arenaRewardTokenAmount), "RewardManager: Arena reward pool transfer failed");
+            try token.transfer(arenaRewardPool, arenaRewardTokenAmount) {
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardTokenAmount) {} catch {}
                 }
@@ -612,8 +610,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
         // 使用try-catch分别处理每个分配，允许部分成功
         if (dividendPool != address(0) && dividendAmount > 0) {
-            try {
-                require(token.transfer(dividendPool, dividendAmount), "RewardManager: Dividend pool transfer failed");
+            try token.transfer(dividendPool, dividendAmount) {
                 // 同步 DividendManager 分红池，使转账的代币被正确计入分红计算
                 try IDividendManager(dividendPool).syncDividendPool() {} catch {}
             } catch {
@@ -621,8 +618,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             }
         }
         if (nftStakingPool != address(0) && nftStakingAmount > 0) {
-            try {
-                require(token.transfer(nftStakingPool, nftStakingAmount), "RewardManager: NFT staking pool transfer failed");
+            try token.transfer(nftStakingPool, nftStakingAmount) {
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToNFTStakingPool(nftStakingAmount) {} catch {}
                 }
@@ -631,8 +627,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             }
         }
         if (tokenStakingPool != address(0) && tokenStakingAmount > 0) {
-            try {
-                require(token.transfer(tokenStakingPool, tokenStakingAmount), "RewardManager: Token staking pool transfer failed");
+            try token.transfer(tokenStakingPool, tokenStakingAmount) {
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch {}
                 }
@@ -641,8 +636,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             }
         }
         if (arenaRewardPool != address(0) && arenaRewardAmount > 0) {
-            try {
-                require(token.transfer(arenaRewardPool, arenaRewardAmount), "RewardManager: Arena reward pool transfer failed");
+            try token.transfer(arenaRewardPool, arenaRewardAmount) {
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardAmount) {} catch {}
                 }

@@ -104,6 +104,16 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     uint256 public constant MAX_HISTORY_LENGTH = 100;
 
     /**
+     * @dev 价格更新冷却时间（秒）
+     */
+    uint256 public constant PRICE_UPDATE_COOLDOWN = 3600;
+
+    /**
+     * @dev 最大价格变动百分比（0-10000，例如 1000 = 10%）
+     */
+    uint256 public constant MAX_PRICE_CHANGE_PERCENT = 5000;
+
+    /**
      * @dev 代币地址
      */
     address public tokenAddress;
@@ -118,10 +128,6 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     address public authorizer;
 
-    /**
-     * @dev 初始化函数
-     * @param _authorizer 授权合约地址
-     */
     bool public paused;
     string public pauseReason;
     

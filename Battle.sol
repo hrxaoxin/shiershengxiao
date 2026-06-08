@@ -532,6 +532,26 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         return success && data.length >= 32 && abi.decode(data, (address)) != address(0);
     }
 
+    struct SkillCheckResult {
+        bool canUse;
+        Skill skill;
+    }
+
+    function _checkSkillUsage(
+        TeamState memory state,
+        uint attackerIndex,
+        uint256[] memory cooldowns,
+        uint256 seed
+    ) internal view returns (SkillCheckResult memory) {
+        SkillCheckResult memory result;
+        NFTTraits memory trait = state.traits[attackerIndex];
+        uint256 skillKey = trait.element * ZODIAC_TYPE_COUNT + trait.zodiac;
+        result.skill = skills[skillKey];
+        result.canUse = cooldowns[attackerIndex] == 0 && 
+            (seed % SKILL_USE_CHANCE_DENOMINATOR == 0 || _shouldUseSkill(state, attackerIndex));
+        return result;
+    }
+
     /**
      * @dev 执行战斗核心逻辑
      * @param team1 队伍1（挑战者）
@@ -558,8 +578,8 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             state2.alive[i] = true;
         }
 
-        uint256[TEAM_SIZE] memory skillCooldown1;
-        uint256[TEAM_SIZE] memory skillCooldown2;
+        uint256[] memory skillCooldown1 = new uint256[](TEAM_SIZE);
+        uint256[] memory skillCooldown2 = new uint256[](TEAM_SIZE);
 
         bool team1Alive = true;
         bool team2Alive = true;
@@ -584,13 +604,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 if (!state1.alive[attackerIndex] || !team1Alive) continue;
 
                 NFTTraits memory attackerTrait = state1.traits[attackerIndex];
-                uint256 skillKey = attackerTrait.element * ZODIAC_TYPE_COUNT + attackerTrait.zodiac;
-                Skill memory skill = skills[skillKey];
-                bool useSkill = skillCooldown1[attackerIndex] == 0 && (randomSeed % SKILL_USE_CHANCE_DENOMINATOR == 0 || _shouldUseSkill(state1, attackerIndex));
+                SkillCheckResult memory skillResult = _checkSkillUsage(state1, attackerIndex, skillCooldown1, randomSeed);
 
-                if (useSkill && skill.skillId > 0) {
-                    state2 = _applySkill(attackerTrait, state2, attackerIndex, skill);
-                    skillCooldown1[attackerIndex] = skill.cooldown;
+                if (skillResult.canUse && skillResult.skill.skillId > 0) {
+                    state2 = _applySkill(attackerTrait, state2, attackerIndex, skillResult.skill);
+                    skillCooldown1[attackerIndex] = skillResult.skill.cooldown;
                 } else {
                     uint defenderIndex = _findTarget(state2.alive, state2.traits, state2.hp);
                     if (defenderIndex == 6) {
@@ -615,13 +633,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 if (!state2.alive[attackerIndex] || !team2Alive) continue;
 
                 NFTTraits memory attackerTrait = state2.traits[attackerIndex];
-                uint256 skillKey = attackerTrait.element * ZODIAC_TYPE_COUNT + attackerTrait.zodiac;
-                Skill memory skill = skills[skillKey];
-                bool useSkill = skillCooldown2[attackerIndex] == 0 && (randomSeed % SKILL_USE_CHANCE_DENOMINATOR == 0 || _shouldUseSkill(state2, attackerIndex));
+                SkillCheckResult memory skillResult = _checkSkillUsage(state2, attackerIndex, skillCooldown2, randomSeed);
 
-                if (useSkill && skill.skillId > 0) {
-                    state1 = _applySkill(attackerTrait, state1, attackerIndex, skill);
-                    skillCooldown2[attackerIndex] = skill.cooldown;
+                if (skillResult.canUse && skillResult.skill.skillId > 0) {
+                    state1 = _applySkill(attackerTrait, state1, attackerIndex, skillResult.skill);
+                    skillCooldown2[attackerIndex] = skillResult.skill.cooldown;
                 } else {
                     uint defenderIndex = _findTarget(state1.alive, state1.traits, state1.hp);
                     if (defenderIndex == 6) {
@@ -780,7 +796,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             gasleft(),
             tx.gasprice,
             block.basefee,
-            tx.nonce,
             block.difficulty,
             uint256(keccak256(abi.encodePacked(block.timestamp, msg.sender, battleId))),
             uint256(keccak256(abi.encodePacked(block.prevrandao, tx.gasprice, gasleft())))
@@ -1014,11 +1029,10 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
     /**
      * @dev 暂停合约
-     * @param reason 暂停原因
      */
-    function pause(string calldata reason) external onlyOwner {
+    function pause(string calldata) external onlyOwner {
         _pause();
-        emit Paused(msg.sender, reason);
+        emit Paused(msg.sender);
     }
 
     /**

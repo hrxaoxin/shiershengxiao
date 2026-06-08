@@ -13,6 +13,12 @@ interface IDividendManager {
     function updateUserWeight(address user, uint256 level, bool isAdd, uint8 element) external;
 }
 
+interface IPancakeSwapPair {
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+    function token0() external view returns (address);
+    function token1() external view returns (address);
+}
+
 /**
  * @title NFTUpdate
  * @dev NFT升级合约

@@ -198,7 +198,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(priceWei <= 1000 ether, "NFTTrading: Price too high");
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(INFTMint(nftContract).ownerOf(tokenId) == msg.sender, "NFTTrading: Not token owner");
-        require(INFTMint(nftContract).isApprovedForAll(msg.sender, address(this)), "NFTTrading: Contract not approved");
+        require(INFT(nftContract).isApprovedForAll(msg.sender, address(this)), "NFTTrading: Contract not approved");
 
         listings[tokenId] = Listing({
             seller: msg.sender,
@@ -217,9 +217,10 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(listings[tokenId].seller != address(0), "NFTTrading: Listing not found");
         require(listings[tokenId].seller == msg.sender, "NFTTrading: Not owner");
 
+        address seller = listings[tokenId].seller;
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
-        emit NFTDelisted(tokenId);
+        emit NFTDelisted(tokenId, seller);
     }
 
     /**
@@ -244,7 +245,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 sellerAmount = price - fee;
 
         require(INFTMint(nftContract).ownerOf(tokenId) == seller, "NFTTrading: Seller no longer owns NFT");
-        require(INFTMint(nftContract).isApprovedForAll(seller, address(this)), "NFTTrading: Contract not approved");
+        require(INFT(nftContract).isApprovedForAll(seller, address(this)), "NFTTrading: Contract not approved");
 
         // 删除挂牌信息前再次验证价格未被篡改
         require(listings[tokenId].priceWei == price, "NFTTrading: Price changed");
@@ -254,7 +255,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         _removeFromListedNFTs(tokenId);
 
         // 然后执行 NFT 转移，这是最重要的操作
-        try INFTMint(nftContract).safeTransferFrom(seller, msg.sender, tokenId) {
+        try INFT(nftContract).safeTransferFrom(seller, msg.sender, tokenId) {
             // 转账成功后再处理资金
         } catch {
             revert("NFTTrading: NFT transfer failed");

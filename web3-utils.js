@@ -189,6 +189,8 @@ window.ZODIAC_WEB3 = (function() {
         'staking': ABIS.stakingABI,
         'tokenStaking': ABIS.tokenStakingABI,
         'breeding': ABIS.breedingABI,
+        'breedingCore': ABIS.breedingCoreABI,
+        'breedingMarket': ABIS.breedingMarketABI,
         'rewardManager': ABIS.rewardManagerABI,
         'dividendManager': ABIS.dividendManagerABI,
         'tokenBurner': ABIS.tokenBurnerABI,
@@ -698,10 +700,10 @@ window.ZODIAC_WEB3 = (function() {
             events.push({ contract: 'nftUpdate', event: 'CardUpgraded', callback: callbacks.onUpgrade });
         }
         if (callbacks.onBreedingCompleted) {
-            events.push({ contract: 'breeding', event: 'BreedingCompleted', callback: callbacks.onBreedingCompleted });
+            events.push({ contract: 'breedingCore', event: 'BreedingCompleted', callback: callbacks.onBreedingCompleted });
         }
         if (callbacks.onBreedingStarted) {
-            events.push({ contract: 'breeding', event: 'BreedingPairCreated', callback: callbacks.onBreedingStarted });
+            events.push({ contract: 'breedingCore', event: 'BreedingPairCreated', callback: callbacks.onBreedingStarted });
         }
         if (callbacks.onRewardClaimed) {
             events.push({ contract: 'arena', event: 'RewardClaimed', callback: callbacks.onRewardClaimed });
@@ -1458,7 +1460,7 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     // --- Breeding Methods ---
-    async function createSelfBreedingPair(fatherId, motherId, coOwnerId) {
+    async function createSelfBreedingPair(fatherId, motherId, coOwnerId = 0) {
         if (!fatherId || fatherId <= 0) {
             throw new Error('[ZODIAC_WEB3] Invalid father ID');
         }
@@ -1468,11 +1470,8 @@ window.ZODIAC_WEB3 = (function() {
         if (fatherId === motherId) {
             throw new Error('[ZODIAC_WEB3] Father and mother must be different');
         }
-        if (!coOwnerId || coOwnerId <= 0) {
-            throw new Error('[ZODIAC_WEB3] Invalid co-owner ID');
-        }
         try {
-            const contract = await getContract('breeding');
+            const contract = await getContract('breedingCore');
             const receipt = await sendAndTrackTransaction(contract, 'createSelfBreedingPair', [fatherId, motherId, coOwnerId]);
             return receipt;
         } catch (e) {
@@ -1486,10 +1485,9 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error('[ZODIAC_WEB3] Invalid pair ID');
         }
         try {
-            const contract = await getContract('breeding');
+            const contract = await getContract('breedingCore');
             const receipt = await sendAndTrackTransaction(contract, 'completeBreeding', [pairId]);
             
-            // 解析事件返回值给前端
             let result = { receipt };
             if (receipt.events) {
                 if (receipt.events.BreedingCompleted) {
@@ -1514,7 +1512,7 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error('[ZODIAC_WEB3] Invalid pair ID');
         }
         try {
-            const contract = await getContract('breeding');
+            const contract = await getContract('breedingCore');
             const receipt = await sendAndTrackTransaction(contract, 'cancelBreeding', [pairId]);
             return receipt;
         } catch (e) {
@@ -1528,7 +1526,7 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error('[ZODIAC_WEB3] Invalid token ID');
         }
         try {
-            const contract = await getContract('breeding');
+            const contract = await getContract('breedingMarket');
             const receipt = await sendAndTrackTransaction(contract, 'listForMarketBreeding', [tokenId]);
             return receipt;
         } catch (e) {
@@ -1548,7 +1546,7 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error('[ZODIAC_WEB3] Father and mother must be different');
         }
         try {
-            const contract = await getContract('breeding');
+            const contract = await getContract('breedingCore');
             const receipt = await sendAndTrackTransaction(contract, 'createMarketBreedingPairPublic', [fatherId, motherId]);
             return receipt;
         } catch (e) {
@@ -1562,12 +1560,33 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error('[ZODIAC_WEB3] Invalid token ID');
         }
         try {
-            const contract = await getContract('breeding');
+            const contract = await getContract('breedingMarket');
             const receipt = await sendAndTrackTransaction(contract, 'delistFromMarketBreeding', [tokenId]);
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] delistFromMarketBreeding failed:', e);
             throw e;
+        }
+    }
+    
+    async function getBreedingConfig() {
+        try {
+            const contract = await getContract('breedingCore');
+            const [selfFee, marketFee, selfCooldown, marketCooldown] = await Promise.all([
+                contract.methods.selfBreedingFee().call(),
+                contract.methods.marketBreedingFee().call(),
+                contract.methods.selfBreedingCooldown().call(),
+                contract.methods.marketBreedingCooldown().call()
+            ]);
+            return {
+                selfBreedingFee: selfFee,
+                marketBreedingFee: marketFee,
+                selfBreedingCooldown: selfCooldown,
+                marketBreedingCooldown: marketCooldown
+            };
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] getBreedingConfig failed:', e);
+            return null;
         }
     }
 
@@ -1870,6 +1889,7 @@ window.ZODIAC_WEB3 = (function() {
         listForMarketBreeding,
         createMarketBreedingPairPublic,
         delistFromMarketBreeding,
+        getBreedingConfig,
 
         // Arena
         challengeMockPlayer,
