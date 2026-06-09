@@ -25,7 +25,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     mapping(uint256 => uint256) public nftBattleLocked;
     mapping(address => uint256) public battleIdCounter;
     mapping(address => uint256) public lastBattleTime;
-    
+     
     event BattleExecuted(
         address indexed challenger,
         address indexed challenged,
