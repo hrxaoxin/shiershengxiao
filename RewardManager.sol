@@ -9,15 +9,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "./NFTInterface.sol";
 
 /**
- * @dev PoolManager 接口，用于同步更新各资金池余额
- */
-interface IPoolManager {
-    function addToNFTStakingPool(uint256 amount) external;
-    function addToTokenStakingPool(uint256 amount) external;
-    function addToArenaRewardPool(uint256 amount) external;
-}
-
-/**
  * @dev DEX Router 接口（兼容 Uniswap V2 标准）
  * 支持 FlapSwap、PancakeSwap、Uniswap
  */
@@ -32,13 +23,6 @@ interface IDEXRouter {
     function WETH() external pure returns (address);
     
     function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
-}
-
-/**
- * @dev DividendManager 接口，用于同步分红池
- */
-interface IDividendManager {
-    function syncDividendPool() external;
 }
 
 /**
@@ -230,6 +214,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
     /**
      * @dev 奖励分配比例（精度4位小数，万分比）
+     * 注意：setDistributionPercents 会校验总和必须等于 PRECISION（10000）
      */
     uint256 public dividendPercent = 5000;     // 50%
     uint256 public nftStakingPercent = 2000;   // 20%
@@ -237,9 +222,42 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     uint256 public arenaRewardPercent = 1500;   // 15%
 
     /**
+     * @dev 设置分配比例（仅owner）
+     * 四个比例之和必须严格等于 PRECISION（10000），即 100%
+     */
+    function setDistributionPercents(uint256 _dividend, uint256 _nftStaking, uint256 _tokenStaking, uint256 _arena) external onlyOwner {
+        require(_dividend + _nftStaking + _tokenStaking + _arena == PRECISION, "RewardManager: Percentages must sum to 10000");
+        dividendPercent = _dividend;
+        nftStakingPercent = _nftStaking;
+        tokenStakingPercent = _tokenStaking;
+        arenaRewardPercent = _arena;
+        emit DistributionPercentsChanged(_dividend, _nftStaking, _tokenStaking, _arena);
+    }
+
+    /**
+     * @dev 分配比例变更事件
+     */
+    event DistributionPercentsChanged(uint256 dividend, uint256 nftStaking, uint256 tokenStaking, uint256 arena);
+
+    /**
      * @dev 精度
      */
     uint256 public constant PRECISION = 10000;
+
+    /**
+     * @dev 累计分发总量（用于统计和前端展示）
+     */
+    uint256 public totalDistributed;
+
+    /**
+     * @dev 当前持有者数量（有分红资格的用户数）
+     */
+    uint256 public holdersCount;
+
+    /**
+     * @dev 用于追踪已记录的用户（用于 holdersCount 计数）
+     */
+    mapping(address => bool) private _isRecordedHolder;
 
     /**
      * @dev 奖励事件
@@ -357,7 +375,9 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     function distributeBNB() external onlyAuthorized nonReentrant {
         uint256 balance = address(this).balance;
-        require(balance > 0, "RewardManager: No BNB to distribute");
+        if (balance == 0) {
+            return; // 没有 BNB 可分配，直接返回而不是 revert，确保流程不中断
+        }
         _distributeBNB(balance);
     }
 
@@ -365,9 +385,12 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 内部函数：分配BNB到各池
      * - 分红池：直接转账BNB
      * - 代币质押池：直接转账BNB
-     * - NFT质押池、竞技场奖励池：兑换为代币后转账
+     * - NFT质押池、竞技场奖励池：优先兑换为代币后转账；兑换失败时将 BNB 直接转入 dividendPool 作为价值储备
      */
     function _distributeBNB(uint256 amount) internal {
+        if (amount == 0) {
+            return; // 0 金额直接返回，不中断流程
+        }
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         require(dexRouter != address(0), "RewardManager: DEX router not set");
 
@@ -410,14 +433,14 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                 // 分配兑换后的代币到NFT质押池和竞技场奖励池
                 _distributeSwappedTokens(tokenAmount, 0, nftStakingAmount, arenaRewardAmount, totalSwapAmount);
             } else {
-                // 兑换失败时，将未兑换的BNB退回至分红池作为安全回退
+                // 兑换失败时，将未兑换的BNB作为价值储备转入分红池（最终回退）
                 if (dividendPool != address(0)) {
-                    (bool success, ) = payable(dividendPool).call{value: totalSwapAmount}("");
-                    if (success) {
+                    (bool fbSuccess, ) = payable(dividendPool).call{value: totalSwapAmount}("");
+                    if (fbSuccess) {
                         try IDividendManager(dividendPool).syncDividendPool() {} catch {}
                         emit SwapFailedFallback(totalSwapAmount);
                     } else {
-                        // 最后安全回退：保留在合约中
+                        // 如果连分红池转账也失败，发出最终失败事件（BNB 保留在合约中）
                         emit SwapFailed(totalSwapAmount);
                     }
                 } else {
@@ -543,14 +566,35 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     event DividendClaimed(address indexed user, uint256 amount);
 
     /**
-     * @dev 领取分红
+     * @dev 领取分红（无参版本，前端直接调用 - 领取 msg.sender 的分红）
      */
-    function claimDividend(address user) external whenNotPaused nonReentrant returns (uint256) {
+    function claimDividend() external whenNotPaused nonReentrant returns (uint256) {
+        address user = msg.sender;
+        require(tokenContract != address(0), "RewardManager: Token contract not set");
+        
+        uint256 dividend = pendingDividends[user];
+        require(dividend > 0, "RewardManager: No pending dividend");
+        
+        pendingDividends[user] = 0;
+        
+        IERC20 token = IERC20(tokenContract);
+        require(token.balanceOf(address(this)) >= dividend, "RewardManager: Insufficient contract balance");
+        require(token.transfer(user, dividend), "RewardManager: Transfer failed");
+        
+        emit DividendClaimed(user, dividend);
+        return dividend;
+    }
+
+    /**
+     * @dev 领取分红（带参数版本 - owner/authorizer 可为其他用户领取）
+     */
+    function claimDividendFor(address user) external whenNotPaused nonReentrant returns (uint256) {
         require(
-            msg.sender == user || msg.sender == owner() || msg.sender == authorizer,
+            msg.sender == owner() || msg.sender == authorizer,
             "RewardManager: Not authorized to claim for other users"
         );
         require(tokenContract != address(0), "RewardManager: Token contract not set");
+        require(user != address(0), "RewardManager: Invalid user address");
         
         uint256 dividend = pendingDividends[user];
         require(dividend > 0, "RewardManager: No pending dividend");
@@ -645,6 +689,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             }
         }
 
+        totalDistributed += amount;
         _addDistributionRecord(amount, dividendAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount);
 
         emit RewardDistributed(
@@ -655,6 +700,16 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             tokenStakingAmount,
             arenaRewardAmount
         );
+    }
+
+    /**
+     * @dev 在分配到用户分红时记录新的持有者
+     */
+    function _recordHolder(address user) internal {
+        if (user != address(0) && !_isRecordedHolder[user]) {
+            _isRecordedHolder[user] = true;
+            holdersCount++;
+        }
     }
 
     event RewardTransferFailed(uint256 poolType, address pool, uint256 amount);
@@ -685,26 +740,6 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             distributionHistory[distributionHistoryStartIndex] = record;
             distributionHistoryStartIndex = (distributionHistoryStartIndex + 1) % MAX_DISTRIBUTION_RECORDS;
         }
-    }
-
-    /**
-     * @dev 设置分配比例
-     */
-    function setDistributionPercents(
-        uint256 _dividendPercent,
-        uint256 _nftStakingPercent,
-        uint256 _tokenStakingPercent,
-        uint256 _arenaRewardPercent
-    ) external onlyOwner {
-        require(
-            _dividendPercent + _nftStakingPercent + _tokenStakingPercent + _arenaRewardPercent == PRECISION,
-            "RewardManager: Percentages must sum to 100%"
-        );
-
-        dividendPercent = _dividendPercent;
-        nftStakingPercent = _nftStakingPercent;
-        tokenStakingPercent = _tokenStakingPercent;
-        arenaRewardPercent = _arenaRewardPercent;
     }
 
     /**

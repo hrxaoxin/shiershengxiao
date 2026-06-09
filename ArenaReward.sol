@@ -187,8 +187,31 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function claimSeasonReward() external nonReentrant whenNotPaused {
-        uint256 currentSeasonId = IArenaRanking(rankingContract).getCurrentSeasonId();
+        uint256 currentSeasonId = IArenaRanking(rankingContract).currentSeasonId();
         this.claimReward(currentSeasonId);
+    }
+
+    function claimSeasonReward(address player, uint256 seasonId) external nonReentrant whenNotPaused returns (uint256) {
+        require(player != address(0), "ArenaReward: Invalid player address");
+        require(seasonId > 0, "ArenaReward: Invalid season ID");
+        require(!claimedRewards[seasonId][player], "ArenaReward: Reward already claimed");
+        require(seasonRewards[seasonId].rewardCalculated, "ArenaReward: Rewards not calculated");
+        
+        uint256 reward = playerSeasonRewards[seasonId][player];
+        require(reward > 0, "ArenaReward: No reward to claim");
+        
+        claimedRewards[seasonId][player] = true;
+        
+        if (rewardType == 0) {
+            (bool success, ) = payable(player).call{value: reward}("");
+            require(success, "ArenaReward: BNB transfer failed");
+        } else {
+            require(tokenContract != address(0), "ArenaReward: Token contract not set");
+            IERC20(tokenContract).transfer(player, reward);
+        }
+        
+        emit RewardClaimed(player, seasonId, reward);
+        return reward;
     }
 
     function getPendingRewardsBySeason(uint256 seasonId) external view returns (uint256) {
@@ -204,7 +227,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function getTotalPendingRewards(address player) external view returns (uint256) {
-        uint256 currentSeasonId = IArenaRanking(rankingContract).getCurrentSeasonId();
+        uint256 currentSeasonId = IArenaRanking(rankingContract).currentSeasonId();
         uint256 total = 0;
         
         for (uint256 i = 1; i <= currentSeasonId; i++) {
@@ -248,7 +271,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function calculateRewardForRank(uint256 rank) external view returns (uint256) {
         require(rank > 0, "ArenaReward: Rank must be > 0");
-        uint256 currentSeasonId = IArenaRanking(rankingContract).getCurrentSeasonId();
+        uint256 currentSeasonId = IArenaRanking(rankingContract).currentSeasonId();
         (uint256 rewardPool, , uint256 totalPlayers) = IArenaRanking(rankingContract).getSeasonRewardData(currentSeasonId);
         uint256 totalRealPlayers = IArenaRanking(rankingContract).countRealPlayers(currentSeasonId);
         return ArenaRankingLib.calculateRankReward(rank, rewardPool, totalRealPlayers);

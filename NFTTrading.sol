@@ -191,14 +191,21 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 上架NFT
+     * @dev 上架NFT（将NFT转入合约托管）
      */
     function listNFT(uint256 tokenId, uint256 priceWei) external whenNotPaused nonReentrant {
         require(priceWei > 0, "NFTTrading: Invalid price");
         require(priceWei <= 1000 ether, "NFTTrading: Price too high");
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(INFTMint(nftContract).ownerOf(tokenId) == msg.sender, "NFTTrading: Not token owner");
-        require(INFT(nftContract).isApprovedForAll(msg.sender, address(this)), "NFTTrading: Contract not approved");
+        require(listings[tokenId].seller == address(0), "NFTTrading: Already listed");
+
+        // 将 NFT 转入合约托管（escrow），使用 safeTransferFrom 确保接收合约有效
+        try INFT(nftContract).safeTransferFrom(msg.sender, address(this), tokenId) {
+            // 成功转入
+        } catch {
+            revert("NFTTrading: NFT escrow transfer failed");
+        }
 
         listings[tokenId] = Listing({
             seller: msg.sender,
@@ -211,20 +218,30 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 下架NFT
+     * @dev 下架NFT（将NFT从合约转回卖家）
      */
     function delistNFT(uint256 tokenId) external whenNotPaused nonReentrant {
         require(listings[tokenId].seller != address(0), "NFTTrading: Listing not found");
         require(listings[tokenId].seller == msg.sender, "NFTTrading: Not owner");
 
         address seller = listings[tokenId].seller;
+
+        // 先删除挂牌信息（Checks-Effects-Interactions 模式）
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
+
+        // 将 NFT 从合约转回卖家
+        try INFT(nftContract).safeTransferFrom(address(this), seller, tokenId) {
+            // 成功转回
+        } catch {
+            revert("NFTTrading: NFT return transfer failed");
+        }
+
         emit NFTDelisted(tokenId, seller);
     }
 
     /**
-     * @dev 购买NFT
+     * @dev 购买NFT（从合约转出NFT给买家，支付BNB给卖家和feeReceiver）
      */
     function buyNFT(uint256 tokenId) external payable whenNotPaused nonReentrant {
         require(tokenId > 0, "NFTTrading: Invalid token ID");
@@ -236,41 +253,35 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         Listing memory listing = listings[tokenId];
         address seller = listing.seller;
         uint256 price = listing.priceWei;
-        
+
         require(msg.sender != seller, "NFTTrading: Cannot buy own NFT");
-        require(msg.value >= price, "NFTTrading: Insufficient payment");
-        require(msg.sender.balance >= msg.value, "NFTTrading: Insufficient balance");
+        require(msg.value == price, "NFTTrading: Incorrect payment amount");
 
         uint256 fee = price * feePercent / 100;
         uint256 sellerAmount = price - fee;
 
-        require(INFTMint(nftContract).ownerOf(tokenId) == seller, "NFTTrading: Seller no longer owns NFT");
-        require(INFT(nftContract).isApprovedForAll(seller, address(this)), "NFTTrading: Contract not approved");
-
-        // 删除挂牌信息前再次验证价格未被篡改
-        require(listings[tokenId].priceWei == price, "NFTTrading: Price changed");
-        
-        // 先删除挂牌信息，防止重入
+        // Checks-Effects-Interactions 模式：先清除挂牌状态
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
 
-        // 然后执行 NFT 转移，这是最重要的操作
-        try INFT(nftContract).safeTransferFrom(seller, msg.sender, tokenId) {
-            // 转账成功后再处理资金
+        // 先转移 NFT（从合约中转给买家）
+        try INFT(nftContract).safeTransferFrom(address(this), msg.sender, tokenId) {
+            // NFT 转移成功
         } catch {
             revert("NFTTrading: NFT transfer failed");
         }
 
-        // 先处理费用
+        // 支付手续费给 feeReceiver
         if (fee > 0) {
-            require(feeReceiver != address(0), "NFTTrading: Invalid fee receiver");
             (bool feeSuccess, ) = payable(feeReceiver).call{value: fee}("");
             require(feeSuccess, "NFTTrading: Fee payment failed");
         }
 
-        // 最后处理卖家收款
-        (bool sellerSuccess, ) = payable(seller).call{value: sellerAmount}("");
-        require(sellerSuccess, "NFTTrading: Seller payment failed");
+        // 支付卖家
+        if (sellerAmount > 0) {
+            (bool sellerSuccess, ) = payable(seller).call{value: sellerAmount}("");
+            require(sellerSuccess, "NFTTrading: Seller payment failed");
+        }
 
         totalVolume += price;
         emit NFTBought(tokenId, msg.sender, seller, price, fee);

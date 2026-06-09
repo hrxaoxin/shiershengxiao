@@ -289,6 +289,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         IERC721Upgradeable nft721 = IERC721Upgradeable(nftMintContract);
         
         pair.status = BREEDING_STATUS_CANCELLED;
+        _breedingPairExists[pair.fatherId][pair.motherId] = false;
         pair.cancelledAt = block.timestamp;
         
         isNFTInActiveBreeding[pair.fatherId] = false;
@@ -337,6 +338,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
             pair.childId = childId;
             pair.status = 1;
+            _breedingPairExists[pair.fatherId][pair.motherId] = false;
             isNFTInActiveBreeding[pair.fatherId] = false;
             isNFTInActiveBreeding[pair.motherId] = false;
             BreedingLib.removeActiveOrder(pair.maleOwner, pairId, _userActiveOrderIds);
@@ -362,6 +364,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             pair.childId = childIdForFemale;
             pair.maleChildId = childIdForMale;
             pair.status = 1;
+            _breedingPairExists[pair.fatherId][pair.motherId] = false;
             isNFTInActiveBreeding[pair.fatherId] = false;
             isNFTInActiveBreeding[pair.motherId] = false;
             BreedingLib.removeActiveOrder(pair.maleOwner, pairId, _userActiveOrderIds);

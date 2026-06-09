@@ -1456,12 +1456,22 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function claimSeasonReward(seasonNumber) {
-        if (seasonNumber === undefined || seasonNumber === null || seasonNumber < 0) {
-            throw new Error('Invalid season number');
-        }
         try {
             const contract = await getContract('arena');
-            const receipt = await sendAndTrackTransaction(contract, 'claimReward', [seasonNumber]);
+            let targetSeason = seasonNumber;
+            if (targetSeason === undefined || targetSeason === null) {
+                try {
+                    const seasonInfo = await contract.methods.getCurrentSeasonInfo().call();
+                    targetSeason = seasonInfo && seasonInfo.seasonId ? seasonInfo.seasonId : 1;
+                } catch (err) {
+                    console.warn('[ZODIAC_WEB3] Cannot get current season, defaulting to 1:', err.message);
+                    targetSeason = 1;
+                }
+            }
+            if (targetSeason < 0) {
+                throw new Error('Invalid season number');
+            }
+            const receipt = await sendAndTrackTransaction(contract, 'claimSeasonReward', [targetSeason]);
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] claimSeasonReward failed:', e);

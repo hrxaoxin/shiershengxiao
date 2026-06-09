@@ -153,17 +153,6 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * 存储所有历史赛季的信息
      */
     mapping(uint256 => SeasonInfo) public seasons;
-    
-    /**
-     * @dev 赛季排名映射（seasonId => address[]）
-     * 按积分从高到低存储玩家地址数组
-     */
-    mapping(uint256 => address[]) public seasonRankings;
-    /**
-     * @dev 玩家排名索引映射（seasonId => address => rankIndex）
-     * 存储玩家在赛季排行榜中的位置（索引从0开始）
-     */
-    mapping(uint256 => mapping(address => uint256)) public playerRankIndex;
     /**
      * @dev 玩家赛季奖励映射（seasonId => address => rewardAmount）
      * 存储赛季结算后每个玩家的奖励金额
@@ -211,6 +200,10 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     address public mockRewardRecipient;
     
+    function setArenaBattleContract(address _arenaBattleContract) external onlyOwner {
+        arenaBattleContract = _arenaBattleContract;
+    }
+    
     event RewardTypeUpdated(uint8 oldType, uint8 newType);
     event RewardRateUpdated(uint256 oldRate, uint256 newRate);
     event ArenaModeUpdated(uint8 oldMode, uint8 newMode);
@@ -224,7 +217,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public constant TEAM_SIZE = 6;
     uint256 public constant RECHARGE_COST = 888;
     uint256 public constant RECHARGE_ATTEMPTS = 3;
-    uint256 public constant MAX_LEADERBOARD_SIZE = type(uint256).max;
+    uint256 public constant MAX_LEADERBOARD_SIZE = 1000;
     uint256 public constant MAX_SEASONS_TO_KEEP = 20;
     uint256 public constant PRECISION = 10000;
     uint256 public constant MAX_MOCK_RANKING = 100;
@@ -242,6 +235,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public seasonRewardRate;
     mapping(address => uint256) public lastBattleTime;
     mapping(address => uint256) public rechargeCount;
+    uint256 public battleIdCounter;
 
     event RechargeLimitUpdated(uint256 newLimit);
 
@@ -291,9 +285,6 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
     function setArenaPlayerContract(address _arenaPlayerContract) external onlyOwner {
         arenaPlayerContract = _arenaPlayerContract;
-    }
-    function setArenaBattleContract(address _arenaBattleContract) external onlyOwner {
-        arenaBattleContract = _arenaBattleContract;
     }
     function setSeasonRewardRate(uint256 rate) external onlyOwner {
         require(rate > 0, "ArenaRanking: Reward rate must be greater than 0");
@@ -366,293 +357,27 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external nonReentrant whenNotPaused returns (bool success) {
         require(arenaBattleContract != address(0), "ArenaRanking: ArenaBattle contract not set");
         
-        (bool success_, uint256 winner, ) = IArenaBattle(arenaBattleContract).executeMockBattle(playerTeam, mockIndex);
-        
-        if (winner == 1) {
-            if (arenaMode == 0) {
-                _updateScorePointsMode(msg.sender, true, mockIndex);
-            } else {
-                _updateScoreChallengeMode(msg.sender, true, mockIndex);
-            }
-        } else if (winner == 2) {
-            if (arenaMode == 0) {
-                _updateScorePointsMode(msg.sender, false, mockIndex);
-            } else {
-                _updateScoreChallengeMode(msg.sender, false, mockIndex);
-            }
-        } else {
-            _updateScoreOnDraw(msg.sender);
-        }
-        emit ChallengeResult(msg.sender, address(0), winner == 1, currentSeasonId);
+        (bool success_, ) = arenaBattleContract.call(
+            abi.encodeWithSignature("challengeMockPlayer(uint256)", mockIndex)
+        );
+        require(success_, "ArenaRanking: Challenge mock player failed");
         
         return success_;
     }
 
     function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external nonReentrant whenNotPaused returns (bool success) {
         require(arenaBattleContract != address(0), "ArenaRanking: ArenaBattle contract not set");
-        require(arenaPlayerContract != address(0), "ArenaRanking: ArenaPlayer contract not set");
         
-        uint256[] memory challengedTeamArray = IArenaPlayer(arenaPlayerContract).getPlayerBattleTeam(challengedPlayer);
-        require(challengedTeamArray.length == 6, "ArenaRanking: Target has no team");
-        
-        uint256[6] memory challengedTeam;
-        for (uint256 i = 0; i < 6; i++) {
-            challengedTeam[i] = challengedTeamArray[i];
-        }
-        
-        (bool success_, uint256 winner, ) = IArenaBattle(arenaBattleContract).executeRealBattle(challengedPlayer, playerTeam, challengedTeam);
-        
-        if (winner == 1) {
-            _updateScore(msg.sender, true);
-            _updateScore(challengedPlayer, false);
-        } else if (winner == 2) {
-            _updateScore(msg.sender, false);
-            _updateScore(challengedPlayer, true);
-        } else {
-            _updateScoreOnDraw(msg.sender);
-            _updateScoreOnDraw(challengedPlayer);
-        }
-        emit ChallengeResult(msg.sender, challengedPlayer, winner == 1, currentSeasonId);
+        (bool success_, ) = arenaBattleContract.call(
+            abi.encodeWithSignature("challengeRealPlayer(address)", challengedPlayer)
+        );
+        require(success_, "ArenaRanking: Challenge real player failed");
         
         return success_;
     }
 
-    function _updateScore(address player, bool isWinner) internal {
-        SeasonInfo storage currentSeason = seasons[currentSeasonId];
-        require(currentSeason.isActive, "ArenaRanking: Season not active");
-
-        PlayerRecord storage record = players[player];
-        
-        if (record.seasonId != currentSeasonId) {
-            record.seasonId = currentSeasonId;
-            record.score = 1000;
-            record.wins = 0;
-            record.losses = 0;
-            record.draws = 0;
-            record.lastBattleTime = block.timestamp;
-            record.lastResetTime = block.timestamp;
-            record.remainingAttempts = DAILY_ATTEMPTS;
-            seasonRankings[currentSeasonId].push(player);
-            playerRankIndex[currentSeasonId][player] = seasonRankings[currentSeasonId].length - 1;
-            currentSeason.totalPlayers++;
-        }
-
-        if (isWinner) {
-            record.score += 25;
-            record.wins++;
-        } else {
-            if (record.score > 25) record.score -= 25;
-            else record.score = 0;
-            record.losses++;
-        }
-        record.lastBattleTime = block.timestamp;
-
-        _updateRanking(player, record.score);
-        emit ScoreUpdated(player, record.score, currentSeasonId);
-    }
-
-    function _updateScorePointsMode(address player, bool isWinner, uint256 mockIndex) internal {
-        SeasonInfo storage currentSeason = seasons[currentSeasonId];
-        require(currentSeason.isActive, "ArenaRanking: Season not active");
-
-        PlayerRecord storage record = players[player];
-        
-        if (record.seasonId != currentSeasonId) {
-            record.seasonId = currentSeasonId;
-            record.score = 1000;
-            record.wins = 0;
-            record.losses = 0;
-            record.draws = 0;
-            record.lastBattleTime = block.timestamp;
-            record.lastResetTime = block.timestamp;
-            record.remainingAttempts = DAILY_ATTEMPTS;
-            seasonRankings[currentSeasonId].push(player);
-            playerRankIndex[currentSeasonId][player] = seasonRankings[currentSeasonId].length - 1;
-            currentSeason.totalPlayers++;
-        }
-
-        uint256 points = ArenaRankingLib.calculateDynamicPoints(mockIndex);
-
-        if (isWinner) {
-            record.score += points;
-            record.wins++;
-        } else {
-            if (record.score > points) record.score -= points;
-            else record.score = 0;
-            record.losses++;
-        }
-        record.lastBattleTime = block.timestamp;
-
-        _updateRanking(player, record.score);
-        emit ScoreUpdated(player, record.score, currentSeasonId);
-    }
-
-    function _updateScoreChallengeMode(address player, bool isWinner, uint256 mockIndex) internal {
-        SeasonInfo storage currentSeason = seasons[currentSeasonId];
-        require(currentSeason.isActive, "ArenaRanking: Season not active");
-
-        PlayerRecord storage record = players[player];
-        
-        if (record.seasonId != currentSeasonId) {
-            record.seasonId = currentSeasonId;
-            record.score = 1000;
-            record.wins = 0;
-            record.losses = 0;
-            record.draws = 0;
-            record.lastBattleTime = block.timestamp;
-            record.lastResetTime = block.timestamp;
-            record.remainingAttempts = DAILY_ATTEMPTS;
-            currentSeason.totalPlayers++;
-        }
-
-        if (isWinner) {
-            _insertPlayerAtRank(player, mockIndex);
-            record.wins++;
-        } else {
-            record.losses++;
-        }
-        record.lastBattleTime = block.timestamp;
-        record.score = 1000 + record.wins * 25 - record.losses * 10;
-        
-        emit ScoreUpdated(player, record.score, currentSeasonId);
-    }
-
-    function _insertPlayerAtRank(address player, uint256 targetRank) internal {
-        uint256 seasonId = currentSeasonId;
-        address[] storage rankings = seasonRankings[seasonId];
-        
-        uint256 currentIndex = playerRankIndex[seasonId][player];
-
-        // Step 1: Remove from current position if already ranked
-        if (currentIndex > 0) {
-            // Shift elements left to fill the gap at currentIndex
-            for (uint256 i = currentIndex; i + 1 < rankings.length; i++) {
-                rankings[i] = rankings[i + 1];
-                playerRankIndex[seasonId][rankings[i]] = i;
-            }
-            rankings.pop();
-            playerRankIndex[seasonId][player] = 0;
-        }
-
-        // Step 2: Insert at targetRank
-        if (targetRank >= rankings.length) {
-            rankings.push(player);
-            playerRankIndex[seasonId][player] = rankings.length - 1;
-        } else {
-            // First push to grow the array
-            rankings.push(address(0));
-            // Shift elements right from targetRank to the end
-            for (uint256 i = rankings.length - 1; i > targetRank; i--) {
-                rankings[i] = rankings[i - 1];
-                playerRankIndex[seasonId][rankings[i]] = i;
-            }
-            rankings[targetRank] = player;
-            playerRankIndex[seasonId][player] = targetRank;
-        }
-    }
-
-    function _updateScoreOnDraw(address player) internal {
-        SeasonInfo storage currentSeason = seasons[currentSeasonId];
-        require(currentSeason.isActive, "ArenaRanking: Season not active");
-
-        PlayerRecord storage record = players[player];
-        
-        if (record.seasonId != currentSeasonId) {
-            record.seasonId = currentSeasonId;
-            record.score = 1000;
-            record.wins = 0;
-            record.losses = 0;
-            record.draws = 0;
-            record.lastBattleTime = block.timestamp;
-            record.lastResetTime = block.timestamp;
-            record.remainingAttempts = DAILY_ATTEMPTS;
-            seasonRankings[currentSeasonId].push(player);
-            playerRankIndex[currentSeasonId][player] = seasonRankings[currentSeasonId].length - 1;
-            currentSeason.totalPlayers++;
-        }
-
-        record.draws++;
-        record.lastBattleTime = block.timestamp;
-        
-        emit ScoreUpdated(player, record.score, currentSeasonId);
-    }
-
-    function _updateRanking(address player, uint256 newScore) internal {
-        uint256 seasonId = currentSeasonId;
-        uint256 currentIndex = playerRankIndex[seasonId][player];
-        address[] storage rankings = seasonRankings[seasonId];
-
-        if (currentIndex == 0 && rankings.length >= MAX_LEADERBOARD_SIZE) {
-            return;
-        }
-
-        if (currentIndex > 0) {
-            address prevPlayer = rankings[currentIndex - 1];
-            if (players[prevPlayer].score >= newScore) {
-                return;
-            }
-        }
-        
-        if (currentIndex < rankings.length - 1) {
-            address nextPlayer = rankings[currentIndex + 1];
-            if (players[nextPlayer].score <= newScore) {
-                return;
-            }
-        }
-
-        while (currentIndex > 0) {
-            address prevPlayer = rankings[currentIndex - 1];
-            if (players[prevPlayer].score >= newScore) break;
-            
-            rankings[currentIndex] = prevPlayer;
-            playerRankIndex[seasonId][prevPlayer] = currentIndex;
-            rankings[currentIndex - 1] = player;
-            playerRankIndex[seasonId][player] = currentIndex - 1;
-            currentIndex--;
-        }
-
-        while (currentIndex < rankings.length - 1 && currentIndex < MAX_LEADERBOARD_SIZE - 1) {
-            address nextPlayer = rankings[currentIndex + 1];
-            if (players[nextPlayer].score <= newScore) break;
-            
-            rankings[currentIndex] = nextPlayer;
-            playerRankIndex[seasonId][nextPlayer] = currentIndex;
-            rankings[currentIndex + 1] = player;
-            playerRankIndex[seasonId][player] = currentIndex + 1;
-            currentIndex++;
-        }
-
-        if (rankings.length > MAX_LEADERBOARD_SIZE) {
-            address removedPlayer = rankings[MAX_LEADERBOARD_SIZE];
-            playerRankIndex[seasonId][removedPlayer] = 0;
-            rankings.pop();
-        }
-    }
-
-    function _removeFromRanking(address player) internal {
-        uint256 seasonId = currentSeasonId;
-        uint256 currentIndex = playerRankIndex[seasonId][player];
-        
-        if (currentIndex == 0) {
-            return;
-        }
-        
-        address[] storage rankings = seasonRankings[seasonId];
-        uint256 lastIndex = rankings.length - 1;
-        
-        if (currentIndex <= lastIndex) {
-            address lastPlayer = rankings[lastIndex];
-            rankings[currentIndex] = lastPlayer;
-            playerRankIndex[seasonId][lastPlayer] = currentIndex;
-            rankings.pop();
-            playerRankIndex[seasonId][player] = 0;
-        }
-    }
-
     function _clearSeasonData(address player) internal {
         PlayerRecord storage record = players[player];
-        
-        _removeFromRanking(player);
         
         record.score = 0;
         record.wins = 0;
@@ -741,7 +466,6 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             currentSeasonId - MAX_SEASONS_TO_KEEP : 0;
         
         for (uint256 i = 1; i <= seasonsToRemove; i++) {
-            delete seasonRankings[i];
             delete seasons[i];
         }
     }
@@ -767,32 +491,19 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     function _countRealPlayers(uint256 seasonId) internal view returns (uint256) {
-        uint256 total = 0;
-        uint256 totalPlayers = seasonRankings[seasonId].length;
-        
-        for (uint256 i = 0; i < totalPlayers; i++) {
-            address player = seasonRankings[seasonId][i];
-            if (!_isMockPlayer(player)) {
-                total++;
-            }
+        if (arenaLeaderboardContract == address(0)) {
+            return seasons[seasonId].totalPlayers;
         }
-        
-        return total;
+        return IArenaLeaderboard(arenaLeaderboardContract).getTotalPlayersInSeason(seasonId);
     }
     
     function _getRealPlayerRank(uint256 seasonId, uint256 index) internal view returns (uint256) {
-        uint256 rank = 0;
-        
-        for (uint256 i = 0; i <= index; i++) {
-            address player = seasonRankings[seasonId][i];
-            if (!_isMockPlayer(player)) {
-                rank++;
-            }
+        if (arenaLeaderboardContract == address(0)) {
+            return index + 1;
         }
-        
-        return rank;
+        return index + 1;
     }
-    
+
     /**
      * @dev 检查是否是Mock玩家（使用特殊地址范围）
      * Mock玩家地址格式为: MOCK_PLAYER_BASE + index (0-999)
@@ -800,8 +511,12 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function _isMockPlayer(address player) internal pure returns (bool) {
         uint256 playerAddress = uint256(uint160(player));
         uint256 baseAddress = uint256(uint160(MOCK_PLAYER_BASE));
-        return playerAddress >= baseAddress && 
-               playerAddress < baseAddress + MAX_MOCK_PLAYERS_COUNT;
+        uint256 maxAddress = baseAddress + MAX_MOCK_PLAYERS_COUNT;
+        // 防止溢出：确保 maxAddress 不会绕回，只有当 baseAddress + MAX_MOCK_PLAYERS_COUNT 未溢出时才进入此范围判断
+        if (maxAddress <= baseAddress) {
+            return false;
+        }
+        return playerAddress >= baseAddress && playerAddress < maxAddress;
     }
     
     /**
@@ -816,13 +531,74 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
     
     function getPlayerRank(address player) external view returns (uint256) {
-        return playerRankIndex[currentSeasonId][player] + 1;
+        if (arenaLeaderboardContract != address(0)) {
+            return IArenaLeaderboard(arenaLeaderboardContract).getPlayerRank(player);
+        }
+        return 0;
     }
 
     function getSeasonInfo(uint256 seasonId) external view returns (uint256 startTime, uint256 endTime, bool isActive, bool isSettled, uint256 totalPlayers) {
-        require(seasonId <= currentSeasonId, "ArenaRanking: Invalid season");
+        require(seasonId > 0 && seasonId <= currentSeasonId, "ArenaRanking: Invalid season");
         SeasonInfo memory s = seasons[seasonId];
         return (s.startTime, s.endTime, s.isActive, s.isSettled, s.totalPlayers);
+    }
+
+    /**
+     * @dev 获取当前赛季信息（返回6个字段）
+     */
+    function getCurrentSeasonInfo() external view returns (uint256 seasonId, uint256 startTime, uint256 endTime, bool isActive, uint256 totalPlayers, uint256 rewardPool) {
+        SeasonInfo storage s = seasons[currentSeasonId];
+        return (currentSeasonId, s.startTime, s.endTime, s.isActive, s.totalPlayers, s.rewardPool);
+    }
+
+    function getLeaderboard(uint256 seasonId, uint256 limit) external view returns (LeaderboardEntry[] memory) {
+        if (arenaLeaderboardContract == address(0)) {
+            return new LeaderboardEntry[](0);
+        }
+        (bool success, bytes memory data) = arenaLeaderboardContract.staticcall(
+            abi.encodeWithSignature("getLeaderboard(uint256,uint256)", seasonId, limit)
+        );
+        require(success, "ArenaRanking: Leaderboard call failed");
+        
+        uint256 count;
+        assembly {
+            count := mload(add(data, 32))
+        }
+        
+        LeaderboardEntry[] memory result = new LeaderboardEntry[](count);
+        
+        uint256 offset = 64;
+        for (uint256 i = 0; i < count; i++) {
+            address playerAddress;
+            uint256 points;
+            uint256 wins;
+            uint256 losses;
+            bool isMock;
+            
+            assembly {
+                playerAddress := mload(add(data, offset))
+                points := mload(add(data, add(offset, 32)))
+                wins := mload(add(data, add(offset, 64)))
+                losses := mload(add(data, add(offset, 96)))
+                isMock := mload(add(data, add(offset, 128)))
+            }
+            
+            result[i] = LeaderboardEntry({
+                playerAddress: playerAddress,
+                points: points,
+                wins: wins,
+                losses: losses,
+                isMock: isMock
+            });
+            
+            offset += 160;
+        }
+        return result;
+    }
+
+    function getPlayerRecord(address player) external view returns (uint256 score, uint256 wins, uint256 losses, uint256 seasonId) {
+        PlayerRecord storage p = players[player];
+        return (p.score, p.wins, p.losses, p.seasonId);
     }
     
     /**
@@ -931,6 +707,308 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
+    // ================================================================
+    // 缺失函数补充：与 config.js 的 arenaABI 对齐
+    // ================================================================
+
+    /**
+     * @dev 充值挑战次数
+     */
+    function rechargeChallengeAttempts() external nonReentrant whenNotPaused {
+        require(arenaPlayerContract != address(0), "ArenaRanking: ArenaPlayer not set");
+        // 外部调用 arenaPlayer 的 rechargeChallengeAttempts
+        (bool success, ) = arenaPlayerContract.call(
+            abi.encodeWithSignature("rechargeChallengeAttempts()")
+        );
+        require(success, "ArenaRanking: rechargeChallengeAttempts failed");
+    }
+
+    /**
+     * @dev 质押NFT到竞技场（通过 arenaPlayer 执行）
+     */
+    function stakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
+        require(arenaPlayerContract != address(0), "ArenaRanking: ArenaPlayer not set");
+        require(tokenIds.length > 0 && tokenIds.length <= 6, "ArenaRanking: Invalid token count");
+        // 通过 call 直接调用 arenaPlayer 处理 NFT 质押
+        (bool success, ) = arenaPlayerContract.call(
+            abi.encodeWithSignature("stakeNFTs(uint256[])", tokenIds)
+        );
+        require(success, "ArenaRanking: stakeNFTs failed");
+    }
+
+    /**
+     * @dev 解除竞技场NFT质押（通过 arenaPlayer 执行）
+     */
+    function unstakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
+        require(arenaPlayerContract != address(0), "ArenaRanking: ArenaPlayer not set");
+        require(tokenIds.length > 0 && tokenIds.length <= 6, "ArenaRanking: Invalid token count");
+        (bool success, ) = arenaPlayerContract.call(
+            abi.encodeWithSignature("unstakeNFTs(uint256[])", tokenIds)
+        );
+        require(success, "ArenaRanking: unstakeNFTs failed");
+    }
+
+    /**
+     * @dev 设置战斗队伍（动态数组版本，与前端 ABI 对齐）
+     */
+    function setBattleTeam(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
+        require(tokenIds.length == 6, "ArenaRanking: Team must have exactly 6 NFTs");
+        uint256[6] memory fixedTeam;
+        for (uint256 i = 0; i < 6; i++) {
+            fixedTeam[i] = tokenIds[i];
+        }
+        _setBattleTeamInternal(fixedTeam);
+    }
+
+    /**
+     * @dev 设置战斗队伍（委托 arenaPlayer 执行，作为统一入口）
+     */
+    function setBattleTeam(uint256[6] calldata tokenIds) external nonReentrant whenNotPaused {
+        _setBattleTeamInternal(tokenIds);
+    }
+
+    /**
+     * @dev 内部函数：设置战斗队伍
+     */
+    function _setBattleTeamInternal(uint256[6] memory tokenIds) internal {
+        for (uint256 i = 0; i < 6; i++) {
+            if (tokenIds[i] == 0) continue;
+            require(INFTMint(nftContract).ownerOf(tokenIds[i]) == msg.sender, "ArenaRanking: Not owner");
+            // 去重校验
+            for (uint256 j = i + 1; j < 6; j++) {
+                if (tokenIds[j] != 0) {
+                    require(tokenIds[j] != tokenIds[i], "ArenaRanking: Duplicate token");
+                }
+            }
+        }
+        PlayerRecord storage record = players[msg.sender];
+        for (uint256 i = 0; i < 6; i++) {
+            record.battleTeam[i] = tokenIds[i];
+        }
+        record.hasTeam = true;
+    }
+
+    /**
+     * @dev 清除战斗队伍
+     */
+    function clearBattleTeam() external nonReentrant whenNotPaused {
+        PlayerRecord storage record = players[msg.sender];
+        for (uint256 i = 0; i < 6; i++) {
+            record.battleTeam[i] = 0;
+        }
+        record.hasTeam = false;
+    }
+
+    /**
+     * @dev 领取赛季奖励（由 arenaReward 实际处理）
+     */
+    /**
+     * @dev 领取赛季奖励（无参版本，领取当前赛季）
+     */
+    function claimSeasonReward() external nonReentrant whenNotPaused {
+        _claimSeasonReward(currentSeasonId);
+    }
+
+    /**
+     * @dev 领取指定赛季奖励（带参数版本）
+     */
+    function claimSeasonReward(uint256 seasonId) external nonReentrant whenNotPaused returns (uint256) {
+        return _claimSeasonReward(seasonId);
+    }
+
+    /**
+     * @dev 内部函数：领取赛季奖励
+     */
+    function _claimSeasonReward(uint256 seasonId) internal returns (uint256) {
+        require(seasonId > 0 && seasonId <= currentSeasonId, "ArenaRanking: Invalid season");
+        require(!seasonRewardsClaimed[seasonId][msg.sender], "ArenaRanking: Already claimed");
+        require(arenaRewardContract != address(0), "ArenaRanking: ArenaReward not set");
+        uint256 amount = IArenaReward(arenaRewardContract).claimSeasonReward(msg.sender, seasonId);
+        seasonRewardsClaimed[seasonId][msg.sender] = true;
+        emit RewardClaimed(msg.sender, amount, seasonId);
+        return amount;
+    }
+
+    /**
+     * @dev 获取玩家当前赛季排名（此函数用于保持与原始实现一致）
+     */
+
+    /**
+     * @dev 获取Mock玩家排名
+     */
+    function getMockPlayerRank(address player) external view returns (uint256) {
+        if (!_isMockPlayer(player)) return 0;
+        if (arenaLeaderboardContract != address(0)) {
+            return IArenaLeaderboard(arenaLeaderboardContract).getMockPlayerRank(player);
+        }
+        return 0;
+    }
+
+    /**
+     * @dev 获取排行榜（仅 limit 参数版本）
+     */
+    function getLeaderboard(uint256 limit) external view returns (LeaderboardEntry[] memory) {
+        return this.getLeaderboard(currentSeasonId, limit);
+    }
+
+    /**
+     * @dev 获取分页排行榜
+     */
+    function getLeaderboardByPage(uint256 seasonId, uint256 page, uint256 pageSize) external view returns (LeaderboardEntry[] memory entries, uint256 totalPages, uint256 totalPlayers) {
+        if (arenaLeaderboardContract == address(0)) {
+            return (new LeaderboardEntry[](0), 0, 0);
+        }
+        (bool success, bytes memory data) = arenaLeaderboardContract.staticcall(
+            abi.encodeWithSignature("getLeaderboardByPage(uint256,uint256,uint256)", seasonId, page, pageSize)
+        );
+        require(success, "ArenaRanking: LeaderboardByPage call failed");
+        
+        uint256 count;
+        assembly {
+            count := mload(add(data, 32))
+        }
+        
+        entries = new LeaderboardEntry[](count);
+        
+        uint256 offset = 64;
+        for (uint256 i = 0; i < count; i++) {
+            address playerAddress;
+            uint256 points;
+            uint256 wins;
+            uint256 losses;
+            bool isMock;
+            
+            assembly {
+                playerAddress := mload(add(data, offset))
+                points := mload(add(data, add(offset, 32)))
+                wins := mload(add(data, add(offset, 64)))
+                losses := mload(add(data, add(offset, 96)))
+                isMock := mload(add(data, add(offset, 128)))
+            }
+            
+            entries[i] = LeaderboardEntry({
+                playerAddress: playerAddress,
+                points: points,
+                wins: wins,
+                losses: losses,
+                isMock: isMock
+            });
+            
+            offset += 160;
+        }
+        
+        assembly {
+            totalPages := mload(add(data, offset))
+            totalPlayers := mload(add(data, add(offset, 32)))
+        }
+    }
+
+    /**
+     * @dev 获取排行榜总页数
+     */
+    function getLeaderboardPageCount(uint256 seasonId, uint256 pageSize) external view returns (uint256) {
+        if (arenaLeaderboardContract != address(0)) {
+            return IArenaLeaderboard(arenaLeaderboardContract).getLeaderboardPageCount(seasonId, pageSize);
+        }
+        return 0;
+    }
+
+    /**
+     * @dev 获取Top N玩家
+     */
+    function getTopPlayers(uint256 seasonId, uint256 count) external view returns (address[] memory playerAddrs, uint256[] memory scores) {
+        if (arenaLeaderboardContract != address(0)) {
+            return IArenaLeaderboard(arenaLeaderboardContract).getTopPlayers(seasonId, count);
+        }
+        return (new address[](0), new uint256[](0));
+    }
+
+    /**
+     * @dev 获取玩家赛季奖励余额（当前赛季）
+     */
+    function getSeasonReward(address player) external view returns (uint256) {
+        return playerSeasonRewards[currentSeasonId][player];
+    }
+
+    /**
+     * @dev 获取玩家指定赛季的奖励余额（与 ABI 定义对齐）
+     */
+    function getSeasonReward(address player, uint256 seasonId) external view returns (uint256) {
+        return playerSeasonRewards[seasonId][player];
+    }
+
+    /**
+     * @dev 获取最近 N 个赛季信息
+     */
+    function getRecentSeasons(uint256 count) external view returns (SeasonInfo[] memory) {
+        if (count == 0 || count > currentSeasonId) count = currentSeasonId;
+        SeasonInfo[] memory result = new SeasonInfo[](count);
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = seasons[currentSeasonId - count + i + 1];
+        }
+        return result;
+    }
+
+    /**
+     * @dev 获取赛季总玩家数
+     */
+    function getTotalPlayersInSeason(uint256 seasonId) external view returns (uint256) {
+        return seasons[seasonId].totalPlayers;
+    }
+
+    /**
+     * @dev 获取玩家剩余挑战次数
+     */
+    function getRemainingAttempts(address player) external view returns (uint256) {
+        PlayerRecord storage p = players[player];
+        if (block.timestamp > p.lastResetTime + 24 hours) {
+            return DAILY_ATTEMPTS;
+        }
+        return p.remainingAttempts;
+    }
+
+    /**
+     * @dev 获取玩家战斗队伍（与 IArenaPlayer 格式一致，返回数组）
+     */
+    function getPlayerBattleTeam(address player) external view returns (uint256[] memory) {
+        PlayerRecord storage p = players[player];
+        uint256[] memory team = new uint256[](6);
+        for (uint256 i = 0; i < 6; i++) {
+            team[i] = p.battleTeam[i];
+        }
+        return team;
+    }
+
+    /**
+     * @dev 获取每场基础获胜奖励（代币数量）
+     */
+    uint256 public baseRewardPerWin = 100;
+
+    function setBaseRewardPerWin(uint256 _reward) external onlyOwner {
+        baseRewardPerWin = _reward;
+    }
+
+    /**
+     * @dev 获取战斗ID计数器（用于前端展示）
+     */
+    function getBattleIdCounter() external view returns (uint256) {
+        return battleIdCounter;
+    }
+
+    /**
+     * @dev 获取某玩家上次战斗时间
+     */
+    function getLastBattleTime(address player) external view returns (uint256) {
+        return players[player].lastBattleTime;
+    }
+
+    /**
+     * @dev 充值成本（与 arenaPlayer 对齐）
+     */
+    function rechargeCost() external pure returns (uint256) {
+        return 888;
+    }
+
     function setArenaRewardContract(address _arenaRewardContract) external onlyOwner {
         arenaRewardContract = _arenaRewardContract;
     }
@@ -939,5 +1017,71 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         if (arenaRewardContract != address(0)) {
             IArenaReward(arenaRewardContract).calculateSeasonRewards(seasonId);
         }
+    }
+
+    // ================================================================
+    // 额外的查询函数 - 与 config.js 的 ABI 定义对齐
+    // ================================================================
+
+    /**
+     * @dev 检查玩家在某个赛季的奖励是否已领取
+     */
+    function isSeasonRewardClaimed(address player, uint256 seasonId) external view returns (bool) {
+        return seasonRewardsClaimed[seasonId][player];
+    }
+
+    /**
+     * @dev 获取玩家在某个赛季的完整统计数据
+     */
+    function getPlayerSeasonStats(address player, uint256 seasonNumber) external view returns (
+        uint256 score,
+        uint256 wins,
+        uint256 losses,
+        uint256 rank,
+        bool rewardClaimed
+    ) {
+        PlayerRecord storage p = players[player];
+        if (p.seasonId == seasonNumber) {
+            score = p.score;
+            wins = p.wins;
+            losses = p.losses;
+        } else {
+            score = 0;
+            wins = 0;
+            losses = 0;
+        }
+        if (arenaLeaderboardContract != address(0)) {
+            rank = IArenaLeaderboard(arenaLeaderboardContract).getPlayerRank(player);
+        } else {
+            rank = 0;
+        }
+        rewardClaimed = seasonRewardsClaimed[seasonNumber][player];
+    }
+
+    /**
+     * @dev 按排名范围获取玩家列表
+     */
+    function getPlayersByRankRange(uint256 seasonId, uint256 startRank, uint256 endRank) external view returns (
+        address[] memory playerAddrs,
+        uint256[] memory scores
+    ) {
+        if (arenaLeaderboardContract != address(0)) {
+            return IArenaLeaderboard(arenaLeaderboardContract).getPlayersByRankRange(seasonId, startRank, endRank);
+        }
+        return (new address[](0), new uint256[](0));
+    }
+
+    /**
+     * @dev 获取玩家挑战状态（剩余次数、上次战斗时间、是否有战队）
+     */
+    function getPlayerChallengeStatus(address player) external view returns (
+        uint256 remainingAttempts,
+        uint256 lastBattleTime,
+        bool hasTeam
+    ) {
+        PlayerRecord storage p = players[player];
+        remainingAttempts = p.remainingAttempts > 0 ? p.remainingAttempts : DAILY_ATTEMPTS;
+        lastBattleTime = p.lastBattleTime;
+        hasTeam = p.hasTeam;
     }
 }

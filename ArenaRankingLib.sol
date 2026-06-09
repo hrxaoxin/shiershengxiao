@@ -2,6 +2,9 @@
 pragma solidity ^0.8.20;
 
 library ArenaRankingLib {
+    uint256 public constant DAILY_ATTEMPTS = 5;
+    uint256 public constant INITIAL_SCORE = 1000;
+    
     function calculateDynamicPoints(uint256 mockIndex) internal pure returns (uint256) {
         if (mockIndex == 0) return 50;
         if (mockIndex <= 2) return 40;

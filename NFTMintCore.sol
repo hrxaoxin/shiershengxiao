@@ -447,14 +447,9 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function getTokenIdsByOwner(address owner) external view returns (uint256[] memory) {
         uint256 balance = _balanceOf[owner];
         uint256[] memory tokenIds = new uint256[](balance);
-        uint256 index = 0;
-        
-        for (uint256 i = 1; i < _nextCardId && index < balance; i++) {
-            if (_ownerOf[i] == owner) {
-                tokenIds[index++] = i;
-            }
+        for (uint256 i = 0; i < balance; i++) {
+            tokenIds[i] = _ownedTokens[owner][i];
         }
-        
         return tokenIds;
     }
 }
