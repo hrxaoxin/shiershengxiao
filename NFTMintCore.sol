@@ -42,16 +42,20 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
     
     modifier onlyTokenBurner() {
+        require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
         require(msg.sender == tokenBurnerContract, "NFTMint: Only TokenBurner");
         _;
     }
     
     modifier onlyBreeding() {
+        require(breedingContract != address(0), "NFTMint: breedingContract not set");
         require(msg.sender == breedingContract, "NFTMint: Only Breeding");
         _;
     }
     
     modifier onlyAuthorized() {
+        require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
+        require(breedingContract != address(0), "NFTMint: breedingContract not set");
         require(msg.sender == tokenBurnerContract || msg.sender == breedingContract, "NFTMint: Unauthorized");
         _;
     }
@@ -215,12 +219,89 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         lastMintBlock = block.number;
         return uint256(keccak256(abi.encodePacked(block.timestamp, block.prevrandao, mintCounter, msg.sender)));
     }
-    
+
+    struct FailedSync {
+        uint256 tokenId;
+        uint256 zodiacType;
+        uint8 level;
+        uint8 growth;
+        address to;
+        uint256 timestamp;
+        uint8 retryCount;
+    }
+
+    mapping(uint256 => FailedSync) public failedSyncs;
+    uint256 public failedSyncCount;
+    uint256 public syncFailureWarningTriggered;
+    uint256 public constant MAX_RETRY_COUNT = 5;
+    uint256 public constant SYNC_FAILURE_WARNING_THRESHOLD = 10;
+
     function _syncNFTData(address to, uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth) internal {
-        try INFTData(nftDataContract).syncNFTData(tokenId, zodiacType, level, growth, to) {
+        require(nftDataContract != address(0), "NFTMint: nftDataContract not set");
+        
+        try INFTDataInterface(nftDataContract).syncNFTData(tokenId, zodiacType, level, growth, to) {
         } catch {
             emit NFTDataSyncFailed(tokenId, zodiacType, level, growth, to);
+            _queueFailedSync(tokenId, zodiacType, level, growth, to);
         }
+    }
+
+    function _queueFailedSync(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to) internal {
+        failedSyncs[failedSyncCount] = FailedSync({
+            tokenId: tokenId,
+            zodiacType: zodiacType,
+            level: level,
+            growth: growth,
+            to: to,
+            timestamp: block.timestamp,
+            retryCount: 0
+        });
+        failedSyncCount++;
+
+        if (failedSyncCount >= SYNC_FAILURE_WARNING_THRESHOLD && syncFailureWarningTriggered == 0) {
+            syncFailureWarningTriggered = block.timestamp;
+        }
+    }
+
+    function retryFailedSync(uint256 syncId) external onlyOwner {
+        require(syncId < failedSyncCount, "NFTMint: Invalid syncId");
+        
+        FailedSync storage sync = failedSyncs[syncId];
+        require(sync.retryCount < MAX_RETRY_COUNT, "NFTMint: Max retry count exceeded");
+        
+        try INFTDataInterface(nftDataContract).syncNFTData(sync.tokenId, sync.zodiacType, sync.level, sync.growth, sync.to) {
+            _removeFailedSync(syncId);
+        } catch {
+            sync.retryCount++;
+            if (sync.retryCount >= MAX_RETRY_COUNT) {
+                _removeFailedSync(syncId);
+            }
+        }
+    }
+
+    function retryAllFailedSyncs() external onlyOwner {
+        for (uint256 i = 0; i < failedSyncCount; ) {
+            FailedSync storage sync = failedSyncs[i];
+            if (sync.retryCount >= MAX_RETRY_COUNT) {
+                _removeFailedSync(i);
+                continue;
+            }
+
+            try INFTDataInterface(nftDataContract).syncNFTData(sync.tokenId, sync.zodiacType, sync.level, sync.growth, sync.to) {
+                _removeFailedSync(i);
+            } catch {
+                sync.retryCount++;
+                i++;
+            }
+        }
+    }
+
+    function _removeFailedSync(uint256 syncId) internal {
+        if (syncId < failedSyncCount - 1) {
+            failedSyncs[syncId] = failedSyncs[failedSyncCount - 1];
+        }
+        delete failedSyncs[failedSyncCount - 1];
+        failedSyncCount--;
     }
     
     function setNftDataContract(address _nftDataContract) external onlyOwner {
@@ -290,15 +371,11 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return _balanceOf[owner];
     }
     
-    function tokenBurnerContract() external view returns (address) {
-        return tokenBurnerContract;
-    }
-    
     function isRare(uint256 tokenId) external view returns (bool) {
         return tokenType[tokenId] >= 72;
     }
     
-    function transferFrom(address from, address to, uint256 tokenId) external {
+    function transferFrom(address from, address to, uint256 tokenId) public {
         require(_ownerOf[tokenId] == from, "ERC721: transfer from incorrect owner");
         require(to != address(0), "ERC721: transfer to the zero address");
         

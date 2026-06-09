@@ -423,16 +423,32 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(nft.ownerOf(tokenId) == msg.sender, "E15");
         
         INFTDataInterface m = INFTDataInterface(metadataContract);
-        NFTDataTypes.ZodiacType t = m.tokenType(tokenId);
+        NFTDataTypes.ZodiacType t = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
         uint8 lv = m.tokenLevel(tokenId);
         require(lv < 5, "E16");
         
+        uint256[] memory burnCandidates = _findBurnCandidates(tokenId, lv, t, nft);
+        _burnNFTs(burnCandidates, t, nft);
+        
+        return _completeUpgrade(tokenId, lv, t, m, nft);
+    }
+
+    /**
+     * @dev 查找可销毁的NFT候选
+     * @param tokenId 要升级的NFT ID
+     * @param lv 当前等级
+     * @param t NFT类型
+     * @param nft NFT合约实例
+     * @return 可销毁的NFT ID数组
+     */
+    function _findBurnCandidates(uint256 tokenId, uint8 lv, NFTDataTypes.ZodiacType t, INFTMint nft) internal view returns (uint256[] memory) {
         uint256[] memory allUserTokens = nft.getTokenIdsByOwner(msg.sender);
         uint256 maxIterations = 100;
         uint256 actualIterations = allUserTokens.length;
         if (actualIterations > maxIterations) {
             actualIterations = maxIterations;
         }
+        require(allUserTokens.length <= maxIterations, "E33: Too many NFTs, please reduce holdings");
         
         uint256[] memory arr = new uint256[](actualIterations);
         uint256 arrLength = 0;
@@ -449,7 +465,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             }
         }
         require(count >= lv + 1, "E17");
-        require(allUserTokens.length <= maxIterations, "E33: Too many NFTs, please reduce holdings");
         
         uint256[] memory burnCandidates = new uint256[](lv);
         uint256 candidateIdx = 0;
@@ -462,48 +477,63 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         }
         
         require(candidateIdx == lv, "E28: Insufficient burn candidates");
-        
-        for (uint i = 0; i < lv; i++) {
+        return burnCandidates;
+    }
+
+    /**
+     * @dev 销毁NFT
+     * @param burnCandidates 要销毁的NFT ID数组
+     * @param t NFT类型
+     * @param nft NFT合约实例
+     */
+    function _burnNFTs(uint256[] memory burnCandidates, NFTDataTypes.ZodiacType t, INFTMint nft) internal {
+        for (uint i = 0; i < burnCandidates.length; i++) {
             uint burnId = burnCandidates[i];
             nft.safeTransferFrom(msg.sender, BLACK_HOLE, burnId);
             emit CardBurned(burnId, t, msg.sender);
         }
-        
+    }
+
+    /**
+     * @dev 完成升级操作
+     * @param tokenId 要升级的NFT ID
+     * @param lv 当前等级
+     * @param t NFT类型
+     * @param m 元数据合约实例
+     * @param nft NFT合约实例
+     * @return 新等级
+     */
+    function _completeUpgrade(uint256 tokenId, uint8 lv, NFTDataTypes.ZodiacType t, INFTDataInterface m, INFTMint nft) internal returns (uint8) {
         uint8 newLv = lv + 1;
         NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         
-        // 使用 Checks-Effects-Interactions 模式：先更新外部合约权重，再更新本合约状态
-        // 这样如果权重更新失败，等级不会被更新，保持数据一致性
-        
-        // 先更新DividendManager权重（外部调用）
         require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
         
-        try IDividendManager(dividendManager).updateUserWeight(msg.sender, uint256(lv), false, uint8(element)) {
-            // 成功
-        } catch Error(string memory reason) {
-            emit WeightUpdateFailed(msg.sender, tokenId, lv, newLv, "old_weight");
-            revert(string(abi.encodePacked("NFTUpdate: Update old weight failed - ", reason)));
-        } catch {
-            emit WeightUpdateFailed(msg.sender, tokenId, lv, newLv, "old_weight");
-            revert("NFTUpdate: Update old weight failed with unknown error");
-        }
+        _updateUserWeight(msg.sender, lv, false, element);
+        _updateUserWeight(msg.sender, newLv, true, element);
         
-        try IDividendManager(dividendManager).updateUserWeight(msg.sender, uint256(newLv), true, uint8(element)) {
-            // 成功
-        } catch Error(string memory reason) {
-            emit WeightUpdateFailed(msg.sender, tokenId, lv, newLv, "new_weight");
-            revert(string(abi.encodePacked("NFTUpdate: Update new weight failed - ", reason)));
-        } catch {
-            emit WeightUpdateFailed(msg.sender, tokenId, lv, newLv, "new_weight");
-            revert("NFTUpdate: Update new weight failed with unknown error");
-        }
-        
-        // 权重更新成功后，再更新NFT等级（本合约状态变更）
         m.setTokenLevel(tokenId, newLv);
-        nft.adminSetNFTLevel(tokenId, newLv); // 同时更新 NFTMint
+        nft.adminSetNFTLevel(tokenId, newLv);
         
         emit CardUpgraded(tokenId, t, lv, newLv, msg.sender, uint64(block.timestamp));
         return newLv;
+    }
+
+    /**
+     * @dev 更新用户权重
+     * @param user 用户地址
+     * @param level 等级
+     * @param isAdd 是否增加
+     * @param element 属性类型
+     */
+    function _updateUserWeight(address user, uint8 level, bool isAdd, NFTDataTypes.ElementType element) internal {
+        try IDividendManager(dividendManager).updateUserWeight(user, uint256(level), isAdd, uint8(element)) {
+            // 成功
+        } catch Error(string memory reason) {
+            revert(string(abi.encodePacked("NFTUpdate: Update weight failed - ", reason)));
+        } catch {
+            revert("NFTUpdate: Update weight failed with unknown error");
+        }
     }
 
     /**
@@ -532,8 +562,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(t.balanceOf(msg.sender) >= cost, "E8: Insufficient balance");
         require(t.transferFrom(msg.sender, BLACK_HOLE, cost), "E9: Transfer failed");
         
-        uint8 newLv = _upgradeLevel(tokenId, lv);
-        emit TokenUpgraded(tokenId, m.tokenType(tokenId), lv, newLv, cost, msg.sender, uint64(block.timestamp));
+        NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
+        uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);
+        emit TokenUpgraded(tokenId, zodiacType, lv, newLv, cost, msg.sender, uint64(block.timestamp));
         return newLv;
     }
 
@@ -597,50 +628,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(t.balanceOf(msg.sender) >= cost, "E8: Insufficient balance");
         require(t.transferFrom(msg.sender, BLACK_HOLE, cost), "E9: Transfer failed");
         
-        uint8 newLv = _upgradeLevel(tokenId, lv);
-        emit USDValueUpgraded(tokenId, m.tokenType(tokenId), lv, newLv, usdValue, cost, price, msg.sender, uint64(block.timestamp));
-        return newLv;
-    }
-
-    /**
-     * @dev 升级等级（内部函数）
-     * @param id NFT ID
-     * @param oldLv 旧等级
-     * @return uint8 新等级
-     */
-    function _upgradeLevel(uint id, uint8 oldLv) internal returns (uint8) {
-        INFTDataInterface m = INFTDataInterface(metadataContract);
-        INFTMint nft = INFTMint(nftContract);
-        NFTDataTypes.ZodiacType t = m.tokenType(id);
-        uint8 newLv = oldLv + 1;
-        
-        // 先更新权重，再更新等级，确保数据一致性
-        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
-        
-        NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
-        
-        // 更新用户权重：先减去旧等级的权重，再加上新等级的权重
-        try IDividendManager(dividendManager).updateUserWeight(msg.sender, uint256(oldLv), false, uint8(element)) {
-            // 成功
-        } catch Error(string memory reason) {
-            revert(string(abi.encodePacked("NFTUpdate: Update old weight failed - ", reason)));
-        } catch {
-            revert("NFTUpdate: Update old weight failed with unknown error");
-        }
-        
-        try IDividendManager(dividendManager).updateUserWeight(msg.sender, uint256(newLv), true, uint8(element)) {
-            // 成功
-        } catch Error(string memory reason) {
-            revert(string(abi.encodePacked("NFTUpdate: Update new weight failed - ", reason)));
-        } catch {
-            revert("NFTUpdate: Update new weight failed with unknown error");
-        }
-        
-        // 权重更新成功后，再更新NFT等级
-        m.setTokenLevel(id, newLv);
-        nft.adminSetNFTLevel(id, newLv); // 同时更新 NFTMint
-        
-        emit CardUpgraded(id, t, oldLv, newLv, msg.sender, uint64(block.timestamp));
+        NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
+        uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);
+        emit USDValueUpgraded(tokenId, zodiacType, lv, newLv, usdValue, cost, price, msg.sender, uint64(block.timestamp));
         return newLv;
     }
 

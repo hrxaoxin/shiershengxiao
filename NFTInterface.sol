@@ -78,6 +78,16 @@ interface INFTDataInterface {
      * @return 权重值
      */
     function calcUserWeight(address user) external view returns (uint256);
+
+    /**
+     * @dev 同步NFT铸造数据到NFTData合约
+     * @param tokenId NFT ID
+     * @param zodiacType 生肖类型
+     * @param level 等级
+     * @param growth 成长值
+     * @param to 接收者地址
+     */
+    function syncNFTData(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to) external;
 }
 
 /**
@@ -288,6 +298,13 @@ struct SeasonInfo {
 }
 
 interface IArenaRanking {
+    /**
+     * @dev 获取Mock玩家排名
+     * @param player 玩家地址
+     * @return 排名
+     */
+    function getMockPlayerRank(address player) external view returns (uint256);
+
     /**
      * @dev 获取赛季奖励数据
      * @param seasonId 赛季ID

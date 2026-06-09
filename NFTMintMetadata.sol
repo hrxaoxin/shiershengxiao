@@ -4,10 +4,14 @@ pragma solidity ^0.8.20;
 import "./NFTLib.sol";
 import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/Strings.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract NFTMintMetadata {
+contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     using Strings for uint256;
     using NFTLib for uint256;
+    using Base64 for bytes;
     
     address public nftMintCore;
     
@@ -28,8 +32,14 @@ contract NFTMintMetadata {
         _;
     }
     
-    function initialize(address _nftMintCore) public {
+    function initialize(address _nftMintCore) public initializer {
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
         nftMintCore = _nftMintCore;
+    }
+    
+    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
+        // Upgrade authorization: only owner can upgrade
     }
     
     function tokenURI(uint256 tokenId) public view returns (string memory) {
@@ -39,7 +49,7 @@ contract NFTMintMetadata {
         uint8 level = INFTMintCore(nftMintCore).tokenLevel(tokenId);
         
         string memory json = _buildTokenURIJson(tokenId, tokenType_, level);
-        return string(abi.encodePacked("data:application/json;base64,", Base64.encode(bytes(json))));
+        return string(abi.encodePacked("data:application/json;base64,", bytes(json).encode()));
     }
     
     function getNFTData(uint256 tokenId) external view returns (NFTDataResult memory) {
@@ -77,7 +87,7 @@ contract NFTMintMetadata {
         string memory zodiacName = NFTLib.getZodiacNameCN(zodiac);
         string memory genderName = gender == 0 ? unicode"\u516C" : unicode"\u6BCD";
         string memory rarity = tokenType_ >= 72 ? unicode"\u7A00\u6709" : unicode"\u666E\u901A";
-        string memory levelStr = level.toString();
+        string memory levelStr = uint256(level).toString();
         string memory tokenIdStr = tokenId.toString();
         
         string memory namePart = NFTLib.concat5(
@@ -90,7 +100,7 @@ contract NFTMintMetadata {
             NFTLib.concat2(',"description":"', unicode"\u5341\u4E8C\u751F\u8096NFT - \u5C5E\u6027\uFF1A"),
             NFTLib.concat2(elementName, unicode"\u00B7\u751F\u8096\uFF1A"),
             NFTLib.concat2(zodiacName, unicode"\u00B7\u6027\u522B\uFF1A"),
-            NFTLib.concat2(genderName, unicode"\u00B7\u7B49\uEA7\uFF1A"),
+            NFTLib.concat2(genderName, unicode"\u00B7\u7B49\u7EA7\uFF1A"),
             NFTLib.concat2(levelStr, unicode"\u00B7\u6301\u6709\u53EF\u4EB2\u53D7\u751F\u6001\u5206\u5143\"")
         );
         
@@ -98,7 +108,7 @@ contract NFTMintMetadata {
             NFTLib.buildAttr(unicode"\u5C5E\u6027", elementName),
             NFTLib.buildAttr(unicode"\u751F\u8096", zodiacName),
             NFTLib.buildAttr(unicode"\u6027\u522B", genderName),
-            NFTLib.buildAttr(unicode"\u7B49\uEA7", levelStr),
+            NFTLib.buildAttr(unicode"\u7B49\u7EA7", levelStr),
             NFTLib.buildAttrLast(unicode"\u7C7B\u578B", rarity)
         );
         string memory attrPart = NFTLib.concat2(',"attributes":[', NFTLib.concat2(attrs, ']}'));
@@ -109,43 +119,5 @@ contract NFTMintMetadata {
     function setNftMintCore(address _nftMintCore) external {
         require(msg.sender == INFTMintCore(nftMintCore).owner(), "NFTMintMetadata: Only owner");
         nftMintCore = _nftMintCore;
-    }
-    
-    library Base64 {
-        bytes internal constant TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        
-        function encode(bytes memory data) internal pure returns (string memory) {
-            uint256 len = data.length;
-            if (len == 0) return "";
-            
-            uint256 encodedLen = (len + 2) / 3 * 4;
-            bytes memory result = new bytes(encodedLen);
-            
-            uint256 i = 0;
-            uint256 j = 0;
-            
-            while (i < len) {
-                uint256 octetA = i < len ? uint8(data[i++]) : 0;
-                uint256 octetB = i < len ? uint8(data[i++]) : 0;
-                uint256 octetC = i < len ? uint8(data[i++]) : 0;
-                
-                uint256 triple = (octetA << 16) | (octetB << 8) | octetC;
-                
-                result[j++] = TABLE[(triple >> 18) & 0x3F];
-                result[j++] = TABLE[(triple >> 12) & 0x3F];
-                result[j++] = TABLE[(triple >> 6) & 0x3F];
-                result[j++] = TABLE[triple & 0x3F];
-            }
-            
-            uint256 padding = encodedLen - ((len * 4) / 3);
-            if (padding > 0) {
-                result[encodedLen - 1] = "=";
-                if (padding > 1) {
-                    result[encodedLen - 2] = "=";
-                }
-            }
-            
-            return string(result);
-        }
     }
 }

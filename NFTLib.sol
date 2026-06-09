@@ -590,3 +590,41 @@ library NFTLib {
         return concat2(elementName, concat2(zodiacName, concat2(unicode"\u00B7", genderName)));
     }
 }
+
+library Base64 {
+    bytes internal constant TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    
+    function encode(bytes memory data) internal pure returns (string memory) {
+        uint256 len = data.length;
+        if (len == 0) return "";
+        
+        uint256 encodedLen = (len + 2) / 3 * 4;
+        bytes memory result = new bytes(encodedLen);
+        
+        uint256 i = 0;
+        uint256 j = 0;
+        
+        while (i < len) {
+            uint256 octetA = i < len ? uint8(data[i++]) : 0;
+            uint256 octetB = i < len ? uint8(data[i++]) : 0;
+            uint256 octetC = i < len ? uint8(data[i++]) : 0;
+            
+            uint256 triple = (octetA << 16) | (octetB << 8) | octetC;
+            
+            result[j++] = TABLE[(triple >> 18) & 0x3F];
+            result[j++] = TABLE[(triple >> 12) & 0x3F];
+            result[j++] = TABLE[(triple >> 6) & 0x3F];
+            result[j++] = TABLE[triple & 0x3F];
+        }
+        
+        uint256 padding = encodedLen - ((len * 4) / 3);
+        if (padding > 0) {
+            result[encodedLen - 1] = "=";
+            if (padding > 1) {
+                result[encodedLen - 2] = "=";
+            }
+        }
+        
+        return string(result);
+    }
+}

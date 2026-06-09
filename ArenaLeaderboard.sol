@@ -89,6 +89,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 wins,
         uint256 losses,
         uint256 rank,
+        uint256 season,
         bool rewardClaimed
     ) {
         return IArenaRanking(rankingContract).getPlayerSeasonStats(player, seasonId);
@@ -107,7 +108,9 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 seasonId,
         uint256 startTime,
         uint256 endTime,
-        bool isActive
+        bool isActive,
+        uint256 totalPlayers,
+        uint256 rewardPool
     ) {
         return IArenaRanking(rankingContract).getCurrentSeasonInfo();
     }
@@ -115,13 +118,14 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     function getPlayerChallengeStatus(address player) external view returns (
         uint256 remainingAttempts,
         uint256 lastBattleTime,
-        bool hasTeam
+        uint256 hasTeam,
+        uint256 seasonId
     ) {
         return IArenaRanking(rankingContract).getPlayerChallengeStatus(player);
     }
 
-    function getPlayerRank(address player, uint256 seasonId) external view returns (uint256) {
-        return IArenaRanking(rankingContract).getPlayerRank(player, seasonId);
+    function getPlayerRank(address player) external view returns (uint256) {
+        return IArenaRanking(rankingContract).getPlayerRank(player);
     }
 
     function getTotalPlayersInSeason(uint256 seasonId) external view returns (uint256) {

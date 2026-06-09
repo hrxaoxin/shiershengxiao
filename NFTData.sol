@@ -521,6 +521,21 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _addUserNFT(owner, tokenId);
         _addToTypeOwners(zodiacType, owner);
     }
+
+    /**
+     * @dev 同步NFT铸造数据（由NFTMintCore调用）
+     */
+    function syncNFTData(
+        uint256 tokenId,
+        uint256 zodiacType,
+        uint8 level,
+        uint8 growth,
+        address to
+    ) external onlyAuthorized {
+        _setNFTInfo(tokenId, zodiacType, level, growth, block.timestamp);
+        _addUserNFT(to, tokenId);
+        _addToTypeOwners(zodiacType, to);
+    }
     
     /**
      * @dev 添加用户NFT（外部调用）

@@ -350,7 +350,7 @@ window.ZODIAC_WEB3 = (function() {
     async function claimDividend() {
         try {
             const contract = await getContract('dividendManager');
-            const receipt = await sendAndTrackTransaction(contract, 'claim', []);
+            const receipt = await sendAndTrackTransaction(contract, 'claimDividend', []);
             
             if (!receipt) {
                 throw new Error('[ZODIAC_WEB3] claimDividend returned no receipt');
@@ -554,6 +554,7 @@ window.ZODIAC_WEB3 = (function() {
     const MAX_EVENT_SUBSCRIPTIONS = 100;
     const EVENT_SUBSCRIPTION_RETRY_LIMIT = 5;
     const EVENT_SUBSCRIPTION_RETRY_DELAY_MS = 3000;
+    const EVENT_SUBSCRIPTION_MAX_RETRY_DELAY = 30000;
 
     function cleanupOldestSubscription() {
         if (activeEventSubscriptions.length === 0) return;
@@ -591,6 +592,7 @@ window.ZODIAC_WEB3 = (function() {
         }
 
         let lastError = null;
+        let retryDelay = EVENT_SUBSCRIPTION_RETRY_DELAY_MS;
         
         for (let attempt = 0; attempt < EVENT_SUBSCRIPTION_RETRY_LIMIT; attempt++) {
             try {
@@ -616,13 +618,35 @@ window.ZODIAC_WEB3 = (function() {
                     }
                 }
                 
-                // Check that event exists on the contract ABI
                 if (!contract.events || !contract.events[eventName]) {
                     console.warn(`[ZODIAC_WEB3] Event "${eventName}" not found on contract "${contractName}" ABI`);
                     return;
                 }
 
                 const subscription = contract.events[eventName](eventOptions, callback);
+                
+                subscription.on('error', (error) => {
+                    console.error(`[ZODIAC_WEB3] Event subscription error for ${contractName}.${eventName}:`, error);
+                    
+                    const subIndex = activeEventSubscriptions.findIndex(
+                        sub => sub.subscription === subscription
+                    );
+                    if (subIndex !== -1) {
+                        activeEventSubscriptions.splice(subIndex, 1);
+                    }
+                    
+                    setTimeout(() => {
+                        console.log(`[ZODIAC_WEB3] Attempting to re-subscribe to ${contractName}.${eventName}`);
+                        listenToEvent(contractName, eventName, callback, options);
+                    }, retryDelay);
+                    retryDelay = Math.min(retryDelay * 2, EVENT_SUBSCRIPTION_MAX_RETRY_DELAY);
+                });
+                
+                subscription.on('connected', (subscriptionId) => {
+                    console.log(`[ZODIAC_WEB3] Event subscription connected for ${contractName}.${eventName}: ${subscriptionId}`);
+                    retryDelay = EVENT_SUBSCRIPTION_RETRY_DELAY_MS;
+                });
+                
                 activeEventSubscriptions.push({
                     contractName,
                     eventName,
@@ -635,10 +659,8 @@ window.ZODIAC_WEB3 = (function() {
                 lastError = e;
                 console.warn(`[ZODIAC_WEB3] Event subscription attempt ${attempt + 1} failed for ${contractName}.${eventName}:`, e.message);
                 
-                // If this was the final retry, stop
                 if (attempt === EVENT_SUBSCRIPTION_RETRY_LIMIT - 1) break;
                 
-                // Exponential backoff: wait before retrying
                 const waitTime = EVENT_SUBSCRIPTION_RETRY_DELAY_MS * Math.pow(2, attempt);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
             }
@@ -1268,17 +1290,43 @@ window.ZODIAC_WEB3 = (function() {
         return true;
     }
 
-    async function burnAndMint(isRare) {
-        try {
-            const burnerContract = await getContract('tokenBurner');
-            const mintCost = isRare 
+    async function _executeMint(methodName, isRare, zodiac) {
+        const burnerContract = await getContract('tokenBurner');
+        
+        let mintCost;
+        if (methodName === 'burnAndMint') {
+            mintCost = isRare 
                 ? await burnerContract.methods.rareMintCost().call()
                 : await burnerContract.methods.normalMintCost().call();
-            
-            await checkTokenBalanceAndAllowance(mintCost);
-            
-            const receipt = await sendAndTrackTransaction(burnerContract, 'burnAndMint', [account, isRare]);
-            return receipt;
+        } else if (methodName === 'burnAndMintTen') {
+            mintCost = isRare 
+                ? await burnerContract.methods.rareMintTenCost().call()
+                : await burnerContract.methods.normalMintTenCost().call();
+        } else if (methodName === 'burnAndMintTargeted') {
+            mintCost = await burnerContract.methods.targetedMintCost().call();
+        } else {
+            throw new Error(`[ZODIAC_WEB3] Unsupported mint method: ${methodName}`);
+        }
+        
+        await checkTokenBalanceAndAllowance(mintCost);
+        
+        let args = [account];
+        if (methodName !== 'burnAndMintTargeted') {
+            args.push(isRare);
+        } else {
+            args.push(zodiac);
+        }
+        
+        const receipt = await sendAndTrackTransaction(burnerContract, methodName, args);
+        return receipt;
+    }
+
+    async function burnAndMint(isRare) {
+        if (isRare !== true && isRare !== false) {
+            throw new Error('[ZODIAC_WEB3] isRare must be a boolean value');
+        }
+        try {
+            return await _executeMint('burnAndMint', isRare);
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMint failed:', e);
             throw e;
@@ -1286,16 +1334,11 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function burnAndMintTen(isRare) {
+        if (isRare !== true && isRare !== false) {
+            throw new Error('[ZODIAC_WEB3] isRare must be a boolean value');
+        }
         try {
-            const burnerContract = await getContract('tokenBurner');
-            const mintCost = isRare 
-                ? await burnerContract.methods.rareMintTenCost().call()
-                : await burnerContract.methods.normalMintTenCost().call();
-            
-            await checkTokenBalanceAndAllowance(mintCost);
-            
-            const receipt = await sendAndTrackTransaction(burnerContract, 'burnAndMintTen', [account, isRare]);
-            return receipt;
+            return await _executeMint('burnAndMintTen', isRare);
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMintTen failed:', e);
             throw e;
@@ -1307,13 +1350,7 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error('[ZODIAC_WEB3] Invalid zodiac index (0-11)');
         }
         try {
-            const burnerContract = await getContract('tokenBurner');
-            const mintCost = await burnerContract.methods.targetedMintCost().call();
-            
-            await checkTokenBalanceAndAllowance(mintCost);
-            
-            const receipt = await sendAndTrackTransaction(burnerContract, 'burnAndMintTargeted', [account, zodiac]);
-            return receipt;
+            return await _executeMint('burnAndMintTargeted', null, zodiac);
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMintTargeted failed:', e);
             throw e;
