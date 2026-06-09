@@ -1008,9 +1008,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     /**
      * @dev 暂停合约
      */
-    function pause(string calldata) external onlyOwner {
+    function pause(string calldata reason) external onlyOwner {
         _pause();
-        emit Paused(msg.sender);
+        emit Paused(msg.sender, reason);
     }
 
     /**

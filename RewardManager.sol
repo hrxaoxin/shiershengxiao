@@ -6,6 +6,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 
 /**
@@ -88,6 +89,8 @@ interface IDEXRouter {
  * - UUPS 可升级：未来可调整分配比例、新增奖励池
  */
 contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
+    
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
      */
@@ -540,11 +543,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         require(token.balanceOf(msg.sender) >= amount, "RewardManager: Insufficient balance");
 
         if (poolType == 0 && nftStakingPool != address(0)) {
-            require(token.transferFrom(msg.sender, nftStakingPool, amount), "RewardManager: Transfer failed");
+            token.safeTransferFrom(msg.sender, nftStakingPool, amount);
         } else if (poolType == 1 && tokenStakingPool != address(0)) {
-            require(token.transferFrom(msg.sender, tokenStakingPool, amount), "RewardManager: Transfer failed");
+            token.safeTransferFrom(msg.sender, tokenStakingPool, amount);
         } else if (poolType == 2 && arenaRewardPool != address(0)) {
-            require(token.transferFrom(msg.sender, arenaRewardPool, amount), "RewardManager: Transfer failed");
+            token.safeTransferFrom(msg.sender, arenaRewardPool, amount);
         }
     }
 
@@ -575,10 +578,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 dividend = pendingDividends[user];
         require(dividend > 0, "RewardManager: No pending dividend");
         
-        pendingDividends[user] = 0;
-        
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= dividend, "RewardManager: Insufficient contract balance");
+        
+        pendingDividends[user] = 0;
+        
         require(token.transfer(user, dividend), "RewardManager: Transfer failed");
         
         emit DividendClaimed(user, dividend);
@@ -599,10 +603,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 dividend = pendingDividends[user];
         require(dividend > 0, "RewardManager: No pending dividend");
         
-        pendingDividends[user] = 0;
-        
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= dividend, "RewardManager: Insufficient contract balance");
+        
+        pendingDividends[user] = 0;
+        
         require(token.transfer(user, dividend), "RewardManager: Transfer failed");
         
         emit DividendClaimed(user, dividend);

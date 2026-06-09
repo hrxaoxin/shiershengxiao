@@ -256,6 +256,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
         require(msg.sender != seller, "NFTTrading: Cannot buy own NFT");
         require(msg.value == price, "NFTTrading: Incorrect payment amount");
+        require(INFT(nftContract).ownerOf(tokenId) == address(this), "NFTTrading: Contract does not own NFT");
 
         uint256 fee = price * feePercent / 100;
         uint256 sellerAmount = price - fee;
