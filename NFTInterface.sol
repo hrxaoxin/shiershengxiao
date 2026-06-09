@@ -306,6 +306,11 @@ interface IArenaRanking {
     function getMockPlayerRank(address player) external view returns (uint256);
 
     /**
+     * @dev 获取当前赛季ID
+     */
+    function getCurrentSeasonId() external view returns (uint256);
+
+    /**
      * @dev 获取赛季奖励数据
      * @param seasonId 赛季ID
      * @return rewardPool BNB奖励池
@@ -342,12 +347,6 @@ interface IArenaRanking {
      * @return 真实排名
      */
     function getRealPlayerRank(uint256 seasonId, uint256 index) external view returns (uint256);
-
-    /**
-     * @dev 获取当前赛季ID
-     * @return 当前赛季ID
-     */
-    function getCurrentSeasonId() external view returns (uint256);
 
     function getLeaderboard(uint256 seasonId, uint256 limit) external view returns (LeaderboardEntry[] memory);
     function getLeaderboardByPage(uint256 seasonId, uint256 page, uint256 pageSize) external view returns (LeaderboardEntry[] memory, uint256, uint256);

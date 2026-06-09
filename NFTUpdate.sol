@@ -423,11 +423,12 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(nft.ownerOf(tokenId) == msg.sender, "E15");
         
         INFTDataInterface m = INFTDataInterface(metadataContract);
-        NFTDataTypes.ZodiacType t = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
+        uint256 tokenTypeValue = m.tokenType(tokenId);
+        NFTDataTypes.ZodiacType t = NFTDataTypes.ZodiacType(tokenTypeValue);
         uint8 lv = m.tokenLevel(tokenId);
         require(lv < 5, "E16");
         
-        uint256[] memory burnCandidates = _findBurnCandidates(tokenId, lv, t, nft);
+        uint256[] memory burnCandidates = _findBurnCandidates(tokenId, lv, tokenTypeValue, nft);
         _burnNFTs(burnCandidates, t, nft);
         
         return _completeUpgrade(tokenId, lv, t, m, nft);
@@ -437,11 +438,11 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 查找可销毁的NFT候选
      * @param tokenId 要升级的NFT ID
      * @param lv 当前等级
-     * @param t NFT类型
+     * @param tokenTypeValue NFT类型值
      * @param nft NFT合约实例
      * @return 可销毁的NFT ID数组
      */
-    function _findBurnCandidates(uint256 tokenId, uint8 lv, NFTDataTypes.ZodiacType t, INFTMint nft) internal view returns (uint256[] memory) {
+    function _findBurnCandidates(uint256 tokenId, uint8 lv, uint256 tokenTypeValue, INFTMint nft) internal view returns (uint256[] memory) {
         uint256[] memory allUserTokens = nft.getTokenIdsByOwner(msg.sender);
         uint256 maxIterations = 100;
         uint256 actualIterations = allUserTokens.length;
@@ -456,7 +457,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         
         for (uint i = 0; i < actualIterations; i++) {
             uint256 tid = allUserTokens[i];
-            if (nft.tokenType(tid) == uint256(t)) {
+            if (nft.tokenType(tid) == tokenTypeValue) {
                 arr[arrLength] = tid;
                 arrLength++;
                 if (nft.tokenLevel(tid) == lv) {

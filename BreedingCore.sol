@@ -61,6 +61,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     mapping(uint256 => uint256) public breedingCooldowns;
     mapping(uint256 => bool) public isNFTInActiveBreeding;
     mapping(address => uint256[]) private _userActiveOrderIds;
+    mapping(uint256 => mapping(uint256 => bool)) private _breedingPairExists;
 
     event BreedingPairCreated(uint256 indexed pairId, uint256 indexed fatherId, uint256 indexed motherId, uint256 breedingType);
     event BreedingCompleted(uint256 indexed pairId, uint256 indexed childId, uint256 zodiacType);
@@ -213,12 +214,14 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(!isNFTInActiveBreeding[fatherId], "BC: Father breeding");
         require(!isNFTInActiveBreeding[motherId], "BC: Mother breeding");
         require(nftMintContract != address(0), "BC: NFT contract not set");
+        require(!_breedingPairExists[fatherId][motherId], "BC: Pair already exists");
 
         if (fee > 0) {
             require(tokenContract != address(0), "BC: Token contract not set");
             require(IERC20(tokenContract).transferFrom(msg.sender, address(this), fee), "BC: Fee transfer failed");
         }
 
+        _breedingPairExists[fatherId][motherId] = true;
         breedingPairCount++;
         pairId = breedingPairCount;
         breedingPairs[pairId] = BreedingPair({
