@@ -252,16 +252,16 @@
         </div>
 
         <div id="tokenStakePanel" class="hidden">
-            <p class="text-lg text-gray-600 mb-8">质押代币获得BNB奖励，支持弹性释放机制</p>
+            <p class="text-lg text-gray-600 mb-8">质押代币获得代币奖励，支持弹性释放机制</p>
 
             <div class="info-box mb-8">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">🌟 代币质押规则</h3>
                 <ul class="text-gray-600 space-y-2">
-                    <li>• 质押代币获得BNB奖励</li>
+                    <li>• 质押代币获得代币奖励</li>
                     <li>• 最低质押时长 <span id="tokenMinDuration">30</span> 分钟</li>
                     <li>• 当前每日释放比例 <span id="dailyReleaseRatioDisplay">1.0</span>%，支持弹性增量机制</li>
                     <li>• 赎回时自动领取累积奖励</li>
-                    <li>• 奖励以BNB形式发放</li>
+                    <li>• 奖励以代币形式发放</li>
                 </ul>
             </div>
 
@@ -290,7 +290,7 @@
                             <p class="text-xl font-bold text-gray-800" id="myTokenStakeAmount">0.00</p>
                         </div>
                         <div class="p-4 bg-gray-50 rounded-lg">
-                            <span class="text-sm text-gray-600">可领取奖励 (BNB)</span>
+                            <span class="text-sm text-gray-600">可领取奖励 (Token)</span>
                             <p class="text-xl font-bold text-blue-600" id="tokenRewardsAmount">0.00</p>
                         </div>
                         <div class="p-4 bg-gray-50 rounded-lg">
@@ -319,7 +319,7 @@
                     <h3 class="text-xl font-bold text-gray-800 mb-4">📊 代币质押合约信息</h3>
                     <div class="space-y-4">
                         <div class="p-4 bg-gray-50 rounded-lg">
-                            <span class="text-sm text-gray-600">合约BNB余额</span>
+                            <span class="text-sm text-gray-600">合约奖励代币余额</span>
                             <p class="text-lg font-bold text-gray-800" id="tokenStakingBNBBalance">0.00</p>
                         </div>
                         <div class="p-4 bg-gray-50 rounded-lg">
@@ -337,11 +337,11 @@
             <div class="info-box">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">🎯 领取奖励</h3>
                 <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg mb-4">
-                    <span class="text-lg font-medium text-gray-800">可领取BNB奖励</span>
+                    <span class="text-lg font-medium text-gray-800">可领取代币奖励</span>
                     <span class="text-lg font-bold text-blue-600" id="claimableBNB">0.00</span>
                 </div>
                 <button id="claimTokenRewardsBtn" class="btn-primary w-full" disabled>
-                    领取BNB奖励
+                    领取代币奖励
                 </button>
             </div>
         </div>
@@ -948,10 +948,10 @@
                 
                 document.getElementById('myTokenStakeAmount').textContent = web3.utils.fromWei(parsedStakeInfo.amount, 'ether').substring(0, 10);
                 
-                const claimableBNB = web3.utils.fromWei(parsedStakeInfo.accumulatedRewards.toString(), 'ether').substring(0, 10);
+                const claimableTokens = web3.utils.fromWei(parsedStakeInfo.accumulatedRewards.toString(), 'ether').substring(0, 10);
                 
-                document.getElementById('tokenRewardsAmount').textContent = claimableBNB;
-                document.getElementById('claimableBNB').textContent = claimableBNB;
+                document.getElementById('tokenRewardsAmount').textContent = claimableTokens;
+                document.getElementById('claimableBNB').textContent = claimableTokens;
 
                 if (parsedStakeInfo.amount > 0) {
                     if (parsedStakeInfo.stakedAt > 0) {
@@ -964,15 +964,19 @@
                     document.getElementById('tokenStakedAt').textContent = '-';
                 }
 
-                // 读取合约 BNB 余额（通过 web3.eth.getBalance）
-                let bnbBalance = '0';
+                // 读取合约代币余额（通过 TokenStaking 合约的 getRewardTokenBalance 方法）
+                let rewardTokenBalance = '0';
                 try {
-                    const bnbBalanceWei = await web3.eth.getBalance(tokenStakingContract.options.address);
-                    bnbBalance = web3.utils.fromWei(bnbBalanceWei, 'ether').substring(0, 10);
+                    const tokenBalanceWei = await tokenContract.methods.balanceOf(tokenStakingContract.options.address).call();
+                    const totalStaked = await tokenStakingContract.methods.getTotalStaked().call();
+                    const rewardWei = BigInt(tokenBalanceWei) > BigInt(totalStaked)
+                        ? BigInt(tokenBalanceWei) - BigInt(totalStaked)
+                        : BigInt(0);
+                    rewardTokenBalance = web3.utils.fromWei(rewardWei.toString(), 'ether').substring(0, 10);
                 } catch (e) {
                     // 余额读取失败
                 }
-                document.getElementById('tokenStakingBNBBalance').textContent = bnbBalance;
+                document.getElementById('tokenStakingBNBBalance').textContent = rewardTokenBalance;
 
                 const totalStakedAll = await tokenStakingContract.methods.getTotalStaked().call();
                 document.getElementById('totalStakedTokens').textContent = web3.utils.fromWei(totalStakedAll, 'ether').substring(0, 10);
@@ -1009,7 +1013,7 @@
 
                 document.getElementById('tokenStakeBtn').disabled = false;
                 document.getElementById('tokenUnstakeBtn').disabled = parsedStakeInfo.amount == 0;
-                document.getElementById('claimTokenRewardsBtn').disabled = parseFloat(claimableBNB) <= 0;
+                document.getElementById('claimTokenRewardsBtn').disabled = parseFloat(claimableTokens) <= 0;
             } catch (error) {
                 console.error('加载代币质押信息失败:', error);
                 ZODIAC_UI.showToast('加载代币质押信息失败: ' + error.message, 'error');
@@ -1116,14 +1120,14 @@
             try {
                 await ZODIAC_WEB3.claimTokenRewards();
 
-                ZODIAC_UI.showToast('BNB奖励领取成功！', 'success');
+                ZODIAC_UI.showToast('代币奖励领取成功！', 'success');
                 await loadTokenStakingInfo();
             } catch (error) {
                 console.error('领取代币奖励失败:', error);
                 ZODIAC_UI.showToast('领取代币奖励失败: ' + (error.message || '未知错误'), 'error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '领取BNB奖励';
+                btn.textContent = '领取代币奖励';
             }
         }
     </script>

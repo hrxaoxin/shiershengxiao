@@ -9,6 +9,10 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 
+interface ITokenStaking {
+    function recordIncomingTokens(uint256 amount) external;
+}
+
 /**
  * @title RewardManager
  * @dev 奖励管理合约，统一管理所有游戏奖励的分发
@@ -377,8 +381,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     /**
      * @dev 内部函数：分配BNB到各池
      * - 分红池：直接转账BNB
-     * - 代币质押池：直接转账BNB
-     * - NFT质押池、竞技场奖励池：优先兑换为代币后转账；兑换失败时将 BNB 直接转入 dividendPool 作为价值储备
+     * - NFT质押池、代币质押池、竞技场奖励池：优先兑换为代币后转账；兑换失败时将 BNB 直接转入 dividendPool 作为价值储备
      */
     function _distributeBNB(uint256 amount) internal {
         if (amount == 0) {
@@ -404,29 +407,16 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             }
         }
 
-        // 代币质押池：直接转账BNB
-        if (tokenStakingPool != address(0) && tokenStakingAmount > 0) {
-            (bool success, ) = payable(tokenStakingPool).call{value: tokenStakingAmount}("");
-            if (success) {
-                if (poolManager != address(0)) {
-                    try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch {}
-                }
-            } else {
-                emit BNBTransferFailed(2, tokenStakingPool, tokenStakingAmount);
-                lockedBNBAmount += tokenStakingAmount;
-            }
-        }
-
-        // 需要兑换为代币的总金额（仅NFT质押池和竞技场奖励池）
-        uint256 totalSwapAmount = nftStakingAmount + arenaRewardAmount;
+        // 需要兑换为代币的总金额（NFT质押池、代币质押池、竞技场奖励池均使用代币奖励）
+        uint256 totalSwapAmount = nftStakingAmount + tokenStakingAmount + arenaRewardAmount;
         
         if (totalSwapAmount > 0) {
             // 兑换 BNB -> 代币
             uint256 tokenAmount = _swapBNBToToken(totalSwapAmount);
             
             if (tokenAmount > 0) {
-                // 分配兑换后的代币到NFT质押池和竞技场奖励池
-                _distributeSwappedTokens(tokenAmount, 0, nftStakingAmount, arenaRewardAmount, totalSwapAmount);
+                // 分配兑换后的代币到NFT质押池、代币质押池和竞技场奖励池
+                _distributeSwappedTokens(tokenAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, totalSwapAmount);
             } else {
                 // 兑换失败时，将未兑换的BNB作为价值储备转入分红池（最终回退）
                 if (dividendPool != address(0)) {
@@ -479,13 +469,13 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 内部函数：分配兑换后的代币到NFT质押池和竞技场奖励池
-     * 分红池和代币质押池直接使用BNB，不需要兑换
+     * @dev 内部函数：分配兑换后的代币到NFT质押池、代币质押池和竞技场奖励池
+     * 分红池直接使用BNB，不需要兑换
      */
     function _distributeSwappedTokens(
         uint256 totalTokenAmount,
-        uint256 /*dividendBNBAmount*/,
         uint256 nftStakingBNBAmount,
+        uint256 tokenStakingBNBAmount,
         uint256 arenaRewardBNBAmount,
         uint256 totalBNBAmount
     ) internal {
@@ -493,6 +483,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         
         // 计算各池应得代币数量（按BNB金额比例）
         uint256 nftStakingTokenAmount = totalTokenAmount * nftStakingBNBAmount / totalBNBAmount;
+        uint256 tokenStakingTokenAmount = totalTokenAmount * tokenStakingBNBAmount / totalBNBAmount;
         uint256 arenaRewardTokenAmount = totalTokenAmount * arenaRewardBNBAmount / totalBNBAmount;
 
         // 分配到NFT质押池
@@ -503,6 +494,19 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                 }
             } catch {
                 emit RewardTransferFailed(1, nftStakingPool, nftStakingTokenAmount);
+            }
+        }
+
+        // 分配到代币质押池
+        if (tokenStakingPool != address(0) && tokenStakingTokenAmount > 0) {
+            try token.transfer(tokenStakingPool, tokenStakingTokenAmount) {
+                if (poolManager != address(0)) {
+                    try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingTokenAmount) {} catch {}
+                }
+                // 调用 TokenStaking 的 recordIncomingTokens 记录流入
+                try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingTokenAmount) {} catch {}
+            } catch {
+                emit RewardTransferFailed(2, tokenStakingPool, tokenStakingTokenAmount);
             }
         }
 
@@ -673,6 +677,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch {}
                 }
+                // 调用 TokenStaking 的 recordIncomingTokens 记录流入
+                try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingAmount) {} catch {}
             } catch {
                 emit RewardTransferFailed(2, tokenStakingPool, tokenStakingAmount);
             }
@@ -910,21 +916,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             }
         }
         
-        if (tokenStakingPool != address(0) && tokenStakingAmount > 0) {
-            (bool success, ) = payable(tokenStakingPool).call{value: tokenStakingAmount}("");
-            if (success) {
-                if (poolManager != address(0)) {
-                    try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch {}
-                }
-                successfullyDistributed += tokenStakingAmount;
-            }
-        }
-        
-        uint256 totalSwapAmount = nftStakingAmount + arenaRewardAmount;
+        uint256 totalSwapAmount = nftStakingAmount + tokenStakingAmount + arenaRewardAmount;
         if (totalSwapAmount > 0 && dexRouter != address(0)) {
             uint256 tokenAmount = _swapBNBToToken(totalSwapAmount);
             if (tokenAmount > 0) {
-                _distributeSwappedTokens(tokenAmount, 0, nftStakingAmount, arenaRewardAmount, totalSwapAmount);
+                _distributeSwappedTokens(tokenAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, totalSwapAmount);
                 successfullyDistributed += totalSwapAmount;
             }
         }

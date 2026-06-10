@@ -163,7 +163,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         rankingContract = _rankingContract;
         tokenContract = _tokenContract;
         authorizer = _authorizer;
-        rewardType = 0;
+        rewardType = 1;
     }
     
     /**

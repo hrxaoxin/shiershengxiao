@@ -11,23 +11,23 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 
 /**
  * @title TokenStaking
- * @dev 代币质押合约，允许用户质押原生代币以获取BNB奖励
+ * @dev 代币质押合约，允许用户质押原生代币以获取代币奖励
  *
  * 核心功能：
  * 1. 代币质押（stakeTokens）：用户存入代币，进入质押池
- * 2. 奖励领取（claimRewards）：根据用户质押份额分配合约收到的BNB
+ * 2. 奖励领取（claimRewards）：根据用户质押份额分配合约收到的代币奖励
  * 3. 解除质押（unstakeTokens）：取出质押的代币，需经过最小锁仓期
  *
  * 奖励机制设计：
  * - 全局累积奖励/代币（rewardPerToken）持续累积
  * - 用户领取时计算其快照与当前值的差值 × 质押数量 = 应得奖励
  * - 用户快照（lastAccumulatedRate）记录上次领取时的累积值，防止重复计算
- * - 每日奖励计算：计算当前合约BNB余额 × rewardRate（万分比）作为当日奖励池
+ * - 每日奖励计算：计算当前合约代币余额 × rewardRate（万分比）作为当日奖励池
  *
  * 动态奖励率调整：
  * - 基础奖励率（rewardRate）：默认1%（100/10000）
  * - 最大奖励率（maxRewardRate）：默认2%（200/10000）
- * - 当每日流入BNB超过每日奖励时，奖励率自动上调（rateStep步长）
+ * - 当每日流入代币超过每日奖励时，奖励率自动上调（rateStep步长）
  * - 目的：在高流入期回馈更多给质押者，激励长期持有
  *
  * 安全限制：
@@ -45,7 +45,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * 典型用户流程：
  * 1. 授权合约使用代币（approve）
  * 2. 调用 stakeTokens(amount) 质押代币
- * 3. 等待若干时间（收取BNB奖励）
+ * 3. 等待若干时间（收取代币奖励）
  * 4. 调用 claimRewards() 领取累计奖励
  * 5. 30分钟锁仓期后调用 unstakeTokens(amount) 解除质押
  */
@@ -64,8 +64,8 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public maxTotalStaked = type(uint256).max;
     /** @dev 单个用户最大质押数量（无限制） */
     uint256 public maxUserStaked = type(uint256).max;
-    /** @dev 今日已进入合约的BNB数量 */
-    uint256 public todayIncomingBNB;
+    /** @dev 今日已进入合约的代币数量 */
+    uint256 public todayIncomingTokens;
     /** @dev 今日奖励总量 */
     uint256 public todayRewardAmount;
     /** @dev 今日开始时间 */
@@ -128,11 +128,10 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     event RewardsClaimed(address indexed user, uint256 amount);
     
-    /**
-     * @dev BNB接收事件
-     * @param amount 接收BNB数量
+    /** @dev 代币接收事件
+     * @param amount 接收代币数量
      */
-    event BNBReceived(uint256 amount);
+    event TokensReceived(uint256 amount);
 
     event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
@@ -145,8 +144,8 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     event RateStepUpdated(uint256 newStep);
     /** @dev 每日奖励计算事件 */
     event DailyRewardCalculated(uint256 totalReward, uint256 totalStaked);
-    /** @dev 流入BNB记录事件 */
-    event IncomingBNBRecorded(uint256 amount, uint256 totalToday);
+    /** @dev 流入代币记录事件 */
+    event IncomingTokensRecorded(uint256 amount, uint256 totalToday);
 
     /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[50] private __gap;
@@ -192,12 +191,22 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /**
-     * @dev 接收BNB
+     * @dev 接收代币奖励（通过 token.transfer 进入合约）
+     * 提供一个记录函数供外部调用以更新流入统计
+     */
+    function recordIncomingTokens(uint256 amount) external onlyAuthorized {
+        require(amount > 0, "TokenStaking: Amount must be > 0");
+        _checkNewDay();
+        todayIncomingTokens += amount;
+        emit IncomingTokensRecorded(amount, todayIncomingTokens);
+    }
+
+    /**
+     * @dev 回退函数：接收意外转入的 BNB
+     * 合约主要处理代币奖励，但仍需处理意外的 BNB 转入
      */
     receive() external payable {
-        require(msg.value > 0, "TokenStaking: Cannot receive zero BNB");
-        recordIncomingBNB(msg.value);
-        emit BNBReceived(msg.value);
+        // 意外转入的 BNB 通过 emergencyWithdrawBNB 取回
     }
 
     /**
@@ -309,15 +318,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     /**
-     * @dev 记录进入合约的BNB数量
-     */
-    function recordIncomingBNB(uint256 amount) internal {
-        _checkNewDay();
-        todayIncomingBNB += amount;
-        emit IncomingBNBRecorded(amount, todayIncomingBNB);
-    }
-
-    /**
      * @dev 检查是否进入新的一天
      * 仅重置每日统计，dailyRewardPerToken 保持累计不重置
      */
@@ -326,7 +326,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         if (todayStart != currentDayStart) {
             todayStart = currentDayStart;
-            todayIncomingBNB = 0;
+            todayIncomingTokens = 0;
             todayRewardAmount = 0;
             // dailyRewardPerToken 为累积值，跨日不重置
             _adjustRewardRate();
@@ -335,11 +335,11 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     /**
      * @dev 动态调整奖励比例
-     * 规则：流入BNB量是每日奖励总量的倍数，每增加1倍，比例上调0.01%，最多上调0.1%
+     * 规则：流入代币量是每日奖励总量的倍数，每增加1倍，比例上调0.01%，最多上调0.1%
      */
     function _adjustRewardRate() internal {
-        if (todayRewardAmount > 0 && todayIncomingBNB > todayRewardAmount) {
-            uint256 multiple = todayIncomingBNB / todayRewardAmount;
+        if (todayRewardAmount > 0 && todayIncomingTokens > todayRewardAmount) {
+            uint256 multiple = todayIncomingTokens / todayRewardAmount;
             uint256 maxSteps = (maxRewardRate - rewardRate) / rateStep;
             uint256 steps = multiple - 1;
 
@@ -380,8 +380,13 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         
         require(todayRewardAmount == 0, "TokenStaking: Daily reward already calculated");
 
-        uint256 contractBalance = address(this).balance;
-        uint256 availableBalance = contractBalance - totalPendingRewards;
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        uint256 contractTokenBalance = token.balanceOf(address(this));
+        // 可用奖励余额 = 总代币余额 - 已质押的代币（质押的代币需要归还用户）
+        // 由于质押和奖励都在合约中，我们区分：totalStakedTokens 是用户质押的本金
+        uint256 availableBalance = contractTokenBalance > totalStakedTokens
+            ? contractTokenBalance - totalStakedTokens - totalPendingRewards
+            : 0;
         
         if (availableBalance > 0 && totalStakedTokens > 0) {
             todayRewardAmount = availableBalance * rewardRate / 10000;
@@ -422,7 +427,10 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         uint256 userReward = stake.accumulatedRewards;
         require(userReward > 0, "TokenStaking: No rewards to claim");
-        require(address(this).balance >= userReward, "TokenStaking: Insufficient BNB in contract");
+        
+        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        require(token.balanceOf(address(this)) >= userReward + totalStakedTokens, 
+                "TokenStaking: Insufficient token balance in contract");
 
         stake.accumulatedRewards = 0;
 
@@ -433,8 +441,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             totalPendingRewards = 0;
         }
 
-        (bool success, ) = payable(msg.sender).call{value: userReward}("");
-        require(success, "TokenStaking: Failed to transfer BNB rewards");
+        SafeERC20Upgradeable.safeTransfer(token, msg.sender, userReward);
 
         emit RewardsClaimed(msg.sender, userReward);
     }
@@ -517,19 +524,20 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     /**
-     * @dev 获取合约BNB余额
-     * @return uint256 BNB余额
-     */
-    function getContractBNBBalance() external view returns (uint256) {
-        return address(this).balance;
-    }
-
-    /**
      * @dev 获取合约代币余额
      * @return uint256 代币余额
      */
     function getContractTokenBalance() external view returns (uint256) {
         return IERC20Upgradeable(tokenContract).balanceOf(address(this));
+    }
+
+    /**
+     * @dev 获取合约可用奖励代币余额（扣除质押本金后）
+     * @return uint256 奖励代币余额
+     */
+    function getRewardTokenBalance() external view returns (uint256) {
+        uint256 balance = IERC20Upgradeable(tokenContract).balanceOf(address(this));
+        return balance > totalStakedTokens ? balance - totalStakedTokens : 0;
     }
 
     /**
@@ -549,7 +557,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         require(tokenContract != address(0), "TokenStaking: Token contract not set");
         require(amount <= token.balanceOf(address(this)), "TokenStaking: insufficient token balance");
-        token.transfer(owner(), amount);
+        SafeERC20Upgradeable.safeTransfer(token, owner(), amount);
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
 }

@@ -1529,7 +1529,7 @@ window.ZODIAC_WEB3 = (function() {
             return await contract.methods.rewardType().call();
         } catch (e) {
             console.error('[ZODIAC_WEB3] getArenaRewardType failed:', e);
-            return 0; // 默认BNB
+            return 1; // 默认代币
         }
     }
 

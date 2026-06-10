@@ -365,7 +365,7 @@
                         </h3>
                         <div id="rewardPoolDisplay" class="text-center mb-4 p-4 bg-yellow-500/10 rounded-lg">
                             <div class="text-yellow-400 text-2xl font-bold" id="rewardPoolAmount">--</div>
-                            <div class="text-gray-400 text-sm mt-1">BNB 总奖励</div>
+                            <div class="text-gray-400 text-sm mt-1">代币总奖励</div>
                             <div class="text-gray-500 text-xs mt-2" id="rewardRateInfo">奖励比例: --</div>
                         </div>
                         <div id="rewardRules" class="mt-4 p-3 bg-blue-500/10 rounded-lg">
@@ -1905,7 +1905,7 @@
                             <div class="text-white text-sm font-medium truncate">${player.isMock ? '模拟玩家' + player.rank : shortenAddress(player.address)}</div>
                             <div class="flex gap-1 mt-1">${player.team && player.team.length > 0 ? player.team.slice(0, 6).map(nft => `<div class="relative"><img src="${nft.imagePath}" alt="${nft.name}" class="w-5 h-5 rounded object-cover" /><span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-bold">${nft.level}</span></div>`).join('') : ''}</div>
                         </div>
-                        <div class="text-yellow-400 text-xs font-medium mr-2">${parseFloat(rewards[index]) > 0 ? rewards[index] : '--'} BNB</div>
+                        <div class="text-yellow-400 text-xs font-medium mr-2">${parseFloat(rewards[index]) > 0 ? rewards[index] : '--'} Token</div>
                         <div class="text-white text-xs font-medium">${player.points}</div>
                     </div>
                 `).join('');
