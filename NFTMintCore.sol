@@ -305,14 +305,20 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
     
     function setNftDataContract(address _nftDataContract) external onlyOwner {
+        // 修复：零地址检查，防止错误配置导致所有 mint 失败
+        require(_nftDataContract != address(0), "NFTMint: nftDataContract cannot be zero address");
         nftDataContract = _nftDataContract;
     }
     
     function setTokenBurnerContract(address _tokenBurnerContract) external onlyOwner {
+        // 修复：零地址检查，防止错误配置导致 burner mint 失败
+        require(_tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract cannot be zero address");
         tokenBurnerContract = _tokenBurnerContract;
     }
     
     function setBreedingContract(address _breedingContract) external onlyOwner {
+        // 修复：零地址检查，防止错误配置导致 breeding mint 失败
+        require(_breedingContract != address(0), "NFTMint: breedingContract cannot be zero address");
         breedingContract = _breedingContract;
     }
     
@@ -376,6 +382,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
     
     function transferFrom(address from, address to, uint256 tokenId) public {
+        // 修复：添加 msg.sender 授权检查，确保只有所有者或授权方可以转移
+        require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: caller is not owner nor approved");
         require(_ownerOf[tokenId] == from, "ERC721: transfer from incorrect owner");
         require(to != address(0), "ERC721: transfer to the zero address");
         
@@ -391,6 +399,14 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit Transfer(from, to, tokenId);
         
         _afterTokenTransfer(from, to, tokenId, 1);
+    }
+    
+    /**
+     * @dev 检查调用者是否是 NFT 所有者或被授权者
+     */
+    function _isApprovedOrOwner(address spender, uint256 tokenId) internal view returns (bool) {
+        address owner = _ownerOf[tokenId];
+        return (spender == owner || _operatorApprovals[owner][spender]);
     }
     
     function _removeTokenFromOwnerEnumeration(address from, uint256 tokenId) private {
@@ -436,6 +452,20 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     
     function safeTransferFrom(address from, address to, uint256 tokenId) external {
         transferFrom(from, to, tokenId);
+        // 修复：检查 to 是合约时是否实现了 IERC721Receiver 接口，避免 NFT 被锁定在不识别 ERC721 的合约中
+        if (to.code.length > 0) {
+            try IERC721Receiver(to).onERC721Received(msg.sender, from, tokenId, "") returns (bytes4 retval) {
+                require(retval == IERC721Receiver.onERC721Received.selector, "ERC721: invalid receiver");
+            } catch (bytes memory reason) {
+                if (reason.length == 0) {
+                    revert("ERC721: transfer to non ERC721Receiver implementer");
+                } else {
+                    assembly {
+                        revert(add(32, reason), mload(reason))
+                    }
+                }
+            }
+        }
     }
     
     function adminSetNFTLevel(uint256 tokenId, uint256 newLevel) external onlyOwner {

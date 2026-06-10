@@ -116,8 +116,10 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         return NFTLib.concat5(namePart, descPart, attrPart, "", "");
     }
     
-    function setNftMintCore(address _nftMintCore) external {
-        require(msg.sender == INFTMintCore(nftMintCore).owner(), "NFTMintMetadata: Only owner");
+    function setNftMintCore(address _nftMintCore) external onlyOwner {
+        // 修复：使用 onlyOwner 修饰符确保只有合约所有者可以调用
+        // 同时添加地址有效性检查
+        require(_nftMintCore != address(0), "NFTMintMetadata: Invalid address");
         nftMintCore = _nftMintCore;
     }
 }

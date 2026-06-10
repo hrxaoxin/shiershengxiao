@@ -175,7 +175,8 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         address[] storage rankings = seasonRankings[seasonId];
         uint256 currentIndex = playerRankIndex[seasonId][player];
         
-        if (currentIndex > 0) {
+        // 先从当前位置移除（如果已经在排行榜中）
+        if (currentIndex > 0 && currentIndex < rankings.length) {
             for (uint256 i = currentIndex; i + 1 < rankings.length; i++) {
                 rankings[i] = rankings[i + 1];
                 playerRankIndex[seasonId][rankings[i]] = i;
@@ -184,11 +185,14 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
             playerRankIndex[seasonId][player] = 0;
         }
         
+        // 修复：确保 targetRank 在有效范围内
         if (targetRank >= rankings.length) {
+            // 添加到末尾
             rankings.push(player);
             playerRankIndex[seasonId][player] = rankings.length - 1;
         } else {
-            rankings.push(address(0));
+            // 插入到指定位置
+            rankings.push(address(0)); // 先扩展数组
             for (uint256 i = rankings.length - 1; i > targetRank; i--) {
                 rankings[i] = rankings[i - 1];
                 playerRankIndex[seasonId][rankings[i]] = i;
@@ -201,7 +205,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
     
     function getLeaderboard(uint256 seasonId, uint256 limit) external view returns (LeaderboardEntry[] memory) {
-        address[] storage rankings = seasonRankings[seasonId];
+        address[] memory rankings = seasonRankings[seasonId];
         uint256 size = limit < rankings.length ? limit : rankings.length;
         LeaderboardEntry[] memory result = new LeaderboardEntry[](size);
         for (uint256 i = 0; i < size; i++) {
@@ -223,7 +227,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 totalPages,
         uint256 totalPlayers
     ) {
-        address[] storage rankings = seasonRankings[seasonId];
+        address[] memory rankings = seasonRankings[seasonId];
         uint256 start = page * pageSize;
         if (start >= rankings.length) {
             return (new LeaderboardEntry[](0), 0, rankings.length);
@@ -257,7 +261,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         address[] memory playerAddrs,
         uint256[] memory scores
     ) {
-        address[] storage rankings = seasonRankings[seasonId];
+        address[] memory rankings = seasonRankings[seasonId];
         if (startRank >= rankings.length) {
             return (new address[](0), new uint256[](0));
         }
@@ -270,12 +274,12 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         }
         return (playerAddrs, scores);
     }
-    
+
     function getTopPlayers(uint256 seasonId, uint256 count) external view returns (
         address[] memory playerAddrs,
         uint256[] memory scores
     ) {
-        address[] storage rankings = seasonRankings[seasonId];
+        address[] memory rankings = seasonRankings[seasonId];
         uint256 size = count < rankings.length ? count : rankings.length;
         playerAddrs = new address[](size);
         scores = new uint256[](size);
@@ -362,11 +366,14 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     function getPlayerChallengeStatus(address player) external view returns (
         uint256 remainingAttempts,
         uint256 lastBattleTime,
-        uint256 hasTeam,
-        uint256 seasonId
+        bool hasTeam
     ) {
+        // 修复：返回值数量和类型需要与 IArenaPlayer 接口匹配
+        // remainingAttempts 和 lastBattleTime 在 ArenaLeaderboard 中不存储，返回 0
         PlayerRecord storage record = players[player];
-        return (0, 0, record.seasonId != 0 ? 1 : 0, record.seasonId);
+        remainingAttempts = 0;
+        lastBattleTime = 0;
+        hasTeam = record.seasonId != 0;
     }
     
     function getPlayerRank(address player) external view returns (uint256) {

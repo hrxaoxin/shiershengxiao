@@ -491,13 +491,14 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             });
         }
 
+        uint256 currentHistoryIndex = battleHistoryIndex;
         battleHistoryIndex = (battleHistoryIndex + 1) % MAX_BATTLE_HISTORY;
 
         emit BattleStarted(battleId, msg.sender, challengedAddress, challengerTeam, challengedTeam);
 
         uint8 winner = _executeBattle(challengerTeam, challengedTeam, battleId);
 
-        uint256 historyIndex = battleHistory.length > MAX_BATTLE_HISTORY ? battleHistoryIndex : battleHistory.length - 1;
+        uint256 historyIndex = battleHistory.length > MAX_BATTLE_HISTORY ? currentHistoryIndex : battleHistory.length - 1;
         battleHistory[historyIndex].winner = winner;
         battleHistory[historyIndex].status = 2;
 
@@ -619,13 +620,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             uint256[6] memory speedOrder1 = _getSpeedOrder(state1, randomSeed);
             uint256[6] memory speedOrder2 = _getSpeedOrder(state2, randomSeed + 1000);
 
-            team1Alive = _executeTeamAttacks(speedOrder1, state1, state2, randomSeed, team1Alive);
+            (team1Alive, state2) = _executeTeamAttacks(speedOrder1, state1, state2, randomSeed, team1Alive);
             
             if (!team1Alive) {
                 break;
             }
 
-            team2Alive = _executeTeamAttacks(speedOrder2, state2, state1, randomSeed + 1000, team2Alive);
+            (team2Alive, state1) = _executeTeamAttacks(speedOrder2, state2, state1, randomSeed + 1000, team2Alive);
         }
 
         if (team1Alive && team2Alive) {
@@ -643,7 +644,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         TeamState memory targetState,
         uint256 seed,
         bool attackerAlive
-    ) internal view returns (bool) {
+    ) internal view returns (bool, TeamState memory) {
         for (uint i = 0; i < 6; i++) {
             uint attackerIdx = speedOrder[i];
             if (!attackerState.alive[attackerIdx] || !attackerAlive) continue;
@@ -651,15 +652,90 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             NFTTraits memory attacker = attackerState.traits[attackerIdx];
             uint256 skillKey = attacker.element * ZODIAC_TYPE_COUNT + attacker.zodiac;
             Skill memory skill = skills[skillKey];
-            bool canUseSkill = (seed % SKILL_USE_CHANCE_DENOMINATOR == 0 || _shouldUseSkill(attackerState, attackerIdx));
+            bool canUseSkill = (seed % SKILL_USE_CHANCE_DENOMINATOR == 0);
 
-            BattleResult memory result = _executeSingleAttack(attacker, targetState, seed + i, attackerIdx, canUseSkill, skill);
-            targetState = result.targetState;
-            if (!result.targetAlive) {
-                return false;
+            // 执行单次攻击，修改 targetState
+            targetState = _executeSingleAttackIntoState(attacker, targetState, seed + i, attackerIdx, canUseSkill, skill);
+            if (!_hasAnyAlive(targetState.alive)) {
+                return (false, targetState);
             }
         }
-        return true;
+        return (true, targetState);
+    }
+
+    /**
+     * @dev 执行单次攻击，返回修改后的目标状态
+     */
+    function _executeSingleAttackIntoState(
+        NFTTraits memory attacker,
+        TeamState memory target,
+        uint256 seed,
+        uint attackerIdx,
+        bool canUseSkill,
+        Skill memory skill
+    ) internal pure returns (TeamState memory) {
+        if (canUseSkill && skill.skillId > 0) {
+            return _applySkillToState(attacker, target, attackerIdx, skill, seed);
+        } else {
+            uint defenderIdx = _findTarget(target.alive, target.traits, target.hp);
+            if (defenderIdx == 6) {
+                return target;
+            }
+            uint damage = _calculateDamage(attacker, target.traits[defenderIdx], seed);
+            if (target.hp[defenderIdx] > damage) {
+                target.hp[defenderIdx] -= damage;
+            } else {
+                target.hp[defenderIdx] = 0;
+                target.alive[defenderIdx] = false;
+            }
+            return target;
+        }
+    }
+
+    /**
+     * @dev 应用技能效果到状态
+     */
+    function _applySkillToState(NFTTraits memory attacker, TeamState memory target, uint attackerIdx, Skill memory skill, uint256 seed) internal pure returns (TeamState memory) {
+        uint256 baseDamage = 0;
+        uint256 targetIndex = 6;
+        uint256 validTargetIndex = 6;
+
+        for (uint i = 0; i < 6; i++) {
+            if (target.alive[i]) {
+                validTargetIndex = i;
+                break;
+            }
+        }
+
+        if (validTargetIndex < 6) {
+            targetIndex = skill.isAoe ? validTargetIndex : _findTarget(target.alive, target.traits, target.hp);
+            if (targetIndex >= 6) {
+                targetIndex = validTargetIndex;
+            }
+            baseDamage = _calculateDamage(attacker, target.traits[targetIndex], seed);
+        }
+        uint256 skillDamage = (baseDamage * skill.damage) / 100;
+
+        if (skill.isAoe) {
+            for (uint i = 0; i < 6; i++) {
+                if (target.alive[i]) {
+                    if (target.hp[i] > skillDamage) {
+                        target.hp[i] -= skillDamage;
+                    } else {
+                        target.hp[i] = 0;
+                        target.alive[i] = false;
+                    }
+                }
+            }
+        } else if (targetIndex < 6) {
+            if (target.hp[targetIndex] > skillDamage) {
+                target.hp[targetIndex] -= skillDamage;
+            } else {
+                target.hp[targetIndex] = 0;
+                target.alive[targetIndex] = false;
+            }
+        }
+        return target;
     }
 
     /**
@@ -788,7 +864,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         bytes32 part1 = keccak256(abi.encodePacked(battleId, block.timestamp, block.number));
         bytes32 part2 = keccak256(abi.encodePacked(msg.sender, address(this), block.coinbase));
         bytes32 part3 = keccak256(abi.encodePacked(block.prevrandao, tx.gasprice, gasleft()));
-        bytes32 part4 = keccak256(abi.encodePacked(block.basefee, block.difficulty));
+        bytes32 part4 = keccak256(abi.encodePacked(block.basefee, block.chainid));
         
         bytes32 entropy = keccak256(abi.encodePacked(part1, part2, part3, part4));
         return uint256(entropy);
@@ -836,8 +912,17 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint256[6] calldata team1,
         uint256[6] calldata team2
     ) external view returns (uint8) {
-        uint256 battleId = block.timestamp % 1000 + 1;
-        return _executeBattleCore(team1, team2, battleId);
+        // 修复：使用多源熵生成种子，避免同区块所有调用结果相同
+        uint256 seed = uint256(keccak256(abi.encodePacked(
+            block.timestamp,
+            block.number,
+            block.prevrandao,
+            block.coinbase,
+            msg.sender,
+            team1[0],
+            team2[0]
+        )));
+        return _executeBattleCore(team1, team2, seed);
     }
 
     /**
@@ -951,8 +1036,16 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         require(_validateTeam(attackerTeam), "Battle: Invalid attacker team");
         require(_validateTeam(defenderTeam), "Battle: Invalid defender team");
 
-        uint256 battleId = block.timestamp % 1000 + 1;
-        uint8 winner = _executeBattleView(attackerTeam, defenderTeam, battleId);
+        // 修复：使用多源熵生成种子，避免同区块结果完全一致
+        uint256 seed = uint256(keccak256(abi.encodePacked(
+            block.timestamp,
+            block.number,
+            block.prevrandao,
+            msg.sender,
+            attackerTeam[0],
+            defenderTeam[0]
+        )));
+        uint8 winner = _executeBattleView(attackerTeam, defenderTeam, seed);
 
         return (true, winner);
     }
@@ -1020,9 +1113,8 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     /**
      * @dev 暂停合约
      */
-    function pause(string calldata reason) external onlyOwner {
+    function pause(string calldata) external onlyOwner {
         _pause();
-        emit Paused(msg.sender, reason);
     }
 
     /**

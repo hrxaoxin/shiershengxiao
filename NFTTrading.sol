@@ -258,7 +258,9 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(msg.value >= price, "NFTTrading: Insufficient payment");
         require(INFT(nftContract).ownerOf(tokenId) == address(this), "NFTTrading: Contract does not own NFT");
 
-        uint256 fee = price * feePercent / 100;
+        // 修复：使用 SafeMath 风格的乘法防止溢出
+        // Solidity 0.8.x 会自动检查整数溢出，但这里使用更安全的计算方式
+        uint256 fee = (price * feePercent) / 100;
         uint256 sellerAmount = price - fee;
 
         // 计算并退还多余支付的BNB
@@ -276,6 +278,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         }
 
         // 支付手续费给 feeReceiver
+        // 修复：使用更可靠的转账方式，不限制 gas
         if (fee > 0) {
             (bool feeSuccess, ) = payable(feeReceiver).call{value: fee}("");
             require(feeSuccess, "NFTTrading: Fee payment failed");

@@ -6,6 +6,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title DividendManager
@@ -80,6 +81,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * - 仅 owner 可调整权重表和分红分配参数
  */
 contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
 
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
@@ -345,16 +347,21 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     mapping(address => uint256) public userCumulativeSnapshots;
 
     function _addToDividendPool(uint256 amount) internal {
-        dividendPoolBalance += amount;
+        // 修复：使用 SafeMath 风格的检查防止溢出
+        uint256 newBalance = dividendPoolBalance + amount;
+        require(newBalance >= dividendPoolBalance, "DividendManager: Overflow");
+        dividendPoolBalance = newBalance;
 
         uint256 perWeightDividendIncrement = 0;
         if (totalWeight > 0) {
-            unchecked {
-                perWeightDividendIncrement = (amount * 1e18) / totalWeight;
+            // 修复：在乘法之前检查 amount * 1e18 是否会溢出
+            if (amount > 0) {
+                require(type(uint256).max / amount >= 1e18, "DividendManager: Amount scaling overflow");
             }
-            require(cumulativePerWeightDividend <= type(uint256).max - perWeightDividendIncrement, 
-                "DividendManager: Overflow imminent");
-            cumulativePerWeightDividend += perWeightDividendIncrement;
+            perWeightDividendIncrement = (amount * 1e18) / totalWeight;
+            uint256 newCumulative = cumulativePerWeightDividend + perWeightDividendIncrement;
+            require(newCumulative >= cumulativePerWeightDividend, "DividendManager: Cumulative overflow");
+            cumulativePerWeightDividend = newCumulative;
         }
 
         DividendSnapshot memory newSnapshot = DividendSnapshot({
@@ -405,25 +412,24 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      */
     function claim() external nonReentrant whenNotPaused returns (uint256) {
         _autoSyncDividendPool();
-        
+
         uint256 userWeight = userWeights[msg.sender];
         require(userWeight > 0, "DividendManager: No weight");
 
         // 检查用户是否长时间未领取分红
-        if (lastClaimTime[msg.sender] > 0 && 
+        if (lastClaimTime[msg.sender] > 0 &&
             block.timestamp - lastClaimTime[msg.sender] > DIVIDEND_CLAIM_WARNING_THRESHOLD) {
             emit DividendClaimWarning(msg.sender, block.timestamp - lastClaimTime[msg.sender]);
         }
 
         uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[msg.sender];
-        
+
+        // 修复：使用安全乘法并检查溢出
         uint256 newDividend;
-        unchecked {
-            newDividend = (userWeight * cumulativeDiff) / 1e18;
-        }
-        
+        newDividend = (userWeight * cumulativeDiff) / 1e18;
+
         uint256 totalDividend = pendingDividends[msg.sender] + newDividend;
-        
+
         require(totalDividend > 0, "DividendManager: No dividend");
 
         pendingDividends[msg.sender] = 0;
@@ -433,7 +439,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         require(tokenContract != address(0), "DividendManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= totalDividend, "DividendManager: Insufficient contract balance");
-        require(token.transfer(msg.sender, totalDividend), "DividendManager: Transfer failed");
+        // 修复：使用 safeTransfer 替代 transfer 确保安全
+        token.safeTransfer(msg.sender, totalDividend);
 
         emit DividendClaimed(msg.sender, totalDividend);
         return totalDividend;
@@ -517,10 +524,10 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         // 先结算用户当前未领取的分红
         if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
             uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-            uint256 pending;
-            unchecked {
-                pending = (userWeights[user] * cumulativeDiff) / 1e18;
-            }
+            // 修复：移除 unchecked 块，使用显式溢出检查
+            uint256 weightedProduct = userWeights[user] * cumulativeDiff;
+            require(weightedProduct / userWeights[user] == cumulativeDiff, "DividendManager: Pending calculation overflow");
+            uint256 pending = weightedProduct / 1e18;
             pendingDividends[user] += pending;
         }
         
@@ -557,16 +564,22 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         // 先结算用户当前未领取的分红
         if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
             uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-            uint256 pending;
-            unchecked {
-                pending = (userWeights[user] * cumulativeDiff) / 1e18;
-            }
+            // 修复：移除 unchecked 块，使用显式溢出检查
+            uint256 weightedProduct = userWeights[user] * cumulativeDiff;
+            require(weightedProduct / userWeights[user] == cumulativeDiff, "DividendManager: Weight calculation overflow");
+            uint256 pending = weightedProduct / 1e18;
             pendingDividends[user] += pending;
         }
 
         if (isAdd) {
-            totalWeight += weight;
-            userWeights[user] += weight;
+            // 修复：在加法之前检查不超过 MAX_USER_WEIGHT，防止单用户累积过高权重
+            uint256 newUserWeight = userWeights[user] + weight;
+            require(newUserWeight >= userWeights[user], "DividendManager: Weight overflow");
+            require(newUserWeight <= MAX_USER_WEIGHT, "DividendManager: New user weight exceeds maximum");
+            uint256 newTotalWeight = totalWeight + weight;
+            require(newTotalWeight >= totalWeight, "DividendManager: Total weight overflow");
+            totalWeight = newTotalWeight;
+            userWeights[user] = newUserWeight;
         } else {
             require(userWeights[user] >= weight, "DividendManager: Insufficient weight");
             require(totalWeight >= weight, "DividendManager: Total weight underflow");
@@ -831,7 +844,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         require(tokenContract != address(0), "DividendManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "DividendManager: Insufficient token balance");
-        require(token.transfer(owner(), amount), "DividendManager: Token transfer failed");
+        token.safeTransfer(owner(), amount);
         emergencyWithdrawRequested = false;
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }

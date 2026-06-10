@@ -7,10 +7,12 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 import "./ArenaRankingLib.sol";
 
 contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    using SafeERC20 for IERC20;
     struct SeasonRewardInfo {
         uint256 rewardPool;
         uint256 tokenRewardPool;
@@ -87,7 +89,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         mockRewardRecipient = recipient;
     }
 
-    function calculateSeasonRewards(uint256 seasonId) external onlyAuthorized whenNotPaused {
+    function calculateSeasonRewards(uint256 seasonId) external onlyAuthorized whenNotPaused nonReentrant {
         require(!seasonRewards[seasonId].rewardCalculated, "ArenaReward: Already calculated");
         
         (uint256 rewardPool, uint256 tokenRewardPool, uint256 totalPlayers) = _getSeasonData(seasonId);
@@ -166,7 +168,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             require(success, "ArenaReward: Mock reward transfer failed");
         } else {
             require(tokenContract != address(0), "ArenaReward: Token contract not set");
-            require(IERC20(tokenContract).transfer(mockRewardRecipient, amount), "ArenaReward: Token transfer failed");
+            SafeERC20.safeTransfer(IERC20(tokenContract), mockRewardRecipient, amount);
         }
     }
 
@@ -187,7 +189,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             require(tokenContract != address(0), "ArenaReward: Token contract not set");
             IERC20 token = IERC20(tokenContract);
             require(token.balanceOf(address(this)) >= reward, "ArenaReward: Insufficient token balance");
-            require(token.transfer(msg.sender, reward), "ArenaReward: Token transfer failed");
+            // 修复：使用 safeTransfer 替代普通 transfer，确保安全
+            token.safeTransfer(msg.sender, reward);
         }
         
         emit RewardClaimed(msg.sender, seasonId, reward);
@@ -195,28 +198,42 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function claimSeasonReward() external nonReentrant whenNotPaused {
         uint256 currentSeasonId = IArenaRanking(rankingContract).currentSeasonId();
-        this.claimReward(currentSeasonId);
+        // 修复：直接调用内部逻辑而非 this.claimReward，避免 msg.sender 被替换为 address(this)
+        _claimRewardFor(msg.sender, currentSeasonId);
     }
 
     function claimSeasonReward(address player, uint256 seasonId) external nonReentrant whenNotPaused returns (uint256) {
         require(player != address(0), "ArenaReward: Invalid player address");
         require(seasonId > 0, "ArenaReward: Invalid season ID");
-        require(!claimedRewards[seasonId][player], "ArenaReward: Reward already claimed");
+        // 修复：仅限授权合约（如排名结算合约）或玩家本人调用，防止他人随意触发领取
+        require(msg.sender == player || msg.sender == authorizer || msg.sender == owner(),
+            "ArenaReward: Not authorized to claim for this player");
+        return _claimRewardFor(player, seasonId);
+    }
+
+    /**
+     * @dev 内部：为指定玩家领取指定赛季奖励
+     */
+    function _claimRewardFor(address player, uint256 seasonId) internal returns (uint256) {
         require(seasonRewards[seasonId].rewardCalculated, "ArenaReward: Rewards not calculated");
-        
+        require(!claimedRewards[seasonId][player], "ArenaReward: Reward already claimed");
+
         uint256 reward = playerSeasonRewards[seasonId][player];
         require(reward > 0, "ArenaReward: No reward to claim");
-        
+
         claimedRewards[seasonId][player] = true;
-        
+
         if (rewardType == 0) {
+            require(address(this).balance >= reward, "ArenaReward: Insufficient balance");
             (bool success, ) = payable(player).call{value: reward}("");
             require(success, "ArenaReward: BNB transfer failed");
         } else {
             require(tokenContract != address(0), "ArenaReward: Token contract not set");
-            IERC20(tokenContract).transfer(player, reward);
+            IERC20 token = IERC20(tokenContract);
+            require(token.balanceOf(address(this)) >= reward, "ArenaReward: Insufficient token balance");
+            token.safeTransfer(player, reward);
         }
-        
+
         emit RewardClaimed(player, seasonId, reward);
         return reward;
     }
@@ -268,7 +285,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(tokenContract != address(0), "ArenaReward: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "ArenaReward: Insufficient token balance");
-        require(token.transfer(owner(), amount), "ArenaReward: Token transfer failed");
+        // 修复：使用 safeTransfer 替代普通 transfer，确保安全
+        token.safeTransfer(owner(), amount);
         emit EmergencyWithdraw(owner(), amount);
     }
 

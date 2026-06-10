@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "./NFTInterface.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
@@ -32,6 +33,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * - 零地址检查：所有外部地址参数均需验证
  */
 contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
      */
@@ -295,7 +297,8 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 cost = isRare ? rareMintCost : normalMintCost;
         require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
-        require(token.transferFrom(user, BLACK_HOLE, cost), "TokenBurner: Token transfer failed");
+        // 修复：使用 SafeERC20.safeTransferFrom 确保安全
+        token.safeTransferFrom(user, BLACK_HOLE, cost);
 
         emit TokenBurned(user, cost, block.timestamp);
 
@@ -330,18 +333,25 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 cost = isRare ? rareMintCost * 10 : normalMintCost * 10;
         require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
-        require(token.transferFrom(user, BLACK_HOLE, cost), "TokenBurner: Token transfer failed");
+        // 修复：使用 SafeERC20.safeTransferFrom 确保安全
+        token.safeTransferFrom(user, BLACK_HOLE, cost);
 
         emit TokenBurned(user, cost, block.timestamp);
 
         INFTMint nftMint = INFTMint(nftMintContract);
         if (isRare) {
             for (uint256 i = 0; i < 10; i++) {
-                nftMint.mintRare(user);
+                uint256 tokenId = nftMint.mintRare(user);
+                require(tokenId > 0, "TokenBurner: NFT mint failed");
+                uint256 zodiacType = nftMint.tokenType(tokenId);
+                emit NFTMinted(user, tokenId, zodiacType, true);
             }
         } else {
             for (uint256 i = 0; i < 10; i++) {
-                nftMint.mintNormal(user);
+                uint256 tokenId = nftMint.mintNormal(user);
+                require(tokenId > 0, "TokenBurner: NFT mint failed");
+                uint256 zodiacType = nftMint.tokenType(tokenId);
+                emit NFTMinted(user, tokenId, zodiacType, false);
             }
         }
 
@@ -365,12 +375,22 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 totalCost = (normalMintCost * 6 + rareMintCost * 4) * 10;
         require(token.balanceOf(user) >= totalCost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= totalCost, "TokenBurner: Insufficient allowance");
-        require(token.transferFrom(user, BLACK_HOLE, totalCost), "TokenBurner: Token transfer failed");
+        // 修复：使用 SafeERC20.safeTransferFrom 确保安全
+        token.safeTransferFrom(user, BLACK_HOLE, totalCost);
 
         emit TokenBurned(user, totalCost, block.timestamp);
 
         INFTMint nftMint = INFTMint(nftMintContract);
-        nftMint.mintNormal(user);
+        for (uint256 i = 0; i < 6; i++) {
+            uint256 tokenId = nftMint.mint(user, zodiac);
+            require(tokenId > 0, "TokenBurner: NFT mint failed");
+            emit NFTMinted(user, tokenId, zodiac, false);
+        }
+        for (uint256 i = 0; i < 4; i++) {
+            uint256 tokenId = nftMint.mint(user, zodiac);
+            require(tokenId > 0, "TokenBurner: NFT mint failed");
+            emit NFTMinted(user, tokenId, zodiac, true);
+        }
 
         return true;
     }

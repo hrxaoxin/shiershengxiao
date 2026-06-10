@@ -8,16 +8,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
-
-interface IDividendManager {
-    function updateUserWeight(address user, uint256 level, bool isAdd, uint8 element) external;
-}
-
-interface IPancakeSwapPair {
-    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-    function token0() external view returns (address);
-    function token1() external view returns (address);
-}
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title NFTUpdate
@@ -81,6 +72,7 @@ interface IPancakeSwapPair {
  * 5. 等级 +1，用户权重更新，升级事件广播
  */
 contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IToken;
     using NFTLib for uint256;
 
     /**
@@ -353,35 +345,60 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 从PancakeSwap获取代币价格（USD）
      * @return uint256 代币价格（精度18位）
      */
+    /**
+     * @dev 预言机读取时所需的最小流动性（防止 pair 中人为设置极低流动性操纵价格）
+     * 使用万分比精度：100 = 1% 偏差即失效。默认 10**15（0.001 token 单位，对 18 位小数代币）
+     */
+    uint256 public minPancakeSwapLiquidity = 10**15;
+
+    /**
+     * @dev 设置预言机读取所需的最小流动性
+     * @param minLiq 最小流动性（代币单位，按 token 的 decimals 计）
+     */
+    function setMinPancakeSwapLiquidity(uint256 minLiq) external onlyOwner {
+        minPancakeSwapLiquidity = minLiq;
+    }
+
+    /**
+     * @dev 从PancakeSwap获取代币价格（USD）
+     * @return uint256 代币价格（精度18位）
+     */
     function getTokenPriceFromPancakeSwap() public view returns (uint256) {
         require(pancakeSwapPair != address(0), "E24: PancakeSwap pair not set");
         
         IPancakeSwapPair pair = IPancakeSwapPair(pancakeSwapPair);
         (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
+        // 修复：添加最小流动性检查，防止低流动性 pair 被操纵价格
         require(reserve0 > 0 && reserve1 > 0, "E25: Insufficient liquidity");
         
         address token0 = pair.token0();
         address token1 = pair.token1();
+
+        // 修复：校验 pair 确实包含 tokenContract，防止设置假 pair 导致价格异常
+        require(token0 == tokenContract || token1 == tokenContract, "E26: Token not in pair");
         
         uint8 decimals0 = 18;
         uint8 decimals1 = 18;
         
         if (token0 == tokenContract) {
+            // 修复：对代币侧（本项目代币）的流动性进行下限校验
+            require(uint256(reserve0) >= minPancakeSwapLiquidity, "E25: Token side liquidity too low");
             try IBEP20(token1).decimals() returns (uint8 d) {
                 decimals1 = d;
             } catch {}
             
             uint256 price = (uint256(reserve1) * 10**18) / uint256(reserve0);
             return _adjustPriceDecimals(price, decimals1);
-        } else if (token1 == tokenContract) {
+        } else {
+            // token1 == tokenContract
+            // 修复：对代币侧（本项目代币）的流动性进行下限校验
+            require(uint256(reserve1) >= minPancakeSwapLiquidity, "E25: Token side liquidity too low");
             try IBEP20(token0).decimals() returns (uint8 d) {
                 decimals0 = d;
             } catch {}
             
             uint256 price = (uint256(reserve0) * 10**18) / uint256(reserve1);
             return _adjustPriceDecimals(price, decimals0);
-        } else {
-            revert("E26: Token not found in pair");
         }
     }
     
@@ -429,9 +446,11 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(lv < 5, "E16");
         
         uint256[] memory burnCandidates = _findBurnCandidates(tokenId, lv, tokenTypeValue, nft);
+        // 修复：先完成升级逻辑（状态变更、跨合约权重更新）再销毁 NFT，避免升级失败导致 NFT 永久损失
+        _completeUpgrade(tokenId, lv, t, m, nft);
         _burnNFTs(burnCandidates, t, nft);
         
-        return _completeUpgrade(tokenId, lv, t, m, nft);
+        return lv + 1;
     }
 
     /**
@@ -465,6 +484,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
                 }
             }
         }
+        // 修复：升级到 lv+1 需要销毁 lv 张同类型同级 NFT，count 要包含 tokenId 本身
+        // 逻辑上 count 是所有同级 NFT 数（包括 tokenId 自己），需要 >= lv+1（销毁 lv 张 + 留 1 张升级）
         require(count >= lv + 1, "E17");
         
         uint256[] memory burnCandidates = new uint256[](lv);
@@ -561,7 +582,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         
         IToken t = IToken(tokenContract);
         require(t.balanceOf(msg.sender) >= cost, "E8: Insufficient balance");
-        require(t.transferFrom(msg.sender, BLACK_HOLE, cost), "E9: Transfer failed");
+        require(t.allowance(msg.sender, address(this)) >= cost, "E8: Insufficient allowance");
+        t.transferFrom(msg.sender, BLACK_HOLE, cost);
         
         NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
         uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);
@@ -627,7 +649,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         
         IToken t = IToken(tokenContract);
         require(t.balanceOf(msg.sender) >= cost, "E8: Insufficient balance");
-        require(t.transferFrom(msg.sender, BLACK_HOLE, cost), "E9: Transfer failed");
+        require(t.allowance(msg.sender, address(this)) >= cost, "E8: Insufficient allowance");
+        t.transferFrom(msg.sender, BLACK_HOLE, cost);
         
         NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
         uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);
@@ -724,7 +747,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(tokenContract != address(0), "NFTUpdate: Token contract not set");
         IToken token = IToken(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "NFTUpdate: Insufficient token balance");
-        require(token.transfer(owner(), amount), "NFTUpdate: Token transfer failed");
+        token.transfer(owner(), amount);
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
 

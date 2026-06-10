@@ -215,7 +215,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             userStakedWeight[msg.sender] += weight;
             
             uint256 snapshotIncrement = globalRewardPerWeight * weight;
-            require(_userSnapshotWeight[msg.sender] <= USER_SNAPSHOT_OVERFLOW_THRESHOLD - snapshotIncrement, "Staking: User snapshot overflow imminent");
+            // 修复：使用 < 而不是 <= 来正确防止溢出
+            require(_userSnapshotWeight[msg.sender] < USER_SNAPSHOT_OVERFLOW_THRESHOLD - snapshotIncrement, "Staking: User snapshot overflow imminent");
             _userSnapshotWeight[msg.sender] += snapshotIncrement;
         }
         emit Staked(msg.sender, tokenIds);
@@ -224,17 +225,21 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function unstake(uint256[] calldata tokenIds) external whenNotPaused nonReentrant {
         require(nftContract != address(0), "Staking: NFT contract not set");
         INFT nft = INFT(nftContract);
-        
+
+        uint256 totalWeightBefore = userStakedWeight[msg.sender];
+
         // 先计算并领取当前用户的所有待领取奖励
         uint256 totalClaimable = _calcUserPending(msg.sender);
-        if (totalClaimable > 0 && rewardTokenContract != address(0)) {
+        if (totalClaimable > 0) {
+            // 只有在有待领取奖励时才检查奖励代币合约是否设置
+            require(rewardTokenContract != address(0), "Staking: Reward token contract not set");
             IERC20 rewardToken = IERC20(rewardTokenContract);
             require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance for unstake");
-            
+
             // 先领取奖励
             rewardToken.safeTransfer(msg.sender, totalClaimable);
             emit RewardClaimed(msg.sender, totalClaimable);
-            
+
             // 重置用户状态
             uint256[] storage userNFTs = userStakedNFTs[msg.sender];
             for (uint256 j = 0; j < userNFTs.length; j++) {
@@ -244,10 +249,15 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
                     info.lastClaimTime = block.timestamp;
                 }
             }
-            _userSnapshotWeight[msg.sender] = globalRewardPerWeight * userStakedWeight[msg.sender];
             pendingRewards[msg.sender] = 0;
         }
-        
+
+        // 更新snapshot以反映当前stake状态
+        uint256 currentWeight = userStakedWeight[msg.sender];
+        if (currentWeight > 0) {
+            _userSnapshotWeight[msg.sender] = globalRewardPerWeight * currentWeight;
+        }
+
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId > 0, "Staking: Invalid token ID");
@@ -263,7 +273,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             totalWeightedNFTs -= weight;
             // 更新用户级别累计跟踪
             userStakedWeight[msg.sender] -= weight;
-            _userSnapshotWeight[msg.sender] -= globalRewardPerWeight * weight;
+            uint256 snapshotDecrement = globalRewardPerWeight * weight;
+            require(_userSnapshotWeight[msg.sender] >= snapshotDecrement, "Staking: Snapshot underflow");
+            _userSnapshotWeight[msg.sender] -= snapshotDecrement;
 
             nft.safeTransferFrom(address(this), msg.sender, tokenId);
         }
@@ -361,10 +373,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         }
         
         if (totalWeightedNFTs > 0 && dailyReward > 0) {
-            uint256 increment;
-            unchecked {
-                increment = (dailyReward * STAKING_REWARD_PRECISION) / totalWeightedNFTs;
-            }
+            // 修复：移除 unchecked 块，添加安全检查防止溢出
+            uint256 increment = (dailyReward * STAKING_REWARD_PRECISION) / totalWeightedNFTs;
             require(globalRewardPerWeight <= type(uint256).max - increment, "Staking: Reward overflow imminent");
             if (globalRewardPerWeight + increment >= REWARD_OVERFLOW_THRESHOLD) {
                 _resetRewardTracking();
@@ -547,16 +557,14 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         if (totalWeight == 0) return pendingRewards[user];
 
         uint256 snapshotBase = _userSnapshotWeight[user];
-        uint256 rewardBase;
-        unchecked {
-            rewardBase = globalRewardPerWeight * totalWeight;
-        }
+        
+        // 修复：移除 unchecked 块，使用安全计算方式
+        uint256 rewardBase = globalRewardPerWeight * totalWeight;
 
         if (rewardBase <= snapshotBase) return pendingRewards[user];
-        uint256 earnedReward;
-        unchecked {
-            earnedReward = (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
-        }
+        
+        // 修复：添加安全检查防止溢出
+        uint256 earnedReward = (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
         return earnedReward + pendingRewards[user];
     }
 

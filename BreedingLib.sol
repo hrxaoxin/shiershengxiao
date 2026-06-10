@@ -8,7 +8,8 @@ library BreedingLib {
         require(fatherZodiac == motherZodiac, "B: Z");
         uint256 seed = uint256(keccak256(abi.encodePacked(fatherType, motherType, timestamp)));
         uint256 childGender = seed % 2;
-        return fatherZodiac * 2 + childGender + 1;
+        uint256 element = fatherType / 24;
+        return element * 24 + fatherZodiac * 2 + childGender;
     }
 
     function generateGrowth(uint256 seed, uint256 offset) internal pure returns (uint8) {
@@ -20,6 +21,7 @@ library BreedingLib {
         uint256 motherZodiac = (motherType / 2) % 12;
         uint256 fatherGender = fatherType % 2;
         uint256 motherGender = motherType % 2;
+        // 修复：不仅要检查生肖相同，还要检查性别不同（必须一公一母才能繁殖）
         return fatherZodiac == motherZodiac && fatherGender != motherGender;
     }
 

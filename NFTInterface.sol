@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+interface IERC721Receiver {
+    function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external returns (bytes4);
+}
+
 interface IBEP20 {
     function decimals() external view returns (uint8);
     function balanceOf(address account) external view returns (uint256);
@@ -201,14 +205,70 @@ struct SeasonInfo {
 }
 
 /**
+ * @title IArenaRankingManager
+ * @dev 竞技场排名管理合约接口（赛季管理 + 战斗挑战 + NFT质押）
+ */
+interface IArenaRankingManager {
+    function currentSeasonId() external view returns (uint256);
+    function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external returns (bool);
+    function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external returns (bool);
+    function startNewSeason() external;
+    function checkAndStartNewSeason() external;
+    function settleSeason(uint256 seasonId) external;
+    function stakeNFTs(uint256[] calldata tokenIds) external;
+    function unstakeNFTs(uint256[] calldata tokenIds) external;
+    function setBattleTeam(uint256[] calldata tokenIds) external;
+    function setBattleTeam(uint256[6] calldata tokenIds) external;
+    function clearBattleTeam() external;
+    function rechargeChallengeAttempts() external;
+    function setRewardType(uint8 _rewardType) external;
+    function setSeasonRewardRate(uint256 rate) external;
+    function setArenaMode(uint8 mode) external;
+    function setMaxRechargeAttempts(uint256 _limit) external;
+    function addRewardToPool() external payable;
+}
+
+/**
+ * @title IArenaRankingQuery
+ * @dev 竞技场排名查询合约接口（排行榜查询 + 奖励领取 + 状态读取）
+ */
+interface IArenaRankingQuery {
+    function currentSeasonId() external view returns (uint256);
+    function getPlayerRank(address player) external view returns (uint256);
+    function getSeasonInfo(uint256 seasonId) external view returns (uint256, uint256, bool, bool, uint256);
+    function getCurrentSeasonInfo() external view returns (uint256, uint256, uint256, bool, uint256, uint256);
+    function getLeaderboard(uint256 seasonId, uint256 limit) external view returns (LeaderboardEntry[] memory);
+    function getLeaderboard(uint256 limit) external view returns (LeaderboardEntry[] memory);
+    function getLeaderboardByPage(uint256 seasonId, uint256 page, uint256 pageSize) external view returns (LeaderboardEntry[] memory, uint256, uint256);
+    function getLeaderboardPageCount(uint256 seasonId, uint256 pageSize) external view returns (uint256);
+    function getPlayerRecord(address player) external view returns (uint256, uint256, uint256, uint256);
+    function getMockPlayerRank(address player) external view returns (uint256);
+    function getTopPlayers(uint256 seasonId, uint256 count) external view returns (address[] memory, uint256[] memory);
+    function getSeasonHistory(uint256 startSeasonId, uint256 count) external view returns (SeasonInfo[] memory);
+    function getRecentSeasons(uint256 count) external view returns (SeasonInfo[] memory);
+    function getPlayerSeasonStats(address player, uint256 seasonId) external view returns (uint256, uint256, uint256, uint256, bool);
+    function getPlayersByRankRange(uint256 seasonId, uint256 startRank, uint256 endRank) external view returns (address[] memory, uint256[] memory);
+    function getSeasonReward(address player) external view returns (uint256);
+    function getSeasonReward(address player, uint256 seasonId) external view returns (uint256);
+    function getTotalPlayersInSeason(uint256 seasonId) external view returns (uint256);
+    function getRemainingAttempts(address player) external view returns (uint256);
+    function getPlayerBattleTeam(address player) external view returns (uint256[] memory);
+    function getLastBattleTime(address player) external view returns (uint256);
+    function getPlayerChallengeStatus(address player) external view returns (uint256, uint256, bool);
+    function isSeasonRewardClaimed(address player, uint256 seasonId) external view returns (bool);
+    function claimSeasonReward() external;
+    function claimSeasonReward(uint256 seasonId) external returns (uint256);
+    function rechargeCost() external pure returns (uint256);
+}
+
+/**
  * @title IArenaRanking
- * @dev 竞技场排名合约接口（核心战斗逻辑 + 排名）
+ * @dev 竞技场排名合约接口（兼容旧版，指向 ArenaRankingManager）
  */
 interface IArenaRanking {
     function currentSeasonId() external view returns (uint256);
     function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external returns (bool);
     function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external returns (bool);
-    function claimReward(uint256 seasonId) external;
     function getPlayerRank(address player) external view returns (uint256);
     function getSeasonInfo(uint256 seasonId) external view returns (uint256, uint256, bool, bool, uint256);
     function getCurrentSeasonInfo() external view returns (uint256, uint256, uint256, bool, uint256, uint256);
@@ -352,6 +412,133 @@ interface IDexRouter {
     function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
 }
 
+interface IDEXRouter {
+    function swapExactETHForTokens(
+        uint256 amountOutMin,
+        address[] calldata path,
+        address to,
+        uint256 deadline
+    ) external payable returns (uint256[] memory amounts);
+    
+    function WETH() external pure returns (address);
+    
+    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
+}
+
+interface IPancakeSwapPair {
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+    function token0() external view returns (address);
+    function token1() external view returns (address);
+}
+
+interface ISetNFTContract {
+    function setNFTContract(address _nftContract) external;
+}
+
+interface ISetRewardTokenContract {
+    function setRewardTokenContract(address _tokenContract) external;
+}
+
+interface ISetDividendPool {
+    function setDividendPool(address _dividendManager) external;
+}
+
+interface ISetNFTStakingPool {
+    function setNFTStakingPool(address _stakingAddress) external;
+}
+
+interface ISetTokenStakingPool {
+    function setTokenStakingPool(address _tokenStakingAddress) external;
+}
+
+interface ISetTokenContract {
+    function setTokenContract(address _tokenContract) external;
+}
+
+interface ISetArenaRewardPool {
+    function setArenaRewardPool(address _arenaRankingAddress) external;
+}
+
+interface ISetArenaRewardContract {
+    function setArenaRewardContract(address _arenaRewardContract) external;
+}
+
+interface ISetArenaLeaderboardContract {
+    function setArenaLeaderboardContract(address _arenaLeaderboardContract) external;
+}
+
+interface ISetArenaPlayerContract {
+    function setArenaPlayerContract(address _arenaPlayerContract) external;
+}
+
+interface ISetArenaBattleContract {
+    function setArenaBattleContract(address _arenaBattleContract) external;
+}
+
+interface ISetRankingContract {
+    function setRankingContract(address _rankingContract) external;
+}
+
+interface ISetTokenAddress {
+    function setTokenAddress(address _tokenContract) external;
+}
+
+interface ISetUSDTAddress {
+    function setUSDTAddress(address _usdtAddress) external;
+}
+
+interface ISetMetadataContract {
+    function setMetadataContract(address _metadataAddress) external;
+}
+
+interface ISetPancakeSwapPair {
+    function setPancakeSwapPair(address _pairAddress) external;
+}
+
+interface ISetAuthorizedNFTContract {
+    function setAuthorizedNFTContract(address _nftContract) external;
+}
+
+interface ISetTokenBurner {
+    function setTokenBurner(address _tokenBurner) external;
+}
+
+interface ISetNFTDataContract {
+    function setNFTDataContract(address _nftDataAddress) external;
+}
+
+interface ISetBattleContract {
+    function setBattleContract(address _battleAddress) external;
+}
+
+interface ISetFeeReceiver {
+    function setFeeReceiver(address _feeReceiver) external;
+}
+
+interface ISetRewardPool {
+    function setRewardPool(address _rewardPool) external;
+}
+
+interface ISetPoolManager {
+    function setPoolManager(address _poolManager) external;
+}
+
+interface ISetNFTUpdateContract {
+    function setNFTUpdateContract(address _nftUpdate) external;
+}
+
+interface ISetRewardManagerContract {
+    function setRewardManagerContract(address _rewardManager) external;
+}
+
+interface ISetBreedingContract {
+    function setBreedingContract(address _breedingContract) external;
+}
+
+interface IBreedingMarket {
+    function setBreedingCore(address _breedingCore) external;
+}
+
 /**
  * @title IDividendManager
  * @dev 分红池接口
@@ -364,6 +551,7 @@ interface IDividendManager {
     function getUserPendingDividend(address user) external view returns (uint256);
     function dividendPoolBalance() external view returns (uint256);
     function totalDistributed() external view returns (uint256);
+    function updateUserWeight(address user, uint256 level, bool isAdd, uint8 element) external;
 }
 
 /**

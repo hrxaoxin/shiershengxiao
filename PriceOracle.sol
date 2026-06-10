@@ -5,15 +5,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
-
-/**
- * @dev DEX Router 接口（兼容 Uniswap V2 标准）
- * 支持 FlapSwap、PancakeSwap、Uniswap
- */
-interface IDEXRouter {
-    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
-    function WETH() external pure returns (address);
-}
+import "./NFTInterface.sol";
 
 /**
  * @title PriceOracle

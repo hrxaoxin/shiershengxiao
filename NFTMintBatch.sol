@@ -34,9 +34,9 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function mintBatch(address to, uint256[] calldata zodiacTypes) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Zero address");
         uint256[] memory tokenIds = new uint256[](zodiacTypes.length);
-        uint256 baseSeed = INFTMintCore(nftMintCore).generateSecureRandom();
         
         for (uint256 i = 0; i < zodiacTypes.length; i++) {
+            // 修复：确保 zodiacTypes[i] 在有效范围内 (0-119)
             require(zodiacTypes[i] < 120, "NFTMint: Invalid type");
             uint256 tokenId = INFTMintCore(nftMintCore).mint(to, zodiacTypes[i]);
             tokenIds[i] = tokenId;

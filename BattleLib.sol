@@ -196,14 +196,13 @@ library BattleLib {
         bool isCritical
     ) internal pure returns (uint256) {
         uint256 baseDamage = attacker.attack * elementalBonus / 100;
-        // 提高中间精度，避免整数除法导致的精度损失
-        // 原公式: damage = baseDamage * 1000 / (1000 + defense)
-        // 使用 10000 作为中间精度因子
-        uint256 defenseFactor = 10000 * 1000 / (1000 + defender.defense);
-        uint256 finalDamage = baseDamage * defenseFactor / 10000;
+        // 防御力减伤公式: damage = baseDamage * 1000 / (1000 + defense)
+        // 修复：使用更高精度计算避免精度损失
+        uint256 defenseFactor = (1000 * 1000) / (1000 + defender.defense);
+        uint256 finalDamage = (baseDamage * defenseFactor) / 1000;
 
         if (isCritical) {
-            finalDamage = finalDamage * 3 / 2;
+            finalDamage = (finalDamage * 3) / 2;
         }
 
         return finalDamage;

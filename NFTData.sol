@@ -366,6 +366,13 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param owner 持有者地址
      */
     function _addToTypeOwners(uint256 nftType, address owner) internal {
+        // 修复：检查 owner 是否已在列表中，避免重复添加
+        address[] storage owners = _nftTypeOwners[nftType];
+        for (uint256 i = 0; i < owners.length; i++) {
+            if (owners[i] == owner) {
+                return; // 已存在，不需要重复添加
+            }
+        }
         _nftTypeOwners[nftType].push(owner);
     }
 
@@ -378,11 +385,16 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function _removeFromTypeOwners(uint256 nftType, address owner) internal {
         address[] storage owners = _nftTypeOwners[nftType];
         uint256 writeIndex = 0;
+        bool found = false;
         for (uint256 i = 0; i < owners.length; i++) {
-            if (owners[i] != owner) {
-                owners[writeIndex] = owners[i];
-                writeIndex++;
+            if (owners[i] == owner) {
+                found = true;
+                continue; // 跳过要移除的元素
             }
+            if (!found || i != writeIndex) {
+                owners[writeIndex] = owners[i];
+            }
+            writeIndex++;
         }
         while (owners.length > writeIndex) {
             owners.pop();
@@ -478,31 +490,26 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function calcUserWeight(address user) external view returns (uint256) {
         uint256[] memory userTokens = _getUserNFTs(user);
         uint256 totalWeight = 0;
-        
+
         for (uint256 i = 0; i < userTokens.length; i++) {
             uint256 tokenId = userTokens[i];
             struct_NFTInfo memory info = _nftInfo[tokenId];
-            
+
+            // 稀有属性权重（暗/光属性，zodiacType >= 72）
+            bool isRare = info.zodiacType >= RARE_TYPE_START;
+
             // 基础权重基于等级
             uint256 levelWeight;
-            if (info.level == 1) levelWeight = 1;
-            else if (info.level == 2) levelWeight = 2;
-            else if (info.level == 3) levelWeight = 6;
-            else if (info.level == 4) levelWeight = 18;
-            else if (info.level == 5) levelWeight = 66;
-            
-            // 稀有属性权重（光/暗属性）
-            if (info.zodiacType >= RARE_TYPE_START) {
-                if (info.level == 1) levelWeight = 10;
-                else if (info.level == 2) levelWeight = 12;
-                else if (info.level == 3) levelWeight = 16;
-                else if (info.level == 4) levelWeight = 28;
-                else if (info.level == 5) levelWeight = 76;
-            }
-            
+            if (info.level == 1) levelWeight = isRare ? 10 : 1;
+            else if (info.level == 2) levelWeight = isRare ? 12 : 2;
+            else if (info.level == 3) levelWeight = isRare ? 16 : 6;
+            else if (info.level == 4) levelWeight = isRare ? 28 : 18;
+            else if (info.level == 5) levelWeight = isRare ? 76 : 66;
+            else levelWeight = 0;
+
             totalWeight += levelWeight;
         }
-        
+
         return totalWeight;
     }
     

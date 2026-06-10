@@ -82,7 +82,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function _checkAndResetAttempts(address player) internal {
-        if (block.timestamp > playerLastResetTime[player] + 24 hours) {
+        if (playerLastResetTime[player] == 0 || block.timestamp > playerLastResetTime[player] + 24 hours) {
             _resetAttempts(player);
             rechargeCount[player] = 0;
         }
@@ -96,8 +96,10 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId > 0, "ArenaPlayer: Invalid token ID");
+            // 检查NFT是否已被其他合约质押
+            require(nftStakedOwner[tokenId] == address(0), "ArenaPlayer: NFT already staked in this contract");
+            // 检查是否在其他质押合约中（需要上层合约配合检查）
             require(nft.ownerOf(tokenId) == msg.sender, "ArenaPlayer: Not owner of token");
-            require(nftStakedOwner[tokenId] == address(0), "ArenaPlayer: NFT already staked");
             require(nft.isApprovedForAll(msg.sender, address(this)), "ArenaPlayer: Contract not approved for transfer");
             
             nft.safeTransferFrom(msg.sender, address(this), tokenId);
@@ -184,12 +186,21 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return playerBattleTeams[player];
     }
 
-    function rechargeChallengeAttempts() external nonReentrant whenNotPaused {
+    function rechargeChallengeAttempts() external payable nonReentrant whenNotPaused {
         require(IArenaRanking(rankingContract).currentSeasonId() > 0, "ArenaPlayer: No active season");
+        
+        _checkAndResetAttempts(msg.sender);
+        require(rechargeCount[msg.sender] < maxRechargeAttempts, "ArenaPlayer: Max recharge attempts reached");
+        // 修复：校验 msg.value >= rechargeCost，恢复付费充值机制
+        require(msg.value >= rechargeCost, "ArenaPlayer: Insufficient BNB for recharge");
+        
+        // 退还多余 BNB
+        if (msg.value > rechargeCost) {
+            (bool refundOk, ) = payable(msg.sender).call{value: msg.value - rechargeCost}("");
+            require(refundOk, "ArenaPlayer: Refund failed");
+        }
 
         uint256 newAttempts = RECHARGE_ATTEMPTS;
-        _checkAndResetAttempts(msg.sender);
-        
         playerRemainingAttempts[msg.sender] += newAttempts;
         rechargeCount[msg.sender]++;
 
@@ -197,6 +208,12 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function getRemainingAttempts(address player) external view returns (uint256) {
+        if (playerLastResetTime[player] == 0) {
+            return DAILY_ATTEMPTS;
+        }
+        if (block.timestamp > playerLastResetTime[player] + 24 hours) {
+            return DAILY_ATTEMPTS;
+        }
         return playerRemainingAttempts[player];
     }
 

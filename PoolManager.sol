@@ -141,7 +141,10 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function addToNFTStakingPool(uint256 amount) external onlyAuthorized whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        poolBalances[POOL_NFT_STAKING] += amount;
+        // 修复：添加溢出检查
+        uint256 newBalance = poolBalances[POOL_NFT_STAKING] + amount;
+        require(newBalance >= poolBalances[POOL_NFT_STAKING], "PoolManager: Overflow");
+        poolBalances[POOL_NFT_STAKING] = newBalance;
         _recordFlow(POOL_NFT_STAKING, amount, msg.sender, address(this), FLOW_DEPOSIT);
         emit PoolDeposited(POOL_NFT_STAKING, amount);
     }
@@ -151,7 +154,10 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function addToTokenStakingPool(uint256 amount) external onlyAuthorized whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        poolBalances[POOL_TOKEN_STAKING] += amount;
+        // 修复：添加溢出检查
+        uint256 newBalance = poolBalances[POOL_TOKEN_STAKING] + amount;
+        require(newBalance >= poolBalances[POOL_TOKEN_STAKING], "PoolManager: Overflow");
+        poolBalances[POOL_TOKEN_STAKING] = newBalance;
         _recordFlow(POOL_TOKEN_STAKING, amount, msg.sender, address(this), FLOW_DEPOSIT);
         emit PoolDeposited(POOL_TOKEN_STAKING, amount);
     }
@@ -161,7 +167,10 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function addToArenaRewardPool(uint256 amount) external onlyAuthorized whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        poolBalances[POOL_ARENA_REWARD] += amount;
+        // 修复：添加溢出检查
+        uint256 newBalance = poolBalances[POOL_ARENA_REWARD] + amount;
+        require(newBalance >= poolBalances[POOL_ARENA_REWARD], "PoolManager: Overflow");
+        poolBalances[POOL_ARENA_REWARD] = newBalance;
         _recordFlow(POOL_ARENA_REWARD, amount, msg.sender, address(this), FLOW_DEPOSIT);
         emit PoolDeposited(POOL_ARENA_REWARD, amount);
     }

@@ -187,7 +187,7 @@ contract WeightManager is
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         minOwnerWeight = 0;
-        ownerWeight = 0;
+        ownerWeight = 100;
         authorizer = _authorizer;
     }
     
@@ -219,10 +219,10 @@ contract WeightManager is
     /**
      * @dev 修饰器：仅合约所有者可调用
      * 用于保护权重更新和缓存管理等敏感操作
+     * 修复：统一使用 require 保持一致性
      */
     modifier onlyOperator() {
-        bool isAuthorized = msg.sender == owner();
-        if (!isAuthorized) revert NotOperator();
+        require(msg.sender == owner(), "WeightManager: Not operator");
         _;
     }
     
@@ -245,8 +245,9 @@ contract WeightManager is
     function setMinOwnerWeight(uint256 _minWeight) external onlyOwner {
         if (_minWeight == 0) revert InvalidAmount();
         minOwnerWeight = _minWeight;
-        if (ownerWeight < minOwnerWeight) {
-            ownerWeight = minOwnerWeight;
+        // 修复：确保 ownerWeight 不低于最小值
+        if (ownerWeight < _minWeight) {
+            ownerWeight = _minWeight;
         }
     }
     

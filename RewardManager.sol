@@ -10,23 +10,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "./NFTInterface.sol";
 
 /**
- * @dev DEX Router 接口（兼容 Uniswap V2 标准）
- * 支持 FlapSwap、PancakeSwap、Uniswap
- */
-interface IDEXRouter {
-    function swapExactETHForTokens(
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external payable returns (uint256[] memory amounts);
-    
-    function WETH() external pure returns (address);
-    
-    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
-}
-
-/**
  * @title RewardManager
  * @dev 奖励管理合约，统一管理所有游戏奖励的分发
  *
@@ -203,9 +186,10 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     uint256 public minSwapAmount = 1000000000000000;  // 0.001 BNB
     
     /**
-     * @dev 滑点保护参数（千分比）
+     * @dev 滑点保护参数（万分比）
+     * 注意：slippage 使用万分比精度，100 = 1%, 1000 = 10%
      */
-    uint256 public slippage = 100;  // 10%
+    uint256 public slippage = 1000;  // 默认10%滑点保护
     
     /**
      * @dev 当前活跃的DEX类型
@@ -363,7 +347,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 设置滑点保护
      */
     function setSlippage(uint256 _slippage) external onlyOwner {
-        require(_slippage <= 2000, "RewardManager: Slippage too high (max 20%)");
+        // 修复：滑点必须大于 0 且不超过 20%，否则几乎一定会失败或被MEV套利
+        require(_slippage > 0 && _slippage <= 2000, "RewardManager: Slippage must be > 0 and <= 2000");
         slippage = _slippage;
     }
 
@@ -477,7 +462,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         // 获取预估输出金额并计算滑点
         uint256[] memory amounts = IDEXRouter(dexRouter).getAmountsOut(bnbAmount, path);
         uint256 expectedOut = amounts[1];
-        uint256 minOut = expectedOut * (1000 - slippage) / 1000;
+        uint256 minOut = expectedOut * (10000 - slippage) / 10000;
 
         try IDEXRouter(dexRouter).swapExactETHForTokens{value: bnbAmount}(
             minOut,
@@ -592,7 +577,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         
         pendingDividends[user] = 0;
         
-        require(token.transfer(user, dividend), "RewardManager: Transfer failed");
+        SafeERC20.safeTransfer(token, user, dividend);
         
         emit DividendClaimed(user, dividend);
         return dividend;
@@ -617,7 +602,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         
         pendingDividends[user] = 0;
         
-        require(token.transfer(user, dividend), "RewardManager: Transfer failed");
+        SafeERC20.safeTransfer(token, user, dividend);
         
         emit DividendClaimed(user, dividend);
         return dividend;
@@ -666,10 +651,9 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
         uint256 arenaRewardAmount = amount * arenaRewardPercent / PRECISION;
 
-        // 使用try-catch分别处理每个分配，允许部分成功
+        // 使用 try-catch 分别处理每个分配，允许部分成功
         if (dividendPool != address(0) && dividendAmount > 0) {
             try token.transfer(dividendPool, dividendAmount) {
-                // 同步 DividendManager 分红池，使转账的代币被正确计入分红计算
                 try IDividendManager(dividendPool).syncDividendPool() {} catch {}
             } catch {
                 emit RewardTransferFailed(0, dividendPool, dividendAmount);
@@ -895,7 +879,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "RewardManager: Insufficient token balance");
-        require(token.transfer(owner(), amount), "RewardManager: Token transfer failed");
+        SafeERC20.safeTransfer(token, owner(), amount);
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
 
@@ -945,6 +929,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             }
         }
         
+        // 修复：添加下溢检查，确保 successfullyDistributed <= lockedBNBAmount
+        require(successfullyDistributed <= lockedBNBAmount, "RewardManager: Invalid distribution amount");
         lockedBNBAmount -= successfullyDistributed;
         emit LockedBNBRedistributed(lockedAmount, successfullyDistributed, lockedBNBAmount);
     }

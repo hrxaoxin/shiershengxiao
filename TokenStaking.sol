@@ -7,6 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title TokenStaking
@@ -49,6 +50,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
  * 5. 30分钟锁仓期后调用 unstakeTokens(amount) 解除质押
  */
 contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    using SafeERC20 for IERC20Upgradeable;
+    
     /** @dev 基础奖励比例（万分比，默认100 = 1%） */
     uint256 public rewardRate = 100;
     /** @dev 最大奖励比例（万分比，默认200 = 2%） */
@@ -217,7 +220,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(token.balanceOf(msg.sender) >= amount, "TokenStaking: Insufficient balance");
         require(token.allowance(msg.sender, address(this)) >= amount, "TokenStaking: Insufficient allowance");
         
-        require(token.transferFrom(msg.sender, address(this), amount), "TokenStaking: Token transfer failed");
+        token.transferFrom(msg.sender, address(this), amount);
         
         if (stake.amount == 0) {
             stake.stakedAt = block.timestamp;
@@ -250,17 +253,27 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(block.timestamp >= stake.stakedAt + MIN_STAKING_DURATION, 
                 "TokenStaking: Must stake for at least 30 minutes");
         
+        // 先累积用户的未领取奖励
         _accumulateRewards(msg.sender);
+        
+        // 计算用户要提取的代币对应的累积奖励份额
+        uint256 userStakeShare = stake.amount > 0 ? stake.accumulatedRewards * amount / stake.amount : 0;
         
         stake.amount -= amount;
         totalStakedTokens -= amount;
         
-        if (stake.amount == 0) {
+        // 重置已提取份额对应的累积奖励
+        if (stake.amount > 0) {
+            // 修复：添加下溢检查
+            require(stake.accumulatedRewards >= userStakeShare, "TokenStaking: Reward underflow");
+            stake.accumulatedRewards -= userStakeShare;
+        } else {
+            stake.accumulatedRewards = 0;
             stake.stakedAt = 0;
         }
         
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        require(token.transfer(msg.sender, amount), "TokenStaking: Failed to transfer staked tokens");
+        token.transfer(msg.sender, amount);
         
         emit TokensUnstaked(msg.sender, amount);
     }
@@ -413,6 +426,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         stake.accumulatedRewards = 0;
 
+        // 修复：添加安全检查确保不会下溢
         if (totalPendingRewards >= userReward) {
             totalPendingRewards -= userReward;
         } else {
@@ -436,8 +450,15 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         if (currentRate > lastRate && stakedAmount > 0) {
             uint256 newReward = stakedAmount * (currentRate - lastRate) / REWARD_PRECISION;
-            userStakes[user].accumulatedRewards += newReward;
-            totalPendingRewards += newReward;
+            // 修复：添加溢出检查，防止 accumulatedRewards 溢出
+            uint256 newAccumulated = userStakes[user].accumulatedRewards + newReward;
+            require(newAccumulated >= userStakes[user].accumulatedRewards, "TokenStaking: Accumulated rewards overflow");
+            userStakes[user].accumulatedRewards = newAccumulated;
+            
+            // 修复：添加溢出检查，防止 totalPendingRewards 溢出
+            uint256 newTotalPending = totalPendingRewards + newReward;
+            require(newTotalPending >= totalPendingRewards, "TokenStaking: Total pending rewards overflow");
+            totalPendingRewards = newTotalPending;
         }
 
         // 更新用户上次累积的奖励率，防止重复累加
@@ -528,7 +549,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
         require(tokenContract != address(0), "TokenStaking: Token contract not set");
         require(amount <= token.balanceOf(address(this)), "TokenStaking: insufficient token balance");
-        require(token.transfer(owner(), amount), "TokenStaking: transfer failed");
+        token.transfer(owner(), amount);
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
 }

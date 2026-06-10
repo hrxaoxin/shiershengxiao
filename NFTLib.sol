@@ -550,8 +550,10 @@ library NFTLib {
         uint256 speed = 60;
         
         if (level > 1) {
-            uint256 growthMultiplier = uint256(growth);
+            uint256 growthMultiplier = uint256(growth); // 范围 10-100
             for (uint256 i = 2; i <= level; i++) {
+                // 修复：每级按 design 比例增长（攻=5%*growth，防=4%*growth，血=20%*growth，速=3%*growth）
+                // 等价于原公式 (5 * growth * 100) / 10000，避免与 /100 混淆
                 attack += (5 * growthMultiplier) / 100;
                 defense += (4 * growthMultiplier) / 100;
                 health += (20 * growthMultiplier) / 100;
@@ -585,7 +587,8 @@ library NFTLib {
         
         string memory elementName = getElementNameCN(element);
         string memory zodiacName = getZodiacNameCN(zodiac);
-        string memory genderName = gender == 0 ? unicode"\u516C" : unicode"\u6BCD";
+        // 修复：GenderType 定义 FEMALE=0, MALE=1，所以 gender==0 应为"母"，gender==1 应为"公"
+        string memory genderName = gender == 0 ? unicode"\u6BCD" : unicode"\u516C";
         
         return concat2(elementName, concat2(zodiacName, concat2(unicode"\u00B7", genderName)));
     }

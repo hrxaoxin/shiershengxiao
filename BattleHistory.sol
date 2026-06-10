@@ -168,7 +168,7 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             uint256 oldestIndex = battleIdToIndex[earliestBattleId];
             delete battleHistory[earliestBattleId];
             delete battleIdToIndex[earliestBattleId];
-            
+
             uint256 nextEarliestId = indexToBattleId[(oldestIndex + 1) % MAX_BATTLE_RECORDS];
             if (nextEarliestId > 0) {
                 earliestBattleId = nextEarliestId;
@@ -176,16 +176,24 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         } else {
             battleCount++;
         }
-        
+
         uint256 newIndex = battleIdToIndex[battleId];
         if (newIndex == 0) {
-            newIndex = battleCount % MAX_BATTLE_RECORDS;
+            // 索引从1开始，0表示未分配
+            // 修复：当 battleId 未分配时，正确计算新索引
+            if (battleCount == 0) {
+                newIndex = 1;
+            } else {
+                newIndex = (battleCount % MAX_BATTLE_RECORDS) + 1;
+                // 防止新索引与现有索引冲突
+                if (newIndex == 0) newIndex = 1;
+            }
         }
-        
+
         battleHistory[battleId] = result;
         battleIdToIndex[battleId] = newIndex;
         indexToBattleId[newIndex] = battleId;
-        
+
         if (battleCount == 1 || battleId < earliestBattleId) {
             earliestBattleId = battleId;
         }

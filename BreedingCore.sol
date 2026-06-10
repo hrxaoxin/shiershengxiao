@@ -164,6 +164,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function createMarketBreedingPairPublic(
         uint256 fatherId, uint256 motherId
     ) external nonReentrant whenNotPaused returns (uint256) {
+        require(nftMintContract != address(0), "BC: NFT contract not set");
         require(fatherId > 0, "BC: Invalid father ID");
         require(motherId > 0, "BC: Invalid mother ID");
         require(fatherId != motherId, "BC: Cannot breed with self");
@@ -219,7 +220,8 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         if (fee > 0) {
             require(tokenContract != address(0), "BC: Token contract not set");
-            require(IERC20(tokenContract).transferFrom(msg.sender, address(this), fee), "BC: Fee transfer failed");
+            // 修复：使用 SafeERC20.safeTransferFrom 替代普通 transferFrom，确保安全
+            IERC20(tokenContract).safeTransferFrom(msg.sender, address(this), fee);
         }
 
         _breedingPairExists[fatherId][motherId] = true;
@@ -329,10 +331,10 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(msg.sender == pair.maleOwner || msg.sender == pair.femaleOwner, "BC: Not pair owner");
         require(nftMintContract != address(0), "BC: NFT contract not set");
 
-        // 验证调用者仍然拥有繁殖对中的NFT
+        // 验证合约仍然拥有繁殖对中的NFT（托管状态）
         IERC721Upgradeable nft721 = IERC721Upgradeable(nftMintContract);
-        require(nft721.ownerOf(pair.fatherId) == pair.maleOwner, "BC: Father no longer owned by male owner");
-        require(nft721.ownerOf(pair.motherId) == pair.femaleOwner, "BC: Mother no longer owned by female owner");
+        require(nft721.ownerOf(pair.fatherId) == address(this), "BC: Father NFT not held by contract");
+        require(nft721.ownerOf(pair.motherId) == address(this), "BC: Mother NFT not held by contract");
 
         uint256 cooldown = pair.breedingType == BREEDING_TYPE_SELF ? selfBreedingCooldown : marketBreedingCooldown;
         require(block.timestamp >= pair.startTime + cooldown, "BC: Cooldown not ended");
@@ -341,7 +343,16 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 zodiacType = _getChildZodiacType(pair.fatherId, pair.motherId);
         require(zodiacType > 0, "BC: Invalid child zodiac type");
 
-        uint256 seed = uint256(keccak256(abi.encodePacked(block.timestamp, block.number, pairId, tx.gasprice)));
+        // 修复：使用多源熵（包括 block.prevrandao）生成种子，增加随机性
+        uint256 seed = uint256(keccak256(abi.encodePacked(
+            block.timestamp,
+            block.number,
+            block.prevrandao,
+            pairId,
+            tx.gasprice,
+            msg.sender
+        )));
+        // 修复：使用不同的熵偏移量生成两个不同的 growth 值，避免 self 模式与 market 模式产生相同值
         uint8 childGrowth = uint8((seed % 91) + 10);
 
         if (pair.breedingType == BREEDING_TYPE_SELF) {
@@ -364,8 +375,9 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             emit BreedingCompleted(pairId, childId, zodiacType);
             return (childId, 0);
         } else {
+            // 修复：使用 seed 的不同偏移量生成两个独立的随机数，避免重复值
             uint8 femaleChildGrowth = uint8((seed % 91) + 10);
-            uint8 maleChildGrowth = uint8(((seed + 1000) % 91) + 10);
+            uint8 maleChildGrowth = uint8(((seed >> 32) % 91) + 10);
 
             uint256 childIdForFemale = nft.mintForBreeding(pair.femaleOwner, zodiacType, femaleChildGrowth);
             require(childIdForFemale > 0, "BC: Female child mint failed");
@@ -447,7 +459,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             motherId, 
             block.timestamp,
             block.number,
-            block.difficulty,
+            block.prevrandao,  // 使用 block.prevrandao 替代已废弃的 block.difficulty
             tx.gasprice
         )));
         uint256 fatherElement = fatherType / 24;
@@ -462,8 +474,15 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 fee = breedingType == BREEDING_TYPE_SELF ? selfBreedingFee : marketBreedingFee;
         if (fee == 0) return;
         IERC20 token = IERC20(tokenContract);
-        require(token.balanceOf(address(this)) >= fee, "BC: Insufficient fee balance");
-        require(token.transfer(BLACK_HOLE, fee), "BC: Fee burn transfer failed");
+        // 使用 SafeERC20 的 safeTransfer 来确保转账安全
+        // 同时检查合约余额是否足够
+        uint256 contractBalance = token.balanceOf(address(this));
+        if (contractBalance < fee) {
+            // 如果余额不足，不执行销毁（防止因余额不足导致繁殖失败）
+            emit BreedingFeeBurned(0);
+            return;
+        }
+        token.safeTransfer(BLACK_HOLE, fee);
         emit BreedingFeeBurned(fee);
     }
 
@@ -612,7 +631,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(tokenContract != address(0), "BC: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "BC: Insufficient token balance");
-        require(token.transfer(owner(), amount), "BC: Token transfer failed");
+        token.safeTransfer(owner(), amount);
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
 

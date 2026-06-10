@@ -171,8 +171,20 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function _executeMockBattle(uint256 mockIndex) internal view returns (bool) {
-        uint256 random = uint256(keccak256(abi.encodePacked(msg.sender, mockIndex, block.timestamp, block.number, tx.gasprice)));
-        return random % 100 < 55;
+        // 使用更安全的随机数生成，结合多个因素
+        uint256 random = uint256(keccak256(abi.encodePacked(msg.sender, mockIndex, block.timestamp, block.number, tx.gasprice, block.prevrandao)));
+        // 根据mockIndex调整胜率，mockIndex越低（排名越高），胜率越低
+        uint256 baseChance = 45; // 基础45%胜率
+        if (mockIndex < 10) {
+            baseChance = 30; // 前10名只有30%胜率
+        } else if (mockIndex < 30) {
+            baseChance = 40;
+        } else if (mockIndex < 50) {
+            baseChance = 50;
+        } else {
+            baseChance = 60; // 排名靠后的模拟玩家更容易战胜
+        }
+        return random % 100 < baseChance;
     }
 
     function _executeRealBattle(address challenger, address challenged) internal view returns (bool) {
@@ -218,7 +230,8 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             record.score += 25;
             record.wins++;
         } else {
-            if (record.score > 25) record.score -= 25;
+            // 修复：使用 >= 确保当分数正好为25时也能正确扣减
+            if (record.score >= 25) record.score -= 25;
             else record.score = 0;
             record.losses++;
         }
@@ -261,7 +274,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function executeMockBattle(
         uint256[6] calldata playerTeam,
         uint256 mockIndex
-    ) external nonReentrant whenNotPaused returns (bool success_, uint256 winner, uint256 battleId) {
+    ) external onlyAuthorized nonReentrant whenNotPaused returns (bool success_, uint256 winner, uint256 battleId) {
         require(battleContract != address(0), "ArenaBattle: Battle contract not set");
         require(nftContract != address(0), "ArenaBattle: NFT contract not set");
         require(mockIndex < MAX_MOCK_RANKING, "ArenaBattle: Invalid mock player index");
@@ -293,7 +306,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         address challengedPlayer,
         uint256[6] calldata playerTeam,
         uint256[6] calldata challengedTeam
-    ) external nonReentrant whenNotPaused returns (bool success_, uint256 winner, uint256 battleId) {
+    ) external onlyAuthorized nonReentrant whenNotPaused returns (bool success_, uint256 winner, uint256 battleId) {
         require(battleContract != address(0), "ArenaBattle: Battle contract not set");
         require(nftContract != address(0), "ArenaBattle: NFT contract not set");
         require(challengedPlayer != address(0), "ArenaBattle: Invalid challenged player");
