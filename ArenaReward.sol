@@ -22,6 +22,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     address public rankingContract;
     address public tokenContract;
     address public mockRewardRecipient;
+    address public authorizer;
     uint8 public rewardType;
     
     uint256 public todayRewardAmount;
@@ -43,11 +44,11 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     event EmergencyWithdraw(address recipient, uint256 amount);
 
     modifier onlyAuthorized() {
-        require(msg.sender == rankingContract, "ArenaReward: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == rankingContract, "ArenaReward: Not authorized");
         _;
     }
 
-    function initialize(address _rankingContract, address _tokenContract) external initializer {
+    function initialize(address _rankingContract, address _tokenContract, address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -55,7 +56,13 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         
         rankingContract = _rankingContract;
         tokenContract = _tokenContract;
+        authorizer = _authorizer;
         rewardType = 0;
+    }
+    
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        require(_authorizer != address(0), "ArenaReward: Invalid authorizer address");
+        authorizer = _authorizer;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -68,11 +75,11 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _unpause();
     }
 
-    function setRankingContract(address a) external onlyOwner {
+    function setRankingContract(address a) external onlyAuthorized {
         rankingContract = a;
     }
 
-    function setTokenContract(address a) external onlyOwner {
+    function setTokenContract(address a) external onlyAuthorized {
         tokenContract = a;
     }
 

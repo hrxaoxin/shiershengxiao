@@ -126,6 +126,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     function createSelfBreedingPair(uint256 fatherId, uint256 motherId, uint256 coOwnerId) external nonReentrant whenNotPaused returns (uint256) {
+        require(nftMintContract != address(0), "BC: NFT contract not set");
         require(fatherId > 0, "BC: Invalid father");
         require(motherId > 0, "BC: Invalid mother");
         require(fatherId != motherId, "BC: Cannot self-breed");
@@ -261,8 +262,15 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         try nft.safeTransferFrom(femaleOwner, address(this), motherId) {
         } catch {
             if (fatherTransferred) {
-                try nft.safeTransferFrom(address(this), maleOwner, fatherId) {} 
-                catch { emit EmergencyNFTLocked(fatherId, maleOwner); }
+                bool revertOnFailure = false;
+                try nft.safeTransferFrom(address(this), maleOwner, fatherId) {
+                } catch {
+                    emit EmergencyNFTLocked(fatherId, maleOwner);
+                    revertOnFailure = true;
+                }
+                if (revertOnFailure) {
+                    revert("BC: Mother transfer failed and father recovery failed");
+                }
             }
             if (fee > 0 && tokenContract != address(0)) {
                 IERC20(tokenContract).safeTransfer(msg.sender, fee);
@@ -321,11 +329,15 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(msg.sender == pair.maleOwner || msg.sender == pair.femaleOwner, "BC: Not pair owner");
         require(nftMintContract != address(0), "BC: NFT contract not set");
 
+        // 验证调用者仍然拥有繁殖对中的NFT
+        IERC721Upgradeable nft721 = IERC721Upgradeable(nftMintContract);
+        require(nft721.ownerOf(pair.fatherId) == pair.maleOwner, "BC: Father no longer owned by male owner");
+        require(nft721.ownerOf(pair.motherId) == pair.femaleOwner, "BC: Mother no longer owned by female owner");
+
         uint256 cooldown = pair.breedingType == BREEDING_TYPE_SELF ? selfBreedingCooldown : marketBreedingCooldown;
         require(block.timestamp >= pair.startTime + cooldown, "BC: Cooldown not ended");
 
         INFTMint nft = INFTMint(nftMintContract);
-        IERC721Upgradeable nft721 = IERC721Upgradeable(nftMintContract);
         uint256 zodiacType = _getChildZodiacType(pair.fatherId, pair.motherId);
         require(zodiacType > 0, "BC: Invalid child zodiac type");
 

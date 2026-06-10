@@ -444,7 +444,13 @@ window.ZODIAC_UI = (function() {
     async function getWeight(level, isRare) {
         // 尝试从合约读取
         try {
-            const contract = await window.ZODIAC_WEB3.getContract('dividendManager');
+            const web3Module = window.ZODIAC_WEB3;
+            if (!web3Module || !web3Module.isConnected()) {
+                console.debug('ZODIAC_WEB3 not initialized or not connected, using fallback weight');
+                return getFallbackWeight(level, isRare);
+            }
+            
+            const contract = await web3Module.getContract('dividendManager');
             if (contract) {
                 const weight = await contract.methods.getNFTWeight(level, isRare).call();
                 return parseInt(weight);
@@ -453,7 +459,10 @@ window.ZODIAC_UI = (function() {
             console.warn('Failed to get weight from contract, using fallback:', e);
         }
         
-        // 回退到硬编码值
+        return getFallbackWeight(level, isRare);
+    }
+    
+    function getFallbackWeight(level, isRare) {
         const weights = {
             1: isRare ? 10 : 1,
             2: isRare ? 12 : 2,

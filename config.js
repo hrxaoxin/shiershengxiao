@@ -182,7 +182,7 @@ window.ZODIAC_CONFIG = (function() {
     function validateContractAddresses() {
         const INVALID_ADDRESS = '0x0000000000000000000000000000000000000000';
         const TEST_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{8}0{32}$/;
-        const PLACEHOLDER_PATTERN = /^0x[0-9a-fA-F]{40}$/;
+        const PLACEHOLDER_PATTERN = /^0x0{40}$/;
         
         const invalidAddresses = Object.entries(CONTRACT_ADDRESSES)
             .filter(([name, addr]) => {

@@ -139,6 +139,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizer;
+        emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
     }
 
     function setAuthorizer(address a) external onlyOwner {
@@ -389,7 +390,48 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function _resetRewardTracking() internal {
         rewardResetCount++;
         
-        for (uint256 i = 0; i < stakingUsers.length; i++) {
+        uint256 batchSize = 100;
+        uint256 totalUsers = stakingUsers.length;
+        uint256 processed = 0;
+        
+        while (processed < totalUsers && gasleft() > 200000) {
+            uint256 end = processed + batchSize;
+            if (end > totalUsers) {
+                end = totalUsers;
+            }
+            
+            for (uint256 i = processed; i < end && gasleft() > 200000; i++) {
+                address user = stakingUsers[i];
+                if (isStakingUser[user]) {
+                    uint256 pending = _calcUserPending(user);
+                    pendingRewards[user] += pending;
+                    _userSnapshotWeight[user] = 0;
+                }
+            }
+            
+            processed = end;
+        }
+        
+        globalRewardPerWeight = 0;
+        
+        if (processed < totalUsers) {
+            emit PartialResetWarning(rewardResetCount, processed, totalUsers);
+        }
+    }
+    
+    /**
+     * @dev 继续未完成的重置操作（公开调用，用于批量处理）
+     * @param startIndex 开始索引
+     * @param batchSize 批量大小
+     */
+    function continueResetRewardTracking(uint256 startIndex, uint256 batchSize) external onlyAuthorized {
+        uint256 totalUsers = stakingUsers.length;
+        uint256 endIndex = startIndex + batchSize;
+        if (endIndex > totalUsers) {
+            endIndex = totalUsers;
+        }
+        
+        for (uint256 i = startIndex; i < endIndex; i++) {
             address user = stakingUsers[i];
             if (isStakingUser[user]) {
                 uint256 pending = _calcUserPending(user);
@@ -398,8 +440,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             }
         }
         
-        globalRewardPerWeight = 0;
+        emit ResetContinued(startIndex, endIndex, totalUsers);
     }
+    
+    event PartialResetWarning(uint256 resetCount, uint256 processedUsers, uint256 totalUsers);
+    event ResetContinued(uint256 startIndex, uint256 endIndex, uint256 totalUsers);
 
     /**
      * @dev 在用户操作时自动触发每日奖励计算

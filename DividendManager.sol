@@ -195,7 +195,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 设置 NFT 升级合约地址（NFTUpdate）
      * @param a NFT 升级合约地址
      */
-    function setNFTUpdateContract(address a) external onlyOwner {
+    function setNFTUpdateContract(address a) external onlyAuthorized {
         require(a != address(0), "DividendManager: Invalid NFT update address");
         nftUpdateContract = a;
     }
@@ -204,7 +204,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 设置奖励管理合约地址（RewardManager）
      * @param a 奖励管理合约地址
      */
-    function setRewardManagerContract(address a) external onlyOwner {
+    function setRewardManagerContract(address a) external onlyAuthorized {
         require(a != address(0), "DividendManager: Invalid reward manager address");
         rewardManagerContract = a;
     }

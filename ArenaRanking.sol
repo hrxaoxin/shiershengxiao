@@ -200,7 +200,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     address public mockRewardRecipient;
     
-    function setArenaBattleContract(address _arenaBattleContract) external onlyOwner {
+    function setArenaBattleContract(address _arenaBattleContract) external onlyAuthorized {
         arenaBattleContract = _arenaBattleContract;
     }
     
@@ -268,22 +268,22 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(a != address(0), "ArenaRanking: Invalid authorizer address");
         authorizer = a;
     }
-    function setBattleContract(address a) external onlyOwner {
+    function setBattleContract(address a) external onlyAuthorized {
         require(a != address(0), "ArenaRanking: Invalid battle contract address");
         battleContract = a;
     }
-    function setNFTContract(address a) external onlyOwner {
+    function setNFTContract(address a) external onlyAuthorized {
         require(a != address(0), "ArenaRanking: Invalid NFT contract address");
         nftContract = a;
     }
-    function setTokenContract(address a) external onlyOwner {
+    function setTokenContract(address a) external onlyAuthorized {
         require(a != address(0), "ArenaRanking: Invalid token contract address");
         tokenContract = a;
     }
-    function setArenaLeaderboardContract(address _arenaLeaderboardContract) external onlyOwner {
+    function setArenaLeaderboardContract(address _arenaLeaderboardContract) external onlyAuthorized {
         arenaLeaderboardContract = _arenaLeaderboardContract;
     }
-    function setArenaPlayerContract(address _arenaPlayerContract) external onlyOwner {
+    function setArenaPlayerContract(address _arenaPlayerContract) external onlyAuthorized {
         arenaPlayerContract = _arenaPlayerContract;
     }
     function setSeasonRewardRate(uint256 rate) external onlyOwner {
@@ -1009,7 +1009,7 @@ contract ArenaRanking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return 888;
     }
 
-    function setArenaRewardContract(address _arenaRewardContract) external onlyOwner {
+    function setArenaRewardContract(address _arenaRewardContract) external onlyAuthorized {
         arenaRewardContract = _arenaRewardContract;
     }
 

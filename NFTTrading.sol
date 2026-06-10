@@ -255,12 +255,15 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 price = listing.priceWei;
 
         require(msg.sender != seller, "NFTTrading: Cannot buy own NFT");
-        require(msg.value == price, "NFTTrading: Incorrect payment amount");
+        require(msg.value >= price, "NFTTrading: Insufficient payment");
         require(INFT(nftContract).ownerOf(tokenId) == address(this), "NFTTrading: Contract does not own NFT");
 
         uint256 fee = price * feePercent / 100;
         uint256 sellerAmount = price - fee;
 
+        // 计算并退还多余支付的BNB
+        uint256 excess = msg.value - price;
+        
         // Checks-Effects-Interactions 模式：先清除挂牌状态
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
@@ -282,6 +285,12 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         if (sellerAmount > 0) {
             (bool sellerSuccess, ) = payable(seller).call{value: sellerAmount}("");
             require(sellerSuccess, "NFTTrading: Seller payment failed");
+        }
+
+        // 退还多余的BNB
+        if (excess > 0) {
+            (bool refundSuccess, ) = payable(msg.sender).call{value: excess}("");
+            require(refundSuccess, "NFTTrading: Refund failed");
         }
 
         totalVolume += price;

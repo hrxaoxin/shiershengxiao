@@ -18,7 +18,7 @@ window.ZODIAC_UTILS = (function() {
      */
     function getNFTInfo(typeId) {
         const typedId = parseInt(typeId, 10);
-        if (isNaN(typedId) || typedId < 0 || typedId >= 120) {
+        if (isNaN(typedId) || typedId < 0 || typedId > 119) {
             return {
                 typeId: typedId,
                 elementIndex: 0,
@@ -48,7 +48,7 @@ window.ZODIAC_UTILS = (function() {
         const ipfsBase = IPFS_BASES[elementKey] || '';
         const prefix = ATTR_PREFIXES[elementKey] || elementKey;
         const animalKey = ANIMAL_KEYS[zodiacIndex] || 'shu';
-        const imagePath = `${ipfsBase}${prefix}${animalKey}_${gender + 1}.png`;
+        const imagePath = `${ipfsBase}${prefix}${animalKey}_${gender}.png`;
 
         return {
             typeId: typedId,

@@ -14,6 +14,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     address public nftContract;
     address public arenaPlayerContract;
     address public arenaLeaderboardContract;
+    address public authorizer;
     
     uint256 public baseRewardPerWin = 100000000000000000; // 0.1 BNB
     
@@ -70,11 +71,11 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     event SeasonSettled(uint256 seasonId, uint256 timestamp);
 
     modifier onlyAuthorized() {
-        require(msg.sender == rankingContract, "ArenaBattle: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == rankingContract, "ArenaBattle: Not authorized");
         _;
     }
 
-    function initialize(address _rankingContract, address _battleContract, address _nftContract) external initializer {
+    function initialize(address _rankingContract, address _battleContract, address _nftContract, address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -82,6 +83,12 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         rankingContract = _rankingContract;
         battleContract = _battleContract;
         nftContract = _nftContract;
+        authorizer = _authorizer;
+    }
+
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        require(_authorizer != address(0), "ArenaBattle: Invalid authorizer address");
+        authorizer = _authorizer;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -94,19 +101,19 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _unpause();
     }
 
-    function setRankingContract(address _rankingContract) external onlyOwner {
+    function setRankingContract(address _rankingContract) external onlyAuthorized {
         rankingContract = _rankingContract;
     }
 
-    function setBattleContract(address _battleContract) external onlyOwner {
+    function setBattleContract(address _battleContract) external onlyAuthorized {
         battleContract = _battleContract;
     }
 
-    function setNFTContract(address _nftContract) external onlyOwner {
+    function setNFTContract(address _nftContract) external onlyAuthorized {
         nftContract = _nftContract;
     }
 
-    function setArenaLeaderboardContract(address _arenaLeaderboardContract) external onlyOwner {
+    function setArenaLeaderboardContract(address _arenaLeaderboardContract) external onlyAuthorized {
         arenaLeaderboardContract = _arenaLeaderboardContract;
     }
 

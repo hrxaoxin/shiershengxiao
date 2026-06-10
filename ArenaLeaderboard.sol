@@ -27,6 +27,8 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
     
     uint256 public currentSeasonId;
+    address public authorizer;
+    address public rankingContract;
     mapping(uint256 => SeasonInfo) public seasons;
     mapping(address => PlayerRecord) public players;
     mapping(uint256 => address[]) public seasonRankings;
@@ -37,6 +39,11 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     event SeasonCreated(uint256 seasonId, uint256 startTime, uint256 endTime);
     event LeaderboardUpdated(uint256 seasonId);
     
+    modifier onlyAuthorized() {
+        require(msg.sender == owner() || msg.sender == authorizer, "ArenaLeaderboard: Not authorized");
+        _;
+    }
+    
     function initialize() external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
@@ -44,6 +51,15 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
     
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        require(_authorizer != address(0), "ArenaLeaderboard: Invalid authorizer address");
+        authorizer = _authorizer;
+    }
+    
+    function setRankingContract(address _rankingContract) external onlyAuthorized {
+        rankingContract = _rankingContract;
+    }
     
     function _createSeason() internal {
         currentSeasonId++;

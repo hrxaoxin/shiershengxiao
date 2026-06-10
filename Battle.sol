@@ -435,6 +435,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
         require(_validateTeam(challengerTeam), "Battle: Invalid challenger team");
         require(_validateTeam(challengedTeam), "Battle: Invalid challenged team");
+        
+        // 检查攻击方和防御方团队没有重叠的NFT
+        for (uint256 i = 0; i < 6; i++) {
+            for (uint256 j = 0; j < 6; j++) {
+                require(challengerTeam[i] != challengedTeam[j], "Battle: Team overlap detected");
+            }
+        }
 
         if (!isMockBattle) {
             require(challengedAddress != address(0), "Battle: Invalid challenged address");
@@ -451,9 +458,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 require(INFTMint(nftContract).ownerOf(challengerId) == msg.sender, "Battle: Not owner of challenger NFT");
             }
         }
-        if (!isMockBattle && challengedId != 0) {
-            require(_isValidNFT(challengedId, false), "Battle: Invalid challenged NFT");
-            require(INFTMint(nftContract).ownerOf(challengedId) == challengedAddress, "Battle: Not owner of challenged NFT");
+        if (challengedId != 0) {
+            require(_isValidNFT(challengedId, isMockBattle), "Battle: Invalid challenged NFT");
+            if (!isMockBattle) {
+                require(INFTMint(nftContract).ownerOf(challengedId) == challengedAddress, "Battle: Not owner of challenged NFT");
+            }
         }
 
         uint256 battleId = battleHistoryIndex + 1;
@@ -553,6 +562,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
         if (canUseSkill && skill.skillId > 0) {
             result.targetState = _applySkill(attacker, result.targetState, attackerIdx, skill);
+            if (!_hasAnyAlive(result.targetState.alive)) {
+                result.targetAlive = false;
+            }
         } else {
             uint defenderIdx = _findTarget(result.targetState.alive, result.targetState.traits, result.targetState.hp);
             if (defenderIdx == 6) {

@@ -256,6 +256,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 当前持有者数量（有分红资格的用户数）
      */
     uint256 public holdersCount;
+    
+    /**
+     * @dev 锁定的BNB金额（因转账失败而暂时保留在合约中的BNB）
+     */
+    uint256 public lockedBNBAmount;
 
     /**
      * @dev 用于追踪已记录的用户（用于 holdersCount 计数）
@@ -410,6 +415,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                 try IDividendManager(dividendPool).syncDividendPool() {} catch {}
             } else {
                 emit BNBTransferFailed(0, dividendPool, dividendAmount);
+                lockedBNBAmount += dividendAmount;
             }
         }
 
@@ -422,6 +428,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                 }
             } else {
                 emit BNBTransferFailed(2, tokenStakingPool, tokenStakingAmount);
+                lockedBNBAmount += tokenStakingAmount;
             }
         }
 
@@ -443,10 +450,12 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                         try IDividendManager(dividendPool).syncDividendPool() {} catch {}
                         emit SwapFailedFallback(totalSwapAmount);
                     } else {
-                        // 如果连分红池转账也失败，发出最终失败事件（BNB 保留在合约中）
+                        // 如果连分红池转账也失败，BNB保留在合约中，后续可通过emergencyWithdraw处理
+                        lockedBNBAmount += totalSwapAmount;
                         emit SwapFailed(totalSwapAmount);
                     }
                 } else {
+                    lockedBNBAmount += totalSwapAmount;
                     emit SwapFailed(totalSwapAmount);
                 }
             }
@@ -892,4 +901,53 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
     event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    
+    /**
+     * @dev 重试分配锁定的BNB（仅owner或authorizer）
+     */
+    function retryLockedBNBDistribution() external onlyAuthorized nonReentrant {
+        uint256 lockedAmount = lockedBNBAmount;
+        if (lockedAmount == 0) {
+            return;
+        }
+        
+        uint256 dividendAmount = lockedAmount * dividendPercent / PRECISION;
+        uint256 nftStakingAmount = lockedAmount * nftStakingPercent / PRECISION;
+        uint256 tokenStakingAmount = lockedAmount * tokenStakingPercent / PRECISION;
+        uint256 arenaRewardAmount = lockedAmount * arenaRewardPercent / PRECISION;
+        
+        uint256 successfullyDistributed = 0;
+        
+        if (dividendPool != address(0) && dividendAmount > 0) {
+            (bool success, ) = payable(dividendPool).call{value: dividendAmount}("");
+            if (success) {
+                try IDividendManager(dividendPool).syncDividendPool() {} catch {}
+                successfullyDistributed += dividendAmount;
+            }
+        }
+        
+        if (tokenStakingPool != address(0) && tokenStakingAmount > 0) {
+            (bool success, ) = payable(tokenStakingPool).call{value: tokenStakingAmount}("");
+            if (success) {
+                if (poolManager != address(0)) {
+                    try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch {}
+                }
+                successfullyDistributed += tokenStakingAmount;
+            }
+        }
+        
+        uint256 totalSwapAmount = nftStakingAmount + arenaRewardAmount;
+        if (totalSwapAmount > 0 && dexRouter != address(0)) {
+            uint256 tokenAmount = _swapBNBToToken(totalSwapAmount);
+            if (tokenAmount > 0) {
+                _distributeSwappedTokens(tokenAmount, 0, nftStakingAmount, arenaRewardAmount, totalSwapAmount);
+                successfullyDistributed += totalSwapAmount;
+            }
+        }
+        
+        lockedBNBAmount -= successfullyDistributed;
+        emit LockedBNBRedistributed(lockedAmount, successfullyDistributed, lockedBNBAmount);
+    }
+    
+    event LockedBNBRedistributed(uint256 totalLocked, uint256 successfullyDistributed, uint256 remainingLocked);
 }

@@ -654,73 +654,93 @@
         }
 
         async function loadWeightConfig() {
+            // 设置默认值
+            const defaultNormalWeights = ['1', '2', '6', '18', '66'];
+            const defaultRareWeights = ['10', '12', '16', '28', '76'];
+            const defaultDividendPercent = '1.0';
+            const defaultNftStakingPercent = '0.4';
+            const defaultTokenStakingPercent = '0.3';
+            const defaultArenaPercent = '0.3';
+            const defaultBurnPercent = '1.0';
+            
+            // 先设置默认值
+            document.getElementById('normalWeight1').textContent = defaultNormalWeights[0];
+            document.getElementById('normalWeight2').textContent = defaultNormalWeights[1];
+            document.getElementById('normalWeight3').textContent = defaultNormalWeights[2];
+            document.getElementById('normalWeight4').textContent = defaultNormalWeights[3];
+            document.getElementById('normalWeight5').textContent = defaultNormalWeights[4];
+            
+            document.getElementById('rareWeight1').textContent = defaultRareWeights[0];
+            document.getElementById('rareWeight2').textContent = defaultRareWeights[1];
+            document.getElementById('rareWeight3').textContent = defaultRareWeights[2];
+            document.getElementById('rareWeight4').textContent = defaultRareWeights[3];
+            document.getElementById('rareWeight5').textContent = defaultRareWeights[4];
+            
+            document.getElementById('dividendPercent').textContent = defaultDividendPercent;
+            document.getElementById('nftStakingPercent').textContent = defaultNftStakingPercent;
+            document.getElementById('tokenStakingPercent').textContent = defaultTokenStakingPercent;
+            document.getElementById('arenaPercent').textContent = defaultArenaPercent;
+            document.getElementById('burnPercent').textContent = defaultBurnPercent;
+            
             try {
-                const dividendManager = await ZODIAC_WEB3.getContract('dividendManager');
-                if (!dividendManager) {
-                    console.warn('DividendManager contract not available, using default weights');
-                } else {
-                    // 从合约读取权重配置
+                const web3Module = window.ZODIAC_WEB3;
+                if (!web3Module || !web3Module.isConnected()) {
+                    console.debug('ZODIAC_WEB3 not initialized or not connected, using default config');
+                    return;
+                }
+                
+                const dividendManager = await web3Module.getContract('dividendManager');
+                if (dividendManager) {
                     try {
                         const config = await dividendManager.methods.getWeightConfig().call();
                         const normalWeights = config[0];
                         const rareWeights = config[1];
                         
-                        // 更新页面显示
-                        document.getElementById('normalWeight1').textContent = normalWeights[0] || '1';
-                        document.getElementById('normalWeight2').textContent = normalWeights[1] || '2';
-                        document.getElementById('normalWeight3').textContent = normalWeights[2] || '6';
-                        document.getElementById('normalWeight4').textContent = normalWeights[3] || '18';
-                        document.getElementById('normalWeight5').textContent = normalWeights[4] || '66';
+                        document.getElementById('normalWeight1').textContent = normalWeights[0] || defaultNormalWeights[0];
+                        document.getElementById('normalWeight2').textContent = normalWeights[1] || defaultNormalWeights[1];
+                        document.getElementById('normalWeight3').textContent = normalWeights[2] || defaultNormalWeights[2];
+                        document.getElementById('normalWeight4').textContent = normalWeights[3] || defaultNormalWeights[3];
+                        document.getElementById('normalWeight5').textContent = normalWeights[4] || defaultNormalWeights[4];
                         
-                        document.getElementById('rareWeight1').textContent = rareWeights[0] || '10';
-                        document.getElementById('rareWeight2').textContent = rareWeights[1] || '12';
-                        document.getElementById('rareWeight3').textContent = rareWeights[2] || '16';
-                        document.getElementById('rareWeight4').textContent = rareWeights[3] || '28';
-                        document.getElementById('rareWeight5').textContent = rareWeights[4] || '76';
+                        document.getElementById('rareWeight1').textContent = rareWeights[0] || defaultRareWeights[0];
+                        document.getElementById('rareWeight2').textContent = rareWeights[1] || defaultRareWeights[1];
+                        document.getElementById('rareWeight3').textContent = rareWeights[2] || defaultRareWeights[2];
+                        document.getElementById('rareWeight4').textContent = rareWeights[3] || defaultRareWeights[3];
+                        document.getElementById('rareWeight5').textContent = rareWeights[4] || defaultRareWeights[4];
                         
                         console.log('Weight config loaded from contract:', { normalWeights, rareWeights });
                     } catch (e) {
-                        console.error('Failed to load weight config:', e);
+                        console.warn('Failed to load weight config from contract, using defaults:', e.message);
                     }
+                } else {
+                    console.debug('DividendManager contract not available, using default weights');
                 }
                 
-                // 从 RewardManager 读取分配比例
-                try {
-                    const rewardManager = await ZODIAC_WEB3.getContract('rewardManager');
-                    if (!rewardManager) {
-                        console.warn('RewardManager contract not available, using default distribution');
-                    } else {
-                        try {
-                            const percents = await rewardManager.methods.getDistributionPercents().call();
-                            // percents[0] = dividendPercent (分红池)
-                            // percents[1] = nftStakingPercent (NFT质押)
-                            // percents[2] = tokenStakingPercent (代币质押)
-                            // percents[3] = arenaRewardPercent (竞技场奖励)
-                            
-                            const dividendPercent = (parseInt(percents[0]) / 100).toFixed(2);
-                            const nftStakingPercent = (parseInt(percents[1]) / 100).toFixed(2);
-                            const tokenStakingPercent = (parseInt(percents[2]) / 100).toFixed(2);
-                            const arenaPercent = (parseInt(percents[3]) / 100).toFixed(2);
-                            
-                            // 销毁比例 = 3% - 其他所有比例之和
-                            const burnPercent = (3 - (parseInt(percents[0]) + parseInt(percents[1]) + parseInt(percents[2]) + parseInt(percents[3])) / 100).toFixed(2);
-                            
-                            document.getElementById('dividendPercent').textContent = dividendPercent;
-                            document.getElementById('nftStakingPercent').textContent = nftStakingPercent;
-                            document.getElementById('tokenStakingPercent').textContent = tokenStakingPercent;
-                            document.getElementById('arenaPercent').textContent = arenaPercent;
-                            document.getElementById('burnPercent').textContent = burnPercent;
-                            
-                            console.log('Distribution config loaded from contract:', { dividendPercent, nftStakingPercent, tokenStakingPercent, arenaPercent, burnPercent });
-                        } catch (e) {
-                            console.error('Failed to load distribution config:', e);
-                        }
+                const rewardManager = await web3Module.getContract('rewardManager');
+                if (rewardManager) {
+                    try {
+                        const percents = await rewardManager.methods.getDistributionPercents().call();
+                        const dividendPercent = (parseInt(percents[0]) / 100).toFixed(2);
+                        const nftStakingPercent = (parseInt(percents[1]) / 100).toFixed(2);
+                        const tokenStakingPercent = (parseInt(percents[2]) / 100).toFixed(2);
+                        const arenaPercent = (parseInt(percents[3]) / 100).toFixed(2);
+                        const burnPercent = (3 - (parseInt(percents[0]) + parseInt(percents[1]) + parseInt(percents[2]) + parseInt(percents[3])) / 100).toFixed(2);
+                        
+                        document.getElementById('dividendPercent').textContent = dividendPercent;
+                        document.getElementById('nftStakingPercent').textContent = nftStakingPercent;
+                        document.getElementById('tokenStakingPercent').textContent = tokenStakingPercent;
+                        document.getElementById('arenaPercent').textContent = arenaPercent;
+                        document.getElementById('burnPercent').textContent = burnPercent;
+                        
+                        console.log('Distribution config loaded from contract:', { dividendPercent, nftStakingPercent, tokenStakingPercent, arenaPercent, burnPercent });
+                    } catch (e) {
+                        console.warn('Failed to load distribution config from contract, using defaults:', e.message);
                     }
-                } catch (error) {
-                    console.error('Load distribution config failed:', error);
+                } else {
+                    console.debug('RewardManager contract not available, using default distribution');
                 }
             } catch (error) {
-                console.error('Load config failed:', error);
+                console.warn('Load config failed, using defaults:', error.message);
             }
         }
 

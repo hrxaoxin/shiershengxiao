@@ -471,9 +471,9 @@ window.ZODIAC_WEB3 = (function() {
     async function estimateGas(contract, methodName, args, from) {
         try {
             const gas = await contract.methods[methodName](...args).estimateGas({ from: from || account });
-            return Math.ceil(gas * 1.2);
+            return { gas: Math.ceil(gas * 1.2), estimated: true };
         } catch (e) {
-            console.warn(`[ZODIAC_WEB3] Gas estimation failed for ${methodName}:`, e);
+            console.warn(`[ZODIAC_WEB3] Gas estimation failed for ${methodName}, using default gas limit:`, e);
             const gasLimits = {
                 'mint': 600000,
                 'mintBatch': 3000000,
@@ -502,7 +502,7 @@ window.ZODIAC_WEB3 = (function() {
                 'unstakeArenaNFTs': 600000,
                 'approveToken': 150000
             };
-            return gasLimits[methodName] || 500000;
+            return { gas: gasLimits[methodName] || 500000, estimated: false };
         }
     }
 
@@ -546,7 +546,7 @@ window.ZODIAC_WEB3 = (function() {
             'setNFTApprovalForAll': 150000,
             'listNFTBatch': 500000
         };
-        return gasLimits[methodName] || 800000;
+        return { gas: gasLimits[methodName] || 800000, estimated: false };
     }
 
     // --- Event Listening ---
@@ -842,13 +842,36 @@ window.ZODIAC_WEB3 = (function() {
         const retryDelayMs = opts.retryDelayMs || 3000;
         const from = opts.from || account;
 
+        if (opts.value !== undefined && opts.value !== null) {
+            if (typeof opts.value === 'string' && opts.value.startsWith('0x')) {
+                opts.value = opts.value;
+            } else if (typeof opts.value === 'number') {
+                if (opts.value < 0) {
+                    throw new Error('[ZODIAC_WEB3] Transaction value cannot be negative');
+                }
+            } else if (typeof opts.value === 'string') {
+                const numValue = BigInt(opts.value);
+                if (numValue < 0) {
+                    throw new Error('[ZODIAC_WEB3] Transaction value cannot be negative');
+                }
+            }
+        }
+
         let gas = opts.gas;
+        let usedDefaultGas = false;
         if (!gas) {
             try {
-                gas = await estimateGas(contract, methodName, args, from);
+                const gasResult = await estimateGas(contract, methodName, args, from);
+                gas = gasResult.gas;
+                if (!gasResult.estimated) {
+                    usedDefaultGas = true;
+                    console.warn(`[ZODIAC_WEB3] Using default gas limit of ${gas} for ${methodName}`);
+                }
             } catch (gasError) {
                 console.warn(`[ZODIAC_WEB3] Gas estimation failed, using default gas for ${methodName}`, gasError);
-                gas = getGasLimit(methodName);
+                const defaultGas = getGasLimit(methodName);
+                gas = defaultGas.gas;
+                usedDefaultGas = true;
             }
         }
 

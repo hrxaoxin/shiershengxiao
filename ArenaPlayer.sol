@@ -11,6 +11,7 @@ import "./NFTInterface.sol";
 contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     address public rankingContract;
     address public nftContract;
+    address public authorizer;
     
     uint256 public constant MAX_TEAM_SIZE = 6;
     uint256 public constant MOCK_PLAYER_INDEX_OFFSET = 1000000;
@@ -38,17 +39,23 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     event MockTeamGenerated(address indexed player, uint256[6] team);
 
     modifier onlyAuthorized() {
-        require(msg.sender == rankingContract, "ArenaPlayer: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == rankingContract, "ArenaPlayer: Not authorized");
         _;
     }
 
-    function initialize(address _rankingContract, address _nftContract) external initializer {
+    function initialize(address _rankingContract, address _nftContract, address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
         rankingContract = _rankingContract;
         nftContract = _nftContract;
+        authorizer = _authorizer;
+    }
+    
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        require(_authorizer != address(0), "ArenaPlayer: Invalid authorizer address");
+        authorizer = _authorizer;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -61,11 +68,11 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _unpause();
     }
 
-    function setRankingContract(address _rankingContract) external onlyOwner {
+    function setRankingContract(address _rankingContract) external onlyAuthorized {
         rankingContract = _rankingContract;
     }
 
-    function setNFTContract(address _nftContract) external onlyOwner {
+    function setNFTContract(address _nftContract) external onlyAuthorized {
         nftContract = _nftContract;
     }
 
