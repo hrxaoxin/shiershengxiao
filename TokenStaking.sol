@@ -7,7 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 
 /**
  * @title TokenStaking
@@ -50,7 +50,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * 5. 30分钟锁仓期后调用 unstakeTokens(amount) 解除质押
  */
 contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    using SafeERC20 for IERC20Upgradeable;
+    using SafeERC20Upgradeable for IERC20Upgradeable;
     
     /** @dev 基础奖励比例（万分比，默认100 = 1%） */
     uint256 public rewardRate = 100;
@@ -220,7 +220,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(token.balanceOf(msg.sender) >= amount, "TokenStaking: Insufficient balance");
         require(token.allowance(msg.sender, address(this)) >= amount, "TokenStaking: Insufficient allowance");
         
-        token.transferFrom(msg.sender, address(this), amount);
+        SafeERC20Upgradeable.safeTransferFrom(token, msg.sender, address(this), amount);
         
         if (stake.amount == 0) {
             stake.stakedAt = block.timestamp;

@@ -379,6 +379,7 @@ interface IArenaReward {
     function getPendingRewardsBySeason(uint256 seasonId) external view returns (uint256);
     function getTotalPendingRewards(address player) external view returns (uint256);
     function isRewardClaimed(address player, uint256 seasonId) external view returns (bool);
+    function rewardType() external view returns (uint8);
     function setRewardType(uint8 _rewardType) external;
     function setRewardRate(uint256 rate) external;
     function setMaxRewardRate(uint256 maxRate) external;

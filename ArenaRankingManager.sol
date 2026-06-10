@@ -88,6 +88,14 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         uint256 seasonId;
     }
 
+    /**
+     * @dev 模拟玩家信息结构体
+     * @param team 模拟玩家队伍（6个NFT ID）
+     * @param score 模拟玩家分数
+     * @param level 模拟玩家等级
+     * @param growth 模拟玩家成长值
+     * @param elementCounts 各属性数量统计
+     */
     struct MockPlayerInfo {
         uint256[6] team;
         uint256 score;
@@ -96,6 +104,19 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         uint256[] elementCounts;
     }
 
+    /**
+     * @dev 赛季信息结构体
+     * @param seasonId 赛季ID
+     * @param startTime 赛季开始时间
+     * @param endTime 赛季结束时间
+     * @param isActive 是否活跃中
+     * @param isSettled 是否已结算
+     * @param rewardCalculated 奖励是否已计算
+     * @param totalPlayers 赛季参与玩家数
+     * @param rewardPool BNB奖励池
+     * @param tokenRewardPool 代币奖励池
+     * @param pendingRewards 待发放奖励
+     */
     struct SeasonInfo {
         uint256 seasonId;
         uint256 startTime;
@@ -109,61 +130,211 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         uint256 pendingRewards;
     }
 
+    /**
+     * @dev 玩家记录映射（地址 -> 玩家记录）
+     */
     mapping(address => PlayerRecord) public players;
+    /**
+     * @dev 赛季信息映射（赛季ID -> 赛季信息）
+     */
     mapping(uint256 => SeasonInfo) public seasons;
+    /**
+     * @dev 玩家赛季奖励映射（赛季ID -> 地址 -> 奖励金额）
+     */
     mapping(uint256 => mapping(address => uint256)) public playerSeasonRewards;
+    /**
+     * @dev 赛季奖励领取状态映射（赛季ID -> 地址 -> 是否已领取）
+     */
     mapping(uint256 => mapping(address => bool)) public seasonRewardsClaimed;
     
+    /**
+     * @dev 当前赛季ID
+     */
     uint256 public currentSeasonId;
+    /**
+     * @dev 赛季持续时间（默认1天）
+     */
     uint256 public seasonDuration = 1 days;
     
+    /**
+     * @dev 授权合约地址
+     */
     address public authorizer;
+    /**
+     * @dev 战斗核心合约地址
+     */
     address public battleContract;
+    /**
+     * @dev NFT合约地址
+     */
     address public nftContract;
+    /**
+     * @dev 代币合约地址
+     */
     address public tokenContract;
+    /**
+     * @dev 竞技场奖励合约地址
+     */
     address public arenaRewardContract;
+    /**
+     * @dev 竞技场排行榜合约地址
+     */
     address public arenaLeaderboardContract;
+    /**
+     * @dev 竞技场玩家合约地址
+     */
     address public arenaPlayerContract;
+    /**
+     * @dev 竞技场战斗合约地址
+     */
     address public arenaBattleContract;
     
+    /**
+     * @dev 竞技场模式：0=单人模式，1=组队模式
+     */
     uint8 public arenaMode = 1;
+    /**
+     * @dev 模式控制类型：0=禁用，1=手动，2=自动
+     */
     uint8 public modeControlType = 0;
+    /**
+     * @dev 上赛季模式（用于模式切换时的记录）
+     */
     uint8 public lastSeasonMode = 1;
+    /**
+     * @dev 模拟玩家奖励接收地址（从玩家挑战模拟玩家获得的奖励）
+     */
     address public mockRewardRecipient;
     
+    /**
+     * @dev 每日挑战次数限制
+     */
     uint256 public constant DAILY_ATTEMPTS = 3;
+    /**
+     * @dev 最大充值次数上限
+     */
     uint256 public constant MAX_RECHARGE_ATTEMPTS = 50;
+    /**
+     * @dev 战斗冷却时间（两次战斗间隔）
+     */
     uint256 public constant BATTLE_COOLDOWN = 30 seconds;
+    /**
+     * @dev 战斗队伍规模（最多6个NFT）
+     */
     uint256 public constant TEAM_SIZE = 6;
+    /**
+     * @dev 充值挑战次数的代币消耗
+     */
     uint256 public constant RECHARGE_COST = 888;
+    /**
+     * @dev 每次充值获得的挑战次数
+     */
     uint256 public constant RECHARGE_ATTEMPTS = 3;
+    /**
+     * @dev 排行榜最大显示数量
+     */
     uint256 public constant MAX_LEADERBOARD_SIZE = 1000;
+    /**
+     * @dev 保留的最大赛季数（超过后自动清理历史数据）
+     */
     uint256 public constant MAX_SEASONS_TO_KEEP = 20;
+    /**
+     * @dev 精度常量（万分比计算使用）
+     */
     uint256 public constant PRECISION = 10000;
+    /**
+     * @dev 模拟玩家排行榜最大显示数量
+     */
     uint256 public constant MAX_MOCK_RANKING = 100;
+    /**
+     * @dev 模拟玩家基础地址（用于生成模拟玩家唯一标识）
+     */
     address public constant MOCK_PLAYER_BASE = address(0x000000000000000000000000000000000000dEaD);
+    /**
+     * @dev 模拟玩家总数
+     */
     uint256 public constant MAX_MOCK_PLAYERS_COUNT = 1000;
     
+    /**
+     * @dev 单用户最大充值次数限制（可配置，默认为无限制）
+     */
     uint256 public maxRechargeAttempts = type(uint256).max;
+    /**
+     * @dev 赛季奖励比例（万分比）
+     */
     uint256 public seasonRewardRate;
+    /**
+     * @dev 玩家上次战斗时间映射（用于冷却检查）
+     */
     mapping(address => uint256) public lastBattleTime;
+    /**
+     * @dev 玩家充值次数映射（当日充值计数）
+     */
     mapping(address => uint256) public rechargeCount;
+    /**
+     * @dev 战斗ID计数器（用于生成唯一战斗记录ID）
+     */
     uint256 public battleIdCounter;
 
+    /**
+     * @dev 充值限制更新事件
+     */
     event RechargeLimitUpdated(uint256 newLimit);
+    /**
+     * @dev 奖励类型更新事件
+     */
     event RewardTypeUpdated(uint8 oldType, uint8 newType);
+    /**
+     * @dev 奖励比例更新事件
+     */
     event RewardRateUpdated(uint256 oldRate, uint256 newRate);
+    /**
+     * @dev 竞技场模式更新事件
+     */
     event ArenaModeUpdated(uint8 oldMode, uint8 newMode);
+    /**
+     * @dev 模式控制类型更新事件
+     */
     event ModeControlTypeUpdated(uint8 oldType, uint8 newType);
+    /**
+     * @dev 模拟玩家奖励接收地址更新事件
+     */
     event MockRewardRecipientUpdated(address oldAddress, address newAddress);
+    /**
+     * @dev 模拟玩家奖励分发事件
+     */
     event MockRewardDistributed(address indexed recipient, uint256 amount, uint256 seasonId);
+    /**
+     * @dev 玩家分数更新事件
+     */
     event ScoreUpdated(address indexed player, uint256 newScore, uint256 seasonId);
+    /**
+     * @dev 赛季开始事件
+     */
     event SeasonStarted(uint256 indexed seasonId, uint256 startTime);
+    /**
+     * @dev 赛季结算事件
+     */
     event SeasonSettled(uint256 indexed seasonId, uint256 endTime);
+    /**
+     * @dev 奖励领取事件
+     */
     event RewardClaimed(address indexed player, uint256 amount, uint256 seasonId);
+    /**
+     * @dev 挑战结果事件
+     */
     event ChallengeResult(address indexed challenger, address indexed challenged, bool isVictory, uint256 seasonId);
+    /**
+     * @dev 赛季奖励计算完成事件
+     */
     event SeasonRewardsCalculated(uint256 indexed seasonNumber, uint256 totalReward, uint256 distributed);
+    /**
+     * @dev 紧急提取BNB事件
+     */
     event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    /**
+     * @dev 紧急提取代币事件
+     */
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
     function initialize(address _battleContract, address _nftContract, address _tokenContract, address _authorizer) external initializer {
@@ -308,8 +479,9 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     function setRewardType(uint8 _rewardType) external onlyOwner {
         require(_rewardType == 0 || _rewardType == 1, "ArenaRankingManager: Invalid reward type");
         require(arenaRewardContract != address(0), "ArenaRankingManager: Reward contract not set");
+        uint8 oldRewardType = IArenaReward(arenaRewardContract).rewardType();
         IArenaReward(arenaRewardContract).setRewardType(_rewardType);
-        emit RewardTypeUpdated(0, _rewardType);
+        emit RewardTypeUpdated(oldRewardType, _rewardType);
     }
 
     /**

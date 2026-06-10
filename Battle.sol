@@ -562,7 +562,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         result.targetState = target;
 
         if (canUseSkill && skill.skillId > 0) {
-            result.targetState = _applySkill(attacker, result.targetState, attackerIdx, skill);
+            result.targetState = _applySkill(attacker, result.targetState, attackerIdx, skill, seed);
             if (!_hasAnyAlive(result.targetState.alive)) {
                 result.targetAlive = false;
             }
@@ -755,9 +755,10 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @param defenderState 防守方状态
      * @param attackerIndex 攻击者索引
      * @param skill 技能数据
+     * @param seed 随机种子
      * @return 更新后的防守方状态
      */
-    function _applySkill(NFTTraits memory attacker, TeamState memory defenderState, uint attackerIndex, Skill memory skill) internal view returns (TeamState memory) {
+    function _applySkill(NFTTraits memory attacker, TeamState memory defenderState, uint attackerIndex, Skill memory skill, uint256 seed) internal view returns (TeamState memory) {
         uint256 baseDamage = 0;
         uint256 targetIndex = 6;
         uint256 validTargetIndex = 6;
@@ -774,7 +775,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             if (targetIndex >= 6) {
                 targetIndex = validTargetIndex;
             }
-            baseDamage = _calculateDamage(attacker, defenderState.traits[targetIndex], attackerIndex);
+            baseDamage = _calculateDamage(attacker, defenderState.traits[targetIndex], seed);
         }
         uint256 skillDamage = (baseDamage * skill.damage) / 100;
 
