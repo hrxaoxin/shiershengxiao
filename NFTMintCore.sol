@@ -9,50 +9,158 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 
+/**
+ * @title NFTMintCore
+ * @dev NFT核心铸造合约，负责NFT的创建和管理
+ * 
+ * 核心职责：
+ * 1. NFT铸造：支持多种铸造方式（普通、稀有、指定类型）
+ * 2. NFT数据管理：存储NFT的类型、等级、成长值
+ * 3. 数据同步：与NFTData合约保持数据同步
+ * 4. 权限控制：限制铸造权限，仅授权合约可调用
+ * 
+ * NFT类型体系：
+ * - 12个生肖 × 5个属性 × 2个性别 = 120种类型
+ * - 属性：水(0)、风(1)、火(2)、暗(3)、光(4)
+ * - 稀有度：普通属性(0-2)占96%，稀有属性(3-4)占4%
+ * 
+ * 铸造方式：
+ * 1. mint(): 指定类型铸造（由TokenBurner调用）
+ * 2. mintNormal(): 随机普通属性铸造
+ * 3. mintRare(): 随机稀有属性铸造
+ * 4. mintAdmin(): 管理员指定类型和成长值铸造
+ * 5. mintForBreeding(): 繁殖产生的子代铸造
+ * 
+ * 成长值系统：
+ * - 范围：10-100
+ * - 影响NFT属性成长潜力
+ * - 由NFTLib.generateGrowthValue()生成
+ * 
+ * 属性概率分布：
+ * - elementProbabilities = [32, 32, 32, 2, 2]
+ *   - 水/风/火各32%，暗/光各2%
+ * - rareElementProbabilities = [50, 50]
+ *   - 稀有属性中暗/光各50%
+ * 
+ * 安全机制：
+ * - ReentrancyGuard: 防止重入攻击
+ * - Pausable: 可暂停铸造
+ * - 权限控制：仅授权合约可铸造
+ * 
+ * 数据存储双轨制：
+ * - 本合约：tokenType[], tokenLevel[], tokenGrowth[]（ERC721标准存储）
+ * - NFTData合约：详细的ZodiacType、用户代币列表等
+ */
 contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, INFTMint {
     using NFTLib for uint256;
     
+    /**
+     * @dev 属性概率分布（水、风、火、暗、光）
+     */
     uint256[5] public elementProbabilities;
+    /**
+     * @dev 稀有属性概率分布（暗、光）
+     */
     uint256[2] public rareElementProbabilities;
     
+    /**
+     * @dev 铸造计数器
+     */
     uint256 public mintCounter;
+    /**
+     * @dev 铸造计数器警告阈值
+     */
     uint256 public constant MINT_COUNTER_WARNING_THRESHOLD = 1000000;
+    /**
+     * @dev 上次铸造区块
+     */
     uint256 public lastMintBlock;
+    /**
+     * @dev 是否触发过计数器警告
+     */
     bool public mintCounterWarningTriggered;
     
+    /**
+     * @dev 下一个NFT ID
+     */
     uint256 public _nextCardId;
+    /**
+     * @dev NFT类型映射（tokenId -> zodiacType）
+     */
     mapping(uint256 => uint256) public tokenType;
+    /**
+     * @dev NFT等级映射（tokenId -> level）
+     */
     mapping(uint256 => uint8) public tokenLevel;
+    /**
+     * @dev NFT成长值映射（tokenId -> growth）
+     */
     mapping(uint256 => uint8) public tokenGrowth;
     
+    /**
+     * @dev NFT数据合约地址
+     */
     address public nftDataContract;
+    /**
+     * @dev 代币销毁合约地址
+     */
     address public tokenBurnerContract;
+    /**
+     * @dev 繁殖合约地址
+     */
     address public breedingContract;
     
+    /**
+     * @dev 是否暂停铸造
+     */
     bool public paused;
+    /**
+     * @dev 是否允许公开铸造
+     */
     bool public allowPublicMinting;
     
+    /**
+     * @dev NFT铸造事件
+     */
     event Mint(address indexed to, uint256 indexed tokenId, uint256 zodiacType, uint8 growth);
+    /**
+     * @dev 批量铸造事件
+     */
     event BatchMint(address indexed to, uint256[] tokenIds);
+    /**
+     * @dev NFT数据同步失败事件
+     */
     event NFTDataSyncFailed(uint256 indexed tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to);
     
+    /**
+     * @dev 修饰器：确保合约未暂停
+     */
     modifier whenNotPaused() {
         require(!paused, "NFTMint: Contract paused");
         _;
     }
     
+    /**
+     * @dev 修饰器：仅TokenBurner合约可调用
+     */
     modifier onlyTokenBurner() {
         require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
         require(msg.sender == tokenBurnerContract, "NFTMint: Only TokenBurner");
         _;
     }
     
+    /**
+     * @dev 修饰器：仅繁殖合约可调用
+     */
     modifier onlyBreeding() {
         require(breedingContract != address(0), "NFTMint: breedingContract not set");
         require(msg.sender == breedingContract, "NFTMint: Only Breeding");
         _;
     }
     
+    /**
+     * @dev 修饰器：仅授权合约可调用（TokenBurner或Breeding）
+     */
     modifier onlyAuthorized() {
         require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
         require(breedingContract != address(0), "NFTMint: breedingContract not set");
@@ -60,6 +168,11 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _;
     }
     
+    /**
+     * @dev 初始化函数
+     * @param _nftDataContract NFT数据合约地址
+     * @param _tokenBurnerContract 代币销毁合约地址
+     */
     function initialize(address _nftDataContract, address _tokenBurnerContract) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
@@ -72,8 +185,17 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _nextCardId = 1;
     }
     
+    /**
+     * @dev UUPS升级授权
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
     
+    /**
+     * @dev 指定类型铸造NFT
+     * @param to 接收地址
+     * @param zodiacType NFT类型
+     * @return tokenId 铸造的NFT ID
+     */
     function mint(address to, uint256 zodiacType) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Zero address");
         require(zodiacType < 120, "NFTMint: Invalid type");
@@ -91,6 +213,11 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return tokenId;
     }
     
+    /**
+     * @dev 铸造普通NFT（随机属性）
+     * @param to 接收地址
+     * @return tokenId 铸造的NFT ID
+     */
     function mintNormal(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Zero address");
         
@@ -109,6 +236,11 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return tokenId;
     }
     
+    /**
+     * @dev 铸造稀有NFT（暗/光属性）
+     * @param to 接收地址
+     * @return tokenId 铸造的NFT ID
+     */
     function mintRare(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Zero address");
         
@@ -127,6 +259,13 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return tokenId;
     }
     
+    /**
+     * @dev 管理员铸造NFT（可指定类型和成长值）
+     * @param to 接收地址
+     * @param zodiacType NFT类型
+     * @param growth 成长值
+     * @return tokenId 铸造的NFT ID
+     */
     function mintAdmin(address to, uint256 zodiacType, uint8 growth) external onlyOwner nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Zero address");
         require(zodiacType < 120, "NFTMint: Invalid type");
@@ -143,6 +282,13 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return tokenId;
     }
     
+    /**
+     * @dev 繁殖铸造NFT（由Breeding合约调用）
+     * @param to 接收地址
+     * @param zodiacType NFT类型
+     * @param growth 成长值
+     * @return tokenId 铸造的NFT ID
+     */
     function mintForBreeding(address to, uint256 zodiacType, uint8 growth) external onlyBreeding nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Zero address");
         require(zodiacType < 120, "NFTMint: Invalid type");

@@ -8,29 +8,127 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
 
+/**
+ * @title ArenaBattle
+ * @dev 竞技场战斗合约，执行 NFT 之间的战斗逻辑
+ * 
+ * 核心职责：
+ * 1. 战斗执行：处理 PvE（模拟玩家）和 PvP（真实玩家）战斗
+ * 2. 赛季管理：跟踪赛季状态、玩家积分、排名等
+ * 3. 奖励计算：根据战斗结果分配奖励
+ * 4. 排行榜更新：战斗结束后更新 ArenaLeaderboard
+ * 
+ * 战斗类型：
+ * - PvE（Mock Battle）：挑战模拟玩家，不涉及真实对手
+ * - PvP（Real Battle）：挑战真实玩家，需要双方设置战斗队伍
+ * 
+ * 与其他合约的交互：
+ * - Battle：调用核心战斗逻辑
+ * - ArenaLeaderboard：更新排行榜数据
+ * - ArenaPlayer：管理玩家 NFT 质押
+ * - RankingContract：发起战斗请求
+ * 
+ * 安全机制：
+ * - ReentrancyGuard：防止重入攻击
+ * - Pausable：可暂停所有操作
+ * - 战斗冷却：30秒冷却时间防止刷战斗
+ * - NFT 锁定：战斗期间锁定 NFT 防止转移
+ * 
+ * 权限控制：
+ * - onlyOwner：设置合约地址、配置参数
+ * - onlyAuthorized：发起战斗调用
+ */
 contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    /**
+     * @dev 排名合约地址
+     */
     address public rankingContract;
+    /**
+     * @dev 战斗核心合约地址
+     */
     address public battleContract;
+    /**
+     * @dev NFT 合约地址
+     */
     address public nftContract;
+    /**
+     * @dev 竞技场玩家合约地址
+     */
     address public arenaPlayerContract;
+    /**
+     * @dev 竞技场排行榜合约地址
+     */
     address public arenaLeaderboardContract;
+    /**
+     * @dev 授权合约地址
+     */
     address public authorizer;
     
+    /**
+     * @dev 每次胜利的基础奖励（0.1 BNB）
+     */
     uint256 public baseRewardPerWin = 100000000000000000; // 0.1 BNB
     
+    /**
+     * @dev 战斗冷却时间（秒）
+     */
     uint256 public constant BATTLE_COOLDOWN = 30 seconds;
+    /**
+     * @dev 最大模拟玩家排名
+     */
     uint256 public constant MAX_MOCK_RANKING = 100;
+    /**
+     * @dev 队伍大小（NFT 数量）
+     */
     uint256 public constant TEAM_SIZE = 6;
+    /**
+     * @dev 模拟玩家 ID 偏移量
+     */
     uint256 public constant MOCK_ID_OFFSET = 10000;
+    /**
+     * @dev 模拟玩家 ID 乘数
+     */
     uint256 public constant MOCK_ID_MULTIPLIER = 1000;
+    /**
+     * @dev 每日挑战次数
+     */
     uint256 public constant DAILY_ATTEMPTS = 5;
+    /**
+     * @dev 最大模拟玩家数量
+     */
     uint256 public constant MAX_MOCK_PLAYERS_COUNT = 1000;
+    /**
+     * @dev 模拟玩家基础地址
+     */
     address public constant MOCK_PLAYER_BASE = address(0x1000000000000000000000000000000000000000);
     
+    /**
+     * @dev NFT 战斗锁定映射
+     * tokenId => lockEndTime
+     */
     mapping(uint256 => uint256) public nftBattleLocked;
+    /**
+     * @dev 玩家战斗 ID 计数器
+     */
     mapping(address => uint256) public battleIdCounter;
+    /**
+     * @dev 玩家上次战斗时间
+     */
     mapping(address => uint256) public lastBattleTime;
     
+    /**
+     * @dev 玩家记录结构体
+     * @param score 玩家积分
+     * @param wins 胜利次数
+     * @param losses 失败次数
+     * @param draws 平局次数
+     * @param seasonId 当前赛季 ID
+     * @param lastBattleTime 上次战斗时间
+     * @param lastResetTime 上次重置时间
+     * @param remainingAttempts 剩余挑战次数
+     * @param battleTeam 战斗队伍（NFT ID 数组）
+     * @param hasTeam 是否已设置战斗队伍
+     */
     struct PlayerRecord {
         uint256 score;
         uint256 wins;
@@ -44,6 +142,15 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         bool hasTeam;
     }
     
+    /**
+     * @dev 赛季信息结构体
+     * @param startTime 赛季开始时间
+     * @param endTime 赛季结束时间
+     * @param isActive 赛季是否进行中
+     * @param isSettled 赛季是否已结算
+     * @param totalPlayers 赛季总玩家数
+     * @param rewardPool 奖励池金额
+     */
     struct SeasonInfo {
         uint256 startTime;
         uint256 endTime;
@@ -53,10 +160,26 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 rewardPool;
     }
     
+    /**
+     * @dev 当前赛季 ID
+     */
     uint256 public currentSeasonId;
+    /**
+     * @dev 赛季信息映射
+     */
     mapping(uint256 => SeasonInfo) public seasons;
+    /**
+     * @dev 玩家记录映射
+     */
     mapping(address => PlayerRecord) public players;
     
+    /**
+     * @dev 战斗执行事件
+     * @param challenger 挑战者地址
+     * @param challenged 被挑战者地址
+     * @param isVictory 是否胜利
+     * @param battleId 战斗 ID
+     */
     event BattleExecuted(
         address indexed challenger,
         address indexed challenged,
@@ -64,17 +187,44 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 battleId
     );
     
+    /**
+     * @dev 分数更新事件
+     * @param player 玩家地址
+     * @param score 新分数
+     * @param seasonId 赛季 ID
+     */
     event ScoreUpdated(address indexed player, uint256 score, uint256 seasonId);
     
+    /**
+     * @dev 战斗结束事件
+     * @param winner 胜利者地址
+     * @param loser 失败者地址
+     * @param battleId 战斗 ID
+     */
     event BattleEnded(address indexed winner, address indexed loser, uint256 battleId);
     
+    /**
+     * @dev 赛季结算事件
+     * @param seasonId 赛季 ID
+     * @param timestamp 结算时间
+     */
     event SeasonSettled(uint256 seasonId, uint256 timestamp);
 
+    /**
+     * @dev 授权检查修饰器
+     */
     modifier onlyAuthorized() {
         require(msg.sender == owner() || msg.sender == authorizer || msg.sender == rankingContract, "ArenaBattle: Not authorized");
         _;
     }
 
+    /**
+     * @dev 初始化函数
+     * @param _rankingContract 排名合约地址
+     * @param _battleContract 战斗合约地址
+     * @param _nftContract NFT 合约地址
+     * @param _authorizer 授权合约地址
+     */
     function initialize(address _rankingContract, address _battleContract, address _nftContract, address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
@@ -86,17 +236,30 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         authorizer = _authorizer;
     }
 
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 授权合约地址
+     */
     function setAuthorizer(address _authorizer) external onlyOwner {
         require(_authorizer != address(0), "ArenaBattle: Invalid authorizer address");
         authorizer = _authorizer;
     }
 
+    /**
+     * @dev UUPS 升级授权
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
+    /**
+     * @dev 暂停合约
+     */
     function pause() external onlyOwner {
         _pause();
     }
 
+    /**
+     * @dev 取消暂停合约
+     */
     function unpause() external onlyOwner {
         _unpause();
     }

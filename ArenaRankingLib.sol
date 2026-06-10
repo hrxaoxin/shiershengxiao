@@ -1,10 +1,44 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+/**
+ * @title ArenaRankingLib
+ * @dev 竞技场排名计算库，提供排名相关的计算函数
+ * 
+ * 核心功能：
+ * 1. 模拟玩家属性计算：根据模拟玩家索引计算等级、成长值、稀有属性数量
+ * 2. 动态积分计算：根据模拟玩家难度计算战斗胜利获得的积分
+ * 3. 排名奖励计算：根据玩家排名计算赛季奖励分配
+ * 
+ * 模拟玩家系统：
+ * - 共有1000个模拟玩家（索引0-999）
+ * - 索引越小，难度越高，奖励越多
+ * - 模拟玩家的等级、成长值、稀有属性数量随索引变化
+ * 
+ * 每日挑战次数：
+ * - DAILY_ATTEMPTS = 5：每日最多挑战5次
+ * - INITIAL_SCORE = 1000：初始积分
+ * 
+ * 奖励分配规则：
+ * - 小群体（<=3人）：分配比例较高
+ * - 中群体（4-10人）：梯度分配
+ * - 大群体（>10人）：更多名额获得奖励
+ */
 library ArenaRankingLib {
+    /**
+     * @dev 每日挑战次数限制
+     */
     uint256 public constant DAILY_ATTEMPTS = 5;
+    /**
+     * @dev 初始积分
+     */
     uint256 public constant INITIAL_SCORE = 1000;
     
+    /**
+     * @dev 计算战胜模拟玩家获得的动态积分
+     * @param mockIndex 模拟玩家索引（0-999）
+     * @return 获得的积分
+     */
     function calculateDynamicPoints(uint256 mockIndex) internal pure returns (uint256) {
         if (mockIndex == 0) return 50;
         if (mockIndex <= 2) return 40;
@@ -15,6 +49,11 @@ library ArenaRankingLib {
         return 10;
     }
 
+    /**
+     * @dev 计算模拟玩家等级
+     * @param mockIndex 模拟玩家索引（0-999）
+     * @return 模拟玩家等级（1-5）
+     */
     function calculateMockLevel(uint256 mockIndex) internal pure returns (uint256) {
         if (mockIndex == 0) return 5;
         if (mockIndex <= 4) return 5;
@@ -25,6 +64,11 @@ library ArenaRankingLib {
         return 1;
     }
 
+    /**
+     * @dev 计算模拟玩家成长值
+     * @param mockIndex 模拟玩家索引（0-999）
+     * @return 模拟玩家成长值（28-80）
+     */
     function calculateMockGrowth(uint256 mockIndex) internal pure returns (uint256) {
         if (mockIndex == 0) return 80;
         if (mockIndex <= 4) return 78;
@@ -36,6 +80,11 @@ library ArenaRankingLib {
         return 28;
     }
 
+    /**
+     * @dev 计算模拟玩家队伍中稀有属性NFT数量
+     * @param mockIndex 模拟玩家索引（0-999）
+     * @return 稀有属性NFT数量（0-6）
+     */
     function calculateRareElementCount(uint256 mockIndex) internal pure returns (uint256) {
         if (mockIndex == 0) return 6;
         if (mockIndex <= 2) return 5;
@@ -48,6 +97,13 @@ library ArenaRankingLib {
         return 0;
     }
 
+    /**
+     * @dev 计算排名奖励
+     * @param rank 玩家排名
+     * @param pool 奖励池总量
+     * @param totalRealPlayers 真实玩家总数
+     * @return 奖励金额
+     */
     function calculateRankReward(uint256 rank, uint256 pool, uint256 totalRealPlayers) internal pure returns (uint256) {
         if (totalRealPlayers == 0 || pool == 0 || rank > totalRealPlayers) return 0;
 
@@ -62,6 +118,13 @@ library ArenaRankingLib {
         return calculateRewardForLargeGroup(rank, pool, totalRealPlayers);
     }
 
+    /**
+     * @dev 小群体奖励计算（1-3人）
+     * @param rank 玩家排名
+     * @param pool 奖励池总量
+     * @param totalPlayers 玩家总数
+     * @return 奖励金额
+     */
     function calculateRewardForSmallGroup(uint256 rank, uint256 pool, uint256 totalPlayers) internal pure returns (uint256) {
         if (totalPlayers == 1) {
             return pool;
@@ -75,6 +138,13 @@ library ArenaRankingLib {
         }
     }
 
+    /**
+     * @dev 中群体奖励计算（4-10人）
+     * @param rank 玩家排名
+     * @param pool 奖励池总量
+     * @param totalPlayers 玩家总数
+     * @return 奖励金额
+     */
     function calculateRewardForMediumGroup(uint256 rank, uint256 pool, uint256 totalPlayers) internal pure returns (uint256) {
         uint256[] memory ratios = new uint256[](10);
         ratios[0] = 2000;

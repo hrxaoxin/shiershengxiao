@@ -8,13 +8,66 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
+/**
+ * @title NFTMintMetadata
+ * @dev NFT元数据管理合约，负责生成和返回NFT的元数据信息
+ * 
+ * 核心职责：
+ * 1. 生成TokenURI：为每个NFT生成符合ERC721标准的TokenURI
+ * 2. 获取NFT数据：提供NFT的完整属性信息查询接口
+ * 3. 属性计算：根据等级和成长值计算NFT的战斗属性
+ * 
+ * TokenURI生成：
+ * - 采用Base64编码的JSON格式
+ * - 包含NFT的名称、描述、属性等信息
+ * - 图片URL指向外部API
+ * 
+ * NFT数据结构（NFTDataResult）：
+ * - tokenType_: NFT类型（生肖+属性+性别）
+ * - attack: 攻击力
+ * - defense: 防御力
+ * - health: 生命值
+ * - speed: 速度（含生肖加成）
+ * - level: 等级
+ * - rank: 排名
+ * - name: NFT名称
+ * - imageUrl: 图片URL
+ * 
+ * 属性计算逻辑：
+ * - 基础属性由等级和成长值决定
+ * - 生肖加成会影响速度属性
+ * - 加成可能为正或负
+ * 
+ * 与其他合约的交互：
+ * - 从NFTMintCore读取NFT的类型、等级和成长值
+ * - 使用NFTLib计算属性和获取生肖加成
+ * 
+ * 权限控制：
+ * - onlyMintCore: 仅NFTMintCore合约可调用特定函数
+ * - onlyOwner: 可升级合约
+ */
 contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     using Strings for uint256;
     using NFTLib for uint256;
     using Base64 for bytes;
     
+    /**
+     * @dev NFT铸造核心合约地址
+     */
     address public nftMintCore;
     
+    /**
+     * @dev NFT数据结果结构体
+     * @param tokenType_ NFT类型
+     * @param attack 攻击力
+     * @param defense 防御力
+     * @param health 生命值
+     * @param speed 速度
+     * @param level 等级
+     * @param rank 排名
+     * @param name NFT名称
+     * @param imageUrl 图片URL
+     */
     struct NFTDataResult {
         uint256 tokenType_;
         uint256 attack;
@@ -27,21 +80,34 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         string imageUrl;
     }
     
+    /**
+     * @dev 修饰器：仅NFTMintCore合约可调用
+     */
     modifier onlyMintCore() {
         require(msg.sender == nftMintCore, "NFTMintMetadata: Only NFTMintCore");
         _;
     }
     
+    /**
+     * @dev 初始化函数
+     * @param _nftMintCore NFT铸造核心合约地址
+     */
     function initialize(address _nftMintCore) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         nftMintCore = _nftMintCore;
     }
     
-    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {
-        // Upgrade authorization: only owner can upgrade
-    }
+    /**
+     * @dev UUPS升级授权
+     */
+    function _authorizeUpgrade(address newImplementation) internal view override onlyOwner {}
     
+    /**
+     * @dev 生成NFT的TokenURI
+     * @param tokenId NFT ID
+     * @return TokenURI字符串
+     */
     function tokenURI(uint256 tokenId) public view returns (string memory) {
         require(INFTMintCore(nftMintCore)._exists(tokenId), "NFTMint: Token not exists");
         
@@ -52,6 +118,11 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         return string(abi.encodePacked("data:application/json;base64,", bytes(json).encode()));
     }
     
+    /**
+     * @dev 获取NFT的完整数据
+     * @param tokenId NFT ID
+     * @return NFTDataResult 包含NFT的所有属性信息
+     */
     function getNFTData(uint256 tokenId) external view returns (NFTDataResult memory) {
         require(INFTMintCore(nftMintCore)._exists(tokenId), "NFTMint: Token not exists");
         

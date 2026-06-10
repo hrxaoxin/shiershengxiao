@@ -8,20 +8,72 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 
+/**
+ * @title NFTMintBatch
+ * @dev NFT批量铸造合约，支持批量铸造多个NFT
+ * 
+ * 核心职责：
+ * 1. 批量铸造：支持一次性铸造多个NFT
+ * 2. 十连抽：支持一次铸造10个普通或稀有NFT
+ * 3. 随机生成：使用安全随机数生成NFT类型和成长值
+ * 
+ * 批量铸造方式：
+ * 1. mintBatch(): 指定多个类型进行批量铸造
+ * 2. mintNormalTen(): 一次铸造10个普通NFT（水/风/火属性）
+ * 3. mintRareTen(): 一次铸造10个稀有NFT（暗/光属性）
+ * 
+ * 随机数生成：
+ * - 使用baseSeed + i * 7919生成每个NFT的种子
+ * - 确保每个NFT有独立的随机值
+ * - 7919是一个大质数，用于分散种子
+ * 
+ * 安全机制：
+ * - ReentrancyGuard: 防止重入攻击
+ * - Pausable: 可暂停铸造
+ * - 权限控制：仅TokenBurner合约可调用
+ * 
+ * 与NFTMintCore的交互：
+ * - 调用NFTMintCore的mint()和mintWithGrowth()方法
+ * - 批量铸造时逐个调用
+ */
 contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using NFTLib for uint256;
     
+    /**
+     * @dev NFT铸造核心合约地址
+     */
     address public nftMintCore;
     
+    /**
+     * @dev 是否暂停铸造
+     */
     bool public paused;
     
+    /**
+     * @dev 批量铸造事件
+     */
     event BatchMint(address indexed to, uint256[] tokenIds);
     
+    /**
+     * @dev 修饰器：确保合约未暂停
+     */
     modifier whenNotPaused() {
         require(!paused, "NFTMintBatch: Contract paused");
         _;
     }
     
+    /**
+     * @dev 修饰器：仅TokenBurner合约可调用
+     */
+    modifier onlyTokenBurner() {
+        require(msg.sender == INFTMintCore(nftMintCore).tokenBurnerContract(), "NFTMintBatch: Only TokenBurner");
+        _;
+    }
+    
+    /**
+     * @dev 初始化函数
+     * @param _nftMintCore NFT铸造核心合约地址
+     */
     function initialize(address _nftMintCore) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
@@ -29,14 +81,22 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         nftMintCore = _nftMintCore;
     }
     
+    /**
+     * @dev UUPS升级授权
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
     
+    /**
+     * @dev 批量铸造NFT（指定类型）
+     * @param to 接收地址
+     * @param zodiacTypes NFT类型数组
+     * @return tokenIds 铸造的NFT ID数组
+     */
     function mintBatch(address to, uint256[] calldata zodiacTypes) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Zero address");
         uint256[] memory tokenIds = new uint256[](zodiacTypes.length);
         
         for (uint256 i = 0; i < zodiacTypes.length; i++) {
-            // 修复：确保 zodiacTypes[i] 在有效范围内 (0-119)
             require(zodiacTypes[i] < 120, "NFTMint: Invalid type");
             uint256 tokenId = INFTMintCore(nftMintCore).mint(to, zodiacTypes[i]);
             tokenIds[i] = tokenId;
@@ -46,6 +106,11 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return tokenIds;
     }
     
+    /**
+     * @dev 十连抽普通NFT（水/风/火属性）
+     * @param to 接收地址
+     * @return tokenIds 铸造的NFT ID数组
+     */
     function mintNormalTen(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Zero address");
         uint256[] memory tokenIds = new uint256[](10);
@@ -64,6 +129,11 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return tokenIds;
     }
     
+    /**
+     * @dev 十连抽稀有NFT（暗/光属性）
+     * @param to 接收地址
+     * @return tokenIds 铸造的NFT ID数组
+     */
     function mintRareTen(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Zero address");
         uint256[] memory tokenIds = new uint256[](10);

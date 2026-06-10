@@ -8,41 +8,147 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
 
+/**
+ * @title ArenaPlayer
+ * @dev 竞技场玩家合约，管理玩家的 NFT 质押、战斗队伍和挑战次数
+ * 
+ * 核心职责：
+ * 1. NFT 质押管理：玩家质押 NFT 用于竞技场战斗
+ * 2. 战斗队伍配置：设置和清除玩家的战斗队伍
+ * 3. 挑战次数管理：跟踪玩家的每日挑战次数，支持充值
+ * 4. 模拟玩家生成：生成用于 PvE 战斗的模拟对手队伍
+ * 
+ * 与其他合约的交互：
+ * - ArenaRanking / ArenaRankingManager：战斗发起时验证 NFT 所有权
+ * - NFT 合约：验证 NFT 所有权，管理 NFT 转移
+ * 
+ * 挑战机制：
+ * - 每日免费挑战次数：默认 3 次
+ * - 充值挑战次数：每次 3 次（代币支付）
+ * - 每日重置：挑战次数每天重置
+ * 
+ * 安全机制：
+ * - ReentrancyGuard：防止重入攻击
+ * - Pausable：可暂停所有操作
+ * - NFT 所有权验证：确保质押的 NFT 属于调用者
+ * 
+ * 权限控制：
+ * - onlyOwner：暂停合约、设置参数
+ * - onlyAuthorized：质押/解除质押、设置队伍
+ */
 contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    /**
+     * @dev 排名合约地址
+     */
     address public rankingContract;
+    /**
+     * @dev NFT 合约地址
+     */
     address public nftContract;
+    /**
+     * @dev 授权合约地址
+     */
     address public authorizer;
     
+    /**
+     * @dev 最大队伍大小（NFT 数量）
+     */
     uint256 public constant MAX_TEAM_SIZE = 6;
+    /**
+     * @dev 模拟玩家索引偏移量
+     */
     uint256 public constant MOCK_PLAYER_INDEX_OFFSET = 1000000;
     
+    /**
+     * @dev 最大充值次数限制
+     */
     uint256 public maxRechargeAttempts = 5;
+    /**
+     * @dev 充值成本（BNB）
+     */
     uint256 public rechargeCost = 1000000000000000000; // 1 BNB
     
+    /**
+     * @dev 玩家战斗队伍映射
+     */
     mapping(address => uint256[]) public playerBattleTeams;
+    /**
+     * @dev NFT 质押所有者映射
+     */
     mapping(uint256 => address) public nftStakedOwner;
+    /**
+     * @dev 用户质押的 NFT 列表
+     */
     mapping(address => uint256[]) public userStakedNFTs;
+    /**
+     * @dev 玩家上次战斗时间
+     */
     mapping(address => uint256) public playerLastBattleTime;
+    /**
+     * @dev 玩家剩余挑战次数
+     */
     mapping(address => uint256) public playerRemainingAttempts;
+    /**
+     * @dev 玩家上次重置时间
+     */
     mapping(address => uint256) public playerLastResetTime;
+    /**
+     * @dev 玩家充值次数
+     */
     mapping(address => uint256) public rechargeCount;
     
+    /**
+     * @dev 每日挑战次数默认值
+     */
     uint256 public constant DAILY_ATTEMPTS = 3;
+    /**
+     * @dev 每次充值获得的挑战次数
+     */
     uint256 public constant RECHARGE_ATTEMPTS = 3;
+    /**
+     * @dev 充值挑战次数的成本（代币）
+     */
     uint256 public constant RECHARGE_COST = 888;
     
+    /**
+     * @dev 战斗队伍设置事件
+     */
     event BattleTeamSet(address indexed player, uint256[6] tokenIds);
+    /**
+     * @dev 战斗队伍清除事件
+     */
     event BattleTeamCleared(address indexed player);
+    /**
+     * @dev NFT 质押事件
+     */
     event NFTsStaked(address indexed player, uint256[] tokenIds);
+    /**
+     * @dev NFT 解除质押事件
+     */
     event NFTsUnstaked(address indexed player, uint256[] tokenIds);
+    /**
+     * @dev 挑战次数充值事件
+     */
     event ChallengeAttemptsRecharged(address indexed player, uint256 attempts);
+    /**
+     * @dev 模拟队伍生成事件
+     */
     event MockTeamGenerated(address indexed player, uint256[6] team);
 
+    /**
+     * @dev 授权检查修饰器
+     */
     modifier onlyAuthorized() {
         require(msg.sender == owner() || msg.sender == authorizer || msg.sender == rankingContract, "ArenaPlayer: Not authorized");
         _;
     }
 
+    /**
+     * @dev 初始化函数
+     * @param _rankingContract 排名合约地址
+     * @param _nftContract NFT 合约地址
+     * @param _authorizer 授权合约地址
+     */
     function initialize(address _rankingContract, address _nftContract, address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
@@ -53,29 +159,54 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         authorizer = _authorizer;
     }
     
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 授权合约地址
+     */
     function setAuthorizer(address _authorizer) external onlyOwner {
         require(_authorizer != address(0), "ArenaPlayer: Invalid authorizer address");
         authorizer = _authorizer;
     }
 
+    /**
+     * @dev UUPS 升级授权
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
+    /**
+     * @dev 暂停合约
+     */
     function pause() external onlyOwner {
         _pause();
     }
 
+    /**
+     * @dev 取消暂停合约
+     */
     function unpause() external onlyOwner {
         _unpause();
     }
 
+    /**
+     * @dev 设置排名合约地址
+     * @param _rankingContract 排名合约地址
+     */
     function setRankingContract(address _rankingContract) external onlyAuthorized {
         rankingContract = _rankingContract;
     }
 
+    /**
+     * @dev 设置 NFT 合约地址
+     * @param _nftContract NFT 合约地址
+     */
     function setNFTContract(address _nftContract) external onlyAuthorized {
         nftContract = _nftContract;
     }
 
+    /**
+     * @dev 内部函数：重置玩家的挑战次数
+     * @param player 玩家地址
+     */
     function _resetAttempts(address player) internal {
         playerLastResetTime[player] = block.timestamp;
         playerRemainingAttempts[player] = DAILY_ATTEMPTS;

@@ -6,9 +6,48 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "./NFTInterface.sol";
 
+/**
+ * @title ArenaLeaderboard
+ * @dev 竞技场排行榜合约，管理玩家的赛季排名和战绩
+ * 
+ * 核心职责：
+ * 1. 排行榜管理：记录和更新玩家在每个赛季的积分和排名
+ * 2. 赛季管理：创建、结束赛季，跟踪赛季状态
+ * 3. 排名查询：提供按页查询、获取玩家排名等功能
+ * 
+ * 排名机制：
+ * - 按积分从高到低排序
+ * - 相同积分按先来后到排序
+ * - 排行榜大小限制为 1000 名
+ * 
+ * 与其他合约的交互：
+ * - ArenaRanking / ArenaRankingManager：战斗后更新玩家排名
+ * - ArenaBattle：战斗结果影响排名变化
+ * - ArenaReward：赛季奖励基于排行榜排名分配
+ * 
+ * 安全机制：
+ * - UUPS 升级：支持合约升级
+ * - 权限控制：只有授权合约才能更新排名
+ * 
+ * 权限控制：
+ * - onlyOwner：结束赛季、升级合约
+ * - onlyAuthorized：设置排名合约地址、更新排名
+ */
 contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
+    /**
+     * @dev 最大排行榜大小
+     */
     uint256 public constant MAX_LEADERBOARD_SIZE = 1000;
     
+    /**
+     * @dev 赛季信息结构体
+     * @param startTime 赛季开始时间
+     * @param endTime 赛季结束时间
+     * @param isActive 赛季是否进行中
+     * @param isSettled 赛季是否已结算
+     * @param totalPlayers 赛季总玩家数
+     * @param rewardPool 奖励池金额
+     */
     struct SeasonInfo {
         uint256 startTime;
         uint256 endTime;
@@ -18,6 +57,14 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 rewardPool;
     }
     
+    /**
+     * @dev 玩家记录结构体
+     * @param score 玩家积分
+     * @param wins 胜利次数
+     * @param losses 失败次数
+     * @param draws 平局次数
+     * @param seasonId 当前赛季 ID
+     */
     struct PlayerRecord {
         uint256 score;
         uint256 wins;
@@ -26,41 +73,94 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 seasonId;
     }
     
+    /**
+     * @dev 当前赛季 ID
+     */
     uint256 public currentSeasonId;
+    /**
+     * @dev 授权合约地址
+     */
     address public authorizer;
+    /**
+     * @dev 排名合约地址
+     */
     address public rankingContract;
+    /**
+     * @dev 赛季信息映射
+     */
     mapping(uint256 => SeasonInfo) public seasons;
+    /**
+     * @dev 玩家记录映射
+     */
     mapping(address => PlayerRecord) public players;
+    /**
+     * @dev 赛季排名数组
+     */
     mapping(uint256 => address[]) public seasonRankings;
+    /**
+     * @dev 玩家在赛季中的排名索引
+     */
     mapping(uint256 => mapping(address => uint256)) public playerRankIndex;
     
+    /**
+     * @dev 分数更新事件
+     */
     event ScoreUpdated(address indexed player, uint256 score, uint256 seasonId);
+    /**
+     * @dev 排名更新事件
+     */
     event RankingUpdated(address indexed player, uint256 rank, uint256 seasonId);
+    /**
+     * @dev 赛季创建事件
+     */
     event SeasonCreated(uint256 seasonId, uint256 startTime, uint256 endTime);
+    /**
+     * @dev 排行榜更新事件
+     */
     event LeaderboardUpdated(uint256 seasonId);
     
+    /**
+     * @dev 授权检查修饰器
+     */
     modifier onlyAuthorized() {
         require(msg.sender == owner() || msg.sender == authorizer, "ArenaLeaderboard: Not authorized");
         _;
     }
     
+    /**
+     * @dev 初始化函数
+     */
     function initialize() external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         _createSeason();
     }
     
+    /**
+     * @dev UUPS 升级授权
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
     
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 授权合约地址
+     */
     function setAuthorizer(address _authorizer) external onlyOwner {
         require(_authorizer != address(0), "ArenaLeaderboard: Invalid authorizer address");
         authorizer = _authorizer;
     }
     
+    /**
+     * @dev 设置排名合约地址
+     * @param _rankingContract 排名合约地址
+     */
     function setRankingContract(address _rankingContract) external onlyAuthorized {
         rankingContract = _rankingContract;
     }
     
+    /**
+     * @dev 内部函数：创建新赛季
+     */
     function _createSeason() internal {
         currentSeasonId++;
         seasons[currentSeasonId] = SeasonInfo({
@@ -74,6 +174,9 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         emit SeasonCreated(currentSeasonId, block.timestamp, block.timestamp + 7 days);
     }
     
+    /**
+     * @dev 结束当前赛季（仅所有者）
+     */
     function endSeason() external onlyOwner {
         SeasonInfo storage season = seasons[currentSeasonId];
         require(season.isActive, "ArenaLeaderboard: Season not active");
@@ -82,6 +185,12 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         _createSeason();
     }
     
+    /**
+     * @dev 更新玩家排名
+     * @param player 玩家地址
+     * @param newScore 新积分
+     * @param seasonId 赛季 ID
+     */
     function updateRanking(address player, uint256 newScore, uint256 seasonId) external {
         SeasonInfo storage season = seasons[seasonId];
         require(season.isActive, "ArenaLeaderboard: Season not active");
