@@ -109,69 +109,82 @@
                     <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center mr-4">
                         <i class="text-white text-xl">📈</i>
                     </div>
-                    <div>
+                    <div class="flex-1">
                         <h3 class="text-lg font-semibold text-gray-800">成长价出售</h3>
                         <p class="text-sm text-gray-500">根据NFT等级和持有时间计算回购价格</p>
+                    </div>
+                    <div class="flex items-center">
+                        <span id="growthBuybackStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-600">
+                            未开启
+                        </span>
                     </div>
                 </div>
 
                 <div id="growthPriceSection">
-                    <div id="userNftGridGrowth" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-96 overflow-y-auto p-2 border-2 border-dashed border-gray-300 rounded-lg mb-6">
-                        <div class="col-span-full text-center py-8">
-                            <i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
-                            <p class="text-gray-600">加载用户NFT中...</p>
-                        </div>
+                    <div id="growthBuybackDisabled" class="text-center py-8 hidden">
+                        <i class="fa fa-lock text-4xl text-gray-400 mb-4"></i>
+                        <p class="text-gray-500">成长价回购功能未开启</p>
+                        <p class="text-sm text-gray-400 mt-2">请等待管理员开启成长价回购功能</p>
                     </div>
+                    
+                    <div id="growthBuybackEnabled">
+                        <div id="userNftGridGrowth" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-96 overflow-y-auto p-2 border-2 border-dashed border-gray-300 rounded-lg mb-6">
+                            <div class="col-span-full text-center py-8">
+                                <i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
+                                <p class="text-gray-600">加载用户NFT中...</p>
+                            </div>
+                        </div>
 
-                    <div id="selectedNftInfoGrowth" class="hidden bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border-2 border-blue-300 mb-6">
-                        <div class="flex justify-between items-start">
-                            <div class="flex items-center">
-                                <div id="selectedNftIconGrowth" class="w-20 h-20 rounded-lg bg-gray-200 flex items-center justify-center text-4xl mr-4"></div>
-                                <div>
-                                    <h3 id="selectedNftNameGrowth" class="text-xl font-bold text-gray-800"></h3>
-                                    <p id="selectedNftIdGrowth" class="text-gray-600"></p>
-                                    <p id="selectedNftLevelGrowth" class="text-gray-500 text-sm"></p>
+                        <div id="selectedNftInfoGrowth" class="hidden bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border-2 border-blue-300 mb-6">
+                            <div class="flex justify-between items-start">
+                                <div class="flex items-center">
+                                    <div id="selectedNftIconGrowth" class="w-20 h-20 rounded-lg bg-gray-200 flex items-center justify-center text-4xl mr-4"></div>
+                                    <div>
+                                        <h3 id="selectedNftNameGrowth" class="text-xl font-bold text-gray-800"></h3>
+                                        <p id="selectedNftIdGrowth" class="text-gray-600"></p>
+                                        <p id="selectedNftLevelGrowth" class="text-gray-500 text-sm"></p>
+                                    </div>
+                                </div>
+                                <button type="button" id="clearSelectionBtnGrowth" class="btn-secondary text-sm">
+                                    <i class="fas fa-times mr-1"></i> 清除
+                                </button>
+                            </div>
+                            
+                            <div class="mt-4 grid grid-cols-2 gap-4">
+                                <div class="bg-white p-3 rounded-lg">
+                                    <p class="text-gray-500 text-sm">持有天数</p>
+                                    <p class="text-xl font-bold text-blue-600" id="holdingDays">-</p>
+                                </div>
+                                <div class="bg-white p-3 rounded-lg">
+                                    <p class="text-gray-500 text-sm">基础回购价</p>
+                                    <p class="text-xl font-bold text-green-600" id="basePrice">-</p>
+                                </div>
+                                <div class="bg-white p-3 rounded-lg">
+                                    <p class="text-gray-500 text-sm">持有加成</p>
+                                    <p class="text-xl font-bold text-orange-600" id="holdingBonus">-</p>
+                                </div>
+                                <div class="bg-white p-3 rounded-lg">
+                                    <p class="text-gray-500 text-sm">最终回购价</p>
+                                    <p class="text-xl font-bold text-red-600" id="finalGrowthPrice">-</p>
                                 </div>
                             </div>
-                            <button type="button" id="clearSelectionBtnGrowth" class="btn-secondary text-sm">
-                                <i class="fas fa-times mr-1"></i> 清除
-                            </button>
-                        </div>
-                        
-                        <div class="mt-4 grid grid-cols-2 gap-4">
-                            <div class="bg-white p-3 rounded-lg">
-                                <p class="text-gray-500 text-sm">持有天数</p>
-                                <p class="text-xl font-bold text-blue-600" id="holdingDays">-</p>
-                            </div>
-                            <div class="bg-white p-3 rounded-lg">
-                                <p class="text-gray-500 text-sm">基础回购价</p>
-                                <p class="text-xl font-bold text-green-600" id="basePrice">-</p>
-                            </div>
-                            <div class="bg-white p-3 rounded-lg">
-                                <p class="text-gray-500 text-sm">持有加成</p>
-                                <p class="text-xl font-bold text-orange-600" id="holdingBonus">-</p>
-                            </div>
-                            <div class="bg-white p-3 rounded-lg">
-                                <p class="text-gray-500 text-sm">最终回购价</p>
-                                <p class="text-xl font-bold text-red-600" id="finalGrowthPrice">-</p>
+
+                            <div class="mt-4">
+                                <div class="flex justify-between text-sm text-gray-600 mb-2">
+                                    <span>持有加成进度</span>
+                                    <span id="bonusProgressText">0%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                    <div id="bonusProgressBar" class="progress-bar bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full" style="width: 0%"></div>
+                                </div>
+                                <p class="text-xs text-gray-400 mt-1" id="bonusHint">持有时间越长，回购价格越高</p>
                             </div>
                         </div>
 
-                        <div class="mt-4">
-                            <div class="flex justify-between text-sm text-gray-600 mb-2">
-                                <span>持有加成进度</span>
-                                <span id="bonusProgressText">0%</span>
-                            </div>
-                            <div class="w-full bg-gray-200 rounded-full h-3">
-                                <div id="bonusProgressBar" class="progress-bar bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full" style="width: 0%"></div>
-                            </div>
-                            <p class="text-xs text-gray-400 mt-1" id="bonusHint">持有时间越长，回购价格越高</p>
-                        </div>
+                        <button id="sellWithGrowthBtn" class="btn-primary w-full" disabled>
+                            <i class="fa fa-arrow-right mr-2"></i>以成长价出售
+                        </button>
                     </div>
-
-                    <button id="sellWithGrowthBtn" class="btn-primary w-full" disabled>
-                        <i class="fa fa-arrow-right mr-2"></i>以成长价出售
-                    </button>
                 </div>
             </div>
 
@@ -180,9 +193,14 @@
                     <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-teal-500 flex items-center justify-center mr-4">
                         <i class="text-white text-xl">🎯</i>
                     </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-800">回购价出售</h3>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-800">固定价出售</h3>
                         <p class="text-sm text-gray-500">按固定回购价格出售NFT</p>
+                    </div>
+                    <div class="flex items-center">
+                        <span id="autoBuybackStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-600">
+                            未开启
+                        </span>
                     </div>
                 </div>
 
@@ -193,18 +211,13 @@
                                 <p class="text-gray-600">当前回购价格</p>
                                 <p class="text-2xl font-bold text-red-600" id="fixedBuybackPrice">-</p>
                             </div>
-                            <div class="flex items-center">
-                                <span id="autoBuybackStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-600">
-                                    未开启
-                                </span>
-                            </div>
                         </div>
                     </div>
 
                     <div id="autoBuybackDisabled" class="text-center py-8">
                         <i class="fa fa-lock text-4xl text-gray-400 mb-4"></i>
-                        <p class="text-gray-500">自动回购功能未开启</p>
-                        <p class="text-sm text-gray-400 mt-2">请等待管理员开启自动回购功能</p>
+                        <p class="text-gray-500">固定价回购功能未开启</p>
+                        <p class="text-sm text-gray-400 mt-2">请等待管理员开启固定价回购功能</p>
                     </div>
 
                     <div id="autoBuybackEnabled" class="hidden">
@@ -244,6 +257,87 @@
                             <i class="fa fa-search mr-2"></i>选择NFT出售
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 余额比例回购 -->
+        <div class="bg-white rounded-xl p-6 shadow-md mt-8">
+            <div class="flex items-center mb-6">
+                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center mr-4">
+                    <i class="text-white text-xl">⚖️</i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-gray-800">余额比例回购</h3>
+                    <p class="text-sm text-gray-500">根据合约代币余额/NFT总供应量计算回购价格</p>
+                </div>
+                <div class="flex items-center">
+                    <span id="balanceRatioBuybackStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-600">
+                        未开启
+                    </span>
+                </div>
+            </div>
+
+            <div id="balanceRatioSection">
+                <div class="bg-orange-50 p-4 rounded-lg mb-4">
+                    <div class="grid grid-cols-3 gap-4">
+                        <div class="text-center">
+                            <p class="text-gray-600 text-sm">合约余额</p>
+                            <p class="text-xl font-bold text-green-600" id="balanceRatioBalance">-</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-600 text-sm">NFT总量</p>
+                            <p class="text-xl font-bold text-blue-600" id="balanceRatioTotalSupply">-</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-600 text-sm">单张回购价</p>
+                            <p class="text-xl font-bold text-red-600" id="balanceRatioPrice">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="balanceRatioBuybackDisabled" class="text-center py-8">
+                    <i class="fa fa-lock text-4xl text-gray-400 mb-4"></i>
+                    <p class="text-gray-500">余额比例回购功能未开启</p>
+                    <p class="text-sm text-gray-400 mt-2">请等待管理员开启余额比例回购功能</p>
+                </div>
+
+                <div id="balanceRatioBuybackEnabled" class="hidden">
+                    <div id="userNftGridBalanceRatio" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-64 overflow-y-auto p-2 border-2 border-dashed border-gray-300 rounded-lg mb-6">
+                        <div class="col-span-full text-center py-8">
+                            <i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
+                            <p class="text-gray-600">加载用户NFT中...</p>
+                        </div>
+                    </div>
+
+                    <div id="selectedNftInfoBalanceRatio" class="hidden bg-gradient-to-r from-orange-50 to-red-50 p-4 rounded-lg border-2 border-orange-300 mb-6">
+                        <div class="flex justify-between items-start">
+                            <div class="flex items-center">
+                                <div id="selectedNftIconBalanceRatio" class="w-16 h-16 rounded-lg bg-gray-200 flex items-center justify-center text-3xl mr-4"></div>
+                                <div>
+                                    <h3 id="selectedNftNameBalanceRatio" class="text-lg font-bold text-gray-800"></h3>
+                                    <p id="selectedNftIdBalanceRatio" class="text-gray-600"></p>
+                                </div>
+                            </div>
+                            <button type="button" id="clearSelectionBtnBalanceRatio" class="btn-secondary text-sm">
+                                <i class="fas fa-times mr-1"></i> 清除
+                            </button>
+                        </div>
+                        
+                        <div class="mt-4 flex justify-between items-center">
+                            <div>
+                                <p class="text-gray-500 text-sm">回购价格</p>
+                                <p class="text-2xl font-bold text-red-600" id="finalBalanceRatioPrice">-</p>
+                            </div>
+                            <button id="sellWithBalanceRatioBtn" class="btn-success">
+                                <i class="fa fa-arrow-right mr-2"></i>确认出售
+                            </button>
+                        </div>
+                    </div>
+
+                    <button id="selectNftForBalanceRatioBtn" class="btn-secondary w-full">
+                        <i class="fa fa-search mr-2"></i>选择NFT出售
+                    </button>
                 </div>
             </div>
         </div>
@@ -359,9 +453,13 @@
         let tokenContract;
         let selectedTokenIdGrowth = null;
         let selectedTokenIdFixed = null;
+        let selectedTokenIdBalanceRatio = null;
         let userNfts = [];
-        let autoBuybackOpen = false;
+        let growthBuybackOpen = false;
+        let fixedBuybackOpen = false;
+        let balanceRatioBuybackOpen = false;
         let fixedPrice = '0';
+        let balanceRatioPrice = '0';
 
         document.addEventListener('DOMContentLoaded', async function() {
             ZODIAC_COMPONENTS.injectNavigation('buyback');
@@ -370,9 +468,12 @@
 
             document.getElementById('clearSelectionBtnGrowth').addEventListener('click', clearGrowthSelection);
             document.getElementById('clearSelectionBtnFixed').addEventListener('click', clearFixedSelection);
+            document.getElementById('clearSelectionBtnBalanceRatio').addEventListener('click', clearBalanceRatioSelection);
             document.getElementById('selectNftForFixedBtn').addEventListener('click', loadUserNftsForFixed);
+            document.getElementById('selectNftForBalanceRatioBtn').addEventListener('click', loadUserNftsForBalanceRatio);
             document.getElementById('sellWithGrowthBtn').addEventListener('click', sellWithGrowthPrice);
             document.getElementById('sellWithFixedBtn').addEventListener('click', sellWithFixedPrice);
+            document.getElementById('sellWithBalanceRatioBtn').addEventListener('click', sellWithBalanceRatioPrice);
             document.getElementById('refreshWallet').addEventListener('click', initWeb3);
         });
 
@@ -438,25 +539,77 @@
             if (!buybackContract) return;
 
             try {
-                autoBuybackOpen = await buybackContract.methods.autoBuybackOpen().call();
+                // 获取所有开关状态
+                growthBuybackOpen = await buybackContract.methods.growthBuybackOpen().call();
+                fixedBuybackOpen = await buybackContract.methods.fixedBuybackOpen().call();
+                balanceRatioBuybackOpen = await buybackContract.methods.balanceRatioBuybackOpen().call();
                 fixedPrice = await buybackContract.methods.fixedBuybackPrice().call();
 
+                // 更新成长价回购状态
+                const growthStatusEl = document.getElementById('growthBuybackStatus');
+                if (growthBuybackOpen) {
+                    growthStatusEl.textContent = '已开启';
+                    growthStatusEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-200 text-green-700';
+                    document.getElementById('growthBuybackDisabled').classList.add('hidden');
+                    document.getElementById('growthBuybackEnabled').classList.remove('hidden');
+                } else {
+                    growthStatusEl.textContent = '未开启';
+                    growthStatusEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-600';
+                    document.getElementById('growthBuybackDisabled').classList.remove('hidden');
+                    document.getElementById('growthBuybackEnabled').classList.add('hidden');
+                }
+
+                // 更新固定价回购状态
                 document.getElementById('fixedBuybackPrice').textContent = web3.utils.fromWei(fixedPrice, 'ether') + ' 代币';
                 
-                const statusEl = document.getElementById('autoBuybackStatus');
-                if (autoBuybackOpen) {
-                    statusEl.textContent = '已开启';
-                    statusEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-200 text-green-700';
+                const fixedStatusEl = document.getElementById('autoBuybackStatus');
+                if (fixedBuybackOpen) {
+                    fixedStatusEl.textContent = '已开启';
+                    fixedStatusEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-200 text-green-700';
                     document.getElementById('autoBuybackDisabled').classList.add('hidden');
                     document.getElementById('autoBuybackEnabled').classList.remove('hidden');
                 } else {
-                    statusEl.textContent = '未开启';
-                    statusEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-600';
+                    fixedStatusEl.textContent = '未开启';
+                    fixedStatusEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-600';
                     document.getElementById('autoBuybackDisabled').classList.remove('hidden');
                     document.getElementById('autoBuybackEnabled').classList.add('hidden');
                 }
+
+                // 更新余额比例回购状态
+                const balanceRatioStatusEl = document.getElementById('balanceRatioBuybackStatus');
+                if (balanceRatioBuybackOpen) {
+                    balanceRatioStatusEl.textContent = '已开启';
+                    balanceRatioStatusEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-green-200 text-green-700';
+                    document.getElementById('balanceRatioBuybackDisabled').classList.add('hidden');
+                    document.getElementById('balanceRatioBuybackEnabled').classList.remove('hidden');
+                    await loadBalanceRatioPrice();
+                } else {
+                    balanceRatioStatusEl.textContent = '未开启';
+                    balanceRatioStatusEl.className = 'px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-600';
+                    document.getElementById('balanceRatioBuybackDisabled').classList.remove('hidden');
+                    document.getElementById('balanceRatioBuybackEnabled').classList.add('hidden');
+                }
             } catch (error) {
                 console.error('加载回购配置失败:', error);
+            }
+        }
+
+        async function loadBalanceRatioPrice() {
+            if (!buybackContract) return;
+
+            try {
+                const result = await buybackContract.methods.calculateBalanceRatioPrice().call();
+                const pricePerNFT = result.pricePerNFT || result['0'];
+                const balance = result.balance || result['1'];
+                const totalSupply = result.totalSupply || result['2'];
+
+                balanceRatioPrice = pricePerNFT;
+
+                document.getElementById('balanceRatioBalance').textContent = web3.utils.fromWei(balance, 'ether');
+                document.getElementById('balanceRatioTotalSupply').textContent = totalSupply;
+                document.getElementById('balanceRatioPrice').textContent = web3.utils.fromWei(pricePerNFT, 'ether') + ' 代币';
+            } catch (error) {
+                console.error('加载余额比例价格失败:', error);
             }
         }
 
@@ -552,8 +705,10 @@
                     
                     if (mode === 'growth') {
                         selectNftForGrowth(tokenId, type, level, mintTime);
-                    } else {
+                    } else if (mode === 'fixed') {
                         selectNftForFixed(tokenId, type);
+                    } else if (mode === 'balanceRatio') {
+                        selectNftForBalanceRatio(tokenId, type);
                     }
                 });
             });
@@ -659,6 +814,105 @@
                 card.classList.remove('border-green-500', 'bg-green-50');
                 card.classList.add('border-gray-200');
             });
+        }
+
+        async function loadUserNftsForBalanceRatio() {
+            const grid = document.getElementById('userNftGridBalanceRatio');
+            grid.innerHTML = '<div class="col-span-full text-center py-8"><i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i><p class="text-gray-600">加载用户NFT中...</p></div>';
+
+            if (!account || !nftMintContract) {
+                grid.innerHTML = '<div class="col-span-full text-center py-8"><p class="text-gray-600">请先连接钱包</p></div>';
+                return;
+            }
+
+            try {
+                if (userNfts.length === 0) {
+                    await loadUserNftsForGrowth();
+                }
+                displayUserNfts(grid, userNfts, 'balanceRatio');
+            } catch (error) {
+                console.error('加载用户NFT失败:', error);
+                grid.innerHTML = '<div class="col-span-full text-center py-8"><p class="text-red-500">加载失败，请重试</p></div>';
+            }
+        }
+
+        function selectNftForBalanceRatio(tokenId, type) {
+            const nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
+            const imagePath = `images/fu-cards/${nftInfo.elementPrefix}${nftInfo.animalKey}_${nftInfo.gender}.png`;
+
+            selectedTokenIdBalanceRatio = tokenId;
+
+            document.getElementById('selectedNftInfoBalanceRatio').classList.remove('hidden');
+            document.getElementById('selectedNftIconBalanceRatio').innerHTML = `<img src="${imagePath}" alt="${nftInfo.name}" class="w-full h-full object-cover rounded-lg" onerror="this.parentElement.innerHTML='<span class=\\'text-3xl\\'>🐾</span>';">`;
+            document.getElementById('selectedNftNameBalanceRatio').textContent = nftInfo.name;
+            document.getElementById('selectedNftIdBalanceRatio').textContent = `NFT #${tokenId}`;
+            document.getElementById('finalBalanceRatioPrice').textContent = web3.utils.fromWei(balanceRatioPrice, 'ether') + ' 代币';
+
+            document.querySelectorAll('.nft-card').forEach(card => {
+                if (parseInt(card.getAttribute('data-tokenid'), 10) === tokenId) {
+                    card.classList.add('border-green-500', 'bg-green-50');
+                    card.classList.remove('border-gray-200');
+                } else {
+                    card.classList.remove('border-green-500', 'bg-green-50');
+                    card.classList.add('border-gray-200');
+                }
+            });
+        }
+
+        function clearBalanceRatioSelection() {
+            selectedTokenIdBalanceRatio = null;
+            document.getElementById('selectedNftInfoBalanceRatio').classList.add('hidden');
+
+            document.querySelectorAll('.nft-card').forEach(card => {
+                card.classList.remove('border-green-500', 'bg-green-50');
+                card.classList.add('border-gray-200');
+            });
+        }
+
+        async function sellWithBalanceRatioPrice() {
+            if (!selectedTokenIdBalanceRatio || !buybackContract) return;
+
+            // 先刷新余额比例价格
+            await loadBalanceRatioPrice();
+            const price = web3.utils.fromWei(balanceRatioPrice, 'ether');
+
+            const confirm = await ZODIAC_UI.showConfirmModal(
+                '确认以余额比例价出售',
+                `将NFT #${selectedTokenIdBalanceRatio} 以 ${price} 代币的价格出售给回购合约，确定继续？`
+            );
+
+            if (!confirm) return;
+
+            const btn = document.getElementById('sellWithBalanceRatioBtn');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 出售中...';
+            btn.disabled = true;
+
+            try {
+                const isApproved = await checkApproval();
+                if (!isApproved) {
+                    await approveNFT();
+                }
+
+                await ZODIAC_WEB3.sellNFTWithBalanceRatioPrice(selectedTokenIdBalanceRatio);
+
+                ZODIAC_UI.showToast('出售成功！', 'success');
+                clearBalanceRatioSelection();
+                userNfts = [];
+                await loadUserNftsForGrowth();
+                await updateWalletStatus();
+                await loadBalanceRatioPrice();
+            } catch (error) {
+                let errorMsg = '出售失败';
+                if (error.code === 4001) {
+                    errorMsg = '用户取消了操作';
+                } else if (error.message) {
+                    errorMsg += ': ' + error.message;
+                }
+                ZODIAC_UI.showToast(errorMsg, 'error');
+            } finally {
+                btn.innerHTML = '<i class="fa fa-arrow-right mr-2"></i>确认出售';
+                btn.disabled = false;
+            }
         }
 
         async function sellWithGrowthPrice() {

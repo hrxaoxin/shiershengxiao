@@ -199,7 +199,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * 用于更新NFT铸造合约的引用地址
      * @param _nftMint 新的NFTMint合约地址，不可为零地址
      */
-    function setNFTContract(address _nftMint) external onlyAuthorized {
+    function setNFTContract(address _nftMint) external onlyAdminOrAuthorizer {
         require(_nftMint != address(0), "TokenBurner: Zero address");
         nftMintContract = _nftMint;
     }
@@ -209,7 +209,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * 此地址将获得调用铸造函数的权限
      * @param _authorized 新的授权NFT合约地址，不可为零地址
      */
-    function setAuthorizedNFTContract(address _authorized) external onlyAuthorized {
+    function setAuthorizedNFTContract(address _authorized) external onlyAdminOrAuthorizer {
         require(_authorized != address(0), "TokenBurner: Zero address");
         authorizedNFTContract = _authorized;
     }
@@ -245,7 +245,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * 更新用于销毁和支付铸造费用的ERC20代币合约
      * @param _tokenContract 新的代币合约地址，不可为零地址
      */
-    function setTokenContract(address _tokenContract) external onlyAuthorized {
+    function setTokenContract(address _tokenContract) external onlyAdminOrAuthorizer {
         require(_tokenContract != address(0), "TokenBurner: Zero address");
         tokenContract = _tokenContract;
         emit TokenContractUpdated(_tokenContract);

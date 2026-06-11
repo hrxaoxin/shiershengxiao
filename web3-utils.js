@@ -1907,6 +1907,20 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
+    async function sellNFTWithBalanceRatioPrice(tokenId) {
+        if (!tokenId || tokenId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid token ID');
+        }
+        try {
+            const contract = await getContract('buyback');
+            const receipt = await sendAndTrackTransaction(contract, 'sellWithBalanceRatioPrice', [tokenId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] sellNFTWithBalanceRatioPrice failed:', e);
+            throw e;
+        }
+    }
+
     async function calculateBuybackPrice(tokenId) {
         if (!tokenId || tokenId <= 0) {
             throw new Error('[ZODIAC_WEB3] Invalid token ID');
@@ -1920,16 +1934,35 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
+    async function calculateBalanceRatioPrice() {
+        try {
+            const contract = await getContract('buyback');
+            const result = await contract.methods.calculateBalanceRatioPrice().call();
+            return {
+                pricePerNFT: result.pricePerNFT || result['0'],
+                balance: result.balance || result['1'],
+                totalSupply: result.totalSupply || result['2']
+            };
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] calculateBalanceRatioPrice failed:', e);
+            throw e;
+        }
+    }
+
     async function getBuybackConfig() {
         try {
             const contract = await getContract('buyback');
-            const [autoBuybackOpen, fixedBuybackPrice, maxBonusPercent] = await Promise.all([
-                contract.methods.autoBuybackOpen().call(),
+            const [fixedBuybackOpen, growthBuybackOpen, balanceRatioBuybackOpen, fixedBuybackPrice, maxBonusPercent] = await Promise.all([
+                contract.methods.fixedBuybackOpen().call(),
+                contract.methods.growthBuybackOpen().call(),
+                contract.methods.balanceRatioBuybackOpen().call(),
                 contract.methods.fixedBuybackPrice().call(),
                 contract.methods.maxBonusPercent().call()
             ]);
             return {
-                autoBuybackOpen: autoBuybackOpen,
+                fixedBuybackOpen: fixedBuybackOpen,
+                growthBuybackOpen: growthBuybackOpen,
+                balanceRatioBuybackOpen: balanceRatioBuybackOpen,
                 fixedBuybackPrice: fixedBuybackPrice,
                 maxBonusPercent: parseInt(maxBonusPercent, 10)
             };
@@ -2068,7 +2101,9 @@ window.ZODIAC_WEB3 = (function() {
         // Buyback
         sellNFTWithGrowthPrice,
         sellNFTWithFixedPrice,
+        sellNFTWithBalanceRatioPrice,
         calculateBuybackPrice,
+        calculateBalanceRatioPrice,
         getBuybackConfig
     };
 })();

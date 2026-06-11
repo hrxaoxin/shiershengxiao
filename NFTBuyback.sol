@@ -14,9 +14,10 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 
 /**
  * @title NFTBuyback - NFT回购销毁合约
- * @dev 实现两种回购方式：
- *      1. 成长价回购：根据NFT等级和持有时间动态计算回购价格
- *      2. 固定价回购：管理员设置固定回购价格，用户按固定价格出售
+ * @dev 实现三种回购方式：
+ *      1. 成长价回购：根据NFT等级和持有时间动态计算回购价格（需开启growthBuybackOpen）
+ *      2. 固定价回购：管理员设置固定回购价格，用户按固定价格出售（需开启fixedBuybackOpen）
+ *      3. 余额比例回购：根据合约代币余额/NFT总供应量计算单张NFT回购价格（需开启balanceRatioBuybackOpen）
  * 
  * 回购价格规则：
  * - 1阶普通NFT：基础回购价为normalMintCost的10%，每日持有加成1%，持有90天回本，最高到成本的110%
@@ -135,6 +136,16 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 固定回购是否开启
      */
     bool public fixedBuybackOpen = false;
+    
+    /**
+     * @dev 成长价回购是否开启
+     */
+    bool public growthBuybackOpen = false;
+    
+    /**
+     * @dev 余额比例回购是否开启
+     */
+    bool public balanceRatioBuybackOpen = false;
 
     /**
      * @dev 获取最高加成百分比
@@ -263,6 +274,24 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     function setFixedBuybackOpen(bool _open) external onlyOwner {
         fixedBuybackOpen = _open;
         emit FixedBuybackOpenUpdated(_open);
+    }
+    
+    /**
+     * @dev 设置成长价回购开关
+     * @param _open 是否开启成长价回购
+     */
+    function setGrowthBuybackOpen(bool _open) external onlyOwner {
+        growthBuybackOpen = _open;
+        emit GrowthBuybackOpenUpdated(_open);
+    }
+    
+    /**
+     * @dev 设置余额比例回购开关
+     * @param _open 是否开启余额比例回购
+     */
+    function setBalanceRatioBuybackOpen(bool _open) external onlyOwner {
+        balanceRatioBuybackOpen = _open;
+        emit BalanceRatioBuybackOpenUpdated(_open);
     }
 
     /**
@@ -447,6 +476,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @param tokenId 要出售的NFT ID
      */
     function sellWithGrowthPrice(uint256 tokenId) external whenNotPaused nonReentrant {
+        require(growthBuybackOpen, "NFTBuyback: Growth buyback not open");
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
 
@@ -494,6 +524,58 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
         emit NFTBurnedForBuyback(tokenId, msg.sender, fixedBuybackPrice, "fixed");
     }
+    
+    /**
+     * @dev 计算余额比例回购价格
+     * @return 单张NFT的回购价格（合约余额/NFT总量）
+     * @return 合约代币余额
+     * @return NFT总供应量
+     */
+    function calculateBalanceRatioPrice() public view returns (uint256, uint256, uint256) {
+        require(nftContract != address(0), "NFTBuyback: NFT contract not set");
+        require(tokenContract != address(0), "NFTBuyback: Token contract not set");
+        
+        IERC20 token = IERC20(tokenContract);
+        uint256 balance = token.balanceOf(address(this));
+        
+        INFTMint nft = INFTMint(nftContract);
+        uint256 totalSupply = nft.totalSupply();
+        
+        require(totalSupply > 0, "NFTBuyback: No NFT exists");
+        
+        uint256 pricePerNFT = balance / totalSupply;
+        
+        return (pricePerNFT, balance, totalSupply);
+    }
+    
+    /**
+     * @dev 按余额比例出售NFT
+     * @param tokenId 要出售的NFT ID
+     */
+    function sellWithBalanceRatioPrice(uint256 tokenId) external whenNotPaused nonReentrant {
+        require(balanceRatioBuybackOpen, "NFTBuyback: Balance ratio buyback not open");
+        require(nftContract != address(0), "NFTBuyback: NFT contract not set");
+        require(tokenContract != address(0), "NFTBuyback: Token contract not set");
+        
+        INFTMint nft = INFTMint(nftContract);
+        require(nft.ownerOf(tokenId) == msg.sender, "NFTBuyback: Not owner");
+        
+        // 计算回购价格
+        (uint256 buybackPrice, , ) = calculateBalanceRatioPrice();
+        require(buybackPrice > 0, "NFTBuyback: Buyback price is zero");
+        
+        // 检查合约余额
+        IERC20 token = IERC20(tokenContract);
+        require(token.balanceOf(address(this)) >= buybackPrice, "NFTBuyback: Insufficient contract balance");
+        
+        // 转移NFT到黑洞（销毁）
+        nft.safeTransferFrom(msg.sender, BLACK_HOLE, tokenId);
+        
+        // 转移代币给卖家
+        token.safeTransfer(msg.sender, buybackPrice);
+        
+        emit NFTBurnedForBuyback(tokenId, msg.sender, buybackPrice, "balanceRatio");
+    }
 
     /**
      * @dev 设置NFTData合约地址（仅授权者可调用）
@@ -534,6 +616,18 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @param open 新的开关状态
      */
     event FixedBuybackOpenUpdated(bool open);
+    
+    /**
+     * @dev 成长价回购开关更新事件
+     * @param open 新的开关状态
+     */
+    event GrowthBuybackOpenUpdated(bool open);
+    
+    /**
+     * @dev 余额比例回购开关更新事件
+     * @param open 新的开关状态
+     */
+    event BalanceRatioBuybackOpenUpdated(bool open);
     
     /**
      * @dev NFT回购销毁事件
