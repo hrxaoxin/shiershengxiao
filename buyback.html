@@ -355,6 +355,7 @@
         let account;
         let buybackContract;
         let nftMintContract;
+        let nftDataContract;
         let tokenContract;
         let selectedTokenIdGrowth = null;
         let selectedTokenIdFixed = null;
@@ -401,6 +402,7 @@
             try {
                 buybackContract = await window.ZODIAC_WEB3.getContract('buyback');
                 nftMintContract = await window.ZODIAC_WEB3.getContract('nftMint');
+                nftDataContract = await window.ZODIAC_WEB3.getContract('nftData');
                 tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
@@ -476,7 +478,7 @@
                         const tokenId = parseInt(await nftMintContract.methods.tokenOfOwnerByIndex(account, i).call(), 10);
                         const type = parseInt(await nftMintContract.methods.tokenType(tokenId).call(), 10);
                         const level = parseInt(await nftMintContract.methods.tokenLevel(tokenId).call(), 10);
-                        const mintTime = parseInt(await nftMintContract.methods.tokenMintTime(tokenId).call(), 10);
+                        const mintTime = parseInt(await nftDataContract.methods.getNFTMintTime(tokenId).call(), 10);
                         
                         userNfts.push({ tokenId, type, level, mintTime });
                     } catch (e) {

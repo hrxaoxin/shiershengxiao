@@ -164,7 +164,7 @@ window.ZODIAC_CONFIG = (function() {
         priceOracle: getEnvContractAddress('priceOracle', '0x1111111111111111111111111111111111111111'),
         authorizer: getEnvContractAddress('authorizer', '0x2222222222222222222222222222222222222222'),
         battleSkillData: getEnvContractAddress('battleSkillData', '0x3333333333333333333333333333333333333333'),
-        buyback: getEnvContractAddress('buyback', '0x8888888888888888888888888888888888888888')
+        buyback: getEnvContractAddress('buyback', '0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa')
     };
 
     function getContractAddresses() {
@@ -628,6 +628,11 @@ window.ZODIAC_CONFIG = (function() {
             {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":false,"internalType":"string","name":"reason","type":"string"}],"name":"Paused","type":"event"},
             {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"}],"name":"Unpaused","type":"event"}
         ],
+        nftDataABI: [
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"getNFTMintTime","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenType","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"tokenLevel","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"}
+        ],
         stakingABI: [
             {"inputs":[{"internalType":"address","name":"_authorizer","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"uint256[]","name":"tokenIds","type":"uint256[]"}],"name":"stake","outputs":[],"stateMutability":"nonpayable","type":"function"},
@@ -646,6 +651,7 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[],"name":"rewardRate","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"normalNFTWeight","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"rareNFTWeight","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"minStakingLevel","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"_tokenContract","type":"address"}],"name":"setRewardTokenContract","outputs":[],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[],"name":"rewardTokenContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"calculateDailyReward","outputs":[],"stateMutability":"nonpayable","type":"function"},
@@ -722,11 +728,9 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"addRewardToPool","outputs":[],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"uint256","name":"seasonId","type":"uint256"}],"name":"getSeasonInfo","outputs":[{"internalType":"uint256","name":"startTime","type":"uint256"},{"internalType":"uint256","name":"endTime","type":"uint256"},{"internalType":"bool","name":"isActive","type":"bool"},{"internalType":"bool","name":"isSettled","type":"bool"},{"internalType":"uint256","name":"totalPlayers","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"getPlayerRecord","outputs":[{"internalType":"uint256","name":"score","type":"uint256"},{"internalType":"uint256","name":"wins","type":"uint256"},{"internalType":"uint256","name":"losses","type":"uint256"},{"internalType":"uint256","name":"seasonId","type":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"playerScores","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"playerInfo","outputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"getCurrentRewardPool","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"getSeasonReward","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-            {"inputs":[{"internalType":"address","name":"player","type":"address"}],"name":"seasonRewardsClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"seasonId","type":"uint256"},{"internalType":"address","name":"player","type":"address"}],"name":"seasonRewardsClaimed","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"currentSeason","outputs":[{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"uint256","name":"","type":"uint256"},{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
             {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"player","type":"address"},{"indexed":false,"internalType":"uint256","name":"newScore","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"seasonId","type":"uint256"}],"name":"ScoreUpdated","type":"event"},
             {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"seasonId","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"startTime","type":"uint256"}],"name":"SeasonStarted","type":"event"},
@@ -775,6 +779,8 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[],"name":"tokenContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"DAILY_ATTEMPTS","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[],"name":"seasonRewardRate","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"getCurrentRewardPool","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"currentSeason","outputs":[{"internalType":"uint256","name":"seasonId","type":"uint256"},{"internalType":"uint256","name":"startTime","type":"uint256"},{"internalType":"uint256","name":"endTime","type":"uint256"},{"internalType":"bool","name":"isActive","type":"bool"},{"internalType":"uint256","name":"rewardPool","type":"uint256"}],"stateMutability":"view","type":"function"},
             {"inputs":[{"internalType":"uint256[6]","name":"playerTeam","type":"uint256[6]"},{"internalType":"uint256","name":"mockIndex","type":"uint256"}],"name":"challengeMockPlayer","outputs":[{"internalType":"bool","name":"success","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[{"internalType":"address","name":"challengedPlayer","type":"address"},{"internalType":"uint256[6]","name":"playerTeam","type":"uint256[6]"}],"name":"challengeRealPlayer","outputs":[{"internalType":"bool","name":"success","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
             {"inputs":[],"name":"rechargeChallengeAttempts","outputs":[],"stateMutability":"nonpayable","type":"function"},

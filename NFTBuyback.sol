@@ -270,8 +270,11 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         }
 
         // 获取升级成本
-        (uint256 level1Cost, uint256 level2Cost, uint256 level3Cost, uint256 level4Cost) = 
-            INFTUpdate(nftUpdateContract).getAllLevelUpgradeCosts();
+        uint256[4] memory upgradeCosts = INFTUpdate(nftUpdateContract).getAllLevelUpgradeCosts();
+        uint256 level1Cost = upgradeCosts[0];
+        uint256 level2Cost = upgradeCosts[1];
+        uint256 level3Cost = upgradeCosts[2];
+        uint256 level4Cost = upgradeCosts[3];
 
         // 累加对应等级的升级成本
         uint256 totalCost = baseCost;
@@ -538,10 +541,7 @@ interface ITokenBurner {
 interface INFTUpdate {
     /**
      * @dev 获取所有等级升级成本
-     * @return level1Cost 1升2成本
-     * @return level2Cost 2升3成本
-     * @return level3Cost 3升4成本
-     * @return level4Cost 4升5成本
+     * @return 升级成本数组 [level1Cost, level2Cost, level3Cost, level4Cost]
      */
-    function getAllLevelUpgradeCosts() external view returns (uint256, uint256, uint256, uint256);
+    function getAllLevelUpgradeCosts() external view returns (uint256[4] memory);
 }

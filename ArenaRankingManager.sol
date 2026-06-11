@@ -743,6 +743,39 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
+     * @dev 获取当前赛季奖励池
+     * @return 当前赛季的奖励池金额
+     */
+    function getCurrentRewardPool() external view returns (uint256) {
+        return seasons[currentSeasonId].rewardPool;
+    }
+
+    /**
+     * @dev 获取当前赛季信息
+     * @return seasonId 赛季ID
+     * @return startTime 赛季开始时间
+     * @return endTime 赛季结束时间
+     * @return isActive 是否活跃
+     * @return rewardPool 奖励池
+     */
+    function currentSeason() external view returns (
+        uint256 seasonId,
+        uint256 startTime,
+        uint256 endTime,
+        bool isActive,
+        uint256 rewardPool
+    ) {
+        SeasonInfo storage season = seasons[currentSeasonId];
+        return (
+            season.seasonId,
+            season.startTime,
+            season.endTime,
+            season.isActive,
+            season.rewardPool
+        );
+    }
+
+    /**
      * @dev 紧急提取 BNB（仅所有者）
      * @param amount 提取金额
      */

@@ -202,7 +202,8 @@ window.ZODIAC_WEB3 = (function() {
         'arenaPlayer': ABIS.arenaPlayerABI,
         'arenaBattle': ABIS.arenaBattleABI,
         'priceOracle': ABIS.priceOracleABI,
-        'buyback': ABIS.buybackABI
+        'buyback': ABIS.buybackABI,
+        'nftData': ABIS.nftDataABI
     };
 
     function initContracts() {

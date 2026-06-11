@@ -175,6 +175,8 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      */
     uint8 public constant ELEMENT_WATER = 0; // 水属性
     uint8 public constant ELEMENT_WIND = 1;  // 风属性
+    
+    uint256 public constant ELEMENT_BONUS = 120; // 属性克制加成百分比（120表示20%加成）
     uint8 public constant ELEMENT_FIRE = 2;  // 火属性
     uint8 public constant ELEMENT_DARK = 3;  // 暗属性
     uint8 public constant ELEMENT_LIGHT = 4; // 光属性

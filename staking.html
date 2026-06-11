@@ -617,7 +617,7 @@
 
                     if (await isNFTLevelEligible(tokenLevel)) {
                         // 检查是否已质押
-                        const stakeInfo = await stakingContract.methods.stakingInfo(tokenId).call();
+                        const stakeInfo = await stakingContract.methods.getStakingInfo(tokenId).call();
                         if (stakeInfo.owner === '0x0000000000000000000000000000000000000000') {
                             const nftInfo = getNFTInfo(tokenType);
                             const isRare = isNFTRare(tokenType);
@@ -678,7 +678,7 @@
 
                 let html = '';
                 for (const tokenId of tokenIds) {
-                    const stakeInfo = await stakingContract.methods.stakingInfo(tokenId).call();
+                    const stakeInfo = await stakingContract.methods.getStakingInfo(tokenId).call();
                     const tokenType = await nftContract.methods.tokenType(tokenId).call();
                     const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
                     const nftInfo = getNFTInfo(tokenType);
@@ -766,7 +766,7 @@
 
         async function checkAlreadyStaked(tokenId) {
             try {
-                const stakeInfo = await stakingContract.methods.stakingInfo(tokenId).call();
+                const stakeInfo = await stakingContract.methods.getStakingInfo(tokenId).call();
                 return stakeInfo.owner !== '0x0000000000000000000000000000000000000000';
             } catch (error) {
                 console.error('检查质押状态失败:', error);
@@ -831,7 +831,7 @@
                             continue;
                         }
                         
-                        const stakeInfo = await stakingContract.methods.stakingInfo(tokenId).call();
+                        const stakeInfo = await stakingContract.methods.getStakingInfo(tokenId).call();
                         if (stakeInfo.owner !== '0x0000000000000000000000000000000000000000') {
                             continue;
                         }

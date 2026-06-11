@@ -1377,7 +1377,7 @@
                 
                 const stakingContract = await ZODIAC_WEB3.getContract('staking');
                 for (const tokenId of tokenIds) {
-                    const stakedInfo = await stakingContract.methods.stakingInfo(tokenId).call();
+                    const stakedInfo = await stakingContract.methods.getStakingInfo(tokenId).call();
                     if (stakedInfo && stakedInfo.owner !== '0x0000000000000000000000000000000000000000') {
                         ZODIAC_UI.hideLoading();
                         ZODIAC_UI.showToast(`NFT #${tokenId} 已被质押，无法加入战队`, 'error');
@@ -1565,17 +1565,12 @@
 
         async function loadMyStats() {
             try {
-                const points = await arenaContract.methods.playerScores(accounts[0]).call();
-                let wins = '0', losses = '0';
-                try {
-                    const ranking = await arenaContract.methods.playerInfo(accounts[0]).call();
-                    wins = ranking.wins || '0';
-                    losses = ranking.losses || '0';
-                } catch (e) {
-                    // playerInfo may fail for unranked players
-                }
+                const playerRecord = await arenaContract.methods.players(accounts[0]).call();
+                const points = playerRecord.score || '0';
+                const wins = playerRecord.wins || '0';
+                const losses = playerRecord.losses || '0';
 
-                document.getElementById('myPoints').textContent = points || '0';
+                document.getElementById('myPoints').textContent = points;
                 document.getElementById('myWins').textContent = wins;
                 document.getElementById('myLosses').textContent = losses;
 
@@ -1597,8 +1592,8 @@
 
         async function getPlayerPoints() {
             try {
-                const points = await arenaContract.methods.playerScores(accounts[0]).call();
-                return parseInt(points || '0', 10);
+                const playerRecord = await arenaContract.methods.players(accounts[0]).call();
+                return parseInt(playerRecord.score || '0', 10);
             } catch (error) {
                 console.error('获取玩家积分失败:', error);
                 return 0;
@@ -1656,7 +1651,8 @@
                 if (seasonIsActive) {
                     // 赛季进行中：显示当前积分对应的潜在奖励
                     try {
-                        const playerScore = await arenaContract.methods.playerScores(accounts[0]).call();
+                        const playerRecord = await arenaContract.methods.players(accounts[0]).call();
+                        const playerScore = playerRecord.score || '0';
                         let estimatedReward = '0';
                         try {
                             const rewardWei = await arenaContract.methods.getSeasonReward(accounts[0]).call();
@@ -1678,7 +1674,7 @@
                     }
                 } else {
                     // 赛季已结束：检查是否已领取奖励
-                    const claimed = await arenaContract.methods.seasonRewardsClaimed(accounts[0]).call();
+                    const claimed = await arenaContract.methods.seasonRewardsClaimed(currentSeasonId, accounts[0]).call();
 
                     if (claimed) {
                         // 已领取

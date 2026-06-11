@@ -290,12 +290,22 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @dev 获取NFT铸造时间
+     * @dev 获取NFT铸造时间（内部）
      *
      * @param tokenId NFT ID
      * @return uint256 铸造时间戳
      */
     function _getNFTMintTime(uint256 tokenId) internal view returns (uint256) {
+        return _nftInfo[tokenId].mintTime;
+    }
+
+    /**
+     * @dev 获取NFT铸造时间（外部）
+     *
+     * @param tokenId NFT ID
+     * @return uint256 铸造时间戳
+     */
+    function getNFTMintTime(uint256 tokenId) external view returns (uint256) {
         return _nftInfo[tokenId].mintTime;
     }
 
