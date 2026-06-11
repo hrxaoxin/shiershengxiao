@@ -112,6 +112,11 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     address public nftUpdateContract;
     
     /**
+     * @dev NFTData合约地址（用于读取NFT铸造时间，计算持有天数加成）
+     */
+    address public nftDataContract;
+    
+    /**
      * @dev 授权者地址（可与所有者共同管理合约）
      */
     address public authorizer;
@@ -132,11 +137,6 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     bool public fixedBuybackOpen = false;
 
     /**
-     * @dev NFT铸造时间映射（用于计算持有天数）
-     */
-    mapping(uint256 => uint256) public nftMintTime;
-
-    /**
      * @dev 获取最高加成百分比
      * @return 最高加成百分比（maxBuybackMultiplier - 100）
      */
@@ -150,6 +150,20 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function autoBuybackOpen() public view returns (bool) {
         return fixedBuybackOpen;
+    }
+
+    /**
+     * @dev 记录收到的代币（用于RewardManager等合约调用，通知回购池收到资金）
+     * @param amount 收到的代币数量
+     *
+     * 说明：该函数不做任何状态变化，仅作为通知钩子。不设访问控制是因为
+     * RewardManager 合约的 `_distributeReward` 中会主动调用它来传递资金，
+     * 但那个时候 msg.sender 是 RewardManager 本身（而非 Authorizer。
+     */
+    function recordIncomingTokens(uint256 amount) external {
+        // 回购池收到代币后可直接用于回购销毁，无需额外记录
+        // 合约余额会自动增加。保留参数以保持接口签名一致。
+        amount;
     }
 
     /**
@@ -331,13 +345,21 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 discount = getBuybackDiscount(level);
         uint256 basePrice = (totalCost * discount) / 100;
 
-        // 如果没有记录铸造时间，返回基础价格
-        if (nftMintTime[tokenId] == 0) {
+        // 从NFTData合约读取铸造时间（持有时间加成基于链上真实铸造时间，避免需要手动同步）
+        uint256 mintTime = 0;
+        if (nftDataContract != address(0)) {
+            try INFTData(nftDataContract).getNFTMintTime(tokenId) returns (uint256 m) {
+                mintTime = m;
+            } catch {}
+        }
+
+        // 如果没有铸造时间记录，返回基础价格
+        if (mintTime == 0) {
             return basePrice;
         }
 
         // 计算持有天数和加成
-        uint256 holdingDays = (block.timestamp - nftMintTime[tokenId]) / 1 days;
+        uint256 holdingDays = (block.timestamp - mintTime) / 1 days;
         uint256 daysToBreakEven = getDaysToBreakEven(level);
         uint256 maxBonusDays = ((maxBuybackMultiplier - 100) * daysToBreakEven) / (100 - discount);
 
@@ -372,21 +394,30 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 basePrice = (totalCost * discount) / 100;
         uint256 daysToMax = getDaysToBreakEven(level);
 
-        if (nftMintTime[tokenId] == 0) {
+        // 从NFTData合约读取铸造时间
+        uint256 mintTime = 0;
+        if (nftDataContract != address(0)) {
+            try INFTData(nftDataContract).getNFTMintTime(tokenId) returns (uint256 m) {
+                mintTime = m;
+            } catch {}
+        }
+
+        if (mintTime == 0) {
             return (basePrice, 0, basePrice, daysToMax);
         }
 
-        return _calculateWithBonus(tokenId, totalCost, discount, basePrice, daysToMax);
+        // 使用mintTime替代存储映射
+        return _calculateWithBonus(mintTime, totalCost, discount, basePrice, daysToMax);
     }
 
     function _calculateWithBonus(
-        uint256 tokenId,
+        uint256 mintTime,
         uint256 totalCost,
         uint256 discount,
         uint256 basePrice,
         uint256 daysToBreakEven
     ) internal view returns (uint256, uint256, uint256, uint256) {
-        uint256 bonusDays = ((block.timestamp - nftMintTime[tokenId]) / 1 days);
+        uint256 bonusDays = ((block.timestamp - mintTime) / 1 days);
         {
             uint256 maxBonusDays = ((maxBuybackMultiplier - 100) * daysToBreakEven) / (100 - discount);
             if (bonusDays > maxBonusDays) {
@@ -465,12 +496,12 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 记录NFT铸造时间（仅授权者可调用）
-     * @param tokenId NFT ID
-     * @param mintTime 铸造时间戳
+     * @dev 设置NFTData合约地址（仅授权者可调用）
+     * @param _nftData NFTData合约地址
      */
-    function recordMintTime(uint256 tokenId, uint256 mintTime) external onlyAuthorized {
-        nftMintTime[tokenId] = mintTime;
+    function setNFTDataContract(address _nftData) external onlyAuthorized {
+        require(_nftData != address(0), "NFTBuyback: Invalid NFT data address");
+        nftDataContract = _nftData;
     }
 
     /**

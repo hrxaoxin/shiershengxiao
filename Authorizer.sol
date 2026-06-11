@@ -131,6 +131,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         address weightManagerAddress;
         address battleHistoryAddress;
         address nftTradingAddress;
+        address nftBuybackAddress;
         address feeReceiverAddress;
         address pancakeSwapPairAddress;
         address metadataContractAddress;
@@ -199,6 +200,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     address public weightManagerAddress;
     address public battleHistoryAddress;
     address public nftTradingAddress;
+    address public nftBuybackAddress;
     address public feeReceiverAddress;
     address public pancakeSwapPairAddress;
     address public metadataContractAddress;
@@ -324,7 +326,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _setOtherAddresses(_addresses);
 
         _setupBattleAndBreeding(_addresses.battleAddress, _addresses.breedingCoreAddress, _addresses.breedingMarketAddress, _addresses.nftMintAddress);
-        _setupStakingAndReward(_addresses.stakingAddress, _addresses.rewardManagerAddress, _addresses.dividendManagerAddress, _addresses.tokenStakingAddress, _addresses.tokenAddress, _addresses.arenaRankingAddress, _addresses.nftMintAddress);
+        _setupStakingAndReward(_addresses.stakingAddress, _addresses.rewardManagerAddress, _addresses.dividendManagerAddress, _addresses.tokenStakingAddress, _addresses.tokenAddress, _addresses.arenaRankingAddress, _addresses.nftMintAddress, _addresses.nftBuybackAddress, _addresses.nftUpdateAddress, _addresses.tokenBurnerAddress);
         _setupPriceAndUpgrade(_addresses.priceOracleAddress, _addresses.upgradeModuleAddress, _addresses.tokenAddress, _addresses.usdtAddress);
         _setupNFTContracts(_addresses.nftUpdateAddress, _addresses.tokenBurnerAddress, _addresses.nftMintAddress, _addresses.metadataContractAddress, _addresses.pancakeSwapPairAddress);
         _setupOtherContracts(_addresses.weightManagerAddress, _addresses.battleHistoryAddress, _addresses.nftTradingAddress, _addresses.feeReceiverAddress, _addresses.arenaRankingAddress, _addresses.arenaRankingManagerAddress, _addresses.arenaRankingQueryAddress, _addresses.rewardManagerAddress, _addresses.arenaRewardAddress, _addresses.arenaLeaderboardAddress, _addresses.arenaPlayerAddress, _addresses.arenaBattleAddress);
@@ -408,7 +410,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         address _tokenStakingAddress,
         address _tokenAddress,
         address _arenaRankingAddress,
-        address _nftMintAddress
+        address _nftMintAddress,
+        address _nftBuybackAddress,
+        address _nftUpdateAddress,
+        address _tokenBurnerAddress
     ) internal {
         if (_stakingAddress != address(0)) {
             ISetRewardTokenContract(_stakingAddress).setRewardTokenContract(_tokenAddress);
@@ -420,6 +425,9 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             ISetTokenStakingPool(_rewardManagerAddress).setTokenStakingPool(_tokenStakingAddress);
             ISetTokenContract(_rewardManagerAddress).setTokenContract(_tokenAddress);
             ISetArenaRewardPool(_rewardManagerAddress).setArenaRewardPool(_arenaRankingAddress);
+            if (_nftBuybackAddress != address(0)) {
+                ISetNFTBuybackPool(_rewardManagerAddress).setNFTBuybackPool(_nftBuybackAddress);
+            }
         }
         if (_dividendManagerAddress != address(0)) {
             ISetTokenContract(_dividendManagerAddress).setTokenContract(_tokenAddress);
@@ -430,6 +438,50 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
         if (poolManagerAddress != address(0)) {
             ISetPoolManager(_rewardManagerAddress).setPoolManager(poolManagerAddress);
+        }
+        // 初始化NFT回购销毁合约
+        if (_nftBuybackAddress != address(0)) {
+            try ISetNFTContract(_nftBuybackAddress).setNFTContract(_nftMintAddress) {
+                emit ContractSetupSuccess("NFTBuyback-NFT");
+            } catch Error(string memory reason) {
+                emit ContractSetupFailed("NFTBuyback-NFT", reason);
+            } catch {
+                emit ContractSetupFailed("NFTBuyback-NFT", "Unknown error");
+            }
+            try ISetTokenContract(_nftBuybackAddress).setTokenContract(_tokenAddress) {
+                emit ContractSetupSuccess("NFTBuyback-Token");
+            } catch Error(string memory reason) {
+                emit ContractSetupFailed("NFTBuyback-Token", reason);
+            } catch {
+                emit ContractSetupFailed("NFTBuyback-Token", "Unknown error");
+            }
+            if (_tokenBurnerAddress != address(0)) {
+                try INFTBuyback(_nftBuybackAddress).setTokenBurnerContract(_tokenBurnerAddress) {
+                    emit ContractSetupSuccess("NFTBuyback-TokenBurner");
+                } catch Error(string memory reason) {
+                    emit ContractSetupFailed("NFTBuyback-TokenBurner", reason);
+                } catch {
+                    emit ContractSetupFailed("NFTBuyback-TokenBurner", "Unknown error");
+                }
+            }
+            if (_nftUpdateAddress != address(0)) {
+                try INFTBuyback(_nftBuybackAddress).setNFTUpdateContract(_nftUpdateAddress) {
+                    emit ContractSetupSuccess("NFTBuyback-NFTUpdate");
+                } catch Error(string memory reason) {
+                    emit ContractSetupFailed("NFTBuyback-NFTUpdate", reason);
+                } catch {
+                    emit ContractSetupFailed("NFTBuyback-NFTUpdate", "Unknown error");
+                }
+            }
+            if (nftDataAddress != address(0)) {
+                try INFTBuyback(_nftBuybackAddress).setNFTDataContract(nftDataAddress) {
+                    emit ContractSetupSuccess("NFTBuyback-NFTData");
+                } catch Error(string memory reason) {
+                    emit ContractSetupFailed("NFTBuyback-NFTData", reason);
+                } catch {
+                    emit ContractSetupFailed("NFTBuyback-NFTData", "Unknown error");
+                }
+            }
         }
     }
 
@@ -596,6 +648,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         weightManagerAddress = _addresses.weightManagerAddress;
         battleHistoryAddress = _addresses.battleHistoryAddress;
         nftTradingAddress = _addresses.nftTradingAddress;
+        nftBuybackAddress = _addresses.nftBuybackAddress;
         arenaRankingAddress = _addresses.arenaRankingAddress;
         arenaRankingManagerAddress = _addresses.arenaRankingManagerAddress;
         arenaRankingQueryAddress = _addresses.arenaRankingQueryAddress;
@@ -624,7 +677,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @dev 触发合约地址更新事件
      */
     function _emitContractAddressesUpdated() internal {
-        address[] memory addrs = new address[](21);
+        address[] memory addrs = new address[](22);
         _fillAddressesPart1(addrs);
         _fillAddressesPart2(addrs);
         emit ContractAddressesUpdated(addrs);
@@ -658,11 +711,12 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         addrs[13] = weightManagerAddress;
         addrs[14] = battleHistoryAddress;
         addrs[15] = nftTradingAddress;
-        addrs[16] = arenaRankingAddress;
-        addrs[17] = tokenStakingAddress;
-        addrs[18] = feeReceiverAddress;
-        addrs[19] = pancakeSwapPairAddress;
-        addrs[20] = metadataContractAddress;
+        addrs[16] = nftBuybackAddress;
+        addrs[17] = arenaRankingAddress;
+        addrs[18] = tokenStakingAddress;
+        addrs[19] = feeReceiverAddress;
+        addrs[20] = pancakeSwapPairAddress;
+        addrs[21] = metadataContractAddress;
     }
 
     /**
@@ -670,7 +724,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      */
     function syncContractAddresses() external onlyOwner whenNotPaused {
         _setupBattleAndBreeding(battleAddress, breedingCoreAddress, breedingMarketAddress, nftMintAddress);
-        _setupStakingAndReward(stakingAddress, rewardManagerAddress, dividendManagerAddress, tokenStakingAddress, tokenAddress, arenaRankingAddress, nftMintAddress);
+        _setupStakingAndReward(stakingAddress, rewardManagerAddress, dividendManagerAddress, tokenStakingAddress, tokenAddress, arenaRankingAddress, nftMintAddress, nftBuybackAddress, nftUpdateAddress, tokenBurnerAddress);
         _setupPriceAndUpgrade(priceOracleAddress, upgradeModuleAddress, tokenAddress, usdtAddress);
         _setupNFTContracts(nftUpdateAddress, tokenBurnerAddress, nftMintAddress, metadataContractAddress, pancakeSwapPairAddress);
         _setupOtherContracts(weightManagerAddress, battleHistoryAddress, nftTradingAddress, feeReceiverAddress, arenaRankingAddress, arenaRankingManagerAddress, arenaRankingQueryAddress, rewardManagerAddress, arenaRewardAddress, arenaLeaderboardAddress, arenaPlayerAddress, arenaBattleAddress);

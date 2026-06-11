@@ -406,7 +406,7 @@
                         <ul class="text-white/90 space-y-2">
                             <li>• 代币交易时扣除3%作为税收</li>
                             <li>• <span id="dividendPercent"></span>1.0</span>%进入分红池，按权重分配给NFT持有者</li>
-                            <li>• <span id="burnPercent">1.0</span>%用于销毁代币实现通缩</li>
+                            <li>• <span id="burnPercent">1.0</span>%进入回购销毁池，用于回购NFT</li>
                             <li>• <span id="nftStakingPercent">0.4</span>%兑换成代币进入NFT质押矿池，用于挖矿产出</li>
                             <li>• <span id="arenaPercent">0.3</span>%用于竞技场排名奖励</li>
                             <li>• <span id="tokenStakingPercent">0.3</span>%进入代币质押矿池，用于挖矿产出</li>
@@ -724,15 +724,15 @@
                         const nftStakingPercent = (parseInt(percents[1]) / 100).toFixed(2);
                         const tokenStakingPercent = (parseInt(percents[2]) / 100).toFixed(2);
                         const arenaPercent = (parseInt(percents[3]) / 100).toFixed(2);
-                        const burnPercent = (3 - (parseInt(percents[0]) + parseInt(percents[1]) + parseInt(percents[2]) + parseInt(percents[3])) / 100).toFixed(2);
+                        const buybackPercent = percents[4] ? (parseInt(percents[4]) / 100).toFixed(2) : '0.00';
                         
                         document.getElementById('dividendPercent').textContent = dividendPercent;
                         document.getElementById('nftStakingPercent').textContent = nftStakingPercent;
                         document.getElementById('tokenStakingPercent').textContent = tokenStakingPercent;
                         document.getElementById('arenaPercent').textContent = arenaPercent;
-                        document.getElementById('burnPercent').textContent = burnPercent;
+                        document.getElementById('burnPercent').textContent = buybackPercent;
                         
-                        console.log('Distribution config loaded from contract:', { dividendPercent, nftStakingPercent, tokenStakingPercent, arenaPercent, burnPercent });
+                        console.log('Distribution config loaded from contract:', { dividendPercent, nftStakingPercent, tokenStakingPercent, arenaPercent, buybackPercent });
                     } catch (e) {
                         console.warn('Failed to load distribution config from contract, using defaults:', e.message);
                     }

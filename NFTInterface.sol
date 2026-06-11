@@ -62,6 +62,16 @@ interface INFTDataInterface {
 }
 
 /**
+ * @title INFTData
+ * @dev NFT数据合约扩展接口：提供 NFT 铸造时间查询，用于回购合约的持有时间加成计算
+ */
+interface INFTData {
+    function getNFTMintTime(uint256 tokenId) external view returns (uint256);
+    function tokenType(uint256 tokenId) external view returns (uint256);
+    function tokenLevel(uint256 tokenId) external view returns (uint8);
+}
+
+/**
  * @title INFTMint
  * @dev NFT铸造接口，提供铸造和查询功能
  */
@@ -526,6 +536,34 @@ interface ISetPoolManager {
 
 interface ISetNFTUpdateContract {
     function setNFTUpdateContract(address _nftUpdate) external;
+}
+
+/**
+ * @title ISetNFTBuybackPool
+ * @dev 设置NFT回购销毁池地址的接口
+ */
+interface ISetNFTBuybackPool {
+    function setNFTBuybackPool(address _pool) external;
+}
+
+/**
+ * @title INFTBuyback
+ * @dev NFT回购销毁合约接口
+ */
+interface INFTBuyback {
+    function setNFTContract(address _nftContract) external;
+    function setTokenContract(address _tokenContract) external;
+    function setTokenBurnerContract(address _tokenBurner) external;
+    function setNFTUpdateContract(address _nftUpdate) external;
+    function setNFTDataContract(address _nftData) external;
+    function setAuthorizer(address a) external;
+    function recordIncomingTokens(uint256 amount) external;
+    function calculateGrowthPrice(uint256 tokenId) external view returns (uint256);
+    function sellWithGrowthPrice(uint256 tokenId) external;
+    function sellWithFixedPrice(uint256 tokenId) external;
+    function setFixedBuybackPrice(uint256 _price) external;
+    function setFixedBuybackOpen(bool _open) external;
+    function setMaxBuybackMultiplier(uint256 _multiplier) external;
 }
 
 interface ISetRewardManagerContract {

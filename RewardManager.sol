@@ -13,14 +13,18 @@ interface ITokenStaking {
     function recordIncomingTokens(uint256 amount) external;
 }
 
+interface IBuybackReceiver {
+    function recordIncomingTokens(uint256 amount) external;
+}
+
 /**
  * @title RewardManager
  * @dev 奖励管理合约，统一管理所有游戏奖励的分发
  *
  * 核心职责：
  * 1. 资金路由：接收游戏中产生的所有手续费、入场费、铸造费用统一归集
- *    → 按预设比例路由到四大奖励池
- * 2. 与 DividendManager、Staking、TokenStaking、ArenaRanking 的资金分发
+ *    → 按预设比例路由到五大奖励池
+ * 2. 与 DividendManager、Staking、TokenStaking、ArenaRanking、NFTBuyback 的资金分发
  * 3. 提供 owner 应急操作：在特殊活动奖励、VIP 空投、活动奖励池注入等
  *
  * 奖励资金来源：
@@ -31,18 +35,20 @@ interface ITokenStaking {
  * - PoolManager.sol：按 owner 可从池中注入
  *
  * 默认分配比例（可由 owner 调整）：
- * - 50% 进入分红池（DividendManager）
+ * - 40% 进入分红池（DividendManager）
  * - 20% 进入 NFT 质押池（Staking）
  * - 15% 进入代币质押池（TokenStaking）
  * - 15% 进入竞技场奖励池（ArenaRanking）
+ * - 10% 进入 NFT 回购销毁池（NFTBuyback）
  *
  * 资金流转模型：
  * - 外部合约 depositToken(address, amount) → 接收并分配
- * 1. 接收代币（ERC20）→ 按比例分配给四大奖励池
- *    - 50% 转账到 DividendManager.tokenDividendPool
+ * 1. 接收代币（ERC20）→ 按比例分配给五大奖励池
+ *    - 40% 转账到 DividendManager.tokenDividendPool
  *    - 20% 转账到 Staking.poolBalances[POOL_NFT_STAKING]
  *    - 15% 转账到 TokenStaking.stakingPool
  *    - 15% 转账到 ArenaRanking.seasonPrizePool
+ *    - 10% 转账到 NFTBuyback 合约（用于回购销毁NFT）
  * 2. 接收 BNB（receive 回退函数）→ 同上分配
  *
  * 主要功能：
@@ -51,14 +57,16 @@ interface ITokenStaking {
  * - claimDividend：用户领取分红（内部调用 DividendManager）
  * - setMinSwapAmount：设置最小金额（防止小额不分配，集中到池）
  * - emergencyWithdraw：紧急提取（owner only）
+ * - setNFTBuybackPool：设置NFT回购销毁池地址
  *
  * 数据结构：
- * - dividendShare / stakingShare / tokenStakingShare / arenaShare
+ * - dividendShare / stakingShare / tokenStakingShare / arenaShare / buybackShare
  * 分别记录各自池的历史流入流出
  *
  * 与其他合约联动：
  * - Authorizer：通过 Authorizer 管理 address 验证
  * - PriceOracle：读取当前价格以分配时用于奖励金额
+ * - NFTBuyback：10%资金用于回购销毁NFT，减少流通量
  *
  * 安全限制：
  * - ReentrancyGuard：防止 claimDividend 时防止重入
@@ -68,9 +76,10 @@ interface ITokenStaking {
  *
  * 典型流程：
  * 1. NFTTrading 产生 5% 手续费转入 RewardManager
- * 2. RewardManager 按比例分配到四个奖励池
+ * 2. RewardManager 按比例分配到五个奖励池
  * 3. 用户领取时自动同步各池
  * 4. 前端同步各池分配给用户（质押/分红/竞技场奖励）
+ * 5. 10%资金进入NFTBuyback用于回购销毁，减少代币流通量
  *
  * 升级与治理：
  * - UUPS 可升级：未来可调整分配比例、新增奖励池
@@ -128,6 +137,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizer;
+        
+        // 设置默认 DEX Router 地址（BSC 链 - PancakeSwap）
+        dexRouter = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
+        activeDEX = 1; // 1 = PancakeSwap
+        wbnb = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
     }
 
     /**
@@ -173,6 +187,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     address public arenaRewardPool;
 
     /**
+     * @dev NFT回购销毁池地址（用于NFT回购销毁）
+     */
+    address public nftBuybackPool;
+
+    /**
      * @dev 资金池管理合约地址（用于追踪各池余额）
      */
     address public poolManager;
@@ -207,28 +226,30 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 奖励分配比例（精度4位小数，万分比）
      * 注意：setDistributionPercents 会校验总和必须等于 PRECISION（10000）
      */
-    uint256 public dividendPercent = 5000;     // 50%
+    uint256 public dividendPercent = 4000;     // 40%
     uint256 public nftStakingPercent = 2000;   // 20%
     uint256 public tokenStakingPercent = 1500;  // 15%
     uint256 public arenaRewardPercent = 1500;   // 15%
+    uint256 public nftBuybackPercent = 1000;    // 10%（用于NFT回购销毁）
 
     /**
      * @dev 设置分配比例（仅owner）
-     * 四个比例之和必须严格等于 PRECISION（10000），即 100%
+     * 五个比例之和必须严格等于 PRECISION（10000），即 100%
      */
-    function setDistributionPercents(uint256 _dividend, uint256 _nftStaking, uint256 _tokenStaking, uint256 _arena) external onlyOwner {
-        require(_dividend + _nftStaking + _tokenStaking + _arena == PRECISION, "RewardManager: Percentages must sum to 10000");
+    function setDistributionPercents(uint256 _dividend, uint256 _nftStaking, uint256 _tokenStaking, uint256 _arena, uint256 _nftBuyback) external onlyOwner {
+        require(_dividend + _nftStaking + _tokenStaking + _arena + _nftBuyback == PRECISION, "RewardManager: Percentages must sum to 10000");
         dividendPercent = _dividend;
         nftStakingPercent = _nftStaking;
         tokenStakingPercent = _tokenStaking;
         arenaRewardPercent = _arena;
-        emit DistributionPercentsChanged(_dividend, _nftStaking, _tokenStaking, _arena);
+        nftBuybackPercent = _nftBuyback;
+        emit DistributionPercentsChanged(_dividend, _nftStaking, _tokenStaking, _arena, _nftBuyback);
     }
 
     /**
      * @dev 分配比例变更事件
      */
-    event DistributionPercentsChanged(uint256 dividend, uint256 nftStaking, uint256 tokenStaking, uint256 arena);
+    event DistributionPercentsChanged(uint256 dividend, uint256 nftStaking, uint256 tokenStaking, uint256 arenaReward, uint256 nftBuyback);
 
     /**
      * @dev 精度
@@ -264,7 +285,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 dividendAmount,
         uint256 nftStakingAmount,
         uint256 tokenStakingAmount,
-        uint256 arenaRewardAmount
+        uint256 arenaRewardAmount,
+        uint256 buybackAmount
     );
 
     /**
@@ -305,6 +327,14 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     function setArenaRewardPool(address _pool) external onlyAuthorized {
         require(_pool != address(0), "RewardManager: Invalid arena reward pool");
         arenaRewardPool = _pool;
+    }
+
+    /**
+     * @dev 设置NFT回购销毁池地址
+     */
+    function setNFTBuybackPool(address _pool) external onlyAuthorized {
+        require(_pool != address(0), "RewardManager: Invalid buyback pool");
+        nftBuybackPool = _pool;
     }
 
     /**
@@ -382,6 +412,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 内部函数：分配BNB到各池
      * - 分红池：直接转账BNB
      * - NFT质押池、代币质押池、竞技场奖励池：优先兑换为代币后转账；兑换失败时将 BNB 直接转入 dividendPool 作为价值储备
+     * - NFT回购池：直接转账BNB
      */
     function _distributeBNB(uint256 amount) internal {
         if (amount == 0) {
@@ -395,6 +426,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 nftStakingAmount = amount * nftStakingPercent / PRECISION;
         uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
         uint256 arenaRewardAmount = amount * arenaRewardPercent / PRECISION;
+        uint256 buybackAmount = amount * nftBuybackPercent / PRECISION;
 
         // 分红池：直接转账BNB
         if (dividendPool != address(0) && dividendAmount > 0) {
@@ -436,7 +468,17 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             }
         }
 
-        emit BNBDistributed(msg.sender, amount, dividendAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount);
+        // NFT回购销毁池：直接转账BNB
+        if (nftBuybackPool != address(0) && buybackAmount > 0) {
+            (bool success, ) = payable(nftBuybackPool).call{value: buybackAmount}("");
+            if (!success) {
+                // 回购池转账失败，保留在合约中
+                lockedBNBAmount += buybackAmount;
+                emit BNBTransferFailed(4, nftBuybackPool, buybackAmount);
+            }
+        }
+
+        emit BNBDistributed(msg.sender, amount, dividendAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, buybackAmount);
     }
 
     /**
@@ -527,7 +569,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     event BNBConverted(uint256 bnbAmount, uint256 tokenAmount);
     event SwapFailed(uint256 bnbAmount);
     event SwapFailedFallback(uint256 bnbAmount);
-    event BNBDistributed(address indexed from, uint256 totalAmount, uint256 dividendAmount, uint256 nftStakingAmount, uint256 tokenStakingAmount, uint256 arenaRewardAmount);
+    event BNBDistributed(address indexed from, uint256 totalAmount, uint256 dividendAmount, uint256 nftStakingAmount, uint256 tokenStakingAmount, uint256 arenaRewardAmount, uint256 buybackAmount);
     event BNBTransferFailed(uint256 poolType, address pool, uint256 amount);
 
     /**
@@ -654,6 +696,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 nftStakingAmount = amount * nftStakingPercent / PRECISION;
         uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
         uint256 arenaRewardAmount = amount * arenaRewardPercent / PRECISION;
+        uint256 buybackAmount = amount * nftBuybackPercent / PRECISION;
 
         // 使用 try-catch 分别处理每个分配，允许部分成功
         if (dividendPool != address(0) && dividendAmount > 0) {
@@ -692,9 +735,18 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                 emit RewardTransferFailed(3, arenaRewardPool, arenaRewardAmount);
             }
         }
+        // NFT回购销毁池：直接转账代币到回购合约，回购合约收到代币后可用于回购销毁NFT
+        if (nftBuybackPool != address(0) && buybackAmount > 0) {
+            try token.transfer(nftBuybackPool, buybackAmount) {
+                // 尝试调用回购合约的记录函数（如果实现）
+                try IBuybackReceiver(nftBuybackPool).recordIncomingTokens(buybackAmount) {} catch {}
+            } catch {
+                emit RewardTransferFailed(4, nftBuybackPool, buybackAmount);
+            }
+        }
 
         totalDistributed += amount;
-        _addDistributionRecord(amount, dividendAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount);
+        _addDistributionRecord(amount, dividendAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, buybackAmount);
 
         emit RewardDistributed(
             msg.sender,
@@ -702,7 +754,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             dividendAmount,
             nftStakingAmount,
             tokenStakingAmount,
-            arenaRewardAmount
+            arenaRewardAmount,
+            buybackAmount
         );
     }
 
@@ -726,7 +779,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 dividendAmount,
         uint256 nftStakingAmount,
         uint256 tokenStakingAmount,
-        uint256 arenaRewardAmount
+        uint256 arenaRewardAmount,
+        uint256 buybackAmount
     ) internal {
         DistributionRecord memory record = DistributionRecord({
             timestamp: block.timestamp,
@@ -735,6 +789,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             nftStakingAmount: nftStakingAmount,
             tokenStakingAmount: tokenStakingAmount,
             arenaRewardAmount: arenaRewardAmount,
+            buybackAmount: buybackAmount,
             distributor: msg.sender
         });
         
@@ -753,9 +808,10 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256,
         uint256,
         uint256,
+        uint256,
         uint256
     ) {
-        return (dividendPercent, nftStakingPercent, tokenStakingPercent, arenaRewardPercent);
+        return (dividendPercent, nftStakingPercent, tokenStakingPercent, arenaRewardPercent, nftBuybackPercent);
     }
 
     /**
@@ -768,6 +824,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 nftStakingAmount;
         uint256 tokenStakingAmount;
         uint256 arenaRewardAmount;
+        uint256 buybackAmount;
         address distributor;
     }
 

@@ -132,6 +132,20 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizer;
+        
+        // 设置默认 DEX Router 地址（BSC 链）
+        // PancakeSwap Router V2 (BSC 主网/测试网通用)
+        pancakeSwapRouter = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
+        // Uniswap Router V2 (兼容 BSC)
+        uniswapRouter = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+        // FlapSwap Router (预留地址，需根据实际部署环境配置)
+        // flapSwapRouter = address(0); // 默认不设置，需手动配置
+        
+        // 设置默认 WBNB 地址（BSC 链）
+        wbnb = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+        
+        // 默认使用 PancakeSwap
+        activeDEX = 1;
     }
     
     function pause(string memory reason) external onlyOwner {
