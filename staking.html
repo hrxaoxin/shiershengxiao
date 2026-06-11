@@ -587,9 +587,14 @@
             };
         }
 
-        function isNFTLevelEligible(level) {
-            const MIN_LEVEL = 5;
-            return parseInt(level) >= MIN_LEVEL;
+        async function isNFTLevelEligible(level) {
+            try {
+                const minLevel = await stakingContract.methods.minStakingLevel().call();
+                return parseInt(level) >= parseInt(minLevel);
+            } catch (e) {
+                console.error('Failed to get minStakingLevel:', e);
+                return parseInt(level) >= 1;
+            }
         }
 
         function isNFTRare(tokenType) {
@@ -602,7 +607,6 @@
             const eligibleNFTs = document.getElementById('eligibleNFTs');
 
             try {
-                const MIN_LEVEL = 5;
                 const eligible = [];
 
                 const balance = await nftContract.methods.balanceOf(account).call();
@@ -611,7 +615,7 @@
                     const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
                     const tokenType = await nftContract.methods.tokenType(tokenId).call();
 
-                    if (isNFTLevelEligible(tokenLevel)) {
+                    if (await isNFTLevelEligible(tokenLevel)) {
                         // 检查是否已质押
                         const stakeInfo = await stakingContract.methods.stakingInfo(tokenId).call();
                         if (stakeInfo.owner === '0x0000000000000000000000000000000000000000') {

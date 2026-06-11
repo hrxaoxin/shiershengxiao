@@ -6,6 +6,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "./NFTInterface.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title NFTTrading
@@ -61,6 +63,7 @@ import "./NFTInterface.sol";
  * 6. 若卖家取消：调用 delistNFT(tokenId) → NFT 返回卖家，从 listedNFTs 移除
  */
 contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
+    using SafeERC20 for IERC20;
 
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
@@ -115,6 +118,11 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev NFT合约地址
      */
     address public nftContract;
+
+    /**
+     * @dev 代币合约地址（ERC20）
+     */
+    address public tokenContract;
 
     /**
      * @dev 初始化函数
@@ -241,30 +249,29 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 购买NFT（从合约转出NFT给买家，支付BNB给卖家和feeReceiver）
+     * @dev 购买NFT（从合约转出NFT给买家，支付代币给卖家和feeReceiver）
      */
-    function buyNFT(uint256 tokenId) external payable whenNotPaused nonReentrant {
+    function buyNFT(uint256 tokenId) external whenNotPaused nonReentrant {
         require(tokenId > 0, "NFTTrading: Invalid token ID");
         require(msg.sender != address(0), "NFTTrading: Invalid buyer address");
         require(listings[tokenId].seller != address(0), "NFTTrading: Listing not found");
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(feeReceiver != address(0), "NFTTrading: Fee receiver not set");
+        require(tokenContract != address(0), "NFTTrading: Token contract not set");
 
         Listing memory listing = listings[tokenId];
         address seller = listing.seller;
         uint256 price = listing.priceWei;
 
         require(msg.sender != seller, "NFTTrading: Cannot buy own NFT");
-        require(msg.value >= price, "NFTTrading: Insufficient payment");
         require(INFT(nftContract).ownerOf(tokenId) == address(this), "NFTTrading: Contract does not own NFT");
 
-        // 修复：使用 SafeMath 风格的乘法防止溢出
-        // Solidity 0.8.x 会自动检查整数溢出，但这里使用更安全的计算方式
+        IERC20 token = IERC20(tokenContract);
+        require(token.balanceOf(msg.sender) >= price, "NFTTrading: Insufficient balance");
+        require(token.allowance(msg.sender, address(this)) >= price, "NFTTrading: Insufficient allowance");
+
         uint256 fee = (price * feePercent) / 100;
         uint256 sellerAmount = price - fee;
-
-        // 计算并退还多余支付的BNB
-        uint256 excess = msg.value - price;
         
         // Checks-Effects-Interactions 模式：先清除挂牌状态
         delete listings[tokenId];
@@ -277,23 +284,17 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             revert("NFTTrading: NFT transfer failed");
         }
 
+        // 从买家转移代币
+        token.safeTransferFrom(msg.sender, address(this), price);
+
         // 支付手续费给 feeReceiver
-        // 修复：使用更可靠的转账方式，不限制 gas
         if (fee > 0) {
-            (bool feeSuccess, ) = payable(feeReceiver).call{value: fee}("");
-            require(feeSuccess, "NFTTrading: Fee payment failed");
+            token.safeTransfer(feeReceiver, fee);
         }
 
         // 支付卖家
         if (sellerAmount > 0) {
-            (bool sellerSuccess, ) = payable(seller).call{value: sellerAmount}("");
-            require(sellerSuccess, "NFTTrading: Seller payment failed");
-        }
-
-        // 退还多余的BNB
-        if (excess > 0) {
-            (bool refundSuccess, ) = payable(msg.sender).call{value: excess}("");
-            require(refundSuccess, "NFTTrading: Refund failed");
+            token.safeTransfer(seller, sellerAmount);
         }
 
         totalVolume += price;
@@ -315,6 +316,17 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(_nftContract != address(0), "NFTTrading: Invalid NFT contract address");
         nftContract = _nftContract;
     }
+
+    /**
+     * @dev 设置代币合约地址
+     */
+    function setTokenContract(address _tokenContract) external onlyAuthorized {
+        require(_tokenContract != address(0), "NFTTrading: Invalid token contract address");
+        tokenContract = _tokenContract;
+        emit TokenContractUpdated(_tokenContract);
+    }
+
+    event TokenContractUpdated(address newTokenContract);
 
     /**
      * @dev 更新价格
@@ -486,14 +498,6 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         }
     }
 
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
-        require(amount > 0, "NFTTrading: Amount must be > 0");
-        require(amount <= address(this).balance, "NFTTrading: Insufficient balance");
-        (bool success, ) = payable(owner()).call{value: amount}("");
-        require(success, "NFTTrading: BNB transfer failed");
-        emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
-    }
-
     function emergencyWithdrawNFT(uint256 tokenId) external onlyOwner nonReentrant {
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         INFT nft = INFT(nftContract);
@@ -501,16 +505,15 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         emit EmergencyNFTWithdrawn(msg.sender, owner(), tokenId);
     }
 
-    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
+        require(amount > 0, "NFTTrading: Amount must be > 0");
+        require(tokenContract != address(0), "NFTTrading: Token contract not set");
+        IERC20 token = IERC20(tokenContract);
+        require(token.balanceOf(address(this)) >= amount, "NFTTrading: Insufficient token balance");
+        token.safeTransfer(owner(), amount);
+        emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
+    }
+
     event EmergencyNFTWithdrawn(address indexed operator, address indexed to, uint256 tokenId);
-
-    /**
-     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
-     */
-    receive() external payable {}
-
-    /**
-     * @dev Fallback 函数 - 处理未匹配的调用
-     */
-    fallback() external payable {}
+    event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 }

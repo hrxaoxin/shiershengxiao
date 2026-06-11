@@ -114,6 +114,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
 
     uint256 public normalNFTWeight = 66;
     uint256 public rareNFTWeight = 76;
+    uint8 public minStakingLevel = 1;
     address public rewardTokenContract;
     address public nftContract;
     address public authorizer;
@@ -157,6 +158,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         breedingContract = _breedingContract;
     }
 
+    function setMinStakingLevel(uint8 _minLevel) external onlyAuthorized {
+        require(_minLevel > 0, "Staking: Minimum level must be at least 1");
+        minStakingLevel = _minLevel;
+    }
+
     modifier onlyAuthorized() {
         require(msg.sender == owner() || msg.sender == authorizer, "Staking: Not authorized");
         _;
@@ -195,6 +201,10 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             if (breedingContract != address(0)) {
                 require(!IBreeding(breedingContract).isNFTInActiveBreeding(tokenId), "Staking: NFT is in breeding");
             }
+
+            // 检查 NFT 等级是否满足质押要求
+            uint8 tokenLevel = nft.tokenLevel(tokenId);
+            require(tokenLevel >= minStakingLevel, "Staking: NFT level below minimum requirement");
 
             bool isRareToken = nft.isRare(tokenId);
             nft.safeTransferFrom(msg.sender, address(this), tokenId);

@@ -201,7 +201,8 @@ window.ZODIAC_WEB3 = (function() {
         'arenaLeaderboard': ABIS.arenaLeaderboardABI,
         'arenaPlayer': ABIS.arenaPlayerABI,
         'arenaBattle': ABIS.arenaBattleABI,
-        'priceOracle': ABIS.priceOracleABI
+        'priceOracle': ABIS.priceOracleABI,
+        'buyback': ABIS.buybackABI
     };
 
     function initContracts() {
@@ -1205,16 +1206,26 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error('[ZODIAC_WEB3] Cannot buy your own NFT');
         }
         
+        const tokenContract = await getContract('tokenContract');
+        const tradingAddress = CONTRACT_ADDRESSES.nftTrading;
+        
+        const balance = await tokenContract.methods.balanceOf(account).call();
+        const allowance = await tokenContract.methods.allowance(account, tradingAddress).call();
+        
         const web3Instance = getWeb3();
-        const balance = await web3Instance.eth.getBalance(account);
         const priceBN = web3Instance.utils.toBN(price);
         const balanceBN = web3Instance.utils.toBN(balance);
+        const allowanceBN = web3Instance.utils.toBN(allowance);
         
         if (balanceBN.lt(priceBN)) {
-            throw new Error(`[ZODIAC_WEB3] Insufficient BNB balance. Need ${web3Instance.utils.fromWei(price, 'ether')} BNB, have ${web3Instance.utils.fromWei(balance, 'ether')} BNB`);
+            throw new Error(`[ZODIAC_WEB3] Insufficient token balance. Need ${web3Instance.utils.fromWei(price, 'ether')} tokens, have ${web3Instance.utils.fromWei(balance, 'ether')} tokens`);
+        }
+        
+        if (allowanceBN.lt(priceBN)) {
+            await approveToken(tradingAddress, web3Instance.utils.toWei('1000000', 'ether'));
         }
 
-        const receipt = await sendAndTrackTransaction(contract, 'buyNFT', [tokenId], { value: price });
+        const receipt = await sendAndTrackTransaction(contract, 'buyNFT', [tokenId]);
 
         return receipt;
     }
@@ -1866,6 +1877,67 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
+    // --- Buyback Methods ---
+    async function sellNFTWithGrowthPrice(tokenId) {
+        if (!tokenId || tokenId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid token ID');
+        }
+        try {
+            const contract = await getContract('buyback');
+            const receipt = await sendAndTrackTransaction(contract, 'sellWithGrowthPrice', [tokenId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] sellNFTWithGrowthPrice failed:', e);
+            throw e;
+        }
+    }
+
+    async function sellNFTWithFixedPrice(tokenId) {
+        if (!tokenId || tokenId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid token ID');
+        }
+        try {
+            const contract = await getContract('buyback');
+            const receipt = await sendAndTrackTransaction(contract, 'sellWithFixedPrice', [tokenId]);
+            return receipt;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] sellNFTWithFixedPrice failed:', e);
+            throw e;
+        }
+    }
+
+    async function calculateBuybackPrice(tokenId) {
+        if (!tokenId || tokenId <= 0) {
+            throw new Error('[ZODIAC_WEB3] Invalid token ID');
+        }
+        try {
+            const contract = await getContract('buyback');
+            return await contract.methods.calculateBuybackPrice(tokenId).call();
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] calculateBuybackPrice failed:', e);
+            throw e;
+        }
+    }
+
+    async function getBuybackConfig() {
+        try {
+            const contract = await getContract('buyback');
+            const [autoBuybackOpen, fixedBuybackPrice, maxBonusPercent] = await Promise.all([
+                contract.methods.autoBuybackOpen().call(),
+                contract.methods.fixedBuybackPrice().call(),
+                contract.methods.maxBonusPercent().call()
+            ]);
+            return {
+                autoBuybackOpen: autoBuybackOpen,
+                fixedBuybackPrice: fixedBuybackPrice,
+                maxBonusPercent: parseInt(maxBonusPercent, 10)
+            };
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] getBuybackConfig failed:', e);
+            return null;
+        }
+    }
+
     // --- Cleanup on page unload or hash change (SPA) ---
     window.addEventListener('beforeunload', function() {
         clearAllEventListeners();
@@ -1990,6 +2062,12 @@ window.ZODIAC_WEB3 = (function() {
         setPriceOracleActiveDEX,
         fetchPriceFromDEX,
         fetchPriceFromAllDEX,
-        getPriceOracleActiveDEX
+        getPriceOracleActiveDEX,
+
+        // Buyback
+        sellNFTWithGrowthPrice,
+        sellNFTWithFixedPrice,
+        calculateBuybackPrice,
+        getBuybackConfig
     };
 })();

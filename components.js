@@ -6,6 +6,7 @@ window.ZODIAC_COMPONENTS = (function() {
         { id: 'rewards', icon: '🏆', name: '奖励', url: 'rewards.html' },
         { id: 'upgrade', icon: '⭐', name: '升阶', url: 'upgrade.html' },
         { id: 'trading', icon: '💰', name: '交易', url: 'trading.html' },
+        { id: 'buyback', icon: '🔄', name: '回购', url: 'buyback.html' },
         { id: 'breeding', icon: '🐾', name: '孕育', url: 'breeding.html' },
         { id: 'staking', icon: '⚡', name: '挖矿', url: 'staking.html' },
         { id: 'arena', icon: '⚔️', name: '竞技', url: 'arena.html' }

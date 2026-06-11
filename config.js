@@ -163,7 +163,8 @@ window.ZODIAC_CONFIG = (function() {
         battleHistory: getEnvContractAddress('battleHistory', '0xf1234567890abcdef1234567890abcdef1234567'),
         priceOracle: getEnvContractAddress('priceOracle', '0x1111111111111111111111111111111111111111'),
         authorizer: getEnvContractAddress('authorizer', '0x2222222222222222222222222222222222222222'),
-        battleSkillData: getEnvContractAddress('battleSkillData', '0x3333333333333333333333333333333333333333')
+        battleSkillData: getEnvContractAddress('battleSkillData', '0x3333333333333333333333333333333333333333'),
+        buyback: getEnvContractAddress('buyback', '0x8888888888888888888888888888888888888888')
     };
 
     function getContractAddresses() {
@@ -596,6 +597,34 @@ window.ZODIAC_CONFIG = (function() {
             {"inputs":[],"name":"nftMintContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},
             {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"tokenId","type":"uint256"},{"indexed":true,"internalType":"address","name":"owner","type":"address"}],"name":"MarketListingCreated","type":"event"},
             {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"tokenId","type":"uint256"},{"indexed":true,"internalType":"address","name":"owner","type":"address"}],"name":"MarketListingRemoved","type":"event"},
+            {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":false,"internalType":"string","name":"reason","type":"string"}],"name":"Paused","type":"event"},
+            {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"}],"name":"Unpaused","type":"event"}
+        ],
+        buybackABI: [
+            {"inputs":[{"internalType":"address","name":"_authorizer","type":"address"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"calculateBuybackPrice","outputs":[{"internalType":"uint256","name":"basePrice","type":"uint256"},{"internalType":"uint256","name":"bonusPercent","type":"uint256"},{"internalType":"uint256","name":"finalPrice","type":"uint256"},{"internalType":"uint256","name":"daysToMax","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"sellWithGrowthPrice","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"}],"name":"sellWithFixedPrice","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"autoBuybackOpen","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"fixedBuybackPrice","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"maxBonusPercent","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+            {"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+            {"inputs":[{"internalType":"string","name":"reason","type":"string"}],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[],"name":"unpause","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"_multiplier","type":"uint256"}],"name":"setMaxBuybackMultiplier","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"_price","type":"uint256"}],"name":"setFixedBuybackPrice","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"bool","name":"_open","type":"bool"}],"name":"setFixedBuybackOpen","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"address","name":"_nftContract","type":"address"}],"name":"setNFTContract","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"address","name":"_tokenContract","type":"address"}],"name":"setTokenContract","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"address","name":"_tokenBurner","type":"address"}],"name":"setTokenBurnerContract","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"address","name":"_nftUpdate","type":"address"}],"name":"setNFTUpdateContract","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"tokenId","type":"uint256"},{"internalType":"uint256","name":"mintTime","type":"uint256"}],"name":"recordMintTime","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"emergencyWithdrawTokens","outputs":[],"stateMutability":"nonpayable","type":"function"},
+            {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"tokenId","type":"uint256"},{"indexed":true,"internalType":"address","name":"seller","type":"address"},{"indexed":false,"internalType":"uint256","name":"price","type":"uint256"},{"indexed":false,"internalType":"string","name":"mode","type":"string"}],"name":"NFTBurnedForBuyback","type":"event"},
+            {"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newMultiplier","type":"uint256"}],"name":"MaxBuybackMultiplierUpdated","type":"event"},
+            {"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"newPrice","type":"uint256"}],"name":"FixedBuybackPriceUpdated","type":"event"},
+            {"anonymous":false,"inputs":[{"indexed":false,"internalType":"bool","name":"open","type":"bool"}],"name":"FixedBuybackOpenUpdated","type":"event"},
+            {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"operator","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"EmergencyTokensWithdrawn","type":"event"},
             {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"},{"indexed":false,"internalType":"string","name":"reason","type":"string"}],"name":"Paused","type":"event"},
             {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"account","type":"address"}],"name":"Unpaused","type":"event"}
         ],
