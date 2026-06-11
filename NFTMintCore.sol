@@ -109,6 +109,10 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 繁殖合约地址
      */
     address public breedingContract;
+    /**
+     * @dev 授权器合约地址（Authorizer）
+     */
+    address public authorizer;
     
     /**
      * @dev 是否暂停铸造
@@ -165,6 +169,14 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
         require(breedingContract != address(0), "NFTMint: breedingContract not set");
         require(msg.sender == tokenBurnerContract || msg.sender == breedingContract, "NFTMint: Unauthorized");
+        _;
+    }
+    
+    /**
+     * @dev 修饰器：仅所有者或授权器可调用
+     */
+    modifier onlyOwnerOrAuthorizer() {
+        require(msg.sender == owner() || msg.sender == authorizer, "NFTMint: Only owner or authorizer");
         _;
     }
     
@@ -456,16 +468,25 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         nftDataContract = _nftDataContract;
     }
     
-    function setTokenBurnerContract(address _tokenBurnerContract) external onlyOwner {
+    function setTokenBurnerContract(address _tokenBurnerContract) external onlyOwnerOrAuthorizer {
         // 修复：零地址检查，防止错误配置导致 burner mint 失败
         require(_tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract cannot be zero address");
         tokenBurnerContract = _tokenBurnerContract;
     }
     
-    function setBreedingContract(address _breedingContract) external onlyOwner {
+    function setBreedingContract(address _breedingContract) external onlyOwnerOrAuthorizer {
         // 修复：零地址检查，防止错误配置导致 breeding mint 失败
         require(_breedingContract != address(0), "NFTMint: breedingContract cannot be zero address");
         breedingContract = _breedingContract;
+    }
+    
+    /**
+     * @dev 设置授权器合约地址
+     * @param _authorizer 授权器合约地址
+     */
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        require(_authorizer != address(0), "NFTMint: authorizer cannot be zero address");
+        authorizer = _authorizer;
     }
     
     function pause() external onlyOwner {

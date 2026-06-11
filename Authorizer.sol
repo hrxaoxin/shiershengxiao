@@ -437,7 +437,13 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             ISetTokenAddress(_tokenStakingAddress).setTokenAddress(_tokenAddress);
         }
         if (poolManagerAddress != address(0)) {
-            ISetPoolManager(_rewardManagerAddress).setPoolManager(poolManagerAddress);
+            try ISetPoolManager(_rewardManagerAddress).setPoolManager(poolManagerAddress) {
+                emit ContractSetupSuccess("RewardManager-PoolManager");
+            } catch Error(string memory reason) {
+                emit ContractSetupFailed("RewardManager-PoolManager", reason);
+            } catch {
+                emit ContractSetupFailed("RewardManager-PoolManager", "Unknown error");
+            }
         }
         // 初始化NFT回购销毁合约
         if (_nftBuybackAddress != address(0)) {

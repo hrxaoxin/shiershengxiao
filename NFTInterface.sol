@@ -512,7 +512,7 @@ interface ISetAuthorizedNFTContract {
 }
 
 interface ISetTokenBurner {
-    function setTokenBurner(address _tokenBurner) external;
+    function setTokenBurnerContract(address _tokenBurner) external;
 }
 
 interface ISetNFTDataContract {
