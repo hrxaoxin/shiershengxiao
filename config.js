@@ -138,7 +138,7 @@ window.ZODIAC_CONFIG = (function() {
     // 示例合约地址配置 - 部署后请替换为真实地址
     const CONTRACT_ADDRESSES = {
         tokenContract: getEnvContractAddress('token', '0x1234567890abcdef1234567890abcdef12345678'),
-        rewardManager: getEnvContractAddress('rewardManager', '0x2345678901abcdef2345678901abcdef23456789'),
+        rewardManager: getEnvContractAddress('rewardManager', '0x5813AE83ddeD8cF4D2a070A4B695510CaE1b481b'),
         dividendManager: getEnvContractAddress('dividendManager', '0x3456789012abcdef3456789012abcdef34567890'),
         weightManager: getEnvContractAddress('weightManager', '0x4567890123abcdef4567890123abcdef45678901'),
         poolManager: getEnvContractAddress('poolManager', '0x5678901234abcdef5678901234abcdef56789012'),
