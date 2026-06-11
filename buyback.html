@@ -250,22 +250,79 @@
 
         <div class="bg-white rounded-xl p-6 shadow-md mt-8">
             <h3 class="text-lg font-semibold text-gray-800 mb-4">回购规则说明</h3>
+            <div class="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-lg mb-4">
+                <div class="flex items-center">
+                    <i class="fa fa-info-circle text-blue-600 mr-3 text-xl"></i>
+                    <div>
+                        <p class="font-medium text-gray-800">持有加成规则</p>
+                        <p class="text-sm text-gray-600">每日持有加成 <span class="text-green-600 font-bold">+1%</span>，持有时间越长，回购价格越高</p>
+                    </div>
+                </div>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div class="bg-blue-50 p-4 rounded-lg">
                     <h4 class="font-bold text-blue-800 mb-2">1阶NFT</h4>
                     <p class="text-sm text-gray-600">基础回购价：成本的10%</p>
-                    <p class="text-sm text-gray-600">持有90天回本，最高110%</p>
+                    <p class="text-sm text-gray-600">每日+1%，持有90天回本，最高110%</p>
                 </div>
                 <div class="bg-green-50 p-4 rounded-lg">
                     <h4 class="font-bold text-green-800 mb-2">2-3阶NFT</h4>
                     <p class="text-sm text-gray-600">基础回购价：成本的15-20%</p>
-                    <p class="text-sm text-gray-600">持有85-80天回本</p>
+                    <p class="text-sm text-gray-600">每日+1%，持有85-80天回本，最高110%</p>
                 </div>
                 <div class="bg-purple-50 p-4 rounded-lg">
                     <h4 class="font-bold text-purple-800 mb-2">4-5阶NFT</h4>
                     <p class="text-sm text-gray-600">基础回购价：成本的25-30%</p>
-                    <p class="text-sm text-gray-600">持有75-70天回本</p>
+                    <p class="text-sm text-gray-600">每日+1%，持有75-70天回本，最高110%</p>
                 </div>
+            </div>
+            <div class="mt-4 p-4 bg-gray-50 rounded-lg">
+                <h4 class="font-bold text-gray-700 mb-2">详细规则表</h4>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-300">
+                                <th class="text-left py-2 px-3 font-semibold">等级</th>
+                                <th class="text-left py-2 px-3 font-semibold">基础回购价</th>
+                                <th class="text-left py-2 px-3 font-semibold">回本天数</th>
+                                <th class="text-left py-2 px-3 font-semibold">最高回购价</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-2 px-3">1阶</td>
+                                <td class="py-2 px-3">成本的10%</td>
+                                <td class="py-2 px-3">90天</td>
+                                <td class="py-2 px-3">成本的110%</td>
+                            </tr>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-2 px-3">2阶</td>
+                                <td class="py-2 px-3">成本的15%</td>
+                                <td class="py-2 px-3">85天</td>
+                                <td class="py-2 px-3">成本的110%</td>
+                            </tr>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-2 px-3">3阶</td>
+                                <td class="py-2 px-3">成本的20%</td>
+                                <td class="py-2 px-3">80天</td>
+                                <td class="py-2 px-3">成本的110%</td>
+                            </tr>
+                            <tr class="border-b border-gray-200">
+                                <td class="py-2 px-3">4阶</td>
+                                <td class="py-2 px-3">成本的25%</td>
+                                <td class="py-2 px-3">75天</td>
+                                <td class="py-2 px-3">成本的110%</td>
+                            </tr>
+                            <tr>
+                                <td class="py-2 px-3">5阶</td>
+                                <td class="py-2 px-3">成本的30%</td>
+                                <td class="py-2 px-3">70天</td>
+                                <td class="py-2 px-3">成本的110%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">注：成本 = 铸造成本 + 累计升级成本；稀有NFT按稀有铸造成本计算；每日持有加成1%，达到最高回购价后不再增加</p>
             </div>
         </div>
     </main>
