@@ -94,3 +94,4 @@ ArenaReward代理：0x0a6D0f7fEDeC99a716C63930372ecfA75948092a
 加ArenaRankingManager2 NFTMintCore2
 BreedingMarket实现：0xD0c345deB64c4d6C4a7DC54BD5dCFE1719407876
 BreedingMarket代理：0x8e8bEB884f419E04b50eeedeca2Fd8e8522e125b
+
