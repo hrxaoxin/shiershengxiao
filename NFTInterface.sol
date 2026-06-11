@@ -76,6 +76,7 @@ interface INFTData {
  * @dev NFT铸造接口，提供铸造和查询功能
  */
 interface INFTMint {
+    function totalSupply() external view returns (uint256);
     function mint(address to, uint256 zodiacType) external returns (uint256);
     function mintNormal(address to) external returns (uint256);
     function mintRare(address to) external returns (uint256);
