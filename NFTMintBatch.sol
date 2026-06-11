@@ -206,11 +206,6 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return NFTLib.calculateZodiacType(element, zodiac, gender);
     }
     
-    modifier onlyTokenBurner() {
-        require(msg.sender == INFTMintCore(nftMintCore).tokenBurnerContract(), "NFTMintBatch: Only TokenBurner");
-        _;
-    }
-    
     function setNftMintCore(address _nftMintCore) external onlyOwner {
         nftMintCore = _nftMintCore;
     }

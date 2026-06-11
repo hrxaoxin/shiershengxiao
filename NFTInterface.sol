@@ -646,6 +646,7 @@ interface INFTUpdate {
     function level3UpgradeCost() external view returns (uint256);
     function level4UpgradeCost() external view returns (uint256);
     function usdUpgradeHidden() external view returns (bool);
+    function getAllLevelUpgradeCosts() external view returns (uint256[4] memory);
 }
 
 /**
@@ -661,6 +662,7 @@ interface ITokenBurner {
     function burnAndMint(address user, bool isRare) external returns (bool);
     function burnAndMintTen(address user, bool isRare) external returns (bool);
     function burnAndMintTargeted(address user, uint8 zodiac) external returns (bool);
+    function getAllCosts() external view returns (uint256, uint256);
 }
 
 /**
