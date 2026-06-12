@@ -129,7 +129,7 @@ window.ZODIAC_CONFIG = (function() {
 
     // DEX Router 配置（支持 FlapSwap、PancakeSwap、Uniswap）
     const DEX_ROUTERS = {
-        flapswap: getEnvContractAddress('flapswapRouter', '0x1111111111111111111111111111111111111111'),
+        flapswap: getEnvContractAddress('flapswapRouter', '0xe2cE6ab80874Fa9Fa2aAE65D277Dd6B8e65C9De0'),
         pancakeswap: getEnvContractAddress('pancakeswapRouter', '0x10ED43C718714eb63d5aA57B78B54704E256024E'),
         uniswap: getEnvContractAddress('uniswapRouter', '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D'),
         wbnb: getEnvContractAddress('wbnb', '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c')
