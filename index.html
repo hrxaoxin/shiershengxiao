@@ -597,10 +597,6 @@
             document.getElementById('unclaimedDividend').textContent = '--';
             document.getElementById('holders').textContent = '--';
             document.getElementById('userWeight').textContent = '--';
-            
-            if (!account) {
-                return;
-            }
 
             try {
                 const dividendManager = await ZODIAC_WEB3.getContract('dividendManager');
@@ -609,7 +605,7 @@
                     return;
                 }
                 
-                // 加载总池金额
+                // 加载总池金额（公共数据，无需连接钱包）
                 try {
                     const totalPoolWei = await dividendManager.methods.dividendPoolBalance().call();
                     const totalPool = web3.utils.fromWei(totalPoolWei, 'ether');
@@ -618,13 +614,29 @@
                     console.error('Failed to load total pool:', e);
                 }
                 
-                // 加载已分配金额 (暂用总池替代，因为没有直接的totalDistributed)
+                // 加载已分配金额
                 try {
-                    const totalPoolWei = await dividendManager.methods.dividendPoolBalance().call();
-                    const distributed = web3.utils.fromWei(totalPoolWei, 'ether');
+                    const distributedWei = await dividendManager.methods.totalDistributed().call();
+                    const distributed = web3.utils.fromWei(distributedWei, 'ether');
                     document.getElementById('distributed').textContent = parseFloat(distributed).toFixed(4);
                 } catch (e) {
                     console.error('Failed to load distributed:', e);
+                }
+
+                // 加载NFT总数（公共数据，无需连接钱包）
+                try {
+                    const nftMint = await ZODIAC_WEB3.getContract('nftMint');
+                    if (nftMint) {
+                        const totalSupply = await nftMint.methods.totalSupply().call();
+                        document.getElementById('holders').textContent = totalSupply.toString();
+                    }
+                } catch (e) {
+                    console.error('Failed to load NFT total supply:', e);
+                }
+
+                // 以下数据需要连接钱包
+                if (!account) {
+                    return;
                 }
 
                 // 加载待领取分红
@@ -795,8 +807,10 @@
                 document.getElementById('userWeight').textContent = '--';
             });
 
-            loadFenHongData();
             loadWeightConfig();
+            
+            // 立即加载公共数据（无需连接钱包）
+            loadFenHongData();
 
             document.getElementById('menuBtn').addEventListener('click', openMobileMenu);
         });
