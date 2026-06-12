@@ -755,11 +755,11 @@
                         document.getElementById('burnPercent').textContent = buybackPercent.replace(/^0+/, '') || defaultBurnPercent;
                         
                         console.log('Distribution config loaded from contract:', { dividendPercent, nftStakingPercent, tokenStakingPercent, arenaPercent, buybackPercent });
-                    } catch (e) {
-                        console.warn('Failed to load distribution config from contract, using defaults:', e.message);
+                    } else {
+                        console.debug('RewardManager contract not available, using default distribution');
                     }
-                } else {
-                    console.debug('RewardManager contract not available, using default distribution');
+                } catch (e) {
+                    console.warn('Failed to load distribution config from contract, using defaults:', e.message);
                 }
             } catch (error) {
                 console.warn('Load config failed, using defaults:', error.message);
