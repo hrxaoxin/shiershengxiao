@@ -129,10 +129,13 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     
     /**
      * @dev 初始化函数
+     * @param _authorizer 授权合约地址
      */
-    function initialize() external initializer {
+    function initialize(address _authorizer) external initializer {
+        require(_authorizer != address(0), "ArenaLeaderboard: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        authorizer = _authorizer;
         _createSeason();
     }
     

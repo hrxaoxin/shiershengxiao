@@ -542,7 +542,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             ISetTokenContract(_tokenBurnerAddress).setTokenContract(tokenAddress);
         }
         if (_nftMintAddress != address(0)) {
-            ISetTokenBurner(_nftMintAddress).setTokenBurner(_tokenBurnerAddress);
+            ISetTokenBurner(_nftMintAddress).setTokenBurnerContract(_tokenBurnerAddress);
         }
     }
 

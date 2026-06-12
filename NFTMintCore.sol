@@ -184,8 +184,9 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 初始化函数
      * @param _nftDataContract NFT数据合约地址
      * @param _tokenBurnerContract 代币销毁合约地址
+     * @param _authorizer 授权合约地址
      */
-    function initialize(address _nftDataContract, address _tokenBurnerContract) public initializer {
+    function initialize(address _nftDataContract, address _tokenBurnerContract, address _authorizer) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -194,6 +195,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         rareElementProbabilities = [50, 50];
         nftDataContract = _nftDataContract;
         tokenBurnerContract = _tokenBurnerContract;
+        authorizer = _authorizer;
         _nextCardId = 1;
     }
     
