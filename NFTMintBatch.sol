@@ -45,6 +45,11 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     address public nftMintCore;
     
     /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+    
+    /**
      * @dev 是否暂停铸造
      */
     bool public paused;
@@ -71,14 +76,26 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
     
     /**
+     * @dev 修饰器：仅所有者或授权器可调用
+     */
+    modifier onlyOwnerOrAuthorizer() {
+        require(msg.sender == owner() || msg.sender == authorizer, "NFTMintBatch: Not owner or authorizer");
+        _;
+    }
+    
+    /**
      * @dev 初始化函数
      * @param _nftMintCore NFT铸造核心合约地址
+     * @param _authorizer 授权合约地址
      */
-    function initialize(address _nftMintCore) public initializer {
+    function initialize(address _nftMintCore, address _authorizer) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        require(_nftMintCore != address(0), "NFTMintBatch: Invalid NFTMintCore address");
+        require(_authorizer != address(0), "NFTMintBatch: Invalid authorizer address");
         nftMintCore = _nftMintCore;
+        authorizer = _authorizer;
     }
     
     /**
@@ -206,8 +223,18 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return NFTLib.calculateZodiacType(element, zodiac, gender);
     }
     
-    function setNftMintCore(address _nftMintCore) external onlyOwner {
+    function setNftMintCore(address _nftMintCore) external onlyOwnerOrAuthorizer {
+        require(_nftMintCore != address(0), "NFTMintBatch: Invalid address");
         nftMintCore = _nftMintCore;
+    }
+    
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 新的授权合约地址
+     */
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        require(_authorizer != address(0), "NFTMintBatch: Invalid authorizer address");
+        authorizer = _authorizer;
     }
     
     function pause() external onlyOwner {

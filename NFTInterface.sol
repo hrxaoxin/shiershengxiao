@@ -76,7 +76,7 @@ interface INFTData {
  * @dev NFT铸造接口，提供铸造和查询功能
  */
 interface INFTMint {
-    // 注意：totalSupply() 函数继承自 ERC721Enumerable，不在此接口中声明
+    function totalSupply() external view returns (uint256);
     function mint(address to, uint256 zodiacType) external returns (uint256);
     function mintNormal(address to) external returns (uint256);
     function mintRare(address to) external returns (uint256);
@@ -573,6 +573,14 @@ interface ISetRewardManagerContract {
 
 interface ISetBreedingContract {
     function setBreedingContract(address _breedingContract) external;
+}
+
+interface ISetStakingContract {
+    function setStakingContract(address _stakingContract) external;
+}
+
+interface ISetAuthorizer {
+    function setAuthorizer(address _authorizer) external;
 }
 
 interface IBreedingMarket {

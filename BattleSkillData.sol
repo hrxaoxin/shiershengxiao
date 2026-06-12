@@ -62,6 +62,11 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+
+    /**
      * @dev 技能数据映射
      * elementIndex (0-4) => zodiacIndex (0-11) => gender (0-1) => FullSkill
      */
@@ -72,11 +77,22 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     bool public skillsInitializationPending;
 
     /**
-     * @dev 初始化函数（仅部署时调用一次）
+     * @dev 修饰器：仅所有者或授权器可调用
      */
-    function initialize() external initializer {
+    modifier onlyOwnerOrAuthorizer() {
+        require(msg.sender == owner() || msg.sender == authorizer, "BattleSkillData: Not owner or authorizer");
+        _;
+    }
+
+    /**
+     * @dev 初始化函数（仅部署时调用一次）
+     * @param _authorizer 授权合约地址
+     */
+    function initialize(address _authorizer) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        require(_authorizer != address(0), "BattleSkillData: Invalid authorizer address");
+        authorizer = _authorizer;
         skillsInitializationPending = true;
     }
 
@@ -111,6 +127,15 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     function initAllSkills() external onlyOwner {
         require(skillsInitialized, "BattleSkillData: Skills not initialized yet");
         _initAllSkills();
+    }
+
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 新的授权合约地址
+     */
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        require(_authorizer != address(0), "BattleSkillData: Invalid authorizer address");
+        authorizer = _authorizer;
     }
 
     /**

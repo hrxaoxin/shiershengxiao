@@ -464,7 +464,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         failedSyncCount--;
     }
     
-    function setNftDataContract(address _nftDataContract) external onlyOwner {
+    function setNftDataContract(address _nftDataContract) external onlyOwnerOrAuthorizer {
         // 修复：零地址检查，防止错误配置导致所有 mint 失败
         require(_nftDataContract != address(0), "NFTMint: nftDataContract cannot be zero address");
         nftDataContract = _nftDataContract;
@@ -612,6 +612,11 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     
     function nextCardId() external view returns (uint256) {
         return _nextCardId;
+    }
+    
+    function totalSupply() external view returns (uint256) {
+        if (_nextCardId == 0) return 0;
+        return _nextCardId - 1;
     }
     
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);

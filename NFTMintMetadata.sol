@@ -57,6 +57,11 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     address public nftMintCore;
     
     /**
+     * @dev 授权合约地址（Authorizer）
+     */
+    address public authorizer;
+    
+    /**
      * @dev NFT数据结果结构体
      * @param tokenType_ NFT类型
      * @param attack 攻击力
@@ -89,13 +94,25 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
     
     /**
+     * @dev 修饰器：仅所有者或授权器可调用
+     */
+    modifier onlyOwnerOrAuthorizer() {
+        require(msg.sender == owner() || msg.sender == authorizer, "NFTMintMetadata: Not owner or authorizer");
+        _;
+    }
+    
+    /**
      * @dev 初始化函数
      * @param _nftMintCore NFT铸造核心合约地址
+     * @param _authorizer 授权合约地址
      */
-    function initialize(address _nftMintCore) public initializer {
+    function initialize(address _nftMintCore, address _authorizer) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
+        require(_nftMintCore != address(0), "NFTMintMetadata: Invalid NFTMintCore address");
+        require(_authorizer != address(0), "NFTMintMetadata: Invalid authorizer address");
         nftMintCore = _nftMintCore;
+        authorizer = _authorizer;
     }
     
     /**
@@ -187,10 +204,17 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         return NFTLib.concat5(namePart, descPart, attrPart, "", "");
     }
     
-    function setNftMintCore(address _nftMintCore) external onlyOwner {
-        // 修复：使用 onlyOwner 修饰符确保只有合约所有者可以调用
-        // 同时添加地址有效性检查
+    function setNftMintCore(address _nftMintCore) external onlyOwnerOrAuthorizer {
         require(_nftMintCore != address(0), "NFTMintMetadata: Invalid address");
         nftMintCore = _nftMintCore;
+    }
+
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizer 新的授权合约地址
+     */
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        require(_authorizer != address(0), "NFTMintMetadata: Invalid authorizer address");
+        authorizer = _authorizer;
     }
 }
