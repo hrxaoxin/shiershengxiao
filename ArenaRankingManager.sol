@@ -680,9 +680,11 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     /**
      * @dev 获取当前赛季信息
      * @return seasonId 赛季ID
-     * @return startTime 赛季开始时�?     * @return endTime 赛季结束时间
-     * @return isActive 是否活跃
-     * @return rewardPool 奖励�?     */
+     * @return startTime 赛季开始时间
+     * @return endTime 赛季结束时间
+     * @return isActive 赛季是否活跃
+     * @return rewardPool 奖励池金额
+     */
     function currentSeason() external view returns (
         uint256 seasonId,
         uint256 startTime,

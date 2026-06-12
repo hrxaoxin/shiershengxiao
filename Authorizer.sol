@@ -345,127 +345,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         admin = _admin;
     }
 
-    // ========== 单独设置各合约地址（方便单独测试） ==========
-    function setTokenAddress(address _tokenAddress) external onlyOwner {
-        tokenAddress = _tokenAddress;
-    }
-
-    function setUsdtAddress(address _usdtAddress) external onlyOwner {
-        usdtAddress = _usdtAddress;
-    }
-
-    function setNFTMintCoreAddress(address _nftMintCoreAddress) external onlyOwner {
-        nftMintCoreAddress = _nftMintCoreAddress;
-    }
-
-    function setNFTMintBatchAddress(address _nftMintBatchAddress) external onlyOwner {
-        nftMintBatchAddress = _nftMintBatchAddress;
-    }
-
-    function setNFTMintMetadataAddress(address _nftMintMetadataAddress) external onlyOwner {
-        nftMintMetadataAddress = _nftMintMetadataAddress;
-    }
-
-    function setNFTUpdateAddress(address _nftUpdateAddress) external onlyOwner {
-        nftUpdateAddress = _nftUpdateAddress;
-    }
-
-    function setNFTDataAddress(address _nftDataAddress) external onlyOwner {
-        nftDataAddress = _nftDataAddress;
-    }
-
-    function setTokenBurnerAddress(address _tokenBurnerAddress) external onlyOwner {
-        tokenBurnerAddress = _tokenBurnerAddress;
-    }
-
-    function setNFTTradingAddress(address _nftTradingAddress) external onlyOwner {
-        nftTradingAddress = _nftTradingAddress;
-    }
-
-    function setNFTBuybackAddress(address _nftBuybackAddress) external onlyOwner {
-        nftBuybackAddress = _nftBuybackAddress;
-    }
-
-    function setStakingAddress(address _stakingAddress) external onlyOwner {
-        stakingAddress = _stakingAddress;
-    }
-
-    function setTokenStakingAddress(address _tokenStakingAddress) external onlyOwner {
-        tokenStakingAddress = _tokenStakingAddress;
-    }
-
-    function setRewardManagerAddress(address _rewardManagerAddress) external onlyOwner {
-        rewardManagerAddress = _rewardManagerAddress;
-    }
-
-    function setDividendManagerAddress(address _dividendManagerAddress) external onlyOwner {
-        dividendManagerAddress = _dividendManagerAddress;
-    }
-
-    function setPoolManagerAddress(address _poolManagerAddress) external onlyOwner {
-        poolManagerAddress = _poolManagerAddress;
-    }
-
-    function setPriceOracleAddress(address _priceOracleAddress) external onlyOwner {
-        priceOracleAddress = _priceOracleAddress;
-    }
-
-    function setBattleAddress(address _battleAddress) external onlyOwner {
-        battleAddress = _battleAddress;
-    }
-
-    function setBattleSkillDataAddress(address _battleSkillDataAddress) external onlyOwner {
-        battleSkillDataAddress = _battleSkillDataAddress;
-    }
-
-    function setBattleHistoryAddress(address _battleHistoryAddress) external onlyOwner {
-        battleHistoryAddress = _battleHistoryAddress;
-    }
-
-    function setBreedingCoreAddress(address _breedingCoreAddress) external onlyOwner {
-        breedingCoreAddress = _breedingCoreAddress;
-    }
-
-    function setBreedingMarketAddress(address _breedingMarketAddress) external onlyOwner {
-        breedingMarketAddress = _breedingMarketAddress;
-    }
-
-    function setWeightManagerAddress(address _weightManagerAddress) external onlyOwner {
-        weightManagerAddress = _weightManagerAddress;
-    }
-
-    function setArenaRankingManagerAddress(address _arenaRankingManagerAddress) external onlyOwner {
-        arenaRankingManagerAddress = _arenaRankingManagerAddress;
-    }
-
-    function setArenaRankingQueryAddress(address _arenaRankingQueryAddress) external onlyOwner {
-        arenaRankingQueryAddress = _arenaRankingQueryAddress;
-    }
-
-    function setArenaRewardAddress(address _arenaRewardAddress) external onlyOwner {
-        arenaRewardAddress = _arenaRewardAddress;
-    }
-
-    function setArenaLeaderboardAddress(address _arenaLeaderboardAddress) external onlyOwner {
-        arenaLeaderboardAddress = _arenaLeaderboardAddress;
-    }
-
-    function setArenaPlayerAddress(address _arenaPlayerAddress) external onlyOwner {
-        arenaPlayerAddress = _arenaPlayerAddress;
-    }
-
-    function setArenaBattleAddress(address _arenaBattleAddress) external onlyOwner {
-        arenaBattleAddress = _arenaBattleAddress;
-    }
-
-    function setFeeReceiverAddress(address _feeReceiverAddress) external onlyOwner {
-        feeReceiverAddress = _feeReceiverAddress;
-    }
-
-    function setPancakeSwapRouterAddress(address _pancakeSwapRouterAddress) external onlyOwner {
-        pancakeSwapRouterAddress = _pancakeSwapRouterAddress;
-    }
-
     /**
      * @dev 更新所有合约地址（立即生效）
      * @param _addresses - 新的合约地址配置
@@ -477,11 +356,11 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _setOtherAddresses(_addresses);
 
 
-        setupBattleAndBreeding(_addresses.battleAddress, _addresses.breedingCoreAddress, _addresses.breedingMarketAddress, _addresses.nftMintCoreAddress, _addresses.stakingAddress);
-        setupStakingAndReward(_addresses.stakingAddress, _addresses.rewardManagerAddress, _addresses.dividendManagerAddress, _addresses.tokenStakingAddress, _addresses.tokenAddress, _addresses.arenaRankingManagerAddress, _addresses.nftMintCoreAddress, _addresses.nftBuybackAddress, _addresses.nftUpdateAddress, _addresses.tokenBurnerAddress);
-        setupPriceAndUpgrade(_addresses.priceOracleAddress, _addresses.nftUpdateAddress, _addresses.tokenAddress, _addresses.usdtAddress);
-        setupNFTContracts(_addresses.nftUpdateAddress, _addresses.tokenBurnerAddress, _addresses.nftMintCoreAddress, _addresses.nftMintMetadataAddress, _addresses.pancakeSwapRouterAddress);
-        setupOtherContracts(_addresses.weightManagerAddress, _addresses.battleHistoryAddress, _addresses.battleSkillDataAddress, _addresses.nftTradingAddress, _addresses.feeReceiverAddress, _addresses.arenaRankingManagerAddress, _addresses.arenaRankingQueryAddress, _addresses.rewardManagerAddress, _addresses.arenaRewardAddress, _addresses.arenaLeaderboardAddress, _addresses.arenaPlayerAddress, _addresses.arenaBattleAddress);
+        _setupBattleAndBreeding(_addresses.battleAddress, _addresses.breedingCoreAddress, _addresses.breedingMarketAddress, _addresses.nftMintCoreAddress, _addresses.stakingAddress);
+        _setupStakingAndReward(_addresses.stakingAddress, _addresses.rewardManagerAddress, _addresses.dividendManagerAddress, _addresses.tokenStakingAddress, _addresses.tokenAddress, _addresses.arenaRankingManagerAddress, _addresses.nftMintCoreAddress, _addresses.nftBuybackAddress, _addresses.nftUpdateAddress, _addresses.tokenBurnerAddress);
+        _setupPriceAndUpgrade(_addresses.priceOracleAddress, _addresses.nftUpdateAddress, _addresses.tokenAddress, _addresses.usdtAddress);
+        _setupNFTContracts(_addresses.nftUpdateAddress, _addresses.tokenBurnerAddress, _addresses.nftMintCoreAddress, _addresses.nftMintMetadataAddress, _addresses.pancakeSwapRouterAddress);
+        _setupOtherContracts(_addresses.weightManagerAddress, _addresses.battleHistoryAddress, _addresses.battleSkillDataAddress, _addresses.nftTradingAddress, _addresses.feeReceiverAddress, _addresses.arenaRankingManagerAddress, _addresses.arenaRankingQueryAddress, _addresses.rewardManagerAddress, _addresses.arenaRewardAddress, _addresses.arenaLeaderboardAddress, _addresses.arenaPlayerAddress, _addresses.arenaBattleAddress);
 
         _emitContractAddressesUpdated();
     }
@@ -494,13 +373,13 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _nftMintAddress - NFT铸造合约地址
      * @param _stakingAddress - NFT质押合约地址
      */
-    function setupBattleAndBreeding(
+    function _setupBattleAndBreeding(
         address _battleAddress,
         address _breedingCoreAddress,
         address _breedingMarketAddress,
         address _nftMintAddress,
         address _stakingAddress
-    ) external onlyOwner {
+    ) internal {
         if (_battleAddress != address(0)) {
             try ISetNFTContract(_battleAddress).setNFTContract(_nftMintAddress) {
                 emit ContractSetupSuccess("Battle");
@@ -591,7 +470,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _arenaRankingManagerAddress - 竞技场排名管理合约地址
      * @param _nftMintCoreAddress - NFT铸造核心合约地址
      */
-    function setupStakingAndReward(
+    function _setupStakingAndReward(
         address _stakingAddress,
         address _rewardManagerAddress,
         address _dividendManagerAddress,
@@ -602,93 +481,27 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         address _nftBuybackAddress,
         address _nftUpdateAddress,
         address _tokenBurnerAddress
-    ) external onlyOwner {
+    ) internal {
         if (_stakingAddress != address(0)) {
-            try ISetRewardTokenContract(_stakingAddress).setRewardTokenContract(_tokenAddress) {
-                emit ContractSetupSuccess("Staking-RewardToken");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("Staking-RewardToken", reason);
-            } catch {
-                emit ContractSetupFailed("Staking-RewardToken", "Unknown error");
-            }
-            try ISetNFTContract(_stakingAddress).setNFTContract(_nftMintCoreAddress) {
-                emit ContractSetupSuccess("Staking-NFT");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("Staking-NFT", reason);
-            } catch {
-                emit ContractSetupFailed("Staking-NFT", "Unknown error");
-            }
+            ISetRewardTokenContract(_stakingAddress).setRewardTokenContract(_tokenAddress);
+            ISetNFTContract(_stakingAddress).setNFTContract(_nftMintCoreAddress);
         }
         if (_rewardManagerAddress != address(0)) {
-            try ISetDividendPool(_rewardManagerAddress).setDividendPool(_dividendManagerAddress) {
-                emit ContractSetupSuccess("RewardManager-DividendPool");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("RewardManager-DividendPool", reason);
-            } catch {
-                emit ContractSetupFailed("RewardManager-DividendPool", "Unknown error");
-            }
-            try ISetNFTStakingPool(_rewardManagerAddress).setNFTStakingPool(_stakingAddress) {
-                emit ContractSetupSuccess("RewardManager-NFTStakingPool");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("RewardManager-NFTStakingPool", reason);
-            } catch {
-                emit ContractSetupFailed("RewardManager-NFTStakingPool", "Unknown error");
-            }
-            try ISetTokenStakingPool(_rewardManagerAddress).setTokenStakingPool(_tokenStakingAddress) {
-                emit ContractSetupSuccess("RewardManager-TokenStakingPool");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("RewardManager-TokenStakingPool", reason);
-            } catch {
-                emit ContractSetupFailed("RewardManager-TokenStakingPool", "Unknown error");
-            }
-            try ISetTokenContract(_rewardManagerAddress).setTokenContract(_tokenAddress) {
-                emit ContractSetupSuccess("RewardManager-Token");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("RewardManager-Token", reason);
-            } catch {
-                emit ContractSetupFailed("RewardManager-Token", "Unknown error");
-            }
-            try ISetArenaRewardPool(_rewardManagerAddress).setArenaRewardPool(_arenaRankingManagerAddress) {
-                emit ContractSetupSuccess("RewardManager-ArenaRewardPool");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("RewardManager-ArenaRewardPool", reason);
-            } catch {
-                emit ContractSetupFailed("RewardManager-ArenaRewardPool", "Unknown error");
-            }
+            ISetDividendPool(_rewardManagerAddress).setDividendPool(_dividendManagerAddress);
+            ISetNFTStakingPool(_rewardManagerAddress).setNFTStakingPool(_stakingAddress);
+            ISetTokenStakingPool(_rewardManagerAddress).setTokenStakingPool(_tokenStakingAddress);
+            ISetTokenContract(_rewardManagerAddress).setTokenContract(_tokenAddress);
+            ISetArenaRewardPool(_rewardManagerAddress).setArenaRewardPool(_arenaRankingManagerAddress);
             if (_nftBuybackAddress != address(0)) {
-                try ISetNFTBuybackPool(_rewardManagerAddress).setNFTBuybackPool(_nftBuybackAddress) {
-                    emit ContractSetupSuccess("RewardManager-NFTBuybackPool");
-                } catch Error(string memory reason) {
-                    emit ContractSetupFailed("RewardManager-NFTBuybackPool", reason);
-                } catch {
-                    emit ContractSetupFailed("RewardManager-NFTBuybackPool", "Unknown error");
-                }
+                ISetNFTBuybackPool(_rewardManagerAddress).setNFTBuybackPool(_nftBuybackAddress);
             }
         }
         if (_dividendManagerAddress != address(0)) {
-            try ISetTokenContract(_dividendManagerAddress).setTokenContract(_tokenAddress) {
-                emit ContractSetupSuccess("DividendManager-Token");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("DividendManager-Token", reason);
-            } catch {
-                emit ContractSetupFailed("DividendManager-Token", "Unknown error");
-            }
-            try ISetRewardManagerContract(_dividendManagerAddress).setRewardManagerContract(_rewardManagerAddress) {
-                emit ContractSetupSuccess("DividendManager-RewardManager");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("DividendManager-RewardManager", reason);
-            } catch {
-                emit ContractSetupFailed("DividendManager-RewardManager", "Unknown error");
-            }
+            ISetTokenContract(_dividendManagerAddress).setTokenContract(_tokenAddress);
+            ISetRewardManagerContract(_dividendManagerAddress).setRewardManagerContract(_rewardManagerAddress);
         }
         if (_tokenStakingAddress != address(0)) {
-            try ISetTokenAddress(_tokenStakingAddress).setTokenAddress(_tokenAddress) {
-                emit ContractSetupSuccess("TokenStaking-Token");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("TokenStaking-Token", reason);
-            } catch {
-                emit ContractSetupFailed("TokenStaking-Token", "Unknown error");
-            }
+            ISetTokenAddress(_tokenStakingAddress).setTokenAddress(_tokenAddress);
         }
         if (poolManagerAddress != address(0)) {
             try ISetPoolManager(_rewardManagerAddress).setPoolManager(poolManagerAddress) {
@@ -699,6 +512,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                 emit ContractSetupFailed("RewardManager-PoolManager", "Unknown error");
             }
         }
+        // 初始化NFT回购销毁合约
         if (_nftBuybackAddress != address(0)) {
             try ISetNFTContract(_nftBuybackAddress).setNFTContract(_nftMintCoreAddress) {
                 emit ContractSetupSuccess("NFTBuyback-NFT");
@@ -751,27 +565,15 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _tokenAddress - 游戏代币地址
      * @param _usdtAddress - USDT代币地址
      */
-    function setupPriceAndUpgrade(
+    function _setupPriceAndUpgrade(
         address _priceOracleAddress,
         address _upgradeModuleAddress,
         address _tokenAddress,
         address _usdtAddress
-    ) external onlyOwner {
+    ) internal {
         if (_priceOracleAddress != address(0)) {
-            try ISetTokenAddress(_priceOracleAddress).setTokenAddress(_tokenAddress) {
-                emit ContractSetupSuccess("PriceOracle-Token");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("PriceOracle-Token", reason);
-            } catch {
-                emit ContractSetupFailed("PriceOracle-Token", "Unknown error");
-            }
-            try ISetUSDTAddress(_priceOracleAddress).setUSDTAddress(_usdtAddress) {
-                emit ContractSetupSuccess("PriceOracle-USDT");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("PriceOracle-USDT", reason);
-            } catch {
-                emit ContractSetupFailed("PriceOracle-USDT", "Unknown error");
-            }
+            ISetTokenAddress(_priceOracleAddress).setTokenAddress(_tokenAddress);
+            ISetUSDTAddress(_priceOracleAddress).setUSDTAddress(_usdtAddress);
         }
         if (_upgradeModuleAddress != address(0)) {
         }
@@ -785,83 +587,30 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _nftMintMetadataAddress - NFT元数据合约地址
      * @param _pancakeSwapRouterAddress - PancakeSwap路由器地址
      */
-    function setupNFTContracts(
+    function _setupNFTContracts(
         address _nftUpdateAddress,
         address _tokenBurnerAddress,
         address _nftMintCoreAddress,
         address _nftMintMetadataAddress,
         address _pancakeSwapRouterAddress
-    ) external onlyOwner {
+    ) internal {
         if (_nftUpdateAddress != address(0)) {
-            try ISetNFTContract(_nftUpdateAddress).setNFTContract(_nftMintCoreAddress) {
-                emit ContractSetupSuccess("NFTUpdate-NFT");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("NFTUpdate-NFT", reason);
-            } catch {
-                emit ContractSetupFailed("NFTUpdate-NFT", "Unknown error");
-            }
-            try ISetMetadataContract(_nftUpdateAddress).setMetadataContract(_nftMintMetadataAddress) {
-                emit ContractSetupSuccess("NFTUpdate-Metadata");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("NFTUpdate-Metadata", reason);
-            } catch {
-                emit ContractSetupFailed("NFTUpdate-Metadata", "Unknown error");
-            }
-            try ISetTokenContract(_nftUpdateAddress).setTokenContract(tokenAddress) {
-                emit ContractSetupSuccess("NFTUpdate-Token");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("NFTUpdate-Token", reason);
-            } catch {
-                emit ContractSetupFailed("NFTUpdate-Token", "Unknown error");
-            }
-            try ISetPancakeSwapPair(_nftUpdateAddress).setPancakeSwapPair(_pancakeSwapRouterAddress) {
-                emit ContractSetupSuccess("NFTUpdate-PancakeSwapPair");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("NFTUpdate-PancakeSwapPair", reason);
-            } catch {
-                emit ContractSetupFailed("NFTUpdate-PancakeSwapPair", "Unknown error");
-            }
+            ISetNFTContract(_nftUpdateAddress).setNFTContract(_nftMintCoreAddress);
+            ISetMetadataContract(_nftUpdateAddress).setMetadataContract(_nftMintMetadataAddress);
+            ISetTokenContract(_nftUpdateAddress).setTokenContract(tokenAddress);
+            ISetPancakeSwapPair(_nftUpdateAddress).setPancakeSwapPair(_pancakeSwapRouterAddress);
             if (dividendManagerAddress != address(0)) {
-                try ISetNFTUpdateContract(dividendManagerAddress).setNFTUpdateContract(_nftUpdateAddress) {
-                    emit ContractSetupSuccess("DividendManager-NFTUpdate");
-                } catch Error(string memory reason) {
-                    emit ContractSetupFailed("DividendManager-NFTUpdate", reason);
-                } catch {
-                    emit ContractSetupFailed("DividendManager-NFTUpdate", "Unknown error");
-                }
+                ISetNFTUpdateContract(dividendManagerAddress).setNFTUpdateContract(_nftUpdateAddress);
             }
         }
         if (_tokenBurnerAddress != address(0)) {
-            try ISetNFTContract(_tokenBurnerAddress).setNFTContract(_nftMintCoreAddress) {
-                emit ContractSetupSuccess("TokenBurner-NFT");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("TokenBurner-NFT", reason);
-            } catch {
-                emit ContractSetupFailed("TokenBurner-NFT", "Unknown error");
-            }
-            try ISetAuthorizedNFTContract(_tokenBurnerAddress).setAuthorizedNFTContract(_nftMintCoreAddress) {
-                emit ContractSetupSuccess("TokenBurner-AuthorizedNFT");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("TokenBurner-AuthorizedNFT", reason);
-            } catch {
-                emit ContractSetupFailed("TokenBurner-AuthorizedNFT", "Unknown error");
-            }
-            try ISetTokenContract(_tokenBurnerAddress).setTokenContract(tokenAddress) {
-                emit ContractSetupSuccess("TokenBurner-Token");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("TokenBurner-Token", reason);
-            } catch {
-                emit ContractSetupFailed("TokenBurner-Token", "Unknown error");
-            }
+            ISetNFTContract(_tokenBurnerAddress).setNFTContract(_nftMintCoreAddress);
+            ISetAuthorizedNFTContract(_tokenBurnerAddress).setAuthorizedNFTContract(_nftMintCoreAddress);
+            ISetTokenContract(_tokenBurnerAddress).setTokenContract(tokenAddress);
         }
         if (_nftMintCoreAddress != address(0)) {
-            try ISetTokenBurner(_nftMintCoreAddress).setTokenBurnerContract(_tokenBurnerAddress) {
-                emit ContractSetupSuccess("NFTMintCore-TokenBurner");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("NFTMintCore-TokenBurner", reason);
-            } catch {
-                emit ContractSetupFailed("NFTMintCore-TokenBurner", "Unknown error");
-            }
+            ISetTokenBurner(_nftMintCoreAddress).setTokenBurnerContract(_tokenBurnerAddress);
+            // 设置NFTMintCore的Breeding合约地址
             if (breedingCoreAddress != address(0)) {
                 try ISetBreedingContract(_nftMintCoreAddress).setBreedingContract(breedingCoreAddress) {
                     emit ContractSetupSuccess("NFTMintCore-Breeding");
@@ -889,7 +638,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _arenaPlayerAddress - 竞技场玩家合约地址
      * @param _arenaBattleAddress - 竞技场战斗合约地址
      */
-    function setupOtherContracts(
+    function _setupOtherContracts(
         address _weightManagerAddress,
         address _battleHistoryAddress,
         address _battleSkillDataAddress,
@@ -902,179 +651,58 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         address _arenaLeaderboardAddress,
         address _arenaPlayerAddress,
         address _arenaBattleAddress
-    ) external onlyOwner {
+    ) internal {
         if (_weightManagerAddress != address(0)) {
-            try ISetNFTDataContract(_weightManagerAddress).setNFTDataContract(nftDataAddress) {
-                emit ContractSetupSuccess("WeightManager-NFTData");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("WeightManager-NFTData", reason);
-            } catch {
-                emit ContractSetupFailed("WeightManager-NFTData", "Unknown error");
-            }
+            ISetNFTDataContract(_weightManagerAddress).setNFTDataContract(nftDataAddress);
         }
         if (_battleHistoryAddress != address(0)) {
-            try ISetBattleContract(_battleHistoryAddress).setBattleContract(battleAddress) {
-                emit ContractSetupSuccess("BattleHistory-Battle");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("BattleHistory-Battle", reason);
-            } catch {
-                emit ContractSetupFailed("BattleHistory-Battle", "Unknown error");
-            }
+            ISetBattleContract(_battleHistoryAddress).setBattleContract(battleAddress);
         }
         if (_battleSkillDataAddress != address(0)) {
             // BattleSkillData 不需要额外配置
         }
         if (_nftTradingAddress != address(0)) {
-            try ISetNFTContract(_nftTradingAddress).setNFTContract(nftMintCoreAddress) {
-                emit ContractSetupSuccess("NFTTrading-NFT");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("NFTTrading-NFT", reason);
-            } catch {
-                emit ContractSetupFailed("NFTTrading-NFT", "Unknown error");
-            }
-            try ISetFeeReceiver(_nftTradingAddress).setFeeReceiver(_feeReceiverAddress) {
-                emit ContractSetupSuccess("NFTTrading-FeeReceiver");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("NFTTrading-FeeReceiver", reason);
-            } catch {
-                emit ContractSetupFailed("NFTTrading-FeeReceiver", "Unknown error");
-            }
+            ISetNFTContract(_nftTradingAddress).setNFTContract(nftMintCoreAddress);
+            ISetFeeReceiver(_nftTradingAddress).setFeeReceiver(_feeReceiverAddress);
         }
         if (_arenaRankingManagerAddress != address(0)) {
-            try ISetTokenContract(_arenaRankingManagerAddress).setTokenContract(tokenAddress) {
-                emit ContractSetupSuccess("ArenaRankingManager-Token");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("ArenaRankingManager-Token", reason);
-            } catch {
-                emit ContractSetupFailed("ArenaRankingManager-Token", "Unknown error");
-            }
-            try ISetRewardPool(_arenaRankingManagerAddress).setRewardPool(_rewardManagerAddress) {
-                emit ContractSetupSuccess("ArenaRankingManager-RewardPool");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("ArenaRankingManager-RewardPool", reason);
-            } catch {
-                emit ContractSetupFailed("ArenaRankingManager-RewardPool", "Unknown error");
-            }
-            try ISetBattleContract(_arenaRankingManagerAddress).setBattleContract(battleAddress) {
-                emit ContractSetupSuccess("ArenaRankingManager-Battle");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("ArenaRankingManager-Battle", reason);
-            } catch {
-                emit ContractSetupFailed("ArenaRankingManager-Battle", "Unknown error");
-            }
+            ISetTokenContract(_arenaRankingManagerAddress).setTokenContract(tokenAddress);
+            ISetBattleContract(_arenaRankingManagerAddress).setBattleContract(battleAddress);
             if (_arenaRewardAddress != address(0)) {
-                try ISetArenaRewardContract(_arenaRankingManagerAddress).setArenaRewardContract(_arenaRewardAddress) {
-                    emit ContractSetupSuccess("ArenaRankingManager-ArenaReward");
-                } catch Error(string memory reason) {
-                    emit ContractSetupFailed("ArenaRankingManager-ArenaReward", reason);
-                } catch {
-                    emit ContractSetupFailed("ArenaRankingManager-ArenaReward", "Unknown error");
-                }
+                ISetArenaRewardContract(_arenaRankingManagerAddress).setArenaRewardContract(_arenaRewardAddress);
             }
             if (_arenaLeaderboardAddress != address(0)) {
-                try ISetArenaLeaderboardContract(_arenaRankingManagerAddress).setArenaLeaderboardContract(_arenaLeaderboardAddress) {
-                    emit ContractSetupSuccess("ArenaRankingManager-ArenaLeaderboard");
-                } catch Error(string memory reason) {
-                    emit ContractSetupFailed("ArenaRankingManager-ArenaLeaderboard", reason);
-                } catch {
-                    emit ContractSetupFailed("ArenaRankingManager-ArenaLeaderboard", "Unknown error");
-                }
+                ISetArenaLeaderboardContract(_arenaRankingManagerAddress).setArenaLeaderboardContract(_arenaLeaderboardAddress);
             }
             if (_arenaPlayerAddress != address(0)) {
-                try ISetArenaPlayerContract(_arenaRankingManagerAddress).setArenaPlayerContract(_arenaPlayerAddress) {
-                    emit ContractSetupSuccess("ArenaRankingManager-ArenaPlayer");
-                } catch Error(string memory reason) {
-                    emit ContractSetupFailed("ArenaRankingManager-ArenaPlayer", reason);
-                } catch {
-                    emit ContractSetupFailed("ArenaRankingManager-ArenaPlayer", "Unknown error");
-                }
+                ISetArenaPlayerContract(_arenaRankingManagerAddress).setArenaPlayerContract(_arenaPlayerAddress);
             }
             if (_arenaBattleAddress != address(0)) {
-                try ISetArenaBattleContract(_arenaRankingManagerAddress).setArenaBattleContract(_arenaBattleAddress) {
-                    emit ContractSetupSuccess("ArenaRankingManager-ArenaBattle");
-                } catch Error(string memory reason) {
-                    emit ContractSetupFailed("ArenaRankingManager-ArenaBattle", reason);
-                } catch {
-                    emit ContractSetupFailed("ArenaRankingManager-ArenaBattle", "Unknown error");
-                }
+                ISetArenaBattleContract(_arenaRankingManagerAddress).setArenaBattleContract(_arenaBattleAddress);
             }
         }
         if (_arenaRankingQueryAddress != address(0)) {
             if (_arenaRewardAddress != address(0)) {
-                try ISetArenaRewardContract(_arenaRankingQueryAddress).setArenaRewardContract(_arenaRewardAddress) {
-                    emit ContractSetupSuccess("ArenaRankingQuery-ArenaReward");
-                } catch Error(string memory reason) {
-                    emit ContractSetupFailed("ArenaRankingQuery-ArenaReward", reason);
-                } catch {
-                    emit ContractSetupFailed("ArenaRankingQuery-ArenaReward", "Unknown error");
-                }
+                ISetArenaRewardContract(_arenaRankingQueryAddress).setArenaRewardContract(_arenaRewardAddress);
             }
             if (_arenaLeaderboardAddress != address(0)) {
-                try ISetArenaLeaderboardContract(_arenaRankingQueryAddress).setArenaLeaderboardContract(_arenaLeaderboardAddress) {
-                    emit ContractSetupSuccess("ArenaRankingQuery-ArenaLeaderboard");
-                } catch Error(string memory reason) {
-                    emit ContractSetupFailed("ArenaRankingQuery-ArenaLeaderboard", reason);
-                } catch {
-                    emit ContractSetupFailed("ArenaRankingQuery-ArenaLeaderboard", "Unknown error");
-                }
+                ISetArenaLeaderboardContract(_arenaRankingQueryAddress).setArenaLeaderboardContract(_arenaLeaderboardAddress);
             }
         }
         if (_arenaRewardAddress != address(0)) {
-            try ISetArenaRankingManagerContract(_arenaRewardAddress).setArenaRankingManagerContract(_arenaRankingManagerAddress) {
-                emit ContractSetupSuccess("ArenaReward-ArenaRankingManager");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("ArenaReward-ArenaRankingManager", reason);
-            } catch {
-                emit ContractSetupFailed("ArenaReward-ArenaRankingManager", "Unknown error");
-            }
+            ISetArenaRankingManagerContract(_arenaRewardAddress).setArenaRankingManagerContract(_arenaRankingManagerAddress);
         }
         if (_arenaLeaderboardAddress != address(0)) {
-            try ISetArenaRankingManagerContract(_arenaLeaderboardAddress).setArenaRankingManagerContract(_arenaRankingManagerAddress) {
-                emit ContractSetupSuccess("ArenaLeaderboard-ArenaRankingManager");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("ArenaLeaderboard-ArenaRankingManager", reason);
-            } catch {
-                emit ContractSetupFailed("ArenaLeaderboard-ArenaRankingManager", "Unknown error");
-            }
+            ISetArenaRankingManagerContract(_arenaLeaderboardAddress).setArenaRankingManagerContract(_arenaRankingManagerAddress);
         }
         if (_arenaPlayerAddress != address(0)) {
-            try ISetArenaRankingManagerContract(_arenaPlayerAddress).setArenaRankingManagerContract(_arenaRankingManagerAddress) {
-                emit ContractSetupSuccess("ArenaPlayer-ArenaRankingManager");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("ArenaPlayer-ArenaRankingManager", reason);
-            } catch {
-                emit ContractSetupFailed("ArenaPlayer-ArenaRankingManager", "Unknown error");
-            }
-            try ISetNFTContract(_arenaPlayerAddress).setNFTContract(nftMintCoreAddress) {
-                emit ContractSetupSuccess("ArenaPlayer-NFT");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("ArenaPlayer-NFT", reason);
-            } catch {
-                emit ContractSetupFailed("ArenaPlayer-NFT", "Unknown error");
-            }
+            ISetArenaRankingManagerContract(_arenaPlayerAddress).setArenaRankingManagerContract(_arenaRankingManagerAddress);
+            ISetNFTContract(_arenaPlayerAddress).setNFTContract(nftMintCoreAddress);
         }
         if (_arenaBattleAddress != address(0)) {
-            try ISetArenaRankingManagerContract(_arenaBattleAddress).setArenaRankingManagerContract(_arenaRankingManagerAddress) {
-                emit ContractSetupSuccess("ArenaBattle-ArenaRankingManager");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("ArenaBattle-ArenaRankingManager", reason);
-            } catch {
-                emit ContractSetupFailed("ArenaBattle-ArenaRankingManager", "Unknown error");
-            }
-            try ISetBattleContract(_arenaBattleAddress).setBattleContract(battleAddress) {
-                emit ContractSetupSuccess("ArenaBattle-Battle");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("ArenaBattle-Battle", reason);
-            } catch {
-                emit ContractSetupFailed("ArenaBattle-Battle", "Unknown error");
-            }
-            try ISetNFTContract(_arenaBattleAddress).setNFTContract(nftMintCoreAddress) {
-                emit ContractSetupSuccess("ArenaBattle-NFT");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("ArenaBattle-NFT", reason);
-            } catch {
-                emit ContractSetupFailed("ArenaBattle-NFT", "Unknown error");
-            }
+            ISetArenaRankingManagerContract(_arenaBattleAddress).setArenaRankingManagerContract(_arenaRankingManagerAddress);
+            ISetBattleContract(_arenaBattleAddress).setBattleContract(battleAddress);
+            ISetNFTContract(_arenaBattleAddress).setNFTContract(nftMintCoreAddress);
         }
     }
 

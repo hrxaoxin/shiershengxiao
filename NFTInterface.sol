@@ -491,6 +491,10 @@ interface ISetArenaRankingManagerContract {
     function setArenaRankingManagerContract(address _arenaRankingManagerContract) external;
 }
 
+interface ISetRankingContract {
+    function setRankingContract(address _rankingContract) external;
+}
+
 interface ISetTokenAddress {
     function setTokenAddress(address _tokenContract) external;
 }

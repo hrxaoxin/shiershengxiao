@@ -578,8 +578,8 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 设置NFTData合约地址（仅授权者可调用�?
-     * @param _nftData NFTData合约地址
+     * @dev 设置NFTData合约地址（仅授权者可调用）
+     * @param _nftDataContract NFTData合约地址
      */
     function setNFTDataContract(address _nftDataContract) external onlyOwnerOrAuthorizer {
         require(_nftDataContract != address(0), "NFTBuyback: Invalid NFT data address");

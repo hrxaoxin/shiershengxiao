@@ -13,43 +13,43 @@ import "./ArenaRankingLib.sol";
 
 /**
  * @title ArenaReward
- * @dev 竞技场奖励合约，负责赛季奖励的计算和发放
+ * @dev 绔炴妧鍦哄鍔卞悎绾︼紝璐熻矗璧涘濂栧姳鐨勮绠楀拰鍙戞斁
  * 
- * 核心职责�?
- * 1. 赛季奖励计算：根据玩家排名计算奖励分�?
- * 2. 奖励发放：处理玩家领取赛季奖�?
- * 3. 奖励池管理：管理 BNB 和代币奖励池
- * 4. 模拟玩家奖励：处理模拟玩家挑战的奖励
+ * 鏍稿績鑱岃矗锟?
+ * 1. 璧涘濂栧姳璁＄畻锛氭牴鎹帺瀹舵帓鍚嶈绠楀鍔卞垎锟?
+ * 2. 濂栧姳鍙戞斁锛氬鐞嗙帺瀹堕鍙栬禌瀛ｅ锟?
+ * 3. 濂栧姳姹犵鐞嗭細绠＄悊 BNB 鍜屼唬甯佸鍔辨睜
+ * 4. 妯℃嫙鐜╁濂栧姳锛氬鐞嗘ā鎷熺帺瀹舵寫鎴樼殑濂栧姳
  * 
- * 奖励机制�?
- * - 赛季结束后计算奖�?
- * - 根据玩家排名分配奖励�?
- * - 支持 BNB 和代币两种奖励类�?
- * - 奖励率可配置，影响奖励分配比�?
+ * 濂栧姳鏈哄埗锟?
+ * - 璧涘缁撴潫鍚庤绠楀锟?
+ * - 鏍规嵁鐜╁鎺掑悕鍒嗛厤濂栧姳锟?
+ * - 鏀寔 BNB 鍜屼唬甯佷袱绉嶅鍔辩被锟?
+ * - 濂栧姳鐜囧彲閰嶇疆锛屽奖鍝嶅鍔卞垎閰嶆瘮锟?
  * 
- * 与其他合约的交互�?
- * - ArenaRanking / ArenaRankingManager：获取赛季数据和玩家排名
- * - ArenaLeaderboard：获取排行榜数据
- * - Token 合约：处理代币转�?
+ * 涓庡叾浠栧悎绾︾殑浜や簰锟?
+ * - ArenaRanking / ArenaRankingManager锛氳幏鍙栬禌瀛ｆ暟鎹拰鐜╁鎺掑悕
+ * - ArenaLeaderboard锛氳幏鍙栨帓琛屾鏁版嵁
+ * - Token 鍚堢害锛氬鐞嗕唬甯佽浆锟?
  * 
- * 安全机制�?
- * - ReentrancyGuard：防止重入攻�?
- * - Pausable：可暂停所有操�?
+ * 瀹夊叏鏈哄埗锟?
+ * - ReentrancyGuard锛氶槻姝㈤噸鍏ユ敾锟?
+ * - Pausable锛氬彲鏆傚仠鎵€鏈夋搷锟?
  * 
- * 权限控制�?
- * - onlyOwner：暂停合约、设置参�?
- * - onlyAuthorized：计算奖励、设置合约地址
+ * 鏉冮檺鎺у埗锟?
+ * - onlyOwner锛氭殏鍋滃悎绾︺€佽缃弬锟?
+ * - onlyAuthorized锛氳绠楀鍔便€佽缃悎绾﹀湴鍧€
  */
 contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
     /**
-     * @dev 赛季奖励信息结构�?
-     * @param rewardPool BNB 奖励�?
-     * @param tokenRewardPool 代币奖励�?
-     * @param pendingRewards 待发放奖�?
-     * @param rewardCalculated 奖励是否已计�?
-     * @param totalDistributed 已发放奖励总额
+     * @dev 璧涘濂栧姳淇℃伅缁撴瀯锟?
+     * @param rewardPool BNB 濂栧姳锟?
+     * @param tokenRewardPool 浠ｅ竵濂栧姳锟?
+     * @param pendingRewards 寰呭彂鏀惧锟?
+     * @param rewardCalculated 濂栧姳鏄惁宸茶锟?
+     * @param totalDistributed 宸插彂鏀惧鍔辨€婚
      */
     struct SeasonRewardInfo {
         uint256 rewardPool;
@@ -60,88 +60,88 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 竞技场排名管理合约地址
+     * @dev 绔炴妧鍦烘帓鍚嶇鐞嗗悎绾﹀湴鍧€
      */
     address public arenaRankingManagerContract;
     /**
-     * @dev 代币合约地址
+     * @dev 浠ｅ竵鍚堢害鍦板潃
      */
     address public tokenContract;
     /**
-     * @dev 模拟玩家奖励接收地址
+     * @dev 妯℃嫙鐜╁濂栧姳鎺ユ敹鍦板潃
      */
     address public mockRewardRecipient;
     /**
-     * @dev 授权合约地址
+     * @dev 鎺堟潈鍚堢害鍦板潃
      */
     address public authorizer;
     /**
-     * @dev 奖励类型�? = BNB, 1 = 代币
+     * @dev 濂栧姳绫诲瀷锟? = BNB, 1 = 浠ｅ竵
      */
     uint8 public rewardType;
     
     /**
-     * @dev 今日奖励金额
+     * @dev 浠婃棩濂栧姳閲戦
      */
     uint256 public todayRewardAmount;
     /**
-     * @dev 奖励率（百分比）
+     * @dev 濂栧姳鐜囷紙鐧惧垎姣旓級
      */
     uint256 public rewardRate = 100;
     /**
-     * @dev 最大奖励率
+     * @dev 鏈€澶у鍔辩巼
      */
     uint256 public maxRewardRate = 200;
     /**
-     * @dev 奖励率步�?
+     * @dev 濂栧姳鐜囨锟?
      */
     uint256 public rateStep = 10;
     
     /**
-     * @dev 今日开始时�?
+     * @dev 浠婃棩寮€濮嬫椂锟?
      */
     uint256 public todayStart;
     /**
-     * @dev 今日收入奖励
+     * @dev 浠婃棩鏀跺叆濂栧姳
      */
     uint256 public todayIncomingReward;
     
     /**
-     * @dev 赛季奖励信息映射
+     * @dev 璧涘濂栧姳淇℃伅鏄犲皠
      */
     mapping(uint256 => SeasonRewardInfo) public seasonRewards;
     /**
-     * @dev 玩家赛季奖励映射
+     * @dev 鐜╁璧涘濂栧姳鏄犲皠
      */
     mapping(uint256 => mapping(address => uint256)) public playerSeasonRewards;
     /**
-     * @dev 玩家奖励领取状态映�?
+     * @dev 鐜╁濂栧姳棰嗗彇鐘舵€佹槧锟?
      */
     mapping(uint256 => mapping(address => bool)) public claimedRewards;
     
     /**
-     * @dev 赛季奖励计算事件
+     * @dev 璧涘濂栧姳璁＄畻浜嬩欢
      */
     event SeasonRewardsCalculated(uint256 seasonId, uint256 totalReward, uint256 distributed);
     /**
-     * @dev 奖励领取事件
+     * @dev 濂栧姳棰嗗彇浜嬩欢
      */
     event RewardClaimed(address player, uint256 seasonId, uint256 amount);
     /**
-     * @dev 模拟玩家奖励发放事件
+     * @dev 妯℃嫙鐜╁濂栧姳鍙戞斁浜嬩欢
      */
     event MockRewardDistributed(address recipient, uint256 amount, uint256 seasonId);
     /**
-     * @dev 奖励添加事件
+     * @dev 濂栧姳娣诲姞浜嬩欢
      */
     event RewardAdded(uint256 amount);
     /**
-     * @dev 紧急提取事�?
+     * @dev 绱ф€ユ彁鍙栦簨锟?
      */
     event EmergencyWithdraw(address recipient, uint256 amount);
 
     /**
-     * @dev 授权检查修饰器
+     * @dev 鎺堟潈妫€鏌ヤ慨楗板櫒
      */
     modifier onlyOwnerOrAuthorizer() {
         require(msg.sender == owner() || msg.sender == authorizer || msg.sender == arenaRankingManagerContract, "ArenaReward: Not authorized");
@@ -149,10 +149,10 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 初始化函�?
-     * @param _arenaRankingManagerContract 竞技场排名管理合约地址
-     * @param _tokenContract 代币合约地址
-     * @param _authorizer 授权合约地址
+     * @dev 鍒濆鍖栧嚱锟?
+     * @param _arenaRankingManagerContract 绔炴妧鍦烘帓鍚嶇鐞嗗悎绾﹀湴鍧€
+     * @param _tokenContract 浠ｅ竵鍚堢害鍦板潃
+     * @param _authorizer 鎺堟潈鍚堢害鍦板潃
      */
     function initialize(address _arenaRankingManagerContract, address _tokenContract, address _authorizer) external initializer {
         __Ownable2Step_init();
@@ -167,8 +167,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
     
     /**
-     * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
+     * @dev 璁剧疆鎺堟潈鍚堢害鍦板潃
+     * @param _authorizer 鎺堟潈鍚堢害鍦板潃
      */
     function setAuthorizer(address _authorizer) external onlyOwner {
         require(_authorizer != address(0), "ArenaReward: Invalid authorizer address");
@@ -176,51 +176,51 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev UUPS 升级授权
+     * @dev UUPS 鍗囩骇鎺堟潈
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /**
-     * @dev 暂停合约
+     * @dev 鏆傚仠鍚堢害
      */
     function pause() external onlyOwner {
         _pause();
     }
 
     /**
-     * @dev 取消暂停合约
+     * @dev 鍙栨秷鏆傚仠鍚堢害
      */
     function unpause() external onlyOwner {
         _unpause();
     }
 
     /**
-     * @dev 设置竞技场排名管理合约地址
-     * @param _arenaRankingManagerContract 竞技场排名管理合约地址
+     * @dev 璁剧疆绔炴妧鍦烘帓鍚嶇鐞嗗悎绾﹀湴鍧€
+     * @param _arenaRankingManagerContract 绔炴妧鍦烘帓鍚嶇鐞嗗悎绾﹀湴鍧€
      */
     function setArenaRankingManagerContract(address _arenaRankingManagerContract) external onlyOwnerOrAuthorizer {
         arenaRankingManagerContract = _arenaRankingManagerContract;
     }
 
     /**
-     * @dev 设置代币合约地址
-     * @param _tokenContract 代币合约地址
+     * @dev 璁剧疆浠ｅ竵鍚堢害鍦板潃
+     * @param _tokenContract 浠ｅ竵鍚堢害鍦板潃
      */
     function setTokenContract(address _tokenContract) external onlyOwnerOrAuthorizer {
         tokenContract = _tokenContract;
     }
 
     /**
-     * @dev 设置模拟玩家奖励接收地址
-     * @param recipient 接收地址
+     * @dev 璁剧疆妯℃嫙鐜╁濂栧姳鎺ユ敹鍦板潃
+     * @param recipient 鎺ユ敹鍦板潃
      */
     function setMockRewardRecipient(address recipient) external onlyOwner {
         mockRewardRecipient = recipient;
     }
 
     /**
-     * @dev 计算赛季奖励
-     * @param seasonId 赛季 ID
+     * @dev 璁＄畻璧涘濂栧姳
+     * @param seasonId 璧涘 ID
      */
     function calculateSeasonRewards(uint256 seasonId) external onlyOwnerOrAuthorizer whenNotPaused nonReentrant {
         require(!seasonRewards[seasonId].rewardCalculated, "ArenaReward: Already calculated");
@@ -253,28 +253,28 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 内部函数：获取赛季数�?
-     * @param seasonId 赛季 ID
-     * @return rewardPool BNB 奖励�? tokenRewardPool 代币奖励�? totalPlayers 总玩家数
+     * @dev 鍐呴儴鍑芥暟锛氳幏鍙栬禌瀛ｆ暟锟?
+     * @param seasonId 璧涘 ID
+     * @return rewardPool BNB 濂栧姳锟? tokenRewardPool 浠ｅ竵濂栧姳锟? totalPlayers 鎬荤帺瀹舵暟
      */
     function _getSeasonData(uint256 seasonId) internal view returns (uint256, uint256, uint256) {
-        return IArenaRanking(rankingContract).getSeasonRewardData(seasonId);
+        return IArenaRanking(arenaRankingManagerContract).getSeasonRewardData(seasonId);
     }
 
     /**
-     * @dev 内部函数：计算模拟玩家奖�?
-     * @param seasonId 赛季 ID
-     * @param totalReward 总奖励金�?
-     * @return 模拟玩家奖励总额
+     * @dev 鍐呴儴鍑芥暟锛氳绠楁ā鎷熺帺瀹跺锟?
+     * @param seasonId 璧涘 ID
+     * @param totalReward 鎬诲鍔遍噾锟?
+     * @return 妯℃嫙鐜╁濂栧姳鎬婚
      */
     function _calculateMockRewards(uint256 seasonId, uint256 totalReward) internal view returns (uint256) {
-        address[] memory rankings = IArenaRanking(rankingContract).getSeasonRankings(seasonId);
+        address[] memory rankings = IArenaRanking(arenaRankingManagerContract).getSeasonRankings(seasonId);
         uint256 totalPlayers = rankings.length;
         uint256 mockRewardTotal = 0;
         
         for (uint256 i = 0; i < totalPlayers; i++) {
             address player = rankings[i];
-            if (IArenaRanking(rankingContract).isMockPlayer(player)) {
+            if (IArenaRanking(arenaRankingManagerContract).isMockPlayer(player)) {
                 uint256 rank = i + 1;
                 uint256 reward = ArenaRankingLib.calculateRankReward(rank, totalReward, totalPlayers);
                 mockRewardTotal += reward;
@@ -285,26 +285,26 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 内部函数：计算真实玩家奖�?
-     * @param seasonId 赛季 ID
-     * @param totalReward 总奖励金�?
-     * @param mockRewardTotal 模拟玩家奖励总额
-     * @return 已分配奖励总额
+     * @dev 鍐呴儴鍑芥暟锛氳绠楃湡瀹炵帺瀹跺锟?
+     * @param seasonId 璧涘 ID
+     * @param totalReward 鎬诲鍔遍噾锟?
+     * @param mockRewardTotal 妯℃嫙鐜╁濂栧姳鎬婚
+     * @return 宸插垎閰嶅鍔辨€婚
      */
     function _calculateRealPlayerRewards(uint256 seasonId, uint256 totalReward, uint256 mockRewardTotal) internal returns (uint256) {
-        address[] memory rankings = IArenaRanking(rankingContract).getSeasonRankings(seasonId);
+        address[] memory rankings = IArenaRanking(arenaRankingManagerContract).getSeasonRankings(seasonId);
         uint256 totalPlayers = rankings.length;
-        uint256 totalRealPlayers = IArenaRanking(rankingContract).countRealPlayers(seasonId);
+        uint256 totalRealPlayers = IArenaRanking(arenaRankingManagerContract).countRealPlayers(seasonId);
         uint256 realPlayerRewardPool = totalReward - mockRewardTotal;
         uint256 distributed = 0;
         
         for (uint256 i = 0; i < totalPlayers; i++) {
             address player = rankings[i];
-            if (IArenaRanking(rankingContract).isMockPlayer(player)) {
+            if (IArenaRanking(arenaRankingManagerContract).isMockPlayer(player)) {
                 continue;
             }
             
-            uint256 rank = IArenaRanking(rankingContract).getRealPlayerRank(seasonId, i);
+            uint256 rank = IArenaRanking(arenaRankingManagerContract).getRealPlayerRank(seasonId, i);
             uint256 rankReward = ArenaRankingLib.calculateRankReward(rank, realPlayerRewardPool, totalRealPlayers);
             playerSeasonRewards[seasonId][player] = rankReward;
             distributed += rankReward;
@@ -314,8 +314,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 内部函数：发放模拟玩家奖�?
-     * @param amount 奖励金额
+     * @dev 鍐呴儴鍑芥暟锛氬彂鏀炬ā鎷熺帺瀹跺锟?
+     * @param amount 濂栧姳閲戦
      */
     function _distributeMockReward(uint256 amount) internal {
         if (rewardType == 0) {
@@ -328,8 +328,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 领取赛季奖励
-     * @param seasonId 赛季 ID
+     * @dev 棰嗗彇璧涘濂栧姳
+     * @param seasonId 璧涘 ID
      */
     function claimReward(uint256 seasonId) external nonReentrant whenNotPaused {
         require(seasonRewards[seasonId].rewardCalculated, "ArenaReward: Rewards not calculated");
@@ -348,7 +348,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             require(tokenContract != address(0), "ArenaReward: Token contract not set");
             IERC20 token = IERC20(tokenContract);
             require(token.balanceOf(address(this)) >= reward, "ArenaReward: Insufficient token balance");
-            // 修复：使�?safeTransfer 替代普�?transfer，确保安�?
+            // 淇锛氫娇锟?safeTransfer 鏇夸唬鏅拷?transfer锛岀‘淇濆畨锟?
             token.safeTransfer(msg.sender, reward);
         }
         
@@ -356,18 +356,18 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 领取当前赛季奖励（重载）
+     * @dev 棰嗗彇褰撳墠璧涘濂栧姳锛堥噸杞斤級
      */
     function claimSeasonReward() external nonReentrant whenNotPaused {
-        uint256 currentSeasonId = IArenaRanking(rankingContract).currentSeasonId();
+        uint256 currentSeasonId = IArenaRanking(arenaRankingManagerContract).currentSeasonId();
         _claimRewardFor(msg.sender, currentSeasonId);
     }
 
     /**
-     * @dev 领取指定赛季奖励（可代领�?
-     * @param player 玩家地址
-     * @param seasonId 赛季 ID
-     * @return 领取的奖励金�?
+     * @dev 棰嗗彇鎸囧畾璧涘濂栧姳锛堝彲浠ｉ锟?
+     * @param player 鐜╁鍦板潃
+     * @param seasonId 璧涘 ID
+     * @return 棰嗗彇鐨勫鍔遍噾锟?
      */
     function claimSeasonReward(address player, uint256 seasonId) external nonReentrant whenNotPaused returns (uint256) {
         require(player != address(0), "ArenaReward: Invalid player address");
@@ -378,10 +378,10 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 内部函数：为指定玩家领取指定赛季奖励
-     * @param player 玩家地址
-     * @param seasonId 赛季 ID
-     * @return 领取的奖励金�?
+     * @dev 鍐呴儴鍑芥暟锛氫负鎸囧畾鐜╁棰嗗彇鎸囧畾璧涘濂栧姳
+     * @param player 鐜╁鍦板潃
+     * @param seasonId 璧涘 ID
+     * @return 棰嗗彇鐨勫鍔遍噾锟?
      */
     function _claimRewardFor(address player, uint256 seasonId) internal returns (uint256) {
         require(seasonRewards[seasonId].rewardCalculated, "ArenaReward: Rewards not calculated");
@@ -408,9 +408,9 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取指定赛季的待领取奖励（调用者自己）
-     * @param seasonId 赛季 ID
-     * @return 待领取奖励金�?
+     * @dev 鑾峰彇鎸囧畾璧涘鐨勫緟棰嗗彇濂栧姳锛堣皟鐢ㄨ€呰嚜宸憋級
+     * @param seasonId 璧涘 ID
+     * @return 寰呴鍙栧鍔遍噾锟?
      */
     function getPendingRewardsBySeason(uint256 seasonId) external view returns (uint256) {
         if (!seasonRewards[seasonId].rewardCalculated) return 0;
@@ -419,10 +419,10 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取指定玩家在指定赛季的待领取奖�?
-     * @param player 玩家地址
-     * @param seasonId 赛季 ID
-     * @return 待领取奖励金�?
+     * @dev 鑾峰彇鎸囧畾鐜╁鍦ㄦ寚瀹氳禌瀛ｇ殑寰呴鍙栧锟?
+     * @param player 鐜╁鍦板潃
+     * @param seasonId 璧涘 ID
+     * @return 寰呴鍙栧鍔遍噾锟?
      */
     function getPendingRewardsByPlayer(address player, uint256 seasonId) external view returns (uint256) {
         if (!seasonRewards[seasonId].rewardCalculated) return 0;
@@ -431,12 +431,12 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取玩家所有赛季的待领取奖励总额
-     * @param player 玩家地址
-     * @return 待领取奖励总额
+     * @dev 鑾峰彇鐜╁鎵€鏈夎禌瀛ｇ殑寰呴鍙栧鍔辨€婚
+     * @param player 鐜╁鍦板潃
+     * @return 寰呴鍙栧鍔辨€婚
      */
     function getTotalPendingRewards(address player) external view returns (uint256) {
-        uint256 currentSeasonId = IArenaRanking(rankingContract).currentSeasonId();
+        uint256 currentSeasonId = IArenaRanking(arenaRankingManagerContract).currentSeasonId();
         uint256 total = 0;
         
         for (uint256 i = 1; i <= currentSeasonId; i++) {
@@ -470,7 +470,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(tokenContract != address(0), "ArenaReward: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "ArenaReward: Insufficient token balance");
-        // 修复：使�?safeTransfer 替代普�?transfer，确保安�?
+        // 淇锛氫娇锟?safeTransfer 鏇夸唬鏅拷?transfer锛岀‘淇濆畨锟?
         token.safeTransfer(owner(), amount);
         emit EmergencyWithdraw(owner(), amount);
     }
@@ -481,9 +481,9 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function calculateRewardForRank(uint256 rank) external view returns (uint256) {
         require(rank > 0, "ArenaReward: Rank must be > 0");
-        uint256 currentSeasonId = IArenaRanking(rankingContract).currentSeasonId();
-        (uint256 rewardPool, , uint256 totalPlayers) = IArenaRanking(rankingContract).getSeasonRewardData(currentSeasonId);
-        uint256 totalRealPlayers = IArenaRanking(rankingContract).countRealPlayers(currentSeasonId);
+        uint256 currentSeasonId = IArenaRanking(arenaRankingManagerContract).currentSeasonId();
+        (uint256 rewardPool, , uint256 totalPlayers) = IArenaRanking(arenaRankingManagerContract).getSeasonRewardData(currentSeasonId);
+        uint256 totalRealPlayers = IArenaRanking(arenaRankingManagerContract).countRealPlayers(currentSeasonId);
         return ArenaRankingLib.calculateRankReward(rank, rewardPool, totalRealPlayers);
     }
 

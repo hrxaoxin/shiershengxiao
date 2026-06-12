@@ -318,7 +318,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function rechargeChallengeAttempts() external payable nonReentrant whenNotPaused {
-        require(IArenaRanking(rankingContract).currentSeasonId() > 0, "ArenaPlayer: No active season");
+        require(IArenaRanking(arenaRankingManagerContract).currentSeasonId() > 0, "ArenaPlayer: No active season");
         
         _checkAndResetAttempts(msg.sender);
         require(rechargeCount[msg.sender] < maxRechargeAttempts, "ArenaPlayer: Max recharge attempts reached");
