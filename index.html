@@ -621,11 +621,14 @@
                     console.error('Failed to load total pool:', e);
                 }
                 
-                // 加载已分配金额
+                // 加载已分配金额（从 rewardManager 合约获取）
                 try {
-                    const distributedWei = await dividendManager.methods.totalDistributed().call();
-                    const distributed = web3Instance.utils.fromWei(distributedWei, 'ether');
-                    document.getElementById('distributed').textContent = parseFloat(distributed).toFixed(4);
+                    const rewardManager = await ZODIAC_WEB3.getContract('rewardManager', false);
+                    if (rewardManager) {
+                        const distributedWei = await rewardManager.methods.totalDistributed().call();
+                        const distributed = web3Instance.utils.fromWei(distributedWei, 'ether');
+                        document.getElementById('distributed').textContent = parseFloat(distributed).toFixed(4);
+                    }
                 } catch (e) {
                     console.error('Failed to load distributed:', e);
                 }
