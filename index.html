@@ -405,11 +405,12 @@
                         <h4 class="text-xl font-bold text-blue-200 mb-3">3% 代币交易税</h4>
                         <ul class="text-white/90 space-y-2">
                             <li>• 代币交易时扣除3%作为税收</li>
-                            <li>• <span id="dividendPercent">1.0</span>%进入分红池，按权重分配给NFT持有者</li>
-                            <li>• <span id="burnPercent">1.0</span>%进入回购销毁池，用于回购NFT</li>
+                            <li>• 1%自动燃烧销毁</li>
+                            <li>• <span id="dividendPercent">0.8</span>%进入分红池，按权重分配给NFT持有者</li>
                             <li>• <span id="nftStakingPercent">0.4</span>%兑换成代币进入NFT质押矿池，用于挖矿产出</li>
                             <li>• <span id="arenaPercent">0.3</span>%用于竞技场排名奖励</li>
                             <li>• <span id="tokenStakingPercent">0.3</span>%进入代币质押矿池，用于挖矿产出</li>
+                            <li>• <span id="burnPercent">0.2</span>%进入回购销毁池，用于回购NFT</li>
                         </ul>
                     </div>
                     <div class="bg-white/10 p-6 rounded-xl backdrop-blur-md">
@@ -676,14 +677,16 @@
         }
 
         async function loadWeightConfig() {
-            // 设置默认值（与合约中的分配比例一致）
+            // 设置默认值（显示相对于总交易税3%的实际百分比）
+            // 1%自动燃烧销毁，剩下2%按比例分配
+            // 40% of 2% = 0.8%, 10% of 2% = 0.2%, 20% of 2% = 0.4%, 15% of 2% = 0.3%
             const defaultNormalWeights = ['1', '2', '6', '18', '66'];
             const defaultRareWeights = ['10', '12', '16', '28', '76'];
-            const defaultDividendPercent = '40';
-            const defaultNftStakingPercent = '20';
-            const defaultTokenStakingPercent = '15';
-            const defaultArenaPercent = '15';
-            const defaultBurnPercent = '10';
+            const defaultDividendPercent = '0.8';
+            const defaultNftStakingPercent = '0.4';
+            const defaultTokenStakingPercent = '0.3';
+            const defaultArenaPercent = '0.3';
+            const defaultBurnPercent = '0.2';
             
             // 先设置默认值
             document.getElementById('normalWeight1').textContent = defaultNormalWeights[0];
@@ -742,11 +745,13 @@
                     const rewardManager = await web3Module.getContract('rewardManager', false);
                     if (rewardManager) {
                         const percents = await rewardManager.methods.getDistributionPercents().call();
-                        const dividendPercent = (parseInt(percents[0]) / 100).toString();
-                        const nftStakingPercent = (parseInt(percents[1]) / 100).toString();
-                        const tokenStakingPercent = (parseInt(percents[2]) / 100).toString();
-                        const arenaPercent = (parseInt(percents[3]) / 100).toString();
-                        const buybackPercent = percents[4] ? (parseInt(percents[4]) / 100).toString() : '10';
+                        // 合约中存储的是相对于剩余2%的千分比，需要转换为相对于总交易税3%的实际百分比
+                        // 计算公式：(合约值 / 10000 * 2%) = (合约值 / 50) / 100 = 合约值 / 5000 * 100%
+                        const dividendPercent = (parseInt(percents[0]) / 500).toFixed(1);
+                        const nftStakingPercent = (parseInt(percents[1]) / 500).toFixed(1);
+                        const tokenStakingPercent = (parseInt(percents[2]) / 500).toFixed(1);
+                        const arenaPercent = (parseInt(percents[3]) / 500).toFixed(1);
+                        const buybackPercent = percents[4] ? (parseInt(percents[4]) / 500).toFixed(1) : '0.2';
                         
                         document.getElementById('dividendPercent').textContent = dividendPercent || defaultDividendPercent;
                         document.getElementById('nftStakingPercent').textContent = nftStakingPercent || defaultNftStakingPercent;
