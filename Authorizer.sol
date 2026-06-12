@@ -370,18 +370,18 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _battleAddress - 战斗合约地址
      * @param _breedingCoreAddress - 繁殖核心合约地址
      * @param _breedingMarketAddress - 繁殖市场合约地址
-     * @param _nftMintAddress - NFT铸造合约地址
+     * @param _nftMintCoreAddress - NFT铸造核心合约地址
      * @param _stakingAddress - NFT质押合约地址
      */
     function _setupBattleAndBreeding(
         address _battleAddress,
         address _breedingCoreAddress,
         address _breedingMarketAddress,
-        address _nftMintAddress,
+        address _nftMintCoreAddress,
         address _stakingAddress
     ) internal {
         if (_battleAddress != address(0)) {
-            try ISetNFTContract(_battleAddress).setNFTContract(_nftMintAddress) {
+            try ISetNFTContract(_battleAddress).setNFTContract(_nftMintCoreAddress) {
                 emit ContractSetupSuccess("Battle");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("Battle", reason);
@@ -561,21 +561,21 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 配置价格预言机和升级模块
      * @param _priceOracleAddress - 价格预言机地址
-     * @param _upgradeModuleAddress - 升级模块地址
+     * @param _nftUpdateAddress - NFT升级合约地址
      * @param _tokenAddress - 游戏代币地址
      * @param _usdtAddress - USDT代币地址
      */
     function _setupPriceAndUpgrade(
         address _priceOracleAddress,
-        address _upgradeModuleAddress,
+        address _nftUpdateAddress,
         address _tokenAddress,
         address _usdtAddress
     ) internal {
         if (_priceOracleAddress != address(0)) {
-            ISetTokenAddress(_priceOracleAddress).setTokenAddress(_tokenAddress);
-            ISetUSDTAddress(_priceOracleAddress).setUSDTAddress(_usdtAddress);
+            ISetTokenContract(_priceOracleAddress).setTokenContract(_tokenAddress);
+            ISetUSDTContract(_priceOracleAddress).setUSDTContract(_usdtAddress);
         }
-        if (_upgradeModuleAddress != address(0)) {
+        if (_nftUpdateAddress != address(0)) {
         }
     }
 
@@ -605,7 +605,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
         if (_tokenBurnerAddress != address(0)) {
             ISetNFTContract(_tokenBurnerAddress).setNFTContract(_nftMintCoreAddress);
-            ISetAuthorizedNFTContract(_tokenBurnerAddress).setAuthorizedNFTContract(_nftMintCoreAddress);
             ISetTokenContract(_tokenBurnerAddress).setTokenContract(tokenAddress);
         }
         if (_nftMintCoreAddress != address(0)) {

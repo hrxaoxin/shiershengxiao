@@ -357,7 +357,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         dexRouter = _dexRouter;
         activeDEX = _dexType;
         // 自动获取 WBNB 地址
-        wbnb = IDEXRouter(_dexRouter).WETH();
+        wbnb = IDexRouter(_dexRouter).WETH();
         
         emit DEXRouterUpdated(_dexRouter, _dexType);
     }
@@ -492,11 +492,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         path[1] = tokenContract;
 
         // 获取预估输出金额并计算滑�?
-        uint256[] memory amounts = IDEXRouter(dexRouter).getAmountsOut(bnbAmount, path);
+        uint256[] memory amounts = IDexRouter(dexRouter).getAmountsOut(bnbAmount, path);
         uint256 expectedOut = amounts[1];
         uint256 minOut = expectedOut * (10000 - slippage) / 10000;
 
-        try IDEXRouter(dexRouter).swapExactETHForTokens{value: bnbAmount}(
+        try IDexRouter(dexRouter).swapExactETHForTokens{value: bnbAmount}(
             minOut,
             path,
             address(this),

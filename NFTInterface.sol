@@ -424,19 +424,6 @@ interface IDexRouter {
     function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
 }
 
-interface IDEXRouter {
-    function swapExactETHForTokens(
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external payable returns (uint256[] memory amounts);
-    
-    function WETH() external pure returns (address);
-    
-    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
-}
-
 interface IPancakeSwapPair {
     function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
     function token0() external view returns (address);
@@ -495,12 +482,12 @@ interface ISetRankingContract {
     function setRankingContract(address _rankingContract) external;
 }
 
-interface ISetTokenAddress {
-    function setTokenAddress(address _tokenContract) external;
+interface ISetTokenContract {
+    function setTokenContract(address _tokenContract) external;
 }
 
-interface ISetUSDTAddress {
-    function setUSDTAddress(address _usdtAddress) external;
+interface ISetUSDTContract {
+    function setUSDTContract(address _usdtContract) external;
 }
 
 interface ISetMetadataContract {
