@@ -390,7 +390,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             }
         }
         if (_breedingCoreAddress != address(0)) {
-            try ISetNFTContract(_breedingCoreAddress).setNFTContract(_nftMintAddress) {
+            try ISetNFTContract(_breedingCoreAddress).setNFTContract(_nftMintCoreAddress) {
                 emit ContractSetupSuccess("BreedingCore-NFT");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("BreedingCore-NFT", reason);
@@ -426,8 +426,8 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             }
 
             // 设置BreedingMarket的NFT合约地址
-            if (_nftMintAddress != address(0)) {
-                try ISetNFTContract(_breedingMarketAddress).setNFTContract(_nftMintAddress) {
+            if (_nftMintCoreAddress != address(0)) {
+                try ISetNFTContract(_breedingMarketAddress).setNFTContract(_nftMintCoreAddress) {
                     emit ContractSetupSuccess("BreedingMarket-NFT");
                 } catch Error(string memory reason) {
                     emit ContractSetupFailed("BreedingMarket-NFT", reason);
@@ -436,8 +436,8 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                 }
             }
 
-            if (_nftMintAddress != address(0)) {
-                try ISetBreedingContract(_nftMintAddress).setBreedingContract(_breedingCoreAddress) {
+            if (_nftMintCoreAddress != address(0)) {
+                try ISetBreedingContract(_nftMintCoreAddress).setBreedingContract(_breedingCoreAddress) {
                     emit ContractSetupSuccess("NFTMint-Breeding");
                 } catch Error(string memory reason) {
                     emit ContractSetupFailed("NFTMint-Breeding", reason);

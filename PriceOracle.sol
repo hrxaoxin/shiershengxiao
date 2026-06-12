@@ -403,13 +403,13 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         // 设置默认活跃DEX（优先使用PancakeSwap，如果可用）
         if (_pancakeSwapRouter != address(0)) {
             activeDEX = 1;
-            wbnb = IDEXRouter(_pancakeSwapRouter).WETH();
+            wbnb = IDexRouter(_pancakeSwapRouter).WETH();
         } else if (_flapSwapRouter != address(0)) {
             activeDEX = 0;
-            wbnb = IDEXRouter(_flapSwapRouter).WETH();
+            wbnb = IDexRouter(_flapSwapRouter).WETH();
         } else if (_uniswapRouter != address(0)) {
             activeDEX = 2;
-            wbnb = IDEXRouter(_uniswapRouter).WETH();
+            wbnb = IDexRouter(_uniswapRouter).WETH();
         }
     }
 
@@ -433,7 +433,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
         
         activeDEX = _dexType;
-        wbnb = IDEXRouter(router).WETH();
+        wbnb = IDexRouter(router).WETH();
     }
 
     /**
@@ -495,7 +495,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         path[1] = wbnb;
         path[2] = usdtAddress;
         
-        try IDEXRouter(router).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
+        try IDexRouter(router).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
             if (amounts.length == 3 && amounts[2] > 0) {
                 // amounts[2] �?USDT 数量�?位精度）
                 // 转换�?USD 价格�?8位精度）
@@ -519,7 +519,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         path[0] = wbnb;
         path[1] = usdtAddress;
         
-        try IDEXRouter(router).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
+        try IDexRouter(router).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
             if (amounts.length == 2 && amounts[1] > 0) {
                 // amounts[1] �?USDT 数量�?位精度）
                 // 转换�?USD 价格�?8位精度）

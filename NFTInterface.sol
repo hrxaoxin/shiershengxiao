@@ -454,6 +454,10 @@ interface ISetTokenContract {
     function setTokenContract(address _tokenContract) external;
 }
 
+interface ISetTokenAddress {
+    function setTokenAddress(address _tokenAddress) external;
+}
+
 interface ISetArenaRewardPool {
     function setArenaRewardPool(address _arenaRankingAddress) external;
 }
@@ -480,10 +484,6 @@ interface ISetArenaRankingManagerContract {
 
 interface ISetRankingContract {
     function setRankingContract(address _rankingContract) external;
-}
-
-interface ISetTokenContract {
-    function setTokenContract(address _tokenContract) external;
 }
 
 interface ISetUSDTContract {
