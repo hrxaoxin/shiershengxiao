@@ -405,7 +405,7 @@
                         <h4 class="text-xl font-bold text-blue-200 mb-3">3% 代币交易税</h4>
                         <ul class="text-white/90 space-y-2">
                             <li>• 代币交易时扣除3%作为税收</li>
-                            <li>• <span id="dividendPercent"></span>1.0</span>%进入分红池，按权重分配给NFT持有者</li>
+                            <li>• <span id="dividendPercent">1.0</span>%进入分红池，按权重分配给NFT持有者</li>
                             <li>• <span id="burnPercent">1.0</span>%进入回购销毁池，用于回购NFT</li>
                             <li>• <span id="nftStakingPercent">0.4</span>%兑换成代币进入NFT质押矿池，用于挖矿产出</li>
                             <li>• <span id="arenaPercent">0.3</span>%用于竞技场排名奖励</li>
@@ -676,14 +676,14 @@
         }
 
         async function loadWeightConfig() {
-            // 设置默认值
+            // 设置默认值（与合约中的分配比例一致）
             const defaultNormalWeights = ['1', '2', '6', '18', '66'];
             const defaultRareWeights = ['10', '12', '16', '28', '76'];
-            const defaultDividendPercent = '1.0';
-            const defaultNftStakingPercent = '0.4';
-            const defaultTokenStakingPercent = '0.3';
-            const defaultArenaPercent = '0.3';
-            const defaultBurnPercent = '1.0';
+            const defaultDividendPercent = '40';
+            const defaultNftStakingPercent = '20';
+            const defaultTokenStakingPercent = '15';
+            const defaultArenaPercent = '15';
+            const defaultBurnPercent = '10';
             
             // 先设置默认值
             document.getElementById('normalWeight1').textContent = defaultNormalWeights[0];
@@ -742,17 +742,17 @@
                     const rewardManager = await web3Module.getContract('rewardManager', false);
                     if (rewardManager) {
                         const percents = await rewardManager.methods.getDistributionPercents().call();
-                        const dividendPercent = (parseInt(percents[0]) / 100).toFixed(2);
-                        const nftStakingPercent = (parseInt(percents[1]) / 100).toFixed(2);
-                        const tokenStakingPercent = (parseInt(percents[2]) / 100).toFixed(2);
-                        const arenaPercent = (parseInt(percents[3]) / 100).toFixed(2);
-                        const buybackPercent = percents[4] ? (parseInt(percents[4]) / 100).toFixed(2) : '1.00';
+                        const dividendPercent = (parseInt(percents[0]) / 100).toString();
+                        const nftStakingPercent = (parseInt(percents[1]) / 100).toString();
+                        const tokenStakingPercent = (parseInt(percents[2]) / 100).toString();
+                        const arenaPercent = (parseInt(percents[3]) / 100).toString();
+                        const buybackPercent = percents[4] ? (parseInt(percents[4]) / 100).toString() : '10';
                         
-                        document.getElementById('dividendPercent').textContent = dividendPercent.replace(/^0+/, '') || defaultDividendPercent;
-                        document.getElementById('nftStakingPercent').textContent = nftStakingPercent.replace(/^0+/, '') || defaultNftStakingPercent;
-                        document.getElementById('tokenStakingPercent').textContent = tokenStakingPercent.replace(/^0+/, '') || defaultTokenStakingPercent;
-                        document.getElementById('arenaPercent').textContent = arenaPercent.replace(/^0+/, '') || defaultArenaPercent;
-                        document.getElementById('burnPercent').textContent = buybackPercent.replace(/^0+/, '') || defaultBurnPercent;
+                        document.getElementById('dividendPercent').textContent = dividendPercent || defaultDividendPercent;
+                        document.getElementById('nftStakingPercent').textContent = nftStakingPercent || defaultNftStakingPercent;
+                        document.getElementById('tokenStakingPercent').textContent = tokenStakingPercent || defaultTokenStakingPercent;
+                        document.getElementById('arenaPercent').textContent = arenaPercent || defaultArenaPercent;
+                        document.getElementById('burnPercent').textContent = buybackPercent || defaultBurnPercent;
                         
                         console.log('Distribution config loaded from contract:', { dividendPercent, nftStakingPercent, tokenStakingPercent, arenaPercent, buybackPercent });
                     } else {
