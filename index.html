@@ -706,14 +706,15 @@
             
             try {
                 const web3Module = window.ZODIAC_WEB3;
-                if (!web3Module || !web3Module.isConnected()) {
-                    console.debug('ZODIAC_WEB3 not initialized or not connected, using default config');
+                if (!web3Module) {
+                    console.debug('ZODIAC_WEB3 not initialized, using default config');
                     return;
                 }
                 
-                const dividendManager = await web3Module.getContract('dividendManager');
-                if (dividendManager) {
-                    try {
+                // 获取权重配置（公共数据，无需连接钱包）
+                try {
+                    const dividendManager = await web3Module.getContract('dividendManager', false);
+                    if (dividendManager) {
                         const config = await dividendManager.methods.getWeightConfig().call();
                         const normalWeights = config[0];
                         const rareWeights = config[1];
@@ -731,28 +732,27 @@
                         document.getElementById('rareWeight5').textContent = rareWeights[4] || defaultRareWeights[4];
                         
                         console.log('Weight config loaded from contract:', { normalWeights, rareWeights });
-                    } catch (e) {
-                        console.warn('Failed to load weight config from contract, using defaults:', e.message);
                     }
-                } else {
-                    console.debug('DividendManager contract not available, using default weights');
+                } catch (e) {
+                    console.warn('Failed to load weight config from contract, using defaults:', e.message);
                 }
                 
-                const rewardManager = await web3Module.getContract('rewardManager');
-                if (rewardManager) {
-                    try {
+                // 获取分配比例配置（公共数据，无需连接钱包）
+                try {
+                    const rewardManager = await web3Module.getContract('rewardManager', false);
+                    if (rewardManager) {
                         const percents = await rewardManager.methods.getDistributionPercents().call();
                         const dividendPercent = (parseInt(percents[0]) / 100).toFixed(2);
                         const nftStakingPercent = (parseInt(percents[1]) / 100).toFixed(2);
                         const tokenStakingPercent = (parseInt(percents[2]) / 100).toFixed(2);
                         const arenaPercent = (parseInt(percents[3]) / 100).toFixed(2);
-                        const buybackPercent = percents[4] ? (parseInt(percents[4]) / 100).toFixed(2) : '0.00';
+                        const buybackPercent = percents[4] ? (parseInt(percents[4]) / 100).toFixed(2) : '1.00';
                         
-                        document.getElementById('dividendPercent').textContent = dividendPercent;
-                        document.getElementById('nftStakingPercent').textContent = nftStakingPercent;
-                        document.getElementById('tokenStakingPercent').textContent = tokenStakingPercent;
-                        document.getElementById('arenaPercent').textContent = arenaPercent;
-                        document.getElementById('burnPercent').textContent = buybackPercent;
+                        document.getElementById('dividendPercent').textContent = dividendPercent.replace(/^0+/, '') || defaultDividendPercent;
+                        document.getElementById('nftStakingPercent').textContent = nftStakingPercent.replace(/^0+/, '') || defaultNftStakingPercent;
+                        document.getElementById('tokenStakingPercent').textContent = tokenStakingPercent.replace(/^0+/, '') || defaultTokenStakingPercent;
+                        document.getElementById('arenaPercent').textContent = arenaPercent.replace(/^0+/, '') || defaultArenaPercent;
+                        document.getElementById('burnPercent').textContent = buybackPercent.replace(/^0+/, '') || defaultBurnPercent;
                         
                         console.log('Distribution config loaded from contract:', { dividendPercent, nftStakingPercent, tokenStakingPercent, arenaPercent, buybackPercent });
                     } catch (e) {
