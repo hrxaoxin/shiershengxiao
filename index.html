@@ -599,16 +599,17 @@
             document.getElementById('userWeight').textContent = '--';
 
             try {
-                const dividendManager = await ZODIAC_WEB3.getContract('dividendManager');
+                // 加载公共数据（无需连接钱包）
+                const dividendManager = await ZODIAC_WEB3.getContract('dividendManager', false);
                 if (!dividendManager) {
                     console.error('DividendManager contract not available');
                     return;
                 }
                 
-                // 加载总池金额（公共数据，无需连接钱包）
+                // 加载总池金额
                 try {
                     const totalPoolWei = await dividendManager.methods.dividendPoolBalance().call();
-                    const totalPool = web3.utils.fromWei(totalPoolWei, 'ether');
+                    const totalPool = window.web3.utils.fromWei(totalPoolWei, 'ether');
                     document.getElementById('totalPool').textContent = parseFloat(totalPool).toFixed(4);
                 } catch (e) {
                     console.error('Failed to load total pool:', e);
@@ -617,15 +618,15 @@
                 // 加载已分配金额
                 try {
                     const distributedWei = await dividendManager.methods.totalDistributed().call();
-                    const distributed = web3.utils.fromWei(distributedWei, 'ether');
+                    const distributed = window.web3.utils.fromWei(distributedWei, 'ether');
                     document.getElementById('distributed').textContent = parseFloat(distributed).toFixed(4);
                 } catch (e) {
                     console.error('Failed to load distributed:', e);
                 }
 
-                // 加载NFT总数（公共数据，无需连接钱包）
+                // 加载NFT总数
                 try {
-                    const nftMint = await ZODIAC_WEB3.getContract('nftMint');
+                    const nftMint = await ZODIAC_WEB3.getContract('nftMint', false);
                     if (nftMint) {
                         const totalSupply = await nftMint.methods.totalSupply().call();
                         document.getElementById('holders').textContent = totalSupply.toString();
@@ -643,7 +644,7 @@
                 try {
                     const userDivResult = await dividendManager.methods.calcUserDividend(account).call();
                     const userDivWei = userDivResult ? userDivResult['0'] : '0';
-                    const userDiv = web3.utils.fromWei(userDivWei, 'ether');
+                    const userDiv = window.web3.utils.fromWei(userDivWei, 'ether');
                     document.getElementById('unclaimedDividend').textContent = parseFloat(userDiv).toFixed(4);
                     
                     // 同时加载用户权重 (从同一个结果中获取)

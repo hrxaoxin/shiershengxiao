@@ -221,14 +221,24 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
-    async function getContract(name) {
+    async function getContract(name, requireAccount = true) {
         if (contracts[name]) return contracts[name];
-        if (!web3 || !account) {
+        
+        if (!web3) {
+            if (typeof window.ethereum === 'undefined') {
+                console.error('[ZODIAC_WEB3] MetaMask not detected');
+                throw new Error('[ZODIAC_WEB3] MetaMask not detected');
+            }
+            web3 = new window.Web3(window.ethereum);
+        }
+        
+        if (requireAccount && !account) {
             const initialized = await initWeb3();
             if (!initialized) {
                 throw new Error(`[ZODIAC_WEB3] Web3 not initialized, cannot get contract: ${name}`);
             }
         }
+        
         if (contracts[name]) return contracts[name];
 
         const abi = ABI_MAP[name];
