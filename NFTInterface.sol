@@ -487,8 +487,8 @@ interface ISetArenaBattleContract {
     function setArenaBattleContract(address _arenaBattleContract) external;
 }
 
-interface ISetRankingContract {
-    function setRankingContract(address _rankingContract) external;
+interface ISetArenaRankingManagerContract {
+    function setArenaRankingManagerContract(address _arenaRankingManagerContract) external;
 }
 
 interface ISetTokenAddress {
@@ -512,15 +512,15 @@ interface ISetAuthorizedNFTContract {
 }
 
 interface ISetTokenBurner {
-    function setTokenBurnerContract(address _tokenBurner) external;
+    function setTokenBurnerContract(address _tokenBurnerContract) external;
 }
 
 interface ISetNFTDataContract {
-    function setNFTDataContract(address _nftDataAddress) external;
+    function setNFTDataContract(address _nftDataContract) external;
 }
 
 interface ISetBattleContract {
-    function setBattleContract(address _battleAddress) external;
+    function setBattleContract(address _battleContract) external;
 }
 
 interface ISetFeeReceiver {
@@ -536,7 +536,7 @@ interface ISetPoolManager {
 }
 
 interface ISetNFTUpdateContract {
-    function setNFTUpdateContract(address _nftUpdate) external;
+    function setNFTUpdateContract(address _nftUpdateContract) external;
 }
 
 /**
@@ -554,10 +554,10 @@ interface ISetNFTBuybackPool {
 interface INFTBuyback {
     function setNFTContract(address _nftContract) external;
     function setTokenContract(address _tokenContract) external;
-    function setTokenBurnerContract(address _tokenBurner) external;
-    function setNFTUpdateContract(address _nftUpdate) external;
-    function setNFTDataContract(address _nftData) external;
-    function setAuthorizer(address a) external;
+    function setTokenBurnerContract(address _tokenBurnerContract) external;
+    function setNFTUpdateContract(address _nftUpdateContract) external;
+    function setNFTDataContract(address _nftDataContract) external;
+    function setAuthorizer(address _authorizer) external;
     function recordIncomingTokens(uint256 amount) external;
     function calculateGrowthPrice(uint256 tokenId) external view returns (uint256);
     function sellWithGrowthPrice(uint256 tokenId) external;

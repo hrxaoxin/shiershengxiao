@@ -253,11 +253,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
     /**
      * @dev 设置授权器地址
-     * @param a 新的授权器地址
+     * @param _authorizer 新的授权器地址
      */
-    function setAuthorizer(address a) external onlyOwner {
-        require(a != address(0), "Battle: Invalid authorizer address");
-        authorizer = a;
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        require(_authorizer != address(0), "Battle: Invalid authorizer address");
+        authorizer = _authorizer;
     }
 
     function setBattleCaller(address _battleCaller) external onlyOwnerOrAuthorizer {
