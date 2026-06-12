@@ -606,10 +606,16 @@
                     return;
                 }
                 
+                const web3Instance = ZODIAC_WEB3.getWeb3();
+                if (!web3Instance) {
+                    console.error('Web3 instance not available');
+                    return;
+                }
+                
                 // 加载总池金额
                 try {
                     const totalPoolWei = await dividendManager.methods.dividendPoolBalance().call();
-                    const totalPool = window.web3.utils.fromWei(totalPoolWei, 'ether');
+                    const totalPool = web3Instance.utils.fromWei(totalPoolWei, 'ether');
                     document.getElementById('totalPool').textContent = parseFloat(totalPool).toFixed(4);
                 } catch (e) {
                     console.error('Failed to load total pool:', e);
@@ -618,7 +624,7 @@
                 // 加载已分配金额
                 try {
                     const distributedWei = await dividendManager.methods.totalDistributed().call();
-                    const distributed = window.web3.utils.fromWei(distributedWei, 'ether');
+                    const distributed = web3Instance.utils.fromWei(distributedWei, 'ether');
                     document.getElementById('distributed').textContent = parseFloat(distributed).toFixed(4);
                 } catch (e) {
                     console.error('Failed to load distributed:', e);
@@ -644,7 +650,7 @@
                 try {
                     const userDivResult = await dividendManager.methods.calcUserDividend(account).call();
                     const userDivWei = userDivResult ? userDivResult['0'] : '0';
-                    const userDiv = window.web3.utils.fromWei(userDivWei, 'ether');
+                    const userDiv = web3Instance.utils.fromWei(userDivWei, 'ether');
                     document.getElementById('unclaimedDividend').textContent = parseFloat(userDiv).toFixed(4);
                     
                     // 同时加载用户权重 (从同一个结果中获取)
