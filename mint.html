@@ -208,7 +208,7 @@
                 <li>• <strong>光暗铸造</strong>：消耗<span id="rareMintCostDisplay">88888</span>枚代币，必定获得光/暗属性NFT</li>
                 <li>• <strong>普通十连</strong>：消耗<span id="normalTenCostDisplay">88880</span>枚代币，随机获得10张生肖NFT（普通铸造概率）</li>
                 <li>• <strong>光暗十连</strong>：消耗<span id="rareTenCostDisplay">888880</span>枚代币，随机获得10张光/暗属性NFT</li>
-                <li>• <strong>指定铸造</strong>：消耗<span id="targetedCostDisplay">(6x普通+4x光暗)×10</span>代币，获得指定生肖所有属性NFT（10张）</li>
+                <li>• <strong>指定铸造</strong>：消耗<span id="targetedCostDisplay">(6x普通+4x光暗)×10</span>代币（<span id="targetedCostFormula" class="text-blue-500">(6×普通铸造代币+4×光暗铸造代币)×10</span>），获得指定生肖所有属性NFT（10张）</li>
                 <li>• 普通铸造概率：水/风/火属性各约32%，暗/光属性各2%</li>
                 <li>• 持有生肖NFT即可享受对应的税收分红</li>
                 <li>• 首次铸造需要授权代币，之后无需重复授权</li>
@@ -385,11 +385,20 @@
                 }
 
                 const web3 = ZODIAC_WEB3.getWeb3();
-                const mintPriceEth = web3.utils.fromWei(MINT_PRICE, 'ether').substring(0, 10);
-                const lightDarkEth = web3.utils.fromWei(LIGHT_DARK_COST, 'ether').substring(0, 10);
-                const normalTenEth = web3.utils.fromWei(NORMAL_TEN_COST, 'ether').substring(0, 10);
-                const rareTenEth = web3.utils.fromWei(RARE_TEN_COST, 'ether').substring(0, 10);
-                const targetedEth = web3.utils.fromWei(TARGETED_COST, 'ether').substring(0, 12);
+                
+                // 解析代币价格（去掉科学计数法）
+                const mintPriceNum = parseFloat(web3.utils.fromWei(MINT_PRICE, 'ether'));
+                const lightDarkNum = parseFloat(web3.utils.fromWei(LIGHT_DARK_COST, 'ether'));
+                const normalTenNum = parseFloat(web3.utils.fromWei(NORMAL_TEN_COST, 'ether'));
+                const rareTenNum = parseFloat(web3.utils.fromWei(RARE_TEN_COST, 'ether'));
+                const targetedNum = parseFloat(web3.utils.fromWei(TARGETED_COST, 'ether'));
+                
+                // 格式化显示（保留整数部分）
+                const mintPriceEth = Math.floor(mintPriceNum).toString();
+                const lightDarkEth = Math.floor(lightDarkNum).toString();
+                const normalTenEth = Math.floor(normalTenNum).toString();
+                const rareTenEth = Math.floor(rareTenNum).toString();
+                const targetedEth = Math.floor(targetedNum).toString();
 
                 document.getElementById('mintPriceDisplay').textContent = `${mintPriceEth} 代币`;
                 document.getElementById('mintBtn').innerHTML = `<i class="fas fa-magic mr-2"></i> 普通铸造（消耗${mintPriceEth}代币）`;
@@ -399,15 +408,20 @@
                 document.getElementById('mintTargetedBtn').innerHTML = `<i class="fas fa-bullseye mr-2"></i> 指定铸造（消耗${targetedEth}代币）`;
                 
                 // 更新温馨提示部分的费用显示
-                const normalCost = parseFloat(mintPriceEth).toLocaleString();
-                const rareCost = parseFloat(lightDarkEth).toLocaleString();
-                const normalTenCost = parseFloat(normalTenEth).toLocaleString();
-                const rareTenCost = parseFloat(rareTenEth).toLocaleString();
+                const normalCost = Math.floor(mintPriceNum).toLocaleString();
+                const rareCost = Math.floor(lightDarkNum).toLocaleString();
+                const normalTenCost = Math.floor(normalTenNum).toLocaleString();
+                const rareTenCost = Math.floor(rareTenNum).toLocaleString();
+                const targetedCost = Math.floor(targetedNum).toLocaleString();
+                
                 document.getElementById('normalMintCostDisplay').textContent = normalCost;
                 document.getElementById('rareMintCostDisplay').textContent = rareCost;
                 document.getElementById('normalTenCostDisplay').textContent = normalTenCost;
                 document.getElementById('rareTenCostDisplay').textContent = rareTenCost;
-                document.getElementById('targetedCostDisplay').textContent = `${normalCost}`;
+                
+                // 显示指定铸造的费用计算说明
+                document.getElementById('targetedCostDisplay').textContent = targetedCost;
+                document.getElementById('targetedCostFormula').textContent = `(6×${normalCost} + 4×${rareCost}) × 10`;
             } catch (error) {
                 console.log('获取铸造费用失败，使用默认值:', error);
             }
