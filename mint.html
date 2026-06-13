@@ -325,12 +325,43 @@
             try {
                 const account = ZODIAC_WEB3.getAccount();
                 const web3 = ZODIAC_WEB3.getWeb3();
-                if (!account || !tokenContract) return;
+                
+                if (!account) {
+                    console.debug('updateTokenBalance: No account connected');
+                    document.getElementById('tokenBalance').textContent = '0.0000';
+                    return;
+                }
+                
+                if (!tokenContract) {
+                    console.debug('updateTokenBalance: tokenContract not initialized');
+                    document.getElementById('tokenBalance').textContent = '0.0000';
+                    return;
+                }
+                
+                console.debug('updateTokenBalance: account:', account);
+                console.debug('updateTokenBalance: tokenContract address:', tokenContract._address);
+                
                 const balance = await tokenContract.methods.balanceOf(account).call();
+                console.debug('updateTokenBalance: raw balance:', balance);
+                
+                let decimals = 18;
+                try {
+                    decimals = await tokenContract.methods.decimals().call();
+                    console.debug('updateTokenBalance: token decimals:', decimals);
+                } catch (e) {
+                    console.warn('Failed to get token decimals, using default 18:', e.message);
+                }
+                
                 const balanceInTokens = web3.utils.fromWei(balance, 'ether');
-                const balanceFormatted = parseFloat(balanceInTokens).toFixed(4);
+                console.debug('updateTokenBalance: balance in tokens:', balanceInTokens);
+                
+                const decimalsNum = parseInt(decimals, 10);
+                const balanceFormatted = parseFloat(balanceInTokens).toFixed(Math.min(decimalsNum, 4));
                 document.getElementById('tokenBalance').textContent = balanceFormatted;
+                
+                console.debug('updateTokenBalance: final balance:', balanceFormatted);
             } catch (error) {
+                console.error('Failed to update token balance:', error);
                 document.getElementById('tokenBalance').textContent = '0.0000';
             }
         }
