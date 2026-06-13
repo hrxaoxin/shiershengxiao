@@ -407,9 +407,8 @@
 
         document.getElementById('approveToken').addEventListener('click', async function() {
             const account = ZODIAC_WEB3.getAccount();
-            const tokenContract = await ZODIAC_WEB3.getContract('tokenContract').catch(() => null);
             
-            if (!account || !tokenContract) {
+            if (!account) {
                 ZODIAC_UI.showToast('请先连接钱包', 'warning');
                 return;
             }
@@ -433,6 +432,8 @@
                 const burnerAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenBurner;
                 await ZODIAC_WEB3.approveToken(burnerAddress, '115792089237316195423570985008687907853269984665640564039457584007913129639935');
 
+                // 重新初始化合约并检查授权状态
+                await initContracts();
                 await checkApprovalStatus();
                 await updateMintStatus();
                 ZODIAC_UI.showToast('代币授权成功！', 'success');
