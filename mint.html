@@ -333,6 +333,22 @@
                 document.getElementById('approvalStatus').style.color = '#f44336';
                 updateMintStatus();
             });
+            
+            // 如果钱包已经连接，自动刷新数据
+            const currentAccount = ZODIAC_WEB3.getAccount();
+            if (currentAccount) {
+                (async () => {
+                    try {
+                        await initContracts();
+                        await fetchMintCosts();
+                        await updateTokenBalance();
+                        await checkApprovalStatus();
+                        await updateMintStatus();
+                    } catch (error) {
+                        console.error('Auto refresh on load error:', error);
+                    }
+                })();
+            }
         }
 
         async function initContracts() {
