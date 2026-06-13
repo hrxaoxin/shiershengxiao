@@ -281,12 +281,37 @@
         function initWalletUI() {
             const connectBtn = document.getElementById('connectWalletBtn');
             const desktopBtn = document.getElementById('connectWalletBtnDesktop');
+            const refreshBtn = document.getElementById('refreshWallet');
             
             if (connectBtn) {
                 ZODIAC_UI.initWalletButton('connectWalletBtn', 'walletAddress', 'connectionStatus');
             }
             if (desktopBtn) {
                 ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddressDesktop', null);
+            }
+            
+            if (refreshBtn) {
+                refreshBtn.addEventListener('click', async function() {
+                    const btn = this;
+                    const originalText = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> 刷新中...';
+                    btn.disabled = true;
+                    
+                    try {
+                        await initContracts();
+                        await fetchMintCosts();
+                        await updateTokenBalance();
+                        await checkApprovalStatus();
+                        await updateMintStatus();
+                        ZODIAC_UI.showToast('数据刷新成功', 'success');
+                    } catch (error) {
+                        console.error('Refresh error:', error);
+                        ZODIAC_UI.showToast('刷新失败，请重试', 'error');
+                    } finally {
+                        btn.innerHTML = originalText;
+                        btn.disabled = false;
+                    }
+                });
             }
 
             ZODIAC_WEB3.on('connect', async () => {
