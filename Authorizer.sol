@@ -607,6 +607,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             ISetBattleContract(_arenaBattleAddress).setBattleContract(battleAddress);
             ISetNFTContract(_arenaBattleAddress).setNFTContract(nftMintCoreAddress);
         }
+        // RewardManager 不需要额外配置（通过其他方式设置）
+        if (_rewardManagerAddress != address(0)) {
+            // RewardManager 已通过 setAllContracts 设置，此处保留参数以保持接口一致性
+        }
     }
 
     /**

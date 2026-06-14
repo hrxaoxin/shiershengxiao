@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/utils/Strings.sol";
+
 /**
  * @title NFTLib
  * @dev NFT工具库，提供生肖NFT相关的数学计算和属性判断函数
@@ -24,6 +26,7 @@ pragma solidity ^0.8.20;
  * - 暗克光：暗属性攻击光属性时伤害×1.5
  */
 library NFTLib {
+    using Strings for uint256;
     function getBASE_HP() internal pure returns (uint256[12] memory) {
         return [
             uint256(1200), uint256(2000), uint256(1600), uint256(1000), uint256(1800), uint256(1400),
@@ -626,6 +629,45 @@ library NFTLib {
         string memory genderStr = gender == 0 ? "0" : "1";
         
         return string(abi.encodePacked(baseUrl, prefix, zodiacKey, "_", genderStr, ".png"));
+    }
+    
+    function buildTokenURIJson(
+        uint256 tokenId, uint256 tokenType_, uint8 level,
+        uint256 element, uint256 zodiac, bool isMale, bool isRare, string memory imagePath
+    ) internal pure returns (string memory) {
+        string memory elementName = getElementNameCN(element);
+        string memory zodiacName = getZodiacNameCN(zodiac);
+        string memory genderName = isMale ? unicode"\u516C" : unicode"\u6BCD";
+        string memory rarity = isRare ? unicode"\u7A00\u6709" : unicode"\u666E\u901A";
+        string memory levelStr = uint256(level).toString();
+        string memory tokenIdStr = tokenId.toString();
+        
+        string memory namePart = concat5(
+            '{"name":"Zodiac NFT #', tokenIdStr, ' - ',
+            concat2(elementName, concat2(zodiacName, unicode"\u00B7")),
+            concat2(genderName, '"')
+        );
+        
+        string memory descPart = concat5(
+            concat2(',"description":"', unicode"\u5341\u4E8C\u751F\u8096NFT - \u5C5E\u6027\uFF1A"),
+            concat2(elementName, unicode"\u00B7\u751F\u8096\uFF1A"),
+            concat2(zodiacName, unicode"\u00B7\u6027\u522B\uFF1A"),
+            concat2(genderName, unicode"\u00B7\u7B49\u7EA7\uFF1A"),
+            concat2(levelStr, unicode"\u00B7\u6301\u6709\u53EF\u4EB2\u53D7\u751F\u6001\u5206\u5143\"")
+        );
+        
+        string memory imagePart = concat2(',"image":"', concat2(imagePath, '"'));
+        
+        string memory attrs = concat5(
+            buildAttr(unicode"\u5C5E\u6027", elementName),
+            buildAttr(unicode"\u751F\u8096", zodiacName),
+            buildAttr(unicode"\u6027\u522B", genderName),
+            buildAttr(unicode"\u7B49\u7EA7", levelStr),
+            buildAttrLast(unicode"\u7C7B\u578B", rarity)
+        );
+        string memory attrPart = concat2(',"attributes":[', concat2(attrs, ']}'));
+        
+        return concat5(namePart, descPart, imagePart, attrPart, "");
     }
 }
 

@@ -236,7 +236,7 @@ contract WeightManager is
     /**
      * @dev 设置NFT数据合约地址
      * 此合约用于查询用户NFT持有情况和计算权重
-     * @param _nftDataContract 新的NFT数据合约地址，不可为零地址
+     * @param _nftDataContractAddress 新的NFT数据合约地址，不可为零地址
      */
     function setNFTDataContract(address _nftDataContractAddress) external onlyOwnerOrAuthorizer {
         if (_nftDataContractAddress == address(0)) revert ZeroAddress();

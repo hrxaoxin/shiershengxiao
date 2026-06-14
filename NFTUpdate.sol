@@ -72,7 +72,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * 5. 等级 +1，用户权重更新，升级事件广播
  */
 contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
-    using SafeERC20 for IToken;
+    using SafeERC20 for IERC20;
     using NFTLib for uint256;
 
     /**
@@ -595,7 +595,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         else if (lv == 4) cost = level4UpgradeCost;
         else revert("E18: Invalid level");
         
-        IToken t = IToken(tokenContract);
+        IERC20 t = IERC20(tokenContract);
         require(t.balanceOf(msg.sender) >= cost, "E8: Insufficient balance");
         require(t.allowance(msg.sender, address(this)) >= cost, "E8: Insufficient allowance");
         t.safeTransferFrom(msg.sender, BLACK_HOLE, cost);
@@ -662,7 +662,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         uint256 cost = (usdValue * 1e18) / price;
         require(cost > 0, "E21: Invalid cost");
         
-        IToken t = IToken(tokenContract);
+        IERC20 t = IERC20(tokenContract);
         require(t.balanceOf(msg.sender) >= cost, "E8: Insufficient balance");
         require(t.allowance(msg.sender, address(this)) >= cost, "E8: Insufficient allowance");
         t.safeTransferFrom(msg.sender, BLACK_HOLE, cost);

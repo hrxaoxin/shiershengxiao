@@ -198,43 +198,13 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     function _buildTokenURIJson(uint256 tokenId, uint256 tokenType_, uint8 level) internal view returns (string memory) {
         uint256 element = tokenType_ / 24;
         uint256 zodiac = (tokenType_ % 24 / 2) % 12;
-        uint8 gender = uint8(tokenType_ % 2);
+        bool isMale = tokenType_ % 2 == 0;
+        bool isRare = tokenType_ >= 72;
         
-        string memory elementName = NFTLib.getElementNameCN(element);
-        string memory zodiacName = NFTLib.getZodiacNameCN(zodiac);
-        string memory genderName = gender == 0 ? unicode"\u516C" : unicode"\u6BCD";
-        string memory rarity = tokenType_ >= 72 ? unicode"\u7A00\u6709" : unicode"\u666E\u901A";
-        string memory levelStr = uint256(level).toString();
-        string memory tokenIdStr = tokenId.toString();
-        
-        string memory namePart = NFTLib.concat5(
-            '{"name":"Zodiac NFT #', tokenIdStr, ' - ',
-            NFTLib.concat2(elementName, NFTLib.concat2(zodiacName, unicode"\u00B7")),
-            NFTLib.concat2(genderName, '"')
-        );
-        
-        string memory descPart = NFTLib.concat5(
-            NFTLib.concat2(',"description":"', unicode"\u5341\u4E8C\u751F\u8096NFT - \u5C5E\u6027\uFF1A"),
-            NFTLib.concat2(elementName, unicode"\u00B7\u751F\u8096\uFF1A"),
-            NFTLib.concat2(zodiacName, unicode"\u00B7\u6027\u522B\uFF1A"),
-            NFTLib.concat2(genderName, unicode"\u00B7\u7B49\u7EA7\uFF1A"),
-            NFTLib.concat2(levelStr, unicode"\u00B7\u6301\u6709\u53EF\u4EB2\u53D7\u751F\u6001\u5206\u5143\"")
-        );
-        
-        string memory imageBase = tokenType_ >= 72 ? ipfsBaseRare : ipfsBaseNormal;
+        string memory imageBase = isRare ? ipfsBaseRare : ipfsBaseNormal;
         string memory imagePath = NFTLib.buildImagePath(imageBase, tokenType_);
-        string memory imagePart = NFTLib.concat2(',"image":"', NFTLib.concat2(imagePath, '"'));
         
-        string memory attrs = NFTLib.concat5(
-            NFTLib.buildAttr(unicode"\u5C5E\u6027", elementName),
-            NFTLib.buildAttr(unicode"\u751F\u8096", zodiacName),
-            NFTLib.buildAttr(unicode"\u6027\u522B", genderName),
-            NFTLib.buildAttr(unicode"\u7B49\u7EA7", levelStr),
-            NFTLib.buildAttrLast(unicode"\u7C7B\u578B", rarity)
-        );
-        string memory attrPart = NFTLib.concat2(',"attributes":[', NFTLib.concat2(attrs, ']}'));
-        
-        return NFTLib.concat5(namePart, descPart, imagePart, attrPart, "");
+        return NFTLib.buildTokenURIJson(tokenId, tokenType_, level, element, zodiac, isMale, isRare, imagePath);
     }
     
     function setNftMintCore(address _nftMintCoreAddress) external onlyOwnerOrAuthorizer {

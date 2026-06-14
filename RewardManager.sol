@@ -581,36 +581,27 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         
         // 分配到NFT质押池
         if (nftStakingPool != address(0) && nftStakingTokenAmount > 0) {
-            try token.safeTransfer(nftStakingPool, nftStakingTokenAmount) {
-                if (poolManager != address(0)) {
-                    try IPoolManager(poolManager).addToNFTStakingPool(nftStakingTokenAmount) {} catch {}
-                }
-            } catch {
-                emit RewardTransferFailed(1, nftStakingPool, nftStakingTokenAmount);
+            token.safeTransfer(nftStakingPool, nftStakingTokenAmount);
+            if (poolManager != address(0)) {
+                try IPoolManager(poolManager).addToNFTStakingPool(nftStakingTokenAmount) {} catch {}
             }
         }
 
         // 分配到代币质押池
         if (tokenStakingPool != address(0) && tokenStakingTokenAmount > 0) {
-            try token.safeTransfer(tokenStakingPool, tokenStakingTokenAmount) {
-                if (poolManager != address(0)) {
-                    try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingTokenAmount) {} catch {}
-                }
-                // 调用 TokenStaking 的 recordIncomingTokens 记录流入
-                try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingTokenAmount) {} catch {}
-            } catch {
-                emit RewardTransferFailed(2, tokenStakingPool, tokenStakingTokenAmount);
+            token.safeTransfer(tokenStakingPool, tokenStakingTokenAmount);
+            if (poolManager != address(0)) {
+                try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingTokenAmount) {} catch {}
             }
+            // 调用 TokenStaking 的 recordIncomingTokens 记录流入
+            try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingTokenAmount) {} catch {}
         }
 
         // 分配到竞技场奖励池
         if (arenaRewardPool != address(0) && arenaRewardTokenAmount > 0) {
-            try token.safeTransfer(arenaRewardPool, arenaRewardTokenAmount) {
-                if (poolManager != address(0)) {
-                    try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardTokenAmount) {} catch {}
-                }
-            } catch {
-                emit RewardTransferFailed(3, arenaRewardPool, arenaRewardTokenAmount);
+            token.safeTransfer(arenaRewardPool, arenaRewardTokenAmount);
+            if (poolManager != address(0)) {
+                try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardTokenAmount) {} catch {}
             }
         }
     }
@@ -751,49 +742,34 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
         // 使用 try-catch 分别处理每个分配，允许部分成功
         if (dividendPool != address(0) && dividendAmount > 0) {
-            try token.safeTransfer(dividendPool, dividendAmount) {
+            token.safeTransfer(dividendPool, dividendAmount);
                 try IDividendManager(dividendPool).syncDividendPool() {} catch {}
-            } catch {
-                emit RewardTransferFailed(0, dividendPool, dividendAmount);
-            }
         }
         if (nftStakingPool != address(0) && nftStakingAmount > 0) {
-            try token.safeTransfer(nftStakingPool, nftStakingAmount) {
-                if (poolManager != address(0)) {
-                    try IPoolManager(poolManager).addToNFTStakingPool(nftStakingAmount) {} catch {}
-                }
-            } catch {
-                emit RewardTransferFailed(1, nftStakingPool, nftStakingAmount);
+            token.safeTransfer(nftStakingPool, nftStakingAmount);
+            if (poolManager != address(0)) {
+                try IPoolManager(poolManager).addToNFTStakingPool(nftStakingAmount) {} catch {}
             }
         }
         if (tokenStakingPool != address(0) && tokenStakingAmount > 0) {
-            try token.safeTransfer(tokenStakingPool, tokenStakingAmount) {
-                if (poolManager != address(0)) {
-                    try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch {}
-                }
-                // 调用 TokenStaking 的 recordIncomingTokens 记录流入
-                try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingAmount) {} catch {}
-            } catch {
-                emit RewardTransferFailed(2, tokenStakingPool, tokenStakingAmount);
+            token.safeTransfer(tokenStakingPool, tokenStakingAmount);
+            if (poolManager != address(0)) {
+                try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch {}
             }
+            // 调用 TokenStaking 的 recordIncomingTokens 记录流入
+            try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingAmount) {} catch {}
         }
         if (arenaRewardPool != address(0) && arenaRewardAmount > 0) {
-            try token.safeTransfer(arenaRewardPool, arenaRewardAmount) {
-                if (poolManager != address(0)) {
-                    try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardAmount) {} catch {}
-                }
-            } catch {
-                emit RewardTransferFailed(3, arenaRewardPool, arenaRewardAmount);
+            token.safeTransfer(arenaRewardPool, arenaRewardAmount);
+            if (poolManager != address(0)) {
+                try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardAmount) {} catch {}
             }
         }
         // NFT回购销毁池：直接转账代币到回购合约，回购合约收到代币后可用于回购销毁NFT
         if (nftBuybackPool != address(0) && buybackAmount > 0) {
-            try token.safeTransfer(nftBuybackPool, buybackAmount) {
-                // 尝试调用回购合约的记录函数（如果实现）
-                try IBuybackReceiver(nftBuybackPool).recordIncomingTokens(buybackAmount) {} catch {}
-            } catch {
-                emit RewardTransferFailed(4, nftBuybackPool, buybackAmount);
-            }
+            token.safeTransfer(nftBuybackPool, buybackAmount);
+            // 尝试调用回购合约的记录函数（如果实现）
+            try IBuybackReceiver(nftBuybackPool).recordIncomingTokens(buybackAmount) {} catch {}
         }
 
         totalDistributed += amount;
