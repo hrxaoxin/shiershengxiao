@@ -15,58 +15,58 @@ import "./BreedingLib.sol";
  * @title BreedingCore
  * @dev NFT繁殖核心合约，负责处理NFT繁殖逻辑
  * 
- * 核心职责�?
+ * 核心职责：
  * 1. 繁殖配对创建：创建繁殖配对，锁定父母NFT
- * 2. 繁殖执行：生成子代NFT，继承父母属�?
+ * 2. 繁殖执行：生成子代NFT，继承父母属性
  * 3. 冷却期管理：管理繁殖后的冷却时间
- * 4. 繁殖类型：支持自繁殖和市场繁殖两种模�?
+ * 4. 繁殖类型：支持自繁殖和市场繁殖两种模式
  * 
- * 繁殖类型�?
+ * 繁殖类型：
  * - 自繁殖（BREEDING_TYPE_SELF = 0）：用户使用自己的两个NFT繁殖
  * - 市场繁殖（BREEDING_TYPE_MARKET = 1）：用户与市场上的NFT配对繁殖
  * 
  * 冷却期设置：
  * - 自繁殖冷却：12小时
- * - 市场繁殖冷却�?4小时
+ * - 市场繁殖冷却：24小时
  * 
- * 费用设置�?
+ * 费用设置：
  * - 自繁殖费用：888代币
- * - 市场繁殖费用�?88代币
+ * - 市场繁殖费用：888代币
  * 
- * 繁殖流程�?
- * 1. 用户调用 breed() �?breedMarket() 创建繁殖配对
- * 2. 检查父母NFT是否满足条件（等�?=5、不在冷却期、未被锁定）
- * 3. 锁定父母NFT，扣除繁殖费�?
- * 4. 生成子代NFT，继承父母属性（生肖、属性、等级等�?
- * 5. 解锁父母NFT（进入冷却期�?
+ * 繁殖流程：
+ * 1. 用户调用 breed() 或 breedMarket() 创建繁殖配对
+ * 2. 检查父母NFT是否满足条件（等级>=5、不在冷却期、未被锁定）
+ * 3. 锁定父母NFT，扣除繁殖费用
+ * 4. 生成子代NFT，继承父母属性（生肖、属性、等级等）
+ * 5. 解锁父母NFT（进入冷却期）
  * 6. 用户领取子代NFT
  * 
  * 属性遗传规则：
- * - 生肖：从父母中随机继�?
+ * - 生肖：从父母中随机继承
  * - 属性：从父母中随机继承，有概率变异
- * - 等级：子代等级为父母等级的平均值向下取�?
+ * - 等级：子代等级为父母等级的平均值向下取整
  * - 稀有度：根据父母稀有度计算，有概率提升
  * 
- * 与其他合约的交互�?
+ * 与其他合约的交互：
  * - NFTMint：铸造新的子代NFT
- * - Staking：检查NFT是否处于质押状�?
- * - TokenBurner：销毁繁殖费用代�?
+ * - Staking：检查NFT是否处于质押状态
+ * - TokenBurner：销毁繁殖费用代币
  * 
- * 安全机制�?
- * - ReentrancyGuard：防止重入攻�?
- * - Pausable：可暂停所有繁殖操�?
+ * 安全机制：
+ * - ReentrancyGuard：防止重入攻击
+ * - Pausable：可暂停所有繁殖操作
  * - NFT锁定：繁殖期间锁定NFT防止转移
  * 
- * 权限控制�?
- * - onlyOwner：暂停合约、设置参数、紧急操�?
- * - onlyAuthorized：授权合约调�?
+ * 权限控制：
+ * - onlyOwner：暂停合约、设置参数、紧急操作
+ * - onlyAuthorized：授权合约调用
  */
 contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
     using BreedingLib for *;
 
     /**
-     * @dev 自繁殖冷却时�?
+     * @dev 自繁殖冷却时间
      */
     uint256 public selfBreedingCooldown = 12 hours;
     /**
@@ -74,7 +74,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     uint256 public marketBreedingCooldown = 24 hours;
     /**
-     * @dev 自繁殖费用（代币�?
+     * @dev 自繁殖费用（代币）
      */
     uint256 public selfBreedingFee = 888 * 1e18;
     /**
@@ -98,12 +98,12 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     address public stakingContract;
     /**
-     * @dev 黑洞地址（用于销毁NFT�?
+     * @dev 黑洞地址（用于销毁NFT）
      */
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
 
     /**
-     * @dev 自繁殖类�?
+     * @dev 自繁殖类型
      */
     uint256 public constant BREEDING_TYPE_SELF = 0;
     /**
@@ -111,12 +111,12 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     uint256 public constant BREEDING_TYPE_MARKET = 1;
     /**
-     * @dev 最大繁殖配对数�?
+     * @dev 最大繁殖配对数量
      */
     uint256 public constant MAX_BREEDING_PAIRS = 10000;
 
     /**
-     * @dev 每日最大公共繁殖次�?
+     * @dev 每日最大公共繁殖次数
      */
     uint256 public maxDailyPublicBreedings = 5;
     /**
@@ -138,33 +138,33 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     string public pauseReason;
 
     /**
-     * @dev 繁殖状态：进行�?
+     * @dev 繁殖状态：进行中
      */
     uint256 public constant BREEDING_STATUS_ACTIVE = 0;
     /**
-     * @dev 繁殖状态：已完�?
+     * @dev 繁殖状态：已完成
      */
     uint256 public constant BREEDING_STATUS_COMPLETED = 1;
     /**
-     * @dev 繁殖状态：已取�?
+     * @dev 繁殖状态：已取消
      */
     uint256 public constant BREEDING_STATUS_CANCELLED = 2;
 
     /**
-     * @dev 繁殖配对结构�?
+     * @dev 繁殖配对结构体
      * @param fatherId 父NFT ID
      * @param motherId 母NFT ID
-     * @param maleOwner 父NFT所有�?
-     * @param femaleOwner 母NFT所有�?
+     * @param maleOwner 父NFT所有者
+     * @param femaleOwner 母NFT所有者
      * @param maleCoOwnerId 父NFT共同所有者ID
      * @param femaleCoOwnerId 母NFT共同所有者ID
-     * @param startTime 繁殖开始时�?
-     * @param breedingType 繁殖类型�?=自繁殖，1=市场繁殖�?
-     * @param status 繁殖状�?
+     * @param startTime 繁殖开始时间
+     * @param breedingType 繁殖类型（0=自繁殖，1=市场繁殖）
+     * @param status 繁殖状态
      * @param childId 子代NFT ID（雌性）
      * @param maleChildId 子代NFT ID（雄性）
-     * @param rewardsClaimed 奖励是否已领�?
-     * @param cancelledAt 取消时间（如果被取消�?
+     * @param rewardsClaimed 奖励是否已领取
+     * @param cancelledAt 取消时间（如果被取消）
      */
     struct BreedingPair {
         uint256 fatherId;
@@ -187,7 +187,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     mapping(uint256 => BreedingPair) public breedingPairs;
     /**
-     * @dev 繁殖配对计数�?
+     * @dev 繁殖配对计数器
      */
     uint256 public breedingPairCount;
     /**
@@ -195,7 +195,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     mapping(uint256 => uint256) public breedingCooldowns;
     /**
-     * @dev NFT是否正在繁殖�?
+     * @dev NFT是否正在繁殖中
      */
     mapping(uint256 => bool) public isNFTInActiveBreeding;
     /**
@@ -237,22 +237,40 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _disableInitializers();
     }
 
-    function initialize(address _authorizer) external initializer {
-        require(_authorizer != address(0), "BC: Invalid authorizer address");
+    /**
+     * @dev 初始化函数
+     * @param _nftMintContractAddress NFT铸造合约地址
+     * @param _tokenContractAddress 代币合约地址
+     * @param _stakingContractAddress 质押合约地址
+     * @param _authorizerAddress 授权合约地址
+     */
+    function initialize(address _nftMintContractAddress, address _tokenContractAddress, address _stakingContractAddress, address _authorizerAddress) external initializer {
+        require(_authorizerAddress != address(0), "BC: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        authorizer = _authorizer;
+        nftMintContract = _nftMintContractAddress;
+        tokenContract = _tokenContractAddress;
+        stakingContract = _stakingContractAddress;
+        authorizer = _authorizerAddress;
     }
 
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "BC: Invalid authorizer address");
-        authorizer = _authorizer;
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizerAddress 授权合约地址
+     */
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "BC: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
-    function setStakingContract(address _stakingContract) external onlyOwnerOrAuthorizer {
-        require(_stakingContract != address(0), "BC: Invalid staking contract address");
-        stakingContract = _stakingContract;
+    /**
+     * @dev 设置质押合约地址
+     * @param _stakingContractAddress 质押合约地址
+     */
+    function setStakingContract(address _stakingContractAddress) external onlyOwnerOrAuthorizer {
+        require(_stakingContractAddress != address(0), "BC: Invalid staking contract address");
+        stakingContract = _stakingContractAddress;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -364,7 +382,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         if (fee > 0) {
             require(tokenContract != address(0), "BC: Token contract not set");
-            // 修复：使�?SafeERC20.safeTransferFrom 替代普�?transferFrom，确保安�?
+            // 修复：使用SafeERC20.safeTransferFrom 替代普通transferFrom，确保安全
             IERC20(tokenContract).safeTransferFrom(msg.sender, address(this), fee);
         }
 
@@ -487,7 +505,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 zodiacType = _getChildZodiacType(pair.fatherId, pair.motherId);
         require(zodiacType > 0, "BC: Invalid child zodiac type");
 
-        // 修复：使用多源熵（包�?block.prevrandao）生成种子，增加随机�?
+        // 修复：使用多源熵（包含block.prevrandao）生成种子，增加随机性
         uint256 seed = uint256(keccak256(abi.encodePacked(
             block.timestamp,
             block.number,
@@ -496,7 +514,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             tx.gasprice,
             msg.sender
         )));
-        // 修复：使用不同的熵偏移量生成两个不同�?growth 值，避免 self 模式�?market 模式产生相同�?
+        // 修复：使用不同的熵偏移量生成两个不同的growth 值，避免 self 模式和 market 模式产生相同的值
         uint8 childGrowth = uint8((seed % 91) + 10);
 
         if (pair.breedingType == BREEDING_TYPE_SELF) {
@@ -519,7 +537,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             emit BreedingCompleted(pairId, childId, zodiacType);
             return (childId, 0);
         } else {
-            // 修复：使�?seed 的不同偏移量生成两个独立的随机数，避免重复�?
+            // 修复：使用seed 的不同偏移量生成两个独立的随机数，避免重复值
             uint8 femaleChildGrowth = uint8((seed % 91) + 10);
             uint8 maleChildGrowth = uint8(((seed >> 32) % 91) + 10);
 
@@ -618,8 +636,8 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 fee = breedingType == BREEDING_TYPE_SELF ? selfBreedingFee : marketBreedingFee;
         if (fee == 0) return;
         IERC20 token = IERC20(tokenContract);
-        // 使用 SafeERC20 �?safeTransfer 来确保转账安�?
-        // 同时检查合约余额是否足�?
+        // 使用 SafeERC20 的 safeTransfer 来确保转账安全
+        // 同时检查合约余额是否充足
         uint256 contractBalance = token.balanceOf(address(this));
         if (contractBalance < fee) {
             // 如果余额不足，不执行销毁（防止因余额不足导致繁殖失败）
@@ -650,16 +668,24 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         emit CooldownUpdated(selfBreedingCooldown, marketBreedingCooldown); 
     }
 
-    function setNFTContract(address _nftContract) external onlyOwnerOrAuthorizer { 
-        require(_nftContract != address(0), "BC: Invalid NFT contract address"); 
-        nftMintContract = _nftContract; 
+    /**
+     * @dev 设置NFT铸造合约地址
+     * @param _nftMintContractAddress NFT铸造合约地址
+     */
+    function setNFTContract(address _nftMintContractAddress) external onlyOwnerOrAuthorizer { 
+        require(_nftMintContractAddress != address(0), "BC: Invalid NFT contract address"); 
+        nftMintContract = _nftMintContractAddress; 
         emit NFTContractSet(nftMintContract); 
     }
 
-    function setTokenContract(address _tokenContract) external onlyOwnerOrAuthorizer { 
-        require(_tokenContract != address(0), "BC: Invalid token contract address"); 
-        tokenContract = _tokenContract; 
-        emit TokenContractSet(_tokenContract); 
+    /**
+     * @dev 设置代币合约地址
+     * @param _tokenContractAddress 代币合约地址
+     */
+    function setTokenContract(address _tokenContractAddress) external onlyOwnerOrAuthorizer { 
+        require(_tokenContractAddress != address(0), "BC: Invalid token contract address"); 
+        tokenContract = _tokenContractAddress; 
+        emit TokenContractSet(_tokenContractAddress); 
     }
 
     function getUserActiveOrders(address user) external view returns (uint256[] memory) {

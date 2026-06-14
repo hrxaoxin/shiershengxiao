@@ -13,50 +13,50 @@ import "./NFTInterface.sol";
  * @title Staking
  * @dev NFT质押合约（优化版：支持大规模用户，实时奖励计算）
  *
- * 核心功能�?
- * 1. NFT质押（stakeNFT）：用户将NFT转入合约，进入质押池开始产生奖�?
+ * 核心功能：
+ * 1. NFT质押（stakeNFT）：用户将NFT转入合约，进入质押池开始产生奖励
  * 2. 奖励领取（claimReward）：用户领取累计奖励，基于全局累积奖励快照计算
- * 3. 解除质押（unstakeNFT）：取出质押的NFT，需经过最小锁仓期（minStakingDuration�?
- * 4. 紧急提取（emergencyWithdraw）：经过 timelock 后可强制提取，防止合约异常锁死资�?
+ * 3. 解除质押（unstakeNFT）：取出质押的NFT，需经过最小锁仓期（minStakingDuration）
+ * 4. 紧急提取（emergencyWithdraw）：经过 timelock 后可强制提取，防止合约异常锁死资产
  *
- * 奖励机制设计（O(1) 计算，Gas 优化版）�?
- * - 核心思想：用一个全局累积变量（globalRewardPerWeight）记�?每单位权重的历史累积奖励"
- * - 每个 NFT 记录质押时的 globalRewardPerWeight 快照（accumulatedReward�?
- * - 用户领取时：(当前 globalRewardPerWeight - NFT快照�? × NFT权重 = 该NFT应得奖励
- * - 这样无论多少用户质押，每次新增奖励池只需更新全局变量，无需遍历所有用�?
+ * 奖励机制设计（O(1) 计算，Gas 优化版）：
+ * - 核心思想：用一个全局累积变量（globalRewardPerWeight）记录"每单位权重的历史累积奖励"
+ * - 每个 NFT 记录质押时的 globalRewardPerWeight 快照（accumulatedReward）
+ * - 用户领取时：(当前 globalRewardPerWeight - NFT快照) × NFT权重 = 该NFT应得奖励
+ * - 这样无论多少用户质押，每次新增奖励池只需更新全局变量，无需遍历所有用户
  *
- * 权重系统�?
- * - 普通NFT（水/�?火属性，type < 72）：根据等级赋予权重 1/2/6/18/66
+ * 权重系统：
+ * - 普通NFT（水/木/火属性，type < 72）：根据等级赋予权重 1/2/6/18/66
  * - 稀有NFT（暗/光属性，type >= 72）：根据等级赋予权重 10/12/16/28/76
  * - 等级越高，权重越大，奖励比例越高
  * - 权重同时会更新到 WeightManager / DividendManager，用于分红池分配
  *
- * 动态奖励率调整�?
- * - 基础奖励率（rewardRate）：默认1%�?00/10000�?
+ * 动态奖励率调整：
+ * - 基础奖励率（rewardRate）：默认1%（100/10000）
  * - 最大奖励率（maxRewardRate）：默认2%
- * - 根据每日流入资金自动调整，激励长期持有�?
+ * - 根据每日流入资金自动调整，激励长期持有者
  *
- * 溢出保护�?
- * - globalRewardPerWeight 使用 uint256，设�?REWARD_OVERFLOW_THRESHOLD 预警
- * - 用户快照权重（_userSnapshotWeight）同样有溢出阈值保�?
- * - 达到阈值时触发 rewardResetCount，重置累积变量防止溢�?
+ * 溢出保护：
+ * - globalRewardPerWeight 使用 uint256，设置 REWARD_OVERFLOW_THRESHOLD 预警
+ * - 用户快照权重（_userSnapshotWeight）同样有溢出阈值保护
+ * - 达到阈值时触发 rewardResetCount，重置累积变量防止溢出
  *
- * 安全限制�?
- * - 最小质押持续时间（minStakingDuration = 30分钟）：防止刷奖�?
+ * 安全限制：
+ * - 最小质押持续时间（minStakingDuration = 30分钟）：防止刷奖励
  * - 重入保护（ReentrancyGuard）：防止 claimReward 时的重入攻击
- * - 紧急提�?timelock（emergencyWithdrawTimelock = 48小时）：防止恶意 owner 提取
+ * - 紧急提取 timelock（emergencyWithdrawTimelock = 48小时）：防止恶意 owner 提取
  * - 暂停机制（paused）：紧急情况下暂停全部用户操作
  *
- * 典型用户流程�?
- * 1. 授权合约转移NFT（approve/setApprovalForAll�?
+ * 典型用户流程：
+ * 1. 授权合约转移NFT（approve/setApprovalForAll）
  * 2. 调用 stakeNFT(tokenId) 质押NFT
- * 3. 等待若干时间（合约持续更�?globalRewardPerWeight�?
+ * 3. 等待若干时间（合约持续更新 globalRewardPerWeight）
  * 4. 调用 claimReward() 领取累计奖励
  * 5. 30分钟锁仓期后调用 unstakeNFT(tokenId) 解除质押
  *
- * 合约升级�?
- * - UUPS 可升级模式，�?onlyOwner 授权升级
- * - 所有状态变量均�?storage 存储，升级后保留
+ * 合约升级：
+ * - UUPS 可升级模式，需 onlyOwner 授权升级
+ * - 所有状态变量均在 storage 存储，升级后保留
  */
 contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
@@ -69,15 +69,15 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     uint256 public minStakingDuration = 30 minutes;
-    uint256 public rewardRate = 100; // 万分�?(1% = 100/10000)
+    uint256 public rewardRate = 100; // 万分比 (1% = 100/10000)
     uint256 public maxRewardRate = 200; // 最大奖励率2%
     uint256 public rateStep = 10; // 调整步长0.1%
 
     uint256 public totalStakedNFTs;
     uint256 public totalWeightedNFTs;
     
-    // 核心优化：全局累积的每单位权重奖励�?
-    // 每次 calculateDailyReward 时增加，用户领取时做差值计�?
+    // 核心优化：全局累积的每单位权重奖励
+    // 每次 calculateDailyReward 时增加，用户领取时做差值计算
     uint256 public globalRewardPerWeight;
     
     uint256 public constant REWARD_OVERFLOW_THRESHOLD = 0x8000000000000000000000000000000000000000000000000000000000000000; // ~50% of 2^256
@@ -91,18 +91,18 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     uint256 public todayRewardAmount;
     uint256 public todayStart;
 
-    // 用户级别累计权重跟踪（优�?getPendingReward / claimReward �?Gas 消耗）
-    mapping(address => uint256) public userStakedWeight;      // 用户质押的NFT总权�?
-    mapping(address => uint256) private _userSnapshotWeight;   // Σ(accumulatedReward * weight) 每用�?
+    // 用户级别累计权重跟踪（优化 getPendingReward / claimReward 的 Gas 消耗）
+    mapping(address => uint256) public userStakedWeight;      // 用户质押的NFT总权重
+    mapping(address => uint256) private _userSnapshotWeight;   // Σ(accumulatedReward * weight) 每用户
     
-    // 用户级别累计快照溢出保护阈值（距离最大值的安全距离�?
+    // 用户级别累计快照溢出保护阈值（距离最大值的安全距离）
     uint256 public constant USER_SNAPSHOT_OVERFLOW_THRESHOLD = 158456325028528675187087900672; // ~90% of 2^256
 
     struct StakingInfo {
         address owner;
         uint256 stakeTime;
         uint256 lastClaimTime;
-        uint256 accumulatedReward; // 记录�?NFT 上次结算时的 globalRewardPerWeight 快照
+        uint256 accumulatedReward; // 记录该 NFT 上次结算时的 globalRewardPerWeight 快照
         bool isRare;
     }
 
@@ -111,6 +111,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     mapping(address => bool) public isStakingUser;
     mapping(address => uint256) public stakingUserIndex;
     address[] public stakingUsers;
+    
+    // 优化：tokenId 到用户在 userStakedNFTs 数组中的索引映射
+    mapping(uint256 => uint256) public tokenIdToUserIndex;
 
     uint256 public normalNFTWeight = 66;
     uint256 public rareNFTWeight = 76;
@@ -134,28 +137,53 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
-    function initialize(address _authorizer) external initializer {
-        require(_authorizer != address(0), "Staking: Invalid authorizer address");
+    function initialize(
+        address _authorizerAddress,
+        address _nftContractAddress,
+        address _rewardTokenContractAddress,
+        address _breedingContractAddress
+    ) external initializer {
+        require(_authorizerAddress != address(0), "Staking: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        authorizer = _authorizer;
+        authorizer = _authorizerAddress;
+        if (_nftContractAddress != address(0)) {
+            nftContract = _nftContractAddress;
+        }
+        if (_rewardTokenContractAddress != address(0)) {
+            rewardTokenContract = _rewardTokenContractAddress;
+        }
+        if (_breedingContractAddress != address(0)) {
+            breedingContract = _breedingContractAddress;
+        }
+        
+        // 初始化带默认值的参数
+        minStakingDuration = 30 minutes;
+        rewardRate = 100;
+        maxRewardRate = 200;
+        rateStep = 10;
+        emergencyWithdrawTimelock = 48 hours;
+        normalNFTWeight = 66;
+        rareNFTWeight = 76;
+        minStakingLevel = 1;
+        
         emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
     }
 
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "Staking: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "Staking: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
-    function setNFTContract(address _nftContract) external onlyOwnerOrAuthorizer {
-        require(_nftContract != address(0), "Staking: Invalid NFT contract address");
-        nftContract = _nftContract;
+    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
+        require(_nftContractAddress != address(0), "Staking: Invalid NFT contract address");
+        nftContract = _nftContractAddress;
     }
 
-    function setBreedingContract(address _breedingContract) external onlyOwnerOrAuthorizer {
-        require(_breedingContract != address(0), "Staking: Invalid breeding contract address");
-        breedingContract = _breedingContract;
+    function setBreedingContract(address _breedingContractAddress) external onlyOwnerOrAuthorizer {
+        require(_breedingContractAddress != address(0), "Staking: Invalid breeding contract address");
+        breedingContract = _breedingContractAddress;
     }
 
     function setMinStakingLevel(uint8 _minLevel) external onlyOwnerOrAuthorizer {
@@ -197,12 +225,12 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             require(stakingInfo[tokenId].owner == address(0), "Staking: Already staked");
             require(nft.ownerOf(tokenId) == msg.sender, "Staking: Not owner of token");
             
-            // 检�?NFT 是否正在繁殖�?
+            // 检查 NFT 是否正在繁殖
             if (breedingContract != address(0)) {
                 require(!IBreeding(breedingContract).isNFTInActiveBreeding(tokenId), "Staking: NFT is in breeding");
             }
 
-            // 检�?NFT 等级是否满足质押要求
+            // 检查 NFT 等级是否满足质押要求
             uint8 tokenLevel = nft.tokenLevel(tokenId);
             require(tokenLevel >= minStakingLevel, "Staking: NFT level below minimum requirement");
 
@@ -213,11 +241,13 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
                 owner: msg.sender,
                 stakeTime: block.timestamp,
                 lastClaimTime: block.timestamp,
-                accumulatedReward: globalRewardPerWeight, // 初始化快照为当前全局�?
+                accumulatedReward: globalRewardPerWeight, // 初始化快照为当前全局值
                 isRare: isRareToken
             });
 
+            uint256 newIndex = userStakedNFTs[msg.sender].length;
             userStakedNFTs[msg.sender].push(tokenId);
+            tokenIdToUserIndex[tokenId] = newIndex;
             totalStakedNFTs++;
             uint256 weight = isRareToken ? rareNFTWeight : normalNFTWeight;
             totalWeightedNFTs += weight;
@@ -225,7 +255,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             userStakedWeight[msg.sender] += weight;
             
             uint256 snapshotIncrement = globalRewardPerWeight * weight;
-            // 修复：使�?< 而不�?<= 来正确防止溢�?
+            // 修复：使用 < 而不是 <= 来正确防止溢出
             require(_userSnapshotWeight[msg.sender] < USER_SNAPSHOT_OVERFLOW_THRESHOLD - snapshotIncrement, "Staking: User snapshot overflow imminent");
             _userSnapshotWeight[msg.sender] += snapshotIncrement;
         }
@@ -241,16 +271,16 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         // 先计算并领取当前用户的所有待领取奖励
         uint256 totalClaimable = _calcUserPending(msg.sender);
         if (totalClaimable > 0) {
-            // 只有在有待领取奖励时才检查奖励代币合约是否设�?
+            // 只有在有待领取奖励时才检查奖励代币合约是否设置
             require(rewardTokenContract != address(0), "Staking: Reward token contract not set");
             IERC20 rewardToken = IERC20(rewardTokenContract);
             require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance for unstake");
 
-            // 先领取奖�?
+            // 先领取奖励
             rewardToken.safeTransfer(msg.sender, totalClaimable);
             emit RewardClaimed(msg.sender, totalClaimable);
 
-            // 重置用户状�?
+            // 重置用户状态
             uint256[] storage userNFTs = userStakedNFTs[msg.sender];
             for (uint256 j = 0; j < userNFTs.length; j++) {
                 StakingInfo storage info = stakingInfo[userNFTs[j]];
@@ -262,7 +292,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             pendingRewards[msg.sender] = 0;
         }
 
-        // 更新snapshot以反映当前stake状�?
+        // 更新snapshot以反映当前stake状态
         uint256 currentWeight = userStakedWeight[msg.sender];
         if (currentWeight > 0) {
             _userSnapshotWeight[msg.sender] = globalRewardPerWeight * currentWeight;
@@ -298,7 +328,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     /**
-     * @dev 领取奖励（Gas优化：用户级别累计公式计算总量，避免逐NFT计算�?
+     * @dev 领取奖励（Gas优化：用户级别累计公式计算总量，避免逐NFT计算）
      */
     function claimReward() external whenNotPaused nonReentrant {
         uint256[] storage nfts = userStakedNFTs[msg.sender];
@@ -312,7 +342,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         IERC20 rewardToken = IERC20(rewardTokenContract);
         require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance");
         
-        // 重置所�?NFT 的快照为当前全局值（必须遍历以更�?storage�?
+        // 重置所有 NFT 的快照为当前全局值（必须遍历以更新 storage）
         for (uint256 i = 0; i < nfts.length; i++) {
             StakingInfo storage info = stakingInfo[nfts[i]];
             if (info.owner == msg.sender) {
@@ -334,7 +364,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
 
     function _calculatePendingForNFT(StakingInfo storage info) internal view returns (uint256) {
         uint256 weight = info.isRare ? rareNFTWeight : normalNFTWeight;
-        // 奖励 = (当前全局�?- 上次快照) * 权重 / 精度
+        // 奖励 = (当前全局值 - 上次快照) * 权重 / 精度
         if (globalRewardPerWeight <= info.accumulatedReward) return 0;
         return (globalRewardPerWeight - info.accumulatedReward) * weight / STAKING_REWARD_PRECISION;
     }
@@ -350,7 +380,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     uint256 public constant STAKING_REWARD_PRECISION = 1e18;
 
     /**
-     * @dev 每日奖励计算（仅增加全局增量，不遍历用户�?
+     * @dev 每日奖励计算（仅增加全局增量，不遍历用户）
      */
     function calculateDailyReward() external whenNotPaused onlyOwnerOrAuthorizer {
         require(rewardTokenContract != address(0), "Staking: Reward token contract not set");
@@ -360,7 +390,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     /**
-     * @dev 内部检查是否需要计算每日奖�?
+     * @dev 内部检查是否需要计算每日奖励
      */
     function _shouldCalculateDailyReward() internal view returns (bool) {
         return rewardTokenContract != address(0) && 
@@ -383,7 +413,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         }
         
         if (totalWeightedNFTs > 0 && dailyReward > 0) {
-            // 修复：移�?unchecked 块，添加安全检查防止溢�?
+            // 修复：移除 unchecked 块，添加安全检查防止溢出
             uint256 increment = (dailyReward * STAKING_REWARD_PRECISION) / totalWeightedNFTs;
             require(globalRewardPerWeight <= type(uint256).max - increment, "Staking: Reward overflow imminent");
             if (globalRewardPerWeight + increment >= REWARD_OVERFLOW_THRESHOLD) {
@@ -441,7 +471,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     
     /**
      * @dev 继续未完成的重置操作（公开调用，用于批量处理）
-     * @param startIndex 开始索�?
+     * @param startIndex 开始索引
      * @param batchSize 批量大小
      */
     function continueResetRewardTracking(uint256 startIndex, uint256 batchSize) external onlyOwnerOrAuthorizer {
@@ -476,18 +506,20 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
 
     function _removeFromUserStakedNFTs(address user, uint256 tokenId) internal {
         uint256[] storage nfts = userStakedNFTs[user];
-        bool found = false;
-        uint256 removeIndex = 0;
-        for (uint256 i = 0; i < nfts.length; i++) {
-            if (nfts[i] == tokenId) {
-                found = true;
-                removeIndex = i;
-                break;
-            }
+        uint256 removeIndex = tokenIdToUserIndex[tokenId];
+        
+        // 验证索引有效性：如果 removeIndex 超出范围，或者对应位置的 tokenId 不匹配，说明未质押
+        require(removeIndex < nfts.length && nfts[removeIndex] == tokenId, "Staking: Token not in user's staked list");
+        
+        uint256 lastIndex = nfts.length - 1;
+        if (removeIndex != lastIndex) {
+            // 将最后一个元素移到当前位置
+            uint256 lastTokenId = nfts[lastIndex];
+            nfts[removeIndex] = lastTokenId;
+            tokenIdToUserIndex[lastTokenId] = removeIndex;
         }
-        require(found, "Staking: Token not in user's staked list");
-        nfts[removeIndex] = nfts[nfts.length - 1];
         nfts.pop();
+        delete tokenIdToUserIndex[tokenId];
     }
 
     function _removeFromStakingUsers(address user) internal {
@@ -551,7 +583,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     /**
-     * @dev 查询待领取奖励（Gas 优化：O(1) 用户级别累计公式，不遍历 NFT 列表�?
+     * @dev 查询待领取奖励（Gas 优化：O(1) 用户级别累计公式，不遍历 NFT 列表）
      */
     function getPendingReward(address user) external view returns (uint256) {
         return _calcUserPending(user);
@@ -559,8 +591,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
 
     /**
      * @dev 内部函数：O(1) 计算用户总待领取奖励
-     * 公式：�?G - Ai) * Wi / P = (G * ΣWi - Σ(Ai * Wi)) / PRECISION
-     * 采用先乘后除方式，避免早期除法导致精度损�?
+     * 公式：(G - Ai) * Wi / P = (G * ΣWi - Σ(Ai * Wi)) / PRECISION
+     * 采用先乘后除方式，避免早期除法导致精度损失
      */
     function _calcUserPending(address user) internal view returns (uint256) {
         uint256 totalWeight = userStakedWeight[user];
@@ -568,19 +600,19 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
 
         uint256 snapshotBase = _userSnapshotWeight[user];
         
-        // 修复：移�?unchecked 块，使用安全计算方式
+        // 修复：移除 unchecked 块，使用安全计算方式
         uint256 rewardBase = globalRewardPerWeight * totalWeight;
 
         if (rewardBase <= snapshotBase) return pendingRewards[user];
         
-        // 修复：添加安全检查防止溢�?
+        // 修复：添加安全检查防止溢出
         uint256 earnedReward = (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
         return earnedReward + pendingRewards[user];
     }
 
-    function setRewardTokenContract(address _tokenContract) external onlyOwnerOrAuthorizer {
-        require(_tokenContract != address(0), "Staking: Invalid token address");
-        rewardTokenContract = _tokenContract;
+    function setRewardTokenContract(address _rewardTokenContractAddress) external onlyOwnerOrAuthorizer {
+        require(_rewardTokenContractAddress != address(0), "Staking: Invalid token address");
+        rewardTokenContract = _rewardTokenContractAddress;
     }
 
     function pause(string memory reason) external onlyOwner {
@@ -596,10 +628,10 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     /**
-     * @dev 获取用户质押统计（Gas 优化：使用用户级�?O(1) 公式计算待领取奖励）
+     * @dev 获取用户质押统计（Gas 优化：使用用户级别 O(1) 公式计算待领取奖励）
      * @param user 用户地址
      * @return totalStaked NFT总数
-     * @return totalPendingReward 待领取奖�?
+     * @return totalPendingReward 待领取奖励
      * @return rareCount 稀有NFT数量
      * @return normalCount 普通NFT数量
      */
@@ -626,7 +658,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     /**
-     * @dev 获取质押池统�?
+     * @dev 获取质押池统计
      * @return totalStakers 质押者总数
      * @return totalNFTs 质押NFT总数
      * @return todayIncoming 今日流入
@@ -642,9 +674,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     /**
-     * @dev 获取用户在质押池中的排名（按质押时间�?
+     * @dev 获取用户在质押池中的排名（按质押时间）
      * @param user 用户地址
-     * @return rank 排名�?开始）�?表示未质�?
+     * @return rank 排名（从1开始），0表示未质押
      */
     function getUserStakingRank(address user) external view returns (uint256 rank) {
         if (!isStakingUser[user]) {
@@ -685,7 +717,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     /**
-     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁�?
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
      */
     receive() external payable {}
 

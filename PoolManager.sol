@@ -12,42 +12,42 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * @title PoolManager
  * @dev 资金池管理合约，管理游戏的各种奖励池
  *
- * 核心职责�?
+ * 核心职责：
  * 1. 资金归集：接收来自交易市场、战斗、繁殖、铸造等业务产生的手续费
- * 2. 资金分配：按照预定比例，将代�?BNB分入不同的资金池
- * 3. 资金释放：当 Staking / TokenStaking / ArenaRanking 等合约需要时，批准提�?
+ * 2. 资金分配：按照预定比例，将代币BNB分入不同的资金池
+ * 3. 资金释放：当 Staking / TokenStaking / ArenaRanking 等合约需要时，批准提取
  *
  * 池子类型常量（poolType）：
- * - POOL_NFT_STAKING = 0: NFT质押奖励池，奖励给质押NFT的用�?
+ * - POOL_NFT_STAKING = 0: NFT质押奖励池，奖励给质押NFT的用户
  * - POOL_TOKEN_STAKING = 1: 代币质押奖励池，奖励给质押代币的用户
  * - POOL_ARENA_REWARD = 2: 竞技场奖励池，奖励给竞技场排名靠前的玩家
  *
- * 资金来源（预期）�?
- * - NFTTrading.sol：交易手续费 5%，其中部分进入各奖励�?
+ * 资金来源（预期）：
+ * - NFTTrading.sol：交易手续费 5%，其中部分进入各奖励池
  * - Battle.sol：战斗入场费，胜者获得奖励，手续费进入竞技场池
- * - Breeding.sol：繁殖费用，部分进入 NFT质押�?
- * - TokenBurner.sol：铸造费用，部分进入分红池和质押�?
+ * - Breeding.sol：繁殖费用，部分进入 NFT质押池
+ * - TokenBurner.sol：铸造费用，部分进入分红池和质押池
  *
- * 数据结构�?
- * - poolBalances[poolType]：各池子的代币余�?
+ * 数据结构：
+ * - poolBalances[poolType]：各池子的代币余额
  * - 另有 BNB 余额按相同逻辑管理
- * - 资金流动记录（FLOW_DEPOSIT/FLOW_WITHDRAW），使用环形缓冲区，最�?MAX_FLOW_RECORDS = 1000 �?
+ * - 资金流动记录（FLOW_DEPOSIT/FLOW_WITHDRAW），使用环形缓冲区，最多 MAX_FLOW_RECORDS = 1000 条
  *
- * 权限控制�?
- * - onlyOwner：可设置授权合约、紧急暂停、紧急提�?
- * - onlyAuthorizedContract：授权的业务合约（NFTTrading/Battle/Breeding 等）可调�?deposit
+ * 权限控制：
+ * - onlyOwner：可设置授权合约、紧急暂停、紧急提取
+ * - onlyAuthorizedContract：授权的业务合约（NFTTrading/Battle/Breeding 等）可调用 deposit
  * - onlyAuthorizedPoolConsumer：授权的消费者合约（Staking/TokenStaking/ArenaRanking）可调用 withdraw
  *
  * 安全特性：
- * - ReentrancyGuard：防止提取时的重入攻�?
- * - Pausable：紧急情况下可暂停所有存�?提取操作
+ * - ReentrancyGuard：防止提取时的重入攻击
+ * - Pausable：紧急情况下可暂停所有存入/提取操作
  * - 地址验证：所有目标地址必须非零，防止误操作锁死资金
- * - UUPS 升级：支�?onlyOwner 授权的合约升级，保留所有状�?
+ * - UUPS 升级：支持 onlyOwner 授权的合约升级，保留所有状态
  *
- * 典型工作流程�?
- * 1. NFTTrading 完成一笔交�?�?调用 depositToPool(poolType, amount) 存入手续�?
- * 2. Staking 合约每日结算 �?调用 withdrawFromPool(POOL_NFT_STAKING, amount) 提取奖励
- * 3. Staking 合约将提取的奖励通过 updateRewardPool 分发给质押者（更新 globalRewardPerWeight�?
+ * 典型工作流程：
+ * 1. NFTTrading 完成一笔交易后，调用 depositToPool(poolType, amount) 存入手续费
+ * 2. Staking 合约每日结算时，调用 withdrawFromPool(POOL_NFT_STAKING, amount) 提取奖励
+ * 3. Staking 合约将提取的奖励通过 updateRewardPool 分发给质押者（更新 globalRewardPerWeight）
  * 4. Owner 可在紧急情况下调用 emergencyWithdraw 提取资金到安全地址
  */
 contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
@@ -76,7 +76,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     uint256 public constant MAX_FLOW_RECORDS = 1000;
 
     /**
-     * @dev 授权合约地址（Authorizer�?
+     * @dev 授权合约地址（Authorizer）
      */
     address public authorizer;
 
@@ -93,7 +93,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     uint256 public totalWithdrawn;
 
     /**
-     * @dev 紧急暂停标�?
+     * @dev 紧急暂停标志
      */
     bool public paused;
 
@@ -103,15 +103,15 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 初始化函�?
-     * @param _authorizer 授权合约地址
+     * @dev 初始化函数
+     * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address _authorizer) external initializer {
-        require(_authorizer != address(0), "PoolManager: Invalid authorizer address");
+    function initialize(address _authorizerAddress) external initializer {
+        require(_authorizerAddress != address(0), "PoolManager: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        authorizer = _authorizer;
+        authorizer = _authorizerAddress;
     }
 
     /**
@@ -121,15 +121,15 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "PoolManager: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "PoolManager: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
     /**
-     * @dev 检查是否为授权调用者（owner或authorizer�?
+     * @dev 检查是否为授权调用者（owner或authorizer）
      */
     modifier onlyOwnerOrAuthorizer() {
         require(msg.sender == owner() || msg.sender == authorizer, "PoolManager: Not authorized");
@@ -137,11 +137,11 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 添加到NFT质押�?
+     * @dev 添加到NFT质押池
      */
     function addToNFTStakingPool(uint256 amount) external onlyOwnerOrAuthorizer whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        // 修复：添加溢出检�?
+        // 修复：添加溢出检查
         uint256 newBalance = poolBalances[POOL_NFT_STAKING] + amount;
         require(newBalance >= poolBalances[POOL_NFT_STAKING], "PoolManager: Overflow");
         poolBalances[POOL_NFT_STAKING] = newBalance;
@@ -154,7 +154,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function addToTokenStakingPool(uint256 amount) external onlyOwnerOrAuthorizer whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        // 修复：添加溢出检�?
+        // 修复：添加溢出检查
         uint256 newBalance = poolBalances[POOL_TOKEN_STAKING] + amount;
         require(newBalance >= poolBalances[POOL_TOKEN_STAKING], "PoolManager: Overflow");
         poolBalances[POOL_TOKEN_STAKING] = newBalance;
@@ -167,7 +167,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function addToArenaRewardPool(uint256 amount) external onlyOwnerOrAuthorizer whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
-        // 修复：添加溢出检�?
+        // 修复：添加溢出检查
         uint256 newBalance = poolBalances[POOL_ARENA_REWARD] + amount;
         require(newBalance >= poolBalances[POOL_ARENA_REWARD], "PoolManager: Overflow");
         poolBalances[POOL_ARENA_REWARD] = newBalance;
@@ -178,7 +178,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     event PoolDeposited(uint256 indexed poolType, uint256 amount);
 
     /**
-     * @dev 从NFT质押池提�?
+     * @dev 从NFT质押池提取
      * @param amount 提取数量
      */
     function withdrawFromNFTStakingPool(uint256 amount) external onlyOwnerOrAuthorizer whenNotPaused {
@@ -209,8 +209,8 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 紧急提取（合约所有者可随时提取�?
-     * @param token 代币地址（address(0)表示BNB�?
+     * @dev 紧急提取（合约所有者可随时提取）
+     * @param token 代币地址（address(0)表示BNB）
      * @param to 接收地址
      * @param amount 提取数量
      */
@@ -244,7 +244,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 资金流动记录结构�?
+     * @dev 资金流动记录结构体
      */
     struct FlowRecord {
         uint256 timestamp;
@@ -256,12 +256,12 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 资金流动记录数组（使用环形缓冲区�?
+     * @dev 资金流动记录数组（使用环形缓冲区）
      */
     FlowRecord[] public flowRecords;
     
     /**
-     * @dev 资金流动记录起始索引（环形缓冲区�?
+     * @dev 资金流动记录起始索引（环形缓冲区）
      */
     uint256 public flowRecordsStartIndex;
 
@@ -301,7 +301,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取指定范围的资金流动记�?
+     * @dev 获取指定范围的资金流动记录
      * @param startIndex 起始索引
      * @param count 获取数量
      */
@@ -323,7 +323,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取最新N条资金流动记�?
+     * @dev 获取最新N条资金流动记录
      * @param count 记录数量
      */
     function getRecentFlowRecords(uint256 count) external view returns (FlowRecord[] memory) {
@@ -345,7 +345,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取指定池子的资金流动记�?
+     * @dev 获取指定池子的资金流动记录
      * @param poolType 池子类型
      * @param count 获取数量
      */
@@ -379,7 +379,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
     
     /**
-     * @dev 导出所有资金流动记录（供管理员导出归档�?
+     * @dev 导出所有资金流动记录（供管理员导出归档）
      * @return 所有flowRecords记录
      */
     function exportAllFlowRecords() external view onlyOwner returns (FlowRecord[] memory) {
@@ -409,11 +409,11 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 获取池子统计
-     * @return nftStakingBalance NFT质押池余�?
-     * @return tokenStakingBalance 代币质押池余�?
+     * @return nftStakingBalance NFT质押池余额
+     * @return tokenStakingBalance 代币质押池余额
      * @return arenaRewardBalance 竞技场奖励池余额
-     * @return totalDeposited_ 总存�?
-     * @return totalWithdrawn_ 总提�?
+     * @return totalDeposited_ 总存入
+     * @return totalWithdrawn_ 总提取
      */
     function getPoolStats() external view returns (
         uint256 nftStakingBalance,
@@ -430,7 +430,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁�?
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
      */
     receive() external payable {}
 

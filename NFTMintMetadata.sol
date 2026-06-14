@@ -62,6 +62,16 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     address public authorizer;
     
     /**
+     * @dev IPFS 基础 URL（普通NFT）
+     */
+    string public ipfsBaseNormal;
+    
+    /**
+     * @dev IPFS 基础 URL（稀有NFT）
+     */
+    string public ipfsBaseRare;
+    
+    /**
      * @dev NFT数据结果结构体
      * @param tokenType_ NFT类型
      * @param attack 攻击力
@@ -103,16 +113,35 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     
     /**
      * @dev 初始化函数
-     * @param _nftMintCore NFT铸造核心合约地址
-     * @param _authorizer 授权合约地址
+     * @param _nftMintCoreAddress NFT铸造核心合约地址
+     * @param _authorizerAddress 授权合约地址
+     * @param _ipfsBaseNormal 普通NFT的IPFS基础URL（可选，有默认值）
+     * @param _ipfsBaseRare 稀有NFT的IPFS基础URL（可选，有默认值）
      */
-    function initialize(address _nftMintCore, address _authorizer) public initializer {
+    function initialize(
+        address _nftMintCoreAddress, 
+        address _authorizerAddress,
+        string calldata _ipfsBaseNormal,
+        string calldata _ipfsBaseRare
+    ) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
-        require(_nftMintCore != address(0), "NFTMintMetadata: Invalid NFTMintCore address");
-        require(_authorizer != address(0), "NFTMintMetadata: Invalid authorizer address");
-        nftMintCore = _nftMintCore;
-        authorizer = _authorizer;
+        require(_nftMintCoreAddress != address(0), "NFTMintMetadata: Invalid NFTMintCore address");
+        require(_authorizerAddress != address(0), "NFTMintMetadata: Invalid authorizer address");
+        nftMintCore = _nftMintCoreAddress;
+        authorizer = _authorizerAddress;
+        
+        if (bytes(_ipfsBaseNormal).length > 0) {
+            ipfsBaseNormal = _ipfsBaseNormal;
+        } else {
+            ipfsBaseNormal = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/";
+        }
+        
+        if (bytes(_ipfsBaseRare).length > 0) {
+            ipfsBaseRare = _ipfsBaseRare;
+        } else {
+            ipfsBaseRare = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/";
+        }
     }
     
     /**
@@ -166,7 +195,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         });
     }
     
-    function _buildTokenURIJson(uint256 tokenId, uint256 tokenType_, uint8 level) internal pure returns (string memory) {
+    function _buildTokenURIJson(uint256 tokenId, uint256 tokenType_, uint8 level) internal view returns (string memory) {
         uint256 element = tokenType_ / 24;
         uint256 zodiac = (tokenType_ % 24 / 2) % 12;
         uint8 gender = uint8(tokenType_ % 2);
@@ -192,6 +221,10 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
             NFTLib.concat2(levelStr, unicode"\u00B7\u6301\u6709\u53EF\u4EB2\u53D7\u751F\u6001\u5206\u5143\"")
         );
         
+        string memory imageBase = tokenType_ >= 72 ? ipfsBaseRare : ipfsBaseNormal;
+        string memory imagePath = NFTLib.buildImagePath(imageBase, tokenType_);
+        string memory imagePart = NFTLib.concat2(',"image":"', NFTLib.concat2(imagePath, '"'));
+        
         string memory attrs = NFTLib.concat5(
             NFTLib.buildAttr(unicode"\u5C5E\u6027", elementName),
             NFTLib.buildAttr(unicode"\u751F\u8096", zodiacName),
@@ -201,20 +234,25 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         );
         string memory attrPart = NFTLib.concat2(',"attributes":[', NFTLib.concat2(attrs, ']}'));
         
-        return NFTLib.concat5(namePart, descPart, attrPart, "", "");
+        return NFTLib.concat5(namePart, descPart, imagePart, attrPart, "");
     }
     
-    function setNftMintCore(address _nftMintCore) external onlyOwnerOrAuthorizer {
-        require(_nftMintCore != address(0), "NFTMintMetadata: Invalid address");
-        nftMintCore = _nftMintCore;
+    function setNftMintCore(address _nftMintCoreAddress) external onlyOwnerOrAuthorizer {
+        require(_nftMintCoreAddress != address(0), "NFTMintMetadata: Invalid address");
+        nftMintCore = _nftMintCoreAddress;
+    }
+
+    function setIPFSBases(string calldata _ipfsBaseNormal, string calldata _ipfsBaseRare) external onlyOwnerOrAuthorizer {
+        ipfsBaseNormal = _ipfsBaseNormal;
+        ipfsBaseRare = _ipfsBaseRare;
     }
 
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 新的授权合约地址
+     * @param _authorizerAddress 新的授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "NFTMintMetadata: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "NFTMintMetadata: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 }

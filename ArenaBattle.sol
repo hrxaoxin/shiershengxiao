@@ -12,31 +12,31 @@ import "./NFTInterface.sol";
  * @title ArenaBattle
  * @dev 竞技场战斗合约，执行 NFT 之间的战斗逻辑
  * 
- * 核心职责�?
- * 1. 战斗执行：处�?PvE（模拟玩家）�?PvP（真实玩家）战斗
+ * 核心职责：
+ * 1. 战斗执行：处理 PvE（模拟玩家）和 PvP（真实玩家）战斗
  * 2. 赛季管理：跟踪赛季状态、玩家积分、排名等
- * 3. 奖励计算：根据战斗结果分配奖�?
- * 4. 排行榜更新：战斗结束后更�?ArenaLeaderboard
+ * 3. 奖励计算：根据战斗结果分配奖励
+ * 4. 排行榜更新：战斗结束后更新 ArenaLeaderboard
  * 
- * 战斗类型�?
+ * 战斗类型：
  * - PvE（Mock Battle）：挑战模拟玩家，不涉及真实对手
- * - PvP（Real Battle）：挑战真实玩家，需要双方设置战斗队�?
+ * - PvP（Real Battle）：挑战真实玩家，需要双方设置战斗队伍
  * 
- * 与其他合约的交互�?
+ * 与其他合约的交互：
  * - Battle：调用核心战斗逻辑
  * - ArenaLeaderboard：更新排行榜数据
- * - ArenaPlayer：管理玩�?NFT 质押
- * - RankingContract：发起战斗请�?
+ * - ArenaPlayer：管理玩家 NFT 质押
+ * - RankingContract：发起战斗请求
  * 
- * 安全机制�?
- * - ReentrancyGuard：防止重入攻�?
- * - Pausable：可暂停所有操�?
- * - 战斗冷却�?0秒冷却时间防止刷战斗
- * - NFT 锁定：战斗期间锁�?NFT 防止转移
+ * 安全机制：
+ * - ReentrancyGuard：防止重入攻击
+ * - Pausable：可暂停所有操作
+ * - 战斗冷却：30秒冷却时间防止刷战斗
+ * - NFT 锁定：战斗期间锁定 NFT 防止转移
  * 
- * 权限控制�?
- * - onlyOwner：设置合约地址、配置参�?
- * - onlyAuthorized：发起战斗调�?
+ * 权限控制：
+ * - onlyOwner：设置合约地址、配置参数
+ * - onlyAuthorized：发起战斗调用
  */
 contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     /**
@@ -65,24 +65,24 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     address public authorizer;
     
     /**
-     * @dev 每次胜利的基础奖励�?.1 BNB�?
+     * @dev 每次胜利的基础奖励（0.1 BNB）
      */
     uint256 public baseRewardPerWin = 100000000000000000; // 0.1 BNB
     
     /**
-     * @dev 战斗冷却时间（秒�?
+     * @dev 战斗冷却时间（秒）
      */
     uint256 public constant BATTLE_COOLDOWN = 30 seconds;
     /**
-     * @dev 最大模拟玩家排�?
+     * @dev 最大模拟玩家排名
      */
     uint256 public constant MAX_MOCK_RANKING = 100;
     /**
-     * @dev 队伍大小（NFT 数量�?
+     * @dev 队伍大小（NFT 数量）
      */
     uint256 public constant TEAM_SIZE = 6;
     /**
-     * @dev 模拟玩家 ID 偏移�?
+     * @dev 模拟玩家 ID 偏移量
      */
     uint256 public constant MOCK_ID_OFFSET = 10000;
     /**
@@ -94,7 +94,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     uint256 public constant DAILY_ATTEMPTS = 5;
     /**
-     * @dev 最大模拟玩家数�?
+     * @dev 最大模拟玩家数量
      */
     uint256 public constant MAX_MOCK_PLAYERS_COUNT = 1000;
     /**
@@ -108,7 +108,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     mapping(uint256 => uint256) public nftBattleLocked;
     /**
-     * @dev 玩家战斗 ID 计数�?
+     * @dev 玩家战斗 ID 计数器
      */
     mapping(address => uint256) public battleIdCounter;
     /**
@@ -117,7 +117,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     mapping(address => uint256) public lastBattleTime;
     
     /**
-     * @dev 玩家记录结构�?
+     * @dev 玩家记录结构体
      * @param score 玩家积分
      * @param wins 胜利次数
      * @param losses 失败次数
@@ -126,8 +126,8 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param lastBattleTime 上次战斗时间
      * @param lastResetTime 上次重置时间
      * @param remainingAttempts 剩余挑战次数
-     * @param battleTeam 战斗队伍（NFT ID 数组�?
-     * @param hasTeam 是否已设置战斗队�?
+     * @param battleTeam 战斗队伍（NFT ID 数组）
+     * @param hasTeam 是否已设置战斗队伍
      */
     struct PlayerRecord {
         uint256 score;
@@ -143,13 +143,13 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
     
     /**
-     * @dev 赛季信息结构�?
-     * @param startTime 赛季开始时�?
+     * @dev 赛季信息结构体
+     * @param startTime 赛季开始时间
      * @param endTime 赛季结束时间
-     * @param isActive 赛季是否进行�?
-     * @param isSettled 赛季是否已结�?
+     * @param isActive 赛季是否进行中
+     * @param isSettled 赛季是否已结算
      * @param totalPlayers 赛季总玩家数
-     * @param rewardPool 奖励池金�?
+     * @param rewardPool 奖励池金额
      */
     struct SeasonInfo {
         uint256 startTime;
@@ -190,7 +190,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     /**
      * @dev 分数更新事件
      * @param player 玩家地址
-     * @param score 新分�?
+     * @param score 新分数
      * @param seasonId 赛季 ID
      */
     event ScoreUpdated(address indexed player, uint256 score, uint256 seasonId);
@@ -219,30 +219,41 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 初始化函�?
-     * @param _arenaRankingManagerContract 竞技场排名管理合约地址
-     * @param _battleContract 战斗核心合约地址
-     * @param _nftContract NFT 合约地址
-     * @param _authorizer 授权合约地址
+     * @dev 初始化函数
+     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
+     * @param _battleContractAddress 战斗核心合约地址
+     * @param _nftContractAddress NFT 合约地址
+     * @param _arenaPlayerContractAddress 竞技场玩家合约地址
+     * @param _arenaLeaderboardContractAddress 竞技场排行榜合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address _arenaRankingManagerContract, address _battleContract, address _nftContract, address _authorizer) external initializer {
+    function initialize(
+        address _arenaRankingManagerContractAddress,
+        address _battleContractAddress,
+        address _nftContractAddress,
+        address _arenaPlayerContractAddress,
+        address _arenaLeaderboardContractAddress,
+        address _authorizerAddress
+    ) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        arenaRankingManagerContract = _arenaRankingManagerContract;
-        battleContract = _battleContract;
-        nftContract = _nftContract;
-        authorizer = _authorizer;
+        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
+        battleContract = _battleContractAddress;
+        nftContract = _nftContractAddress;
+        arenaPlayerContract = _arenaPlayerContractAddress;
+        arenaLeaderboardContract = _arenaLeaderboardContractAddress;
+        authorizer = _authorizerAddress;
     }
 
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "ArenaBattle: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "ArenaBattle: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
     /**
@@ -264,20 +275,24 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _unpause();
     }
 
-    function setArenaRankingManagerContract(address _arenaRankingManagerContract) external onlyOwnerOrAuthorizer {
-        arenaRankingManagerContract = _arenaRankingManagerContract;
+    function setArenaRankingManagerContract(address _arenaRankingManagerContractAddress) external onlyOwnerOrAuthorizer {
+        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
     }
 
-    function setBattleContract(address _battleContract) external onlyOwnerOrAuthorizer {
-        battleContract = _battleContract;
+    function setBattleContract(address _battleContractAddress) external onlyOwnerOrAuthorizer {
+        battleContract = _battleContractAddress;
     }
 
-    function setNFTContract(address _nftContract) external onlyOwnerOrAuthorizer {
-        nftContract = _nftContract;
+    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
+        nftContract = _nftContractAddress;
     }
 
-    function setArenaLeaderboardContract(address _arenaLeaderboardContract) external onlyOwnerOrAuthorizer {
-        arenaLeaderboardContract = _arenaLeaderboardContract;
+    function setArenaLeaderboardContract(address _arenaLeaderboardContractAddress) external onlyOwnerOrAuthorizer {
+        arenaLeaderboardContract = _arenaLeaderboardContractAddress;
+    }
+
+    function setArenaPlayerContract(address _arenaPlayerContractAddress) external onlyOwnerOrAuthorizer {
+        arenaPlayerContract = _arenaPlayerContractAddress;
     }
 
     function challengeMockPlayer(uint256 mockIndex) external nonReentrant whenNotPaused returns (bool, uint256) {
@@ -336,10 +351,10 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function _executeMockBattle(uint256 mockIndex) internal view returns (bool) {
         // 使用更安全的随机数生成，结合多个因素
         uint256 random = uint256(keccak256(abi.encodePacked(msg.sender, mockIndex, block.timestamp, block.number, tx.gasprice, block.prevrandao)));
-        // 根据mockIndex调整胜率，mockIndex越低（排名越高），胜率越�?
+        // 根据mockIndex调整胜率，mockIndex越低（排名越高），胜率越低
         uint256 baseChance = 45; // 基础45%胜率
         if (mockIndex < 10) {
-            baseChance = 30; // �?0名只�?0%胜率
+            baseChance = 30; // 前10名只有30%胜率
         } else if (mockIndex < 30) {
             baseChance = 40;
         } else if (mockIndex < 50) {
@@ -393,7 +408,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             record.score += 25;
             record.wins++;
         } else {
-            // 修复：使�?>= 确保当分数正好为25时也能正确扣�?
+            // 修复：使用 >= 确保当分数正好为25时也能正确扣除
             if (record.score >= 25) record.score -= 25;
             else record.score = 0;
             record.losses++;
@@ -422,15 +437,14 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function getRemainingAttempts(address player) external view returns (uint256) {
-        PlayerRecord storage p = players[player];
-        if (block.timestamp > p.lastResetTime + 24 hours) {
+        if (block.timestamp > players[player].lastResetTime + 24 hours) {
             return DAILY_ATTEMPTS;
         }
-        return p.remainingAttempts;
+        return players[player].remainingAttempts;
     }
 
     function getPlayerRecord(address player) external view returns (uint256 score, uint256 wins, uint256 losses, uint256 seasonId) {
-        PlayerRecord storage p = players[player];
+        PlayerRecord memory p = players[player];
         return (p.score, p.wins, p.losses, p.seasonId);
     }
 
@@ -501,7 +515,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function _validateTeam(uint256[6] memory team) internal view {
         require(nftContract != address(0), "ArenaBattle: NFT contract not set");
-        // 轻量校验：仅检�?tokenId > 0（ArenaRanking会做更深层的所有者验�?
+        // 轻量校验：仅检查 tokenId > 0（ArenaRanking会做更深层的所有者验证）
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
             uint256 tokenId = team[i];
             require(tokenId > 0, "ArenaBattle: Invalid token ID");
@@ -521,7 +535,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         for (uint256 i = 0; i < team.length; i++) {
             if (team[i] > 0) {
                 uint256 level = INFTMint(nftContract).tokenLevel(team[i]);
-                // 基础战力 = level * 100 + level * level * 2（高等级加成�?
+                // 基础战力 = level * 100 + level * level * 2（高等级加成）
                 totalPower += level * 100 + level * level * 2;
             }
         }

@@ -21,63 +21,63 @@ interface IBuybackReceiver {
  * @title RewardManager
  * @dev 奖励管理合约，统一管理所有游戏奖励的分发
  *
- * 核心职责�?
+ * 核心职责：
  * 1. 资金路由：接收游戏中产生的所有手续费、入场费、铸造费用统一归集
- *    �?按预设比例路由到五大奖励�?
- * 2. �?DividendManager、Staking、TokenStaking、ArenaRanking、NFTBuyback 的资金分�?
- * 3. 提供 owner 应急操作：在特殊活动奖励、VIP 空投、活动奖励池注入�?
+ *    2. 按预设比例路由到五大奖励池
+ * 2. 向 DividendManager、Staking、TokenStaking、ArenaRanking、NFTBuyback 的资金分发
+ * 3. 提供 owner 应急操作：在特殊活动奖励、VIP 空投、活动奖励池注入等
  *
- * 奖励资金来源�?
+ * 奖励资金来源：
  * - NFTTrading.sol：交易手续费 5% 转入 RewardManager
- * - Battle.sol：战斗入场费的部�?
+ * - Battle.sol：战斗入场费的部分
  * - Breeding.sol：繁殖费用的部分
  * - TokenBurner.sol：铸造费用的部分
  * - PoolManager.sol：按 owner 可从池中注入
  *
- * 默认分配比例（可�?owner 调整）：
- * - 40% 进入分红池（DividendManager�?
- * - 20% 进入 NFT 质押池（Staking�?
- * - 15% 进入代币质押池（TokenStaking�?
- * - 15% 进入竞技场奖励池（ArenaRanking�?
- * - 10% 进入 NFT 回购销毁池（NFTBuyback�?
+ * 默认分配比例（可由 owner 调整）：
+ * - 40% 进入分红池（DividendManager）
+ * - 20% 进入 NFT 质押池（Staking）
+ * - 15% 进入代币质押池（TokenStaking）
+ * - 15% 进入竞技场奖励池（ArenaRanking）
+ * - 10% 进入 NFT 回购销毁池（NFTBuyback）
  *
- * 资金流转模型�?
- * - 外部合约 depositToken(address, amount) �?接收并分�?
- * 1. 接收代币（ERC20）→ 按比例分配给五大奖励�?
- *    - 40% 转账�?DividendManager.tokenDividendPool
- *    - 20% 转账�?Staking.poolBalances[POOL_NFT_STAKING]
- *    - 15% 转账�?TokenStaking.stakingPool
- *    - 15% 转账�?ArenaRanking.seasonPrizePool
- *    - 10% 转账�?NFTBuyback 合约（用于回购销毁NFT�?
+ * 资金流转模型：
+ * - 外部合约 depositToken(address, amount) 或 接收并分发
+ * 1. 接收代币（ERC20）→ 按比例分配给五大奖励池
+ *    - 40% 转账至 DividendManager.tokenDividendPool
+ *    - 20% 转账至 Staking.poolBalances[POOL_NFT_STAKING]
+ *    - 15% 转账至 TokenStaking.stakingPool
+ *    - 15% 转账至 ArenaRanking.seasonPrizePool
+ *    - 10% 转账至 NFTBuyback 合约（用于回购销毁NFT）
  * 2. 接收 BNB（receive 回退函数）→ 同上分配
  *
- * 主要功能�?
+ * 主要功能：
  * - depositToken / depositBNB：接收游戏手续费并按比例分配
  * - distributeRewards：手动触发分配（可选）
- * - claimDividend：用户领取分红（内部调用 DividendManager�?
- * - setMinSwapAmount：设置最小金额（防止小额不分配，集中到池�?
- * - emergencyWithdraw：紧急提取（owner only�?
+ * - claimDividend：用户领取分红（内部调用 DividendManager）
+ * - setMinSwapAmount：设置最小金额（防止小额不分配，集中到池中）
+ * - emergencyWithdraw：紧急提取（owner only）
  * - setNFTBuybackPool：设置NFT回购销毁池地址
  *
- * 数据结构�?
+ * 数据结构：
  * - dividendShare / stakingShare / tokenStakingShare / arenaShare / buybackShare
  * 分别记录各自池的历史流入流出
  *
  * 与其他合约联动：
  * - Authorizer：通过 Authorizer 管理 address 验证
- * - PriceOracle：读取当前价格以分配时用于奖励金�?
- * - NFTBuyback�?0%资金用于回购销毁NFT，减少流通量
+ * - PriceOracle：读取当前价格以分配时用于奖励金额
+ * - NFTBuyback：10%资金用于回购销毁NFT，减少流通量
  *
- * 安全限制�?
- * - ReentrancyGuard：防�?claimDividend 时防止重�?
- * - Pausable：暂停所有分配操作（维护�?
+ * 安全限制：
+ * - ReentrancyGuard：防止 claimDividend 时防止重入
+ * - Pausable：暂停所有分配操作（维护时）
  * - onlyOwner：设置分配比例、暂停等
- * - 最小金�?minSwapAmount：防止微小金�?
+ * - 最小金额 minSwapAmount：防止微小金额
  *
- * 典型流程�?
- * 1. NFTTrading 产生 5% 手续费转�?RewardManager
- * 2. RewardManager 按比例分配到五个奖励�?
- * 3. 用户领取时自动同步各�?
+ * 典型流程：
+ * 1. NFTTrading 产生 5% 手续费转入 RewardManager
+ * 2. RewardManager 按比例分配到五个奖励池
+ * 3. 用户领取时自动同步各池
  * 4. 前端同步各池分配给用户（质押/分红/竞技场奖励）
  * 5. 10%资金进入NFTBuyback用于回购销毁，减少代币流通量
  *
@@ -123,38 +123,85 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     address public tokenContract;
 
     /**
-     * @dev 授权合约地址（Authorizer�?
+     * @dev 授权合约地址（Authorizer）
      */
     address public authorizer;
 
     /**
-     * @dev 初始化函�?
-     * @param _authorizer 授权合约地址
+     * @dev 初始化函数
+     * @param _authorizerAddress 授权合约地址
+     * @param _tokenContractAddress 代币合约地址
+     * @param _dividendManagerAddress 分红管理合约地址
+     * @param _stakingAddress NFT质押池地址
+     * @param _tokenStakingAddress 代币质押池地址
+     * @param _arenaRewardAddress 竞技场奖励池地址
+     * @param _nftBuybackAddress NFT回购池地址
+     * @param _poolManagerAddress 资金池管理合约地址
      */
-    function initialize(address _authorizer) external initializer {
-        require(_authorizer != address(0), "RewardManager: Invalid authorizer address");
+    function initialize(
+        address _authorizerAddress,
+        address _tokenContractAddress,
+        address _dividendManagerAddress,
+        address _stakingAddress,
+        address _tokenStakingAddress,
+        address _arenaRewardAddress,
+        address _nftBuybackAddress,
+        address _poolManagerAddress
+    ) external initializer {
+        require(_authorizerAddress != address(0), "RewardManager: Invalid authorizer address");
+        require(_tokenContractAddress != address(0), "RewardManager: Invalid token contract address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        authorizer = _authorizer;
+        authorizer = _authorizerAddress;
+        tokenContract = _tokenContractAddress;
         
-        // 设置默认 DEX Router 地址（BSC �?- PancakeSwap�?
+        if (_dividendManagerAddress != address(0)) {
+            dividendPool = _dividendManagerAddress;
+        }
+        if (_stakingAddress != address(0)) {
+            nftStakingPool = _stakingAddress;
+        }
+        if (_tokenStakingAddress != address(0)) {
+            tokenStakingPool = _tokenStakingAddress;
+        }
+        if (_arenaRewardAddress != address(0)) {
+            arenaRewardPool = _arenaRewardAddress;
+        }
+        if (_nftBuybackAddress != address(0)) {
+            nftBuybackPool = _nftBuybackAddress;
+        }
+        if (_poolManagerAddress != address(0)) {
+            poolManager = _poolManagerAddress;
+        }
+        
+        // 设置默认 DEX Router 地址（BSC - PancakeSwap）
         dexRouter = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
         activeDEX = 1; // 1 = PancakeSwap
         wbnb = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+        
+        // 初始化带默认值的参数
+        autoSwapEnabled = true;
+        minSwapAmount = 1000000000000000;
+        slippage = 1000;
+        dividendPercent = 4000;
+        nftStakingPercent = 2000;
+        tokenStakingPercent = 1500;
+        arenaRewardPercent = 1500;
+        nftBuybackPercent = 1000;
     }
 
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "RewardManager: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "RewardManager: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
     /**
-     * @dev 检查是否为授权调用者（owner或authorizer�?
+     * @dev 检查是否为授权调用者（owner或authorizer）
      */
     modifier onlyOwnerOrAuthorizer() {
         require(msg.sender == owner() || msg.sender == authorizer, "RewardManager: Not authorized");
@@ -209,7 +256,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     uint256 public minSwapAmount = 1000000000000000;  // 0.001 BNB
     
     /**
-     * @dev 滑点保护参数（万分比�?
+     * @dev 滑点保护参数（万分比）
      * 注意：slippage 使用万分比精度，100 = 1%, 1000 = 10%
      */
     uint256 public slippage = 1000;  // 默认10%滑点保护
@@ -223,8 +270,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     uint8 public activeDEX;
 
     /**
-     * @dev 奖励分配比例（精�?位小数，万分比）
-     * 注意：setDistributionPercents 会校验总和必须等于 PRECISION�?0000�?
+     * @dev 奖励分配比例（精度四位小数，万分比）
+     * 注意：setDistributionPercents 会校验总和必须等于 PRECISION（10000）
      */
     uint256 public dividendPercent = 4000;     // 40%
     uint256 public nftStakingPercent = 2000;   // 20%
@@ -233,8 +280,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     uint256 public nftBuybackPercent = 1000;    // 10%（用于NFT回购销毁）
 
     /**
-     * @dev 设置分配比例（仅owner�?
-     * 五个比例之和必须严格等于 PRECISION�?0000），�?100%
+     * @dev 设置分配比例（仅owner）
+     * 五个比例之和必须严格等于 PRECISION（10000），即 100%
      */
     function setDistributionPercents(uint256 _dividend, uint256 _nftStaking, uint256 _tokenStaking, uint256 _arena, uint256 _nftBuyback) external onlyOwner {
         require(_dividend + _nftStaking + _tokenStaking + _arena + _nftBuyback == PRECISION, "RewardManager: Percentages must sum to 10000");
@@ -257,7 +304,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     uint256 public constant PRECISION = 10000;
 
     /**
-     * @dev 累计分发总量（用于统计和前端展示�?
+     * @dev 累计分发总量（用于统计和前端展示）
      */
     uint256 public totalDistributed;
 
@@ -267,12 +314,12 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     uint256 public holdersCount;
     
     /**
-     * @dev 锁定的BNB金额（因转账失败而暂时保留在合约中的BNB�?
+     * @dev 锁定的BNB金额（因转账失败而暂时保留在合约中的BNB）
      */
     uint256 public lockedBNBAmount;
 
     /**
-     * @dev 用于追踪已记录的用户（用�?holdersCount 计数�?
+     * @dev 用于追踪已记录的用户（用于 holdersCount 计数）
      */
     mapping(address => bool) private _isRecordedHolder;
 
@@ -292,25 +339,25 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     /**
      * @dev 设置分红池地址
      */
-    function setDividendPool(address _dividendPool) external onlyOwnerOrAuthorizer {
-        require(_dividendPool != address(0), "RewardManager: Invalid dividend pool");
-        dividendPool = _dividendPool;
+    function setDividendPool(address _dividendPoolAddress) external onlyOwnerOrAuthorizer {
+        require(_dividendPoolAddress != address(0), "RewardManager: Invalid dividend pool");
+        dividendPool = _dividendPoolAddress;
     }
 
     /**
      * @dev 设置NFT质押池地址
      */
-    function setNFTStakingPool(address _nftStakingPool) external onlyOwnerOrAuthorizer {
-        require(_nftStakingPool != address(0), "RewardManager: Invalid NFT staking pool");
-        nftStakingPool = _nftStakingPool;
+    function setNFTStakingPool(address _stakingAddress) external onlyOwnerOrAuthorizer {
+        require(_stakingAddress != address(0), "RewardManager: Invalid NFT staking pool");
+        nftStakingPool = _stakingAddress;
     }
 
     /**
      * @dev 设置代币质押池地址
      */
-    function setTokenStakingPool(address _tokenStakingPool) external onlyOwnerOrAuthorizer {
-        require(_tokenStakingPool != address(0), "RewardManager: Invalid token staking pool");
-        tokenStakingPool = _tokenStakingPool;
+    function setTokenStakingPool(address _tokenStakingAddress) external onlyOwnerOrAuthorizer {
+        require(_tokenStakingAddress != address(0), "RewardManager: Invalid token staking pool");
+        tokenStakingPool = _tokenStakingAddress;
     }
 
     /**
@@ -324,17 +371,17 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     /**
      * @dev 设置竞技场奖励池地址
      */
-    function setArenaRewardPool(address _arenaRewardPool) external onlyOwnerOrAuthorizer {
-        require(_arenaRewardPool != address(0), "RewardManager: Invalid arena reward pool");
-        arenaRewardPool = _arenaRewardPool;
+    function setArenaRewardPool(address _arenaRewardAddress) external onlyOwnerOrAuthorizer {
+        require(_arenaRewardAddress != address(0), "RewardManager: Invalid arena reward pool");
+        arenaRewardPool = _arenaRewardAddress;
     }
 
     /**
      * @dev 设置NFT回购销毁池地址
      */
-    function setNFTBuybackPool(address _nftBuybackPool) external onlyOwnerOrAuthorizer {
-        require(_nftBuybackPool != address(0), "RewardManager: Invalid buyback pool");
-        nftBuybackPool = _nftBuybackPool;
+    function setNFTBuybackPool(address _nftBuybackAddress) external onlyOwnerOrAuthorizer {
+        require(_nftBuybackAddress != address(0), "RewardManager: Invalid buyback pool");
+        nftBuybackPool = _nftBuybackAddress;
     }
 
     /**
@@ -346,9 +393,9 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 设置DEX Router地址（支�?FlapSwap、PancakeSwap、Uniswap�?
+     * @dev 设置DEX Router地址（支持 FlapSwap、PancakeSwap、Uniswap）
      * @param _dexRouter DEX Router 合约地址
-     * @param _dexType DEX类型�?=FlapSwap, 1=PancakeSwap, 2=Uniswap
+     * @param _dexType DEX类型：0=FlapSwap, 1=PancakeSwap, 2=Uniswap
      */
     function setDEXRouter(address _dexRouter, uint8 _dexType) external onlyOwner {
         require(_dexRouter != address(0), "RewardManager: Invalid DEX router");
@@ -363,14 +410,14 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 设置自动兑换开�?
+     * @dev 设置自动兑换开关
      */
     function setAutoSwapEnabled(bool enabled) external onlyOwner {
         autoSwapEnabled = enabled;
     }
 
     /**
-     * @dev 设置最小兑换金�?
+     * @dev 设置最小兑换金额
      */
     function setMinSwapAmount(uint256 amount) external onlyOwner {
         require(amount > 0, "RewardManager: Amount must be greater than 0");
@@ -381,13 +428,13 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 设置滑点保护
      */
     function setSlippage(uint256 _slippage) external onlyOwner {
-        // 修复：滑点必须大�?0 且不超过 20%，否则几乎一定会失败或被MEV套利
+        // 修复：滑点必须大于 0 且不超过 20%，否则几乎一定会失败或被MEV套利
         require(_slippage > 0 && _slippage <= 2000, "RewardManager: Slippage must be > 0 and <= 2000");
         slippage = _slippage;
     }
 
     /**
-     * @dev 接收BNB并自动处�?
+     * @dev 接收BNB并自动处理
      */
     receive() external payable {
         if (msg.value > 0 && autoSwapEnabled && dexRouter != address(0)) {
@@ -403,15 +450,15 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     function distributeBNB() external onlyOwnerOrAuthorizer nonReentrant {
         uint256 balance = address(this).balance;
         if (balance == 0) {
-            return; // 没有 BNB 可分配，直接返回而不�?revert，确保流程不中断
+            return; // 没有 BNB 可分配，直接返回而不 revert，确保流程不中断
         }
         _distributeBNB(balance);
     }
 
     /**
-     * @dev 内部函数：分配BNB到各�?
+     * @dev 内部函数：分配BNB到各池
      * - 分红池：直接转账BNB
-     * - NFT质押池、代币质押池、竞技场奖励池：优先兑换为代币后转账；兑换失败时将 BNB 直接转入 dividendPool 作为价值储�?
+     * - NFT质押池、代币质押池、竞技场奖励池：优先兑换为代币后转账；兑换失败时将 BNB 直接转入 dividendPool 作为价值储备
      * - NFT回购池：直接转账BNB
      */
     function _distributeBNB(uint256 amount) internal {
@@ -450,7 +497,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                 // 分配兑换后的代币到NFT质押池、代币质押池和竞技场奖励池
                 _distributeSwappedTokens(tokenAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, totalSwapAmount);
             } else {
-                // 兑换失败时，将未兑换的BNB作为价值储备转入分红池（最终回退�?
+                // 兑换失败时，将未兑换的BNB作为价值储备转入分红池（最终回退）
                 if (dividendPool != address(0)) {
                     (bool fbSuccess, ) = payable(dividendPool).call{value: totalSwapAmount}("");
                     if (fbSuccess) {
@@ -482,7 +529,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 内部函数：将BNB兑换为代�?
+     * @dev 内部函数：将BNB兑换为代币
      */
     function _swapBNBToToken(uint256 bnbAmount) internal returns (uint256) {
         require(tokenContract != address(0), "RewardManager: Token contract not set");
@@ -491,7 +538,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         path[0] = wbnb;
         path[1] = tokenContract;
 
-        // 获取预估输出金额并计算滑�?
+        // 获取预估输出金额并计算滑点
         uint256[] memory amounts = IDexRouter(dexRouter).getAmountsOut(bnbAmount, path);
         uint256 expectedOut = amounts[1];
         uint256 minOut = expectedOut * (10000 - slippage) / 10000;
@@ -512,7 +559,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
     /**
      * @dev 内部函数：分配兑换后的代币到NFT质押池、代币质押池和竞技场奖励池
-     * 分红池直接使用BNB，不需要兑�?
+     * 分红池直接使用BNB，不需要兑换
      */
     function _distributeSwappedTokens(
         uint256 totalTokenAmount,
@@ -523,14 +570,18 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     ) internal {
         IERC20 token = IERC20(tokenContract);
         
-        // 计算各池应得代币数量（按BNB金额比例�?
+        // 计算各池应得代币数量（按BNB金额比例）
         uint256 nftStakingTokenAmount = totalTokenAmount * nftStakingBNBAmount / totalBNBAmount;
-        uint256 tokenStakingTokenAmount = totalTokenAmount * tokenStakingBNBAmount / totalBNBAmount;
-        uint256 arenaRewardTokenAmount = totalTokenAmount * arenaRewardBNBAmount / totalBNBAmount;
-
-        // 分配到NFT质押�?
+        uint256 tokenStakingTokenAmount;
+        uint256 arenaRewardTokenAmount;
+        if (totalBNBAmount > 0) {
+            tokenStakingTokenAmount = totalTokenAmount * tokenStakingBNBAmount / totalBNBAmount;
+            arenaRewardTokenAmount = totalTokenAmount * arenaRewardBNBAmount / totalBNBAmount;
+        }
+        
+        // 分配到NFT质押池
         if (nftStakingPool != address(0) && nftStakingTokenAmount > 0) {
-            try token.transfer(nftStakingPool, nftStakingTokenAmount) {
+            try token.safeTransfer(nftStakingPool, nftStakingTokenAmount) {
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToNFTStakingPool(nftStakingTokenAmount) {} catch {}
                 }
@@ -541,11 +592,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
         // 分配到代币质押池
         if (tokenStakingPool != address(0) && tokenStakingTokenAmount > 0) {
-            try token.transfer(tokenStakingPool, tokenStakingTokenAmount) {
+            try token.safeTransfer(tokenStakingPool, tokenStakingTokenAmount) {
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingTokenAmount) {} catch {}
                 }
-                // 调用 TokenStaking �?recordIncomingTokens 记录流入
+                // 调用 TokenStaking 的 recordIncomingTokens 记录流入
                 try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingTokenAmount) {} catch {}
             } catch {
                 emit RewardTransferFailed(2, tokenStakingPool, tokenStakingTokenAmount);
@@ -554,7 +605,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
         // 分配到竞技场奖励池
         if (arenaRewardPool != address(0) && arenaRewardTokenAmount > 0) {
-            try token.transfer(arenaRewardPool, arenaRewardTokenAmount) {
+            try token.safeTransfer(arenaRewardPool, arenaRewardTokenAmount) {
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardTokenAmount) {} catch {}
                 }
@@ -573,7 +624,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     event BNBTransferFailed(uint256 poolType, address pool, uint256 amount);
 
     /**
-     * @dev 添加质押池奖�?
+     * @dev 添加质押池奖励
      */
     function addStakingReward(uint256 amount, uint256 poolType) external onlyOwnerOrAuthorizer whenNotPaused {
         require(amount > 0, "RewardManager: Invalid amount");
@@ -592,7 +643,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 用户可领取分红映�?
+     * @dev 用户可领取分红映射
      * user => pendingDividend
      */
     mapping(address => uint256) public pendingDividends;
@@ -630,7 +681,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 领取分红（带参数版本 - owner/authorizer 可为其他用户领取�?
+     * @dev 领取分红（带参数版本 - owner/authorizer 可为其他用户领取）
      */
     function claimDividendFor(address user) external whenNotPaused nonReentrant returns (uint256) {
         require(
@@ -655,14 +706,14 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 获取用户可领取分�?
+     * @dev 获取用户可领取分红
      */
     function getDividend(address user) external view returns (uint256) {
         return pendingDividends[user];
     }
 
     /**
-     * @dev 计算用户可领取分红（前端调用�?
+     * @dev 计算用户可领取分红（前端调用）
      */
     function calcUserDividend(address user) external view returns (uint256, uint256) {
         return (pendingDividends[user], userWeights[user]);
@@ -676,7 +727,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 获取分红池余�?
+     * @dev 获取分红池余额
      */
     function dividendPoolBalance() external view returns (uint256) {
         require(tokenContract != address(0), "RewardManager: Token contract not set");
@@ -698,16 +749,16 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 arenaRewardAmount = amount * arenaRewardPercent / PRECISION;
         uint256 buybackAmount = amount * nftBuybackPercent / PRECISION;
 
-        // 使用 try-catch 分别处理每个分配，允许部分成�?
+        // 使用 try-catch 分别处理每个分配，允许部分成功
         if (dividendPool != address(0) && dividendAmount > 0) {
-            try token.transfer(dividendPool, dividendAmount) {
+            try token.safeTransfer(dividendPool, dividendAmount) {
                 try IDividendManager(dividendPool).syncDividendPool() {} catch {}
             } catch {
                 emit RewardTransferFailed(0, dividendPool, dividendAmount);
             }
         }
         if (nftStakingPool != address(0) && nftStakingAmount > 0) {
-            try token.transfer(nftStakingPool, nftStakingAmount) {
+            try token.safeTransfer(nftStakingPool, nftStakingAmount) {
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToNFTStakingPool(nftStakingAmount) {} catch {}
                 }
@@ -716,18 +767,18 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             }
         }
         if (tokenStakingPool != address(0) && tokenStakingAmount > 0) {
-            try token.transfer(tokenStakingPool, tokenStakingAmount) {
+            try token.safeTransfer(tokenStakingPool, tokenStakingAmount) {
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch {}
                 }
-                // 调用 TokenStaking �?recordIncomingTokens 记录流入
+                // 调用 TokenStaking 的 recordIncomingTokens 记录流入
                 try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingAmount) {} catch {}
             } catch {
                 emit RewardTransferFailed(2, tokenStakingPool, tokenStakingAmount);
             }
         }
         if (arenaRewardPool != address(0) && arenaRewardAmount > 0) {
-            try token.transfer(arenaRewardPool, arenaRewardAmount) {
+            try token.safeTransfer(arenaRewardPool, arenaRewardAmount) {
                 if (poolManager != address(0)) {
                     try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardAmount) {} catch {}
                 }
@@ -737,8 +788,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         }
         // NFT回购销毁池：直接转账代币到回购合约，回购合约收到代币后可用于回购销毁NFT
         if (nftBuybackPool != address(0) && buybackAmount > 0) {
-            try token.transfer(nftBuybackPool, buybackAmount) {
-                // 尝试调用回购合约的记录函数（如果实现�?
+            try token.safeTransfer(nftBuybackPool, buybackAmount) {
+                // 尝试调用回购合约的记录函数（如果实现）
                 try IBuybackReceiver(nftBuybackPool).recordIncomingTokens(buybackAmount) {} catch {}
             } catch {
                 emit RewardTransferFailed(4, nftBuybackPool, buybackAmount);
@@ -760,7 +811,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 在分配到用户分红时记录新的持有�?
+     * @dev 在分配到用户分红时记录新的持有者
      */
     function _recordHolder(address user) internal {
         if (user != address(0) && !_isRecordedHolder[user]) {
@@ -815,7 +866,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 分发历史记录结构�?
+     * @dev 分发历史记录结构体
      */
     struct DistributionRecord {
         uint256 timestamp;
@@ -829,7 +880,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 分发历史记录数组（使用环形缓冲区�?
+     * @dev 分发历史记录数组（使用环形缓冲区）
      */
     DistributionRecord[] public distributionHistory;
     
@@ -839,7 +890,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     uint256 public constant MAX_DISTRIBUTION_RECORDS = 1000;
     
     /**
-     * @dev 分发历史记录起始索引（环形缓冲区�?
+     * @dev 分发历史记录起始索引（环形缓冲区）
      */
     uint256 public distributionHistoryStartIndex;
 
@@ -851,8 +902,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 获取指定范围的分发历�?
-     * @param startIndex 起始索引（逻辑索引�?
+     * @dev 获取指定范围的分发历史
+     * @param startIndex 起始索引（逻辑索引）
      * @param count 获取数量
      */
     function getDistributionHistory(uint256 startIndex, uint256 count) external view returns (DistributionRecord[] memory) {
@@ -875,7 +926,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 获取最新N条分发记�?
+     * @dev 获取最新N条分发记录
      * @param count 记录数量
      */
     function getRecentDistributions(uint256 count) external view returns (DistributionRecord[] memory) {
@@ -899,11 +950,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 获取奖励池统�?
-     * @return dividendPoolBalance NFT质押池余�?
-     * @return tokenStakingBalance 代币质押池余�?
+     * @dev 获取奖励池统计
+     * @return dividendPoolBalance NFT质押池余额
+     * @return tokenStakingBalance 代币质押池余额
      * @return arenaRewardBalance 竞技场奖励池余额
-     * @return totalDistributed 总分发金�?
+     * @return totalDistributed 总分发金额
      */
     function getRewardPoolStats() external view returns (
         uint256 dividendPoolBalance,
@@ -950,7 +1001,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
     
     /**
-     * @dev 重试分配锁定的BNB（仅owner或authorizer�?
+     * @dev 重试分配锁定的BNB（仅owner或authorizer）
      */
     function retryLockedBNBDistribution() external onlyOwnerOrAuthorizer nonReentrant {
         uint256 lockedAmount = lockedBNBAmount;

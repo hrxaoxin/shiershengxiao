@@ -811,11 +811,31 @@
             await ZODIAC_WEB3.initWeb3();
             ZODIAC_UI.initWalletButton('walletBtn', null, null);
 
+            // 数据刷新定时器
+            let dataRefreshInterval = null;
+            const DATA_REFRESH_MS = 30000; // 30秒刷新一次
+
+            function startDataRefresh() {
+                if (dataRefreshInterval) clearInterval(dataRefreshInterval);
+                dataRefreshInterval = setInterval(() => {
+                    loadFenHongData();
+                }, DATA_REFRESH_MS);
+            }
+
+            function stopDataRefresh() {
+                if (dataRefreshInterval) {
+                    clearInterval(dataRefreshInterval);
+                    dataRefreshInterval = null;
+                }
+            }
+
             ZODIAC_WEB3.on('connect', () => {
                 loadFenHongData();
+                startDataRefresh();
             });
 
             ZODIAC_WEB3.on('disconnect', () => {
+                stopDataRefresh();
                 document.getElementById('totalPool').textContent = '--';
                 document.getElementById('distributed').textContent = '--';
                 document.getElementById('unclaimedDividend').textContent = '--';
@@ -827,12 +847,19 @@
             
             // 立即加载公共数据（无需连接钱包）
             loadFenHongData();
+            startDataRefresh();
 
             document.getElementById('menuBtn').addEventListener('click', openMobileMenu);
         });
 
-        window.addEventListener('beforeunload', cleanup);
-        window.addEventListener('pagehide', cleanup);
+        window.addEventListener('beforeunload', () => {
+            cleanup();
+            if (dataRefreshInterval) clearInterval(dataRefreshInterval);
+        });
+        window.addEventListener('pagehide', () => {
+            cleanup();
+            if (dataRefreshInterval) clearInterval(dataRefreshInterval);
+        });
     </script>
 </body>
 </html>

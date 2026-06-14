@@ -231,16 +231,18 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
     /**
      * @dev 初始化合约
-     * @param _authorizer 授权器合约地址
-     * @param _battleCaller 战斗调用者地址（通常是ArenaRanking合约）
+     * @param _nftContractAddress NFT合约地址
+     * @param _authorizerAddress 授权器合约地址
+     * @param _battleCallerAddress 战斗调用者地址（通常是ArenaRanking合约）
      */
-    function initialize(address _authorizer, address _battleCaller) external initializer {
-        require(_authorizer != address(0), "Battle: Invalid authorizer address");
+    function initialize(address _nftContractAddress, address _authorizerAddress, address _battleCallerAddress) external initializer {
+        require(_authorizerAddress != address(0), "Battle: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        authorizer = _authorizer;
-        battleCaller = _battleCaller;
+        nftContract = _nftContractAddress;
+        authorizer = _authorizerAddress;
+        battleCaller = _battleCallerAddress;
         _initSkills();
     }
 
@@ -253,16 +255,20 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
     /**
      * @dev 设置授权器地址
-     * @param _authorizer 新的授权器地址
+     * @param _authorizerAddress 新的授权器地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "Battle: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "Battle: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
-    function setBattleCaller(address _battleCaller) external onlyOwnerOrAuthorizer {
-        require(_battleCaller != address(0), "Battle: Invalid battle caller address");
-        battleCaller = _battleCaller;
+    /**
+     * @dev 设置战斗调用者地址
+     * @param _battleCallerAddress 战斗调用者地址
+     */
+    function setBattleCaller(address _battleCallerAddress) external onlyOwnerOrAuthorizer {
+        require(_battleCallerAddress != address(0), "Battle: Invalid battle caller address");
+        battleCaller = _battleCallerAddress;
     }
 
     /**
@@ -273,11 +279,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
     /**
      * @dev 设置NFT合约地址
-     * @param _nftContract NFT合约地址
+     * @param _nftContractAddress NFT合约地址
      */
-    function setNFTContract(address _nftContract) external onlyOwnerOrAuthorizer {
-        require(_nftContract != address(0), "Battle: Invalid NFT contract address");
-        nftContract = _nftContract;
+    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
+        require(_nftContractAddress != address(0), "Battle: Invalid NFT contract address");
+        nftContract = _nftContractAddress;
     }
 
     /**

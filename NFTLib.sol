@@ -592,6 +592,41 @@ library NFTLib {
         
         return concat2(elementName, concat2(zodiacName, concat2(unicode"\u00B7", genderName)));
     }
+
+    function getElementPrefix(uint256 element) internal pure returns (string memory) {
+        if (element == 0) return "shui";
+        if (element == 1) return "feng";
+        if (element == 2) return "huo";
+        if (element == 3) return "an";
+        return "guang";
+    }
+
+    function getZodiacKey(uint256 zodiac) internal pure returns (string memory) {
+        if (zodiac == 0) return "shu";
+        if (zodiac == 1) return "niu";
+        if (zodiac == 2) return "hu";
+        if (zodiac == 3) return "tu";
+        if (zodiac == 4) return "long";
+        if (zodiac == 5) return "she";
+        if (zodiac == 6) return "ma";
+        if (zodiac == 7) return "yang";
+        if (zodiac == 8) return "hou";
+        if (zodiac == 9) return "ji";
+        if (zodiac == 10) return "gou";
+        return "zhu";
+    }
+
+    function buildImagePath(string memory baseUrl, uint256 tokenType_) internal pure returns (string memory) {
+        uint256 element = tokenType_ / 24;
+        uint256 zodiac = (tokenType_ / 2) % 12;
+        uint8 gender = uint8(tokenType_ % 2);
+        
+        string memory prefix = getElementPrefix(element);
+        string memory zodiacKey = getZodiacKey(zodiac);
+        string memory genderStr = gender == 0 ? "0" : "1";
+        
+        return string(abi.encodePacked(baseUrl, prefix, zodiacKey, "_", genderStr, ".png"));
+    }
 }
 
 library Base64 {

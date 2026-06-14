@@ -11,25 +11,25 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 
 /**
  * @title TokenBurner
- * @dev 代币销毁与NFT铸造合约，负责管理代币销毁和NFT铸造流�?
+ * @dev 代币销毁与NFT铸造合约，负责管理代币销毁和NFT铸造流程
  *
- * 核心功能�?
+ * 核心功能：
  * 1. 代币销毁：将用户代币转入黑洞地址进行永久销毁，实现代币通缩机制
- * 2. NFT铸造：销毁代币后调用NFTMint合约进行NFT铸�?
- * 3. 费用管理：支持动态调整普�?稀有NFT铸造费�?
+ * 2. NFT铸造：销毁代币后调用NFTMint合约进行NFT铸造
+ * 3. 费用管理：支持动态调整普通、稀有NFT铸造费用
  *
  * 铸造模式：
  * - 单抽模式：销毁一次代币，铸造一个NFT（普通或稀有）
  * - 十连抽模式：销毁十倍代币，连续铸造十个NFT
- * - 定向铸造：按指定生肖类型铸造（6普�?4稀有的组合�?
+ * - 定向铸造：按指定生肖类型铸造（6普通、4稀有的组合）
  *
- * 权限控制�?
- * - 仅所有�?授权合约可调用铸造相关函�?
- * - 仅所有者可调整铸造费用参�?
+ * 权限控制：
+ * - 仅所有者、授权合约可调用铸造相关函数
+ * - 仅所有者可调整铸造费用参数
  *
- * 安全机制�?
- * - 重入保护：nonReentrant修饰器防止重入攻�?
- * - 暂停机制：paused标志支持紧急暂�?
+ * 安全机制：
+ * - 重入保护：nonReentrant修饰器防止重入攻击
+ * - 暂停机制：paused标志支持紧急暂停
  * - 零地址检查：所有外部地址参数均需验证
  */
 contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
@@ -42,13 +42,13 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 黑洞地址，用于永久销毁代�?
+     * @dev 黑洞地址，用于永久销毁代币
      * 转入此地址的代币将永久不可访问，实现通缩机制
      */
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
 
     /**
-     * @dev 暂停状态标志，true表示合约已暂�?
+     * @dev 暂停状态标志，true表示合约已暂停
      */
     bool public paused;
     /**
@@ -57,7 +57,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     string public pauseReason;
 
     /**
-     * @dev 合约暂停事件，记录执行暂停的账户和原�?
+     * @dev 合约暂停事件，记录执行暂停的账户和原因
      */
     event Paused(address account, string reason);
     /**
@@ -74,9 +74,9 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 暂停合约，停止所有铸造和销毁操�?
+     * @dev 暂停合约，停止所有铸造和销毁操作
      * 仅合约所有者可以调用，用于紧急情况下暂停服务
-     * @param reason 暂停原因，将被记录在事件日志�?
+     * @param reason 暂停原因，将被记录在事件日志中
      */
     function pause(string memory reason) external onlyOwner {
         paused = true;
@@ -85,8 +85,8 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 取消合约暂停，恢复铸造和销毁操�?
-     * 仅合约所有者可以调�?
+     * @dev 取消合约暂停，恢复铸造和销毁操作
+     * 仅合约所有者可以调用
      */
     function unpause() external onlyOwner {
         paused = false;
@@ -95,24 +95,24 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 普通NFT单次铸造费用（单位：代币，�?8位小数）
-     * 默认值：8888 * 10^18 = 8888 个代�?
+     * @dev 普通NFT单次铸造费用（单位：代币，18位小数）
+     * 默认值：8888 * 10^18 = 8888 个代币
      */
     uint256 public normalMintCost = 8888 * 10**18;
     /**
-     * @dev 稀有NFT单次铸造费用（单位：代币，�?8位小数）
-     * 稀有NFT费用更高，默认值：88888 * 10^18 = 88888 个代�?
+     * @dev 稀有NFT单次铸造费用（单位：代币，18位小数）
+     * 稀有NFT费用更高，默认值：88888 * 10^18 = 88888 个代币
      */
     uint256 public rareMintCost = 88888 * 10**18;
 
     /**
-     * @dev 代币合约地址（ERC20�?
-     * 用于执行代币转账和销毁操�?
+     * @dev 代币合约地址（ERC20）
+     * 用于执行代币转账和销毁操作
      */
     address public tokenContract;
     /**
      * @dev 授权的NFT合约地址
-     * 此地址可以调用铸造授权函�?
+     * 此地址可以调用铸造授权函数
      */
     address public authorizedNFTContract;
     /**
@@ -125,7 +125,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     address public authorizer;
 
     /**
-     * @dev 代币销毁事件，记录用户地址、销毁数量和时间�?
+     * @dev 代币销毁事件，记录用户地址、销毁数量和时间戳
      */
     event TokenBurned(address indexed user, uint256 amount, uint256 timestamp);
     /**
@@ -133,13 +133,13 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     event MintCostUpdated(uint256 oldNormalCost, uint256 newNormalCost, uint256 oldRareCost, uint256 newRareCost, uint256 timestamp);
     /**
-     * @dev NFT铸造完成事件，记录用户、NFT ID、生肖类型和是否稀�?
+     * @dev NFT铸造完成事件，记录用户、NFT ID、生肖类型和是否稀有
      */
     event NFTMinted(address indexed user, uint256 tokenId, uint256 zodiacType, bool isRare);
 
 
     /**
-     * @dev 修饰器：仅管理员或授权器可调�?
+     * @dev 修饰器：仅管理员或授权器可调用
      * 用于保护合约配置更新函数，如设置各种合约地址
      */
     modifier onlyAdminOrAuthorizer() {
@@ -147,31 +147,40 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _;
     }
 
+    modifier onlyOwnerOrAuthorizer() {
+        require(msg.sender == owner() || msg.sender == authorizer, "TokenBurner: Not owner or authorizer");
+        _;
+    }
+
     /**
      * @dev 合约初始化函数（仅可调用一次）
      * 初始化合约地址和OpenZeppelin升级组件
-     * @param _tokenContract 代币合约地址（ERC20�?
-     * @param _nftMint NFTMint主合约地址
-     * @param _authorizer 授权管理合约地址
-     * @param _authorizedNFT 授权的NFT合约地址
+     * @param _tokenContractAddress 代币合约地址（ERC20）
+     * @param _nftMintContractAddress NFTMint主合约地址
+     * @param _authorizerAddress 授权管理合约地址
+     * @param _authorizedNFTContractAddress 授权的NFT合约地址
      */
-    function initialize(address _tokenContract, address _nftMint, address _authorizer, address _authorizedNFT) external initializer {
-        require(_tokenContract != address(0), "TokenBurner: Invalid token contract address");
-        require(_nftMint != address(0), "TokenBurner: Invalid NFT mint address");
-        require(_authorizer != address(0), "TokenBurner: Invalid authorizer address");
-        require(_authorizedNFT != address(0), "TokenBurner: Invalid authorized NFT address");
+    function initialize(address _tokenContractAddress, address _nftMintContractAddress, address _authorizerAddress, address _authorizedNFTContractAddress) external initializer {
+        require(_tokenContractAddress != address(0), "TokenBurner: Invalid token contract address");
+        require(_nftMintContractAddress != address(0), "TokenBurner: Invalid NFT mint address");
+        require(_authorizerAddress != address(0), "TokenBurner: Invalid authorizer address");
+        require(_authorizedNFTContractAddress != address(0), "TokenBurner: Invalid authorized NFT address");
         __UUPSUpgradeable_init();
         __Ownable2Step_init();
         __ReentrancyGuard_init();
-        tokenContract = _tokenContract;
-        nftMintContract = _nftMint;
-        authorizer = _authorizer;
-        authorizedNFTContract = _authorizedNFT;
+        tokenContract = _tokenContractAddress;
+        nftMintContract = _nftMintContractAddress;
+        authorizer = _authorizerAddress;
+        authorizedNFTContract = _authorizedNFTContractAddress;
+        
+        // 初始化带默认值的参数
+        normalMintCost = 8888 * 10**18;
+        rareMintCost = 88888 * 10**18;
     }
 
     /**
      * @dev UUPS升级授权函数
-     * 仅允许合约所有者升级合约实�?
+     * 仅允许合约所有者升级合约实现
      * @param newImplementation 新实现合约地址
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -179,37 +188,37 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     /**
      * @dev 设置授权器地址
      * 仅所有者可调用，用于更改授权管理合约
-     * @param _authorizer 新的授权器地址，不可为零地址
+     * @param _authorizerAddress 新的授权器地址，不可为零地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "TokenBurner: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "TokenBurner: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
     /**
      * @dev 设置NFTMint合约地址
      * 用于更新NFT铸造合约的引用地址
-     * @param _nftMint 新的NFTMint合约地址，不可为零地址
+     * @param _nftMintContractAddress 新的NFTMint合约地址，不可为零地址
      */
-    function setNFTContract(address _nftMint) external onlyAdminOrAuthorizer {
-        require(_nftMint != address(0), "TokenBurner: Zero address");
-        nftMintContract = _nftMint;
+    function setNFTContract(address _nftMintContractAddress) external onlyAdminOrAuthorizer {
+        require(_nftMintContractAddress != address(0), "TokenBurner: Zero address");
+        nftMintContract = _nftMintContractAddress;
     }
 
     /**
      * @dev 设置授权NFT合约地址
      * 此地址将获得调用铸造函数的权限
-     * @param _authorized 新的授权NFT合约地址，不可为零地址
+     * @param _authorizedNFTContractAddress 新的授权NFT合约地址，不可为零地址
      */
-    function setAuthorizedNFTContract(address _authorized) external onlyAdminOrAuthorizer {
-        require(_authorized != address(0), "TokenBurner: Zero address");
-        authorizedNFTContract = _authorized;
+    function setAuthorizedNFTContract(address _authorizedNFTContractAddress) external onlyAdminOrAuthorizer {
+        require(_authorizedNFTContractAddress != address(0), "TokenBurner: Zero address");
+        authorizedNFTContract = _authorizedNFTContractAddress;
     }
 
     /**
-     * @dev 设置普通NFT铸造费�?
-     * 仅所有者可调整，用于更改单抽普通NFT的代币消�?
-     * @param cost 新的普通NFT铸造费用（必须大于0�?
+     * @dev 设置普通NFT铸造费用
+     * 仅所有者可调整，用于更改单抽普通NFT的代币消耗
+     * @param cost 新的普通NFT铸造费用（必须大于0）
      */
     function setNormalMintCost(uint256 cost) external onlyOwner {
         require(cost > 0, "TokenBurner: cost must be > 0");
@@ -220,9 +229,9 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 设置稀有NFT铸造费�?
-     * 仅所有者可调整，用于更改单抽稀有NFT的代币消�?
-     * @param cost 新的稀有NFT铸造费用（必须大于0�?
+     * @dev 设置稀有NFT铸造费用
+     * 仅所有者可调整，用于更改单抽稀有NFT的代币消耗
+     * @param cost 新的稀有NFT铸造费用（必须大于0）
      */
     function setRareMintCost(uint256 cost) external onlyOwner {
         require(cost > 0, "TokenBurner: cost must be > 0");
@@ -235,12 +244,12 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     /**
      * @dev 设置代币合约地址
      * 更新用于销毁和支付铸造费用的ERC20代币合约
-     * @param _tokenContract 新的代币合约地址，不可为零地址
+     * @param _tokenContractAddress 新的代币合约地址，不可为零地址
      */
-    function setTokenContract(address _tokenContract) external onlyAdminOrAuthorizer {
-        require(_tokenContract != address(0), "TokenBurner: Zero address");
-        tokenContract = _tokenContract;
-        emit TokenContractUpdated(_tokenContract);
+    function setTokenContract(address _tokenContractAddress) external onlyAdminOrAuthorizer {
+        require(_tokenContractAddress != address(0), "TokenBurner: Zero address");
+        tokenContract = _tokenContractAddress;
+        emit TokenContractUpdated(_tokenContractAddress);
     }
     
     /**
@@ -249,7 +258,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     event TokenContractUpdated(address newTokenContract);
 
     /**
-     * @dev 获取普通NFT十连抽总费�?
+     * @dev 获取普通NFT十连抽总费用
      * @return 十连抽普通NFT所需总代币数
      */
     function normalMintTenCost() external view returns (uint256) {
@@ -257,7 +266,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取稀有NFT十连抽总费�?
+     * @dev 获取稀有NFT十连抽总费用
      * @return 十连抽稀有NFT所需总代币数
      */
     function rareMintTenCost() external view returns (uint256) {
@@ -265,8 +274,8 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取定向铸造费�?
-     * 定向铸�?= 6 * 普通铸�?+ 4 * 稀有铸造，再乘�?0（十连抽倍数�?
+     * @dev 获取定向铸造费用
+     * 定向铸造 = 6 * 普通铸造 + 4 * 稀有铸造，再乘以10（十连抽倍数）
      * @return 定向铸造所需总代币数
      */
     function targetedMintCost() external view returns (uint256) {
@@ -275,7 +284,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 单次代币销毁并铸造NFT
-     * 流程：验证合约配�?-> 检查用户余额和授权 -> 销毁代�?-> 调用NFTMint铸�?
+     * 流程：验证合约配置 -> 检查用户余额和授权 -> 销毁代币 -> 调用NFTMint铸造
      * @param user 目标用户地址（将获得NFT的用户）
      * @param isRare 是否铸造稀有NFT（true=稀有，false=普通）
      * @return 操作是否成功，成功返回true
@@ -289,7 +298,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 cost = isRare ? rareMintCost : normalMintCost;
         require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
-        // 修复：使�?SafeERC20.safeTransferFrom 确保安全
+        // 修复：使用 SafeERC20.safeTransferFrom 确保安全
         token.safeTransferFrom(user, BLACK_HOLE, cost);
 
         emit TokenBurned(user, cost, block.timestamp);
@@ -325,7 +334,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 cost = isRare ? rareMintCost * 10 : normalMintCost * 10;
         require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
-        // 修复：使�?SafeERC20.safeTransferFrom 确保安全
+        // 修复：使用 SafeERC20.safeTransferFrom 确保安全
         token.safeTransferFrom(user, BLACK_HOLE, cost);
 
         emit TokenBurned(user, cost, block.timestamp);
@@ -352,9 +361,9 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 定向代币销毁并铸造指定生肖NFT
-     * 按指定生肖类型铸造，费用 = (普通费�?6 + 稀有费�?4) * 10
+     * 按指定生肖类型铸造，费用 = (普通费用 * 6 + 稀有费用 * 4) * 10
      * @param user 目标用户地址（将获得NFT的用户）
-     * @param zodiac 目标生肖类型�?-11，对应十二生肖）
+     * @param zodiac 目标生肖类型（0-11，对应十二生肖）
      * @return 操作是否成功，成功返回true
      */
     function burnAndMintTargeted(address user, uint8 zodiac) external nonReentrant whenNotPaused returns (bool) {
@@ -367,7 +376,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 totalCost = (normalMintCost * 6 + rareMintCost * 4) * 10;
         require(token.balanceOf(user) >= totalCost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= totalCost, "TokenBurner: Insufficient allowance");
-        // 修复：使�?SafeERC20.safeTransferFrom 确保安全
+        // 修复：使用 SafeERC20.safeTransferFrom 确保安全
         token.safeTransferFrom(user, BLACK_HOLE, totalCost);
 
         emit TokenBurned(user, totalCost, block.timestamp);
@@ -388,10 +397,10 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取铸造费�?
-     * @param isRare 是否稀�?
+     * @dev 获取铸造费用
+     * @param isRare 是否稀有
      * @param count 数量
-     * @return 总费�?
+     * @return 总费用
      */
     function getMintCost(bool isRare, uint256 count) external view returns (uint256) {
         require(count > 0, "TokenBurner: Invalid count");
@@ -400,10 +409,10 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取定向铸造费�?
-     * @return 普通部分费�?
-     * @return 稀有部分费�?
-     * @return 总费�?
+     * @dev 获取定向铸造费用
+     * @return 普通部分费用
+     * @return 稀有部分费用
+     * @return 总费用
      */
     function getTargetedMintCost() external view returns (uint256, uint256, uint256) {
         uint256 normalPart = normalMintCost * 6 * 10;
@@ -412,16 +421,16 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取所有费用配�?
-     * @return 普通铸造费�?
-     * @return 稀有铸造费�?
+     * @dev 获取所有费用配置
+     * @return 普通铸造费用
+     * @return 稀有铸造费用
      */
     function getAllCosts() external view returns (uint256, uint256) {
         return (normalMintCost, rareMintCost);
     }
 
     /**
-     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁�?
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
      */
     receive() external payable {}
 

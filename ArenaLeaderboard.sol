@@ -8,30 +8,30 @@ import "./NFTInterface.sol";
 
 /**
  * @title ArenaLeaderboard
- * @dev 竞技场排行榜合约，管理玩家的赛季排名和战�?
+ * @dev 竞技场排行榜合约，管理玩家的赛季排名和战绩
  * 
- * 核心职责�?
+ * 核心职责：
  * 1. 排行榜管理：记录和更新玩家在每个赛季的积分和排名
- * 2. 赛季管理：创建、结束赛季，跟踪赛季状�?
+ * 2. 赛季管理：创建、结束赛季，跟踪赛季状态
  * 3. 排名查询：提供按页查询、获取玩家排名等功能
  * 
- * 排名机制�?
- * - 按积分从高到低排�?
- * - 相同积分按先来后到排�?
- * - 排行榜大小限制为 1000 �?
+ * 排名机制：
+ * - 按积分从高到低排名
+ * - 相同积分按先来后到排名
+ * - 排行榜大小限制为 1000 名
  * 
- * 与其他合约的交互�?
+ * 与其他合约的交互：
  * - ArenaRanking / ArenaRankingManager：战斗后更新玩家排名
- * - ArenaBattle：战斗结果影响排名变�?
+ * - ArenaBattle：战斗结果影响排名变化
  * - ArenaReward：赛季奖励基于排行榜排名分配
  * 
- * 安全机制�?
- * - UUPS 升级：支持合约升�?
- * - 权限控制：只有授权合约才能更新排�?
+ * 安全机制：
+ * - UUPS 升级：支持合约升级
+ * - 权限控制：只有授权合约才能更新排名
  * 
- * 权限控制�?
- * - onlyOwner：结束赛季、升级合�?
- * - onlyAuthorized：设置排名合约地址、更新排�?
+ * 权限控制：
+ * - onlyOwner：结束赛季、升级合约
+ * - onlyAuthorized：设置排名合约地址、更新排名
  */
 contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
@@ -40,13 +40,13 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     uint256 public constant MAX_LEADERBOARD_SIZE = 1000;
     
     /**
-     * @dev 赛季信息结构�?
-     * @param startTime 赛季开始时�?
+     * @dev 赛季信息结构：
+     * @param startTime 赛季开始时间
      * @param endTime 赛季结束时间
-     * @param isActive 赛季是否进行�?
-     * @param isSettled 赛季是否已结�?
+     * @param isActive 赛季是否进行中
+     * @param isSettled 赛季是否已结算
      * @param totalPlayers 赛季总玩家数
-     * @param rewardPool 奖励池金�?
+     * @param rewardPool 奖励池金额
      */
     struct SeasonInfo {
         uint256 startTime;
@@ -58,7 +58,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
     
     /**
-     * @dev 玩家记录结构�?
+     * @dev 玩家记录结构：
      * @param score 玩家积分
      * @param wins 胜利次数
      * @param losses 失败次数
@@ -98,7 +98,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      */
     mapping(uint256 => address[]) public seasonRankings;
     /**
-     * @dev 玩家在赛季中的排名索�?
+     * @dev 玩家在赛季中的排名索引
      */
     mapping(uint256 => mapping(address => uint256)) public playerRankIndex;
     
@@ -115,7 +115,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      */
     event SeasonCreated(uint256 seasonId, uint256 startTime, uint256 endTime);
     /**
-     * @dev 排行榜更新事�?
+     * @dev 排行榜更新事件
      */
     event LeaderboardUpdated(uint256 seasonId);
     
@@ -128,14 +128,19 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
     
     /**
-     * @dev 初始化函�?
-     * @param _authorizer 授权合约地址
+     * @dev 初始化函数
+     * @param _authorizerAddress 授权合约地址
+     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
      */
-    function initialize(address _authorizer) external initializer {
-        require(_authorizer != address(0), "ArenaLeaderboard: Invalid authorizer address");
+    function initialize(
+        address _authorizerAddress,
+        address _arenaRankingManagerContractAddress
+    ) external initializer {
+        require(_authorizerAddress != address(0), "ArenaLeaderboard: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
-        authorizer = _authorizer;
+        authorizer = _authorizerAddress;
+        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
         _createSeason();
     }
     
@@ -146,19 +151,19 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "ArenaLeaderboard: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "ArenaLeaderboard: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
     
     /**
      * @dev 设置竞技场排名管理合约地址
-     * @param _arenaRankingManagerContract 竞技场排名管理合约地址
+     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
      */
-    function setArenaRankingManagerContract(address _arenaRankingManagerContract) external onlyOwnerOrAuthorizer {
-        arenaRankingManagerContract = _arenaRankingManagerContract;
+    function setArenaRankingManagerContract(address _arenaRankingManagerContractAddress) external onlyOwnerOrAuthorizer {
+        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
     }
     
     /**
@@ -191,7 +196,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     /**
      * @dev 更新玩家排名
      * @param player 玩家地址
-     * @param newScore 新积�?
+     * @param newScore 新积分
      * @param seasonId 赛季 ID
      */
     function updateRanking(address player, uint256 newScore, uint256 seasonId) external {
@@ -287,7 +292,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         address[] storage rankings = seasonRankings[seasonId];
         uint256 currentIndex = playerRankIndex[seasonId][player];
         
-        // 先从当前位置移除（如果已经在排行榜中�?
+        // 先从当前位置移除（如果已经在排行榜中）
         if (currentIndex > 0 && currentIndex < rankings.length) {
             for (uint256 i = currentIndex; i + 1 < rankings.length; i++) {
                 rankings[i] = rankings[i + 1];
@@ -297,14 +302,14 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
             playerRankIndex[seasonId][player] = 0;
         }
         
-        // 修复：确�?targetRank 在有效范围内
+        // 修复：确保 targetRank 在有效范围内
         if (targetRank >= rankings.length) {
-            // 添加到末�?
+            // 添加到末尾
             rankings.push(player);
             playerRankIndex[seasonId][player] = rankings.length - 1;
         } else {
-            // 插入到指定位�?
-            rankings.push(address(0)); // 先扩展数�?
+            // 插入到指定位置
+            rankings.push(address(0)); // 先扩展数组
             for (uint256 i = rankings.length - 1; i > targetRank; i--) {
                 rankings[i] = rankings[i - 1];
                 playerRankIndex[seasonId][rankings[i]] = i;
@@ -481,7 +486,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         bool hasTeam
     ) {
         // 修复：返回值数量和类型需要与 IArenaPlayer 接口匹配
-        // remainingAttempts �?lastBattleTime �?ArenaLeaderboard 中不存储，返�?0
+        // remainingAttempts 和 lastBattleTime 在 ArenaLeaderboard 中不存储，返回 0
         PlayerRecord storage record = players[player];
         remainingAttempts = 0;
         lastBattleTime = 0;

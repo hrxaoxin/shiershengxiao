@@ -5,6 +5,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "./NFTInterface.sol";
+import "./AuthorizerLib.sol";
 
 /**
  * @title Authorizer
@@ -176,10 +177,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         emit Unpaused(msg.sender);
     }
 
-    mapping(address => uint256) public weights;
-    uint256 public totalWeight;
-    address public admin;
-
     // ========== 代币合约 ==========
     address public tokenAddress;              // 游戏代币合约地址（ERC20）
     address public usdtAddress;               // USDT代币合约地址
@@ -244,7 +241,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function initialize() external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
-        admin = msg.sender;
     }
 
     /**
@@ -252,98 +248,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param newImplementation - 新实现合约地址
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    event WeightGranted(address indexed user, uint256 weight);
-    event WeightRevoked(address indexed user);
-    event WeightsUpdated(address[] users, uint256[] weights);
-
-    /**
-     * @dev 为用户授予权限权重
-     * @param user - 用户地址
-     * @param weight - 权限权重值
-     */
-    function grantPermission(address user, uint256 weight) external onlyOwner {
-        if (weights[user] == 0) {
-            totalWeight += weight;
-        } else {
-            totalWeight = totalWeight - weights[user] + weight;
-        }
-        weights[user] = weight;
-        emit WeightGranted(user, weight);
-    }
-
-    /**
-     * @dev 撤销用户的权限
-     * @param user - 用户地址
-     */
-    function revokePermission(address user) external onlyOwner {
-        uint256 w = weights[user];
-        require(w > 0, "Authorizer: No permission to revoke");
-        if (w >= totalWeight) {
-            totalWeight = 0;
-        } else {
-            totalWeight -= w;
-        }
-        weights[user] = 0;
-        emit WeightRevoked(user);
-    }
-
-    /**
-     * @dev 检查用户是否具有足够的权限
-     * @param user - 用户地址
-     * @param weightRequired - 所需权限权重
-     * @return bool - 是否具有足够权限
-     */
-    function hasPermission(address user, uint256 weightRequired) external view returns (bool) {
-        return weights[user] >= weightRequired;
-    }
-
-    /**
-     * @dev 获取用户的权限权重
-     * @param user - 用户地址
-     * @return uint256 - 用户权限权重
-     */
-    function getWeight(address user) external view returns (uint256) {
-        return weights[user];
-    }
-
-    /**
-     * @dev 获取系统总权限权重
-     * @return uint256 - 总权重
-     */
-    function getTotalWeight() external view returns (uint256) {
-        return totalWeight;
-    }
-
-    /**
-     * @dev 批量更新用户权限权重
-     * @param users - 用户地址数组
-     * @param newWeights - 新权重数组
-     */
-    function updateWeightsBatch(
-        address[] calldata users,
-        uint256[] calldata newWeights
-    ) external onlyOwner {
-        require(users.length == newWeights.length, "Authorizer: Length mismatch");
-        for (uint256 i = 0; i < users.length; i++) {
-            if (weights[users[i]] > 0) {
-                totalWeight = totalWeight - weights[users[i]] + newWeights[i];
-            } else {
-                totalWeight += newWeights[i];
-            }
-            weights[users[i]] = newWeights[i];
-        }
-        emit WeightsUpdated(users, newWeights);
-    }
-
-    /**
-     * @dev 设置管理员地址
-     * @param _admin - 新管理员地址
-     */
-    function setAdmin(address _admin) external onlyOwner {
-        require(_admin != address(0), "Authorizer: Invalid admin address");
-        admin = _admin;
-    }
 
     /**
      * @dev 更新所有合约地址（立即生效）
@@ -386,7 +290,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("Battle", reason);
             } catch {
-                emit ContractSetupFailed("Battle", "Unknown error");
+                emit ContractSetupFailed("Battle", "Unknown");
             }
         }
         if (_breedingCoreAddress != address(0)) {
@@ -395,7 +299,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("BreedingCore-NFT", reason);
             } catch {
-                emit ContractSetupFailed("BreedingCore-NFT", "Unknown error");
+                emit ContractSetupFailed("BreedingCore-NFT", "Unknown");
             }
             
             try ISetTokenContract(_breedingCoreAddress).setTokenContract(tokenAddress) {
@@ -403,7 +307,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("BreedingCore-Token", reason);
             } catch {
-                emit ContractSetupFailed("BreedingCore-Token", "Unknown error");
+                emit ContractSetupFailed("BreedingCore-Token", "Unknown");
             }
 
             // 设置BreedingCore的Staking合约地址
@@ -413,7 +317,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                 } catch Error(string memory reason) {
                     emit ContractSetupFailed("BreedingCore-Staking", reason);
                 } catch {
-                    emit ContractSetupFailed("BreedingCore-Staking", "Unknown error");
+                    emit ContractSetupFailed("BreedingCore-Staking", "Unknown");
                 }
             }
 
@@ -422,7 +326,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("BreedingMarket-Core", reason);
             } catch {
-                emit ContractSetupFailed("BreedingMarket-Core", "Unknown error");
+                emit ContractSetupFailed("BreedingMarket-Core", "Unknown");
             }
 
             // 设置BreedingMarket的NFT合约地址
@@ -432,7 +336,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                 } catch Error(string memory reason) {
                     emit ContractSetupFailed("BreedingMarket-NFT", reason);
                 } catch {
-                    emit ContractSetupFailed("BreedingMarket-NFT", "Unknown error");
+                    emit ContractSetupFailed("BreedingMarket-NFT", "Unknown");
                 }
             }
 
@@ -442,7 +346,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                 } catch Error(string memory reason) {
                     emit ContractSetupFailed("NFTMint-Breeding", reason);
                 } catch {
-                    emit ContractSetupFailed("NFTMint-Breeding", "Unknown error");
+                    emit ContractSetupFailed("NFTMint-Breeding", "Unknown");
                 }
             }
         }
@@ -453,7 +357,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("Staking-Breeding", reason);
             } catch {
-                emit ContractSetupFailed("Staking-Breeding", "Unknown error");
+                emit ContractSetupFailed("Staking-Breeding", "Unknown");
             }
         }
     }
@@ -509,7 +413,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("RewardManager-PoolManager", reason);
             } catch {
-                emit ContractSetupFailed("RewardManager-PoolManager", "Unknown error");
+                emit ContractSetupFailed("RewardManager-PoolManager", "Unknown");
             }
         }
         // 初始化NFT回购销毁合约
@@ -519,14 +423,14 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("NFTBuyback-NFT", reason);
             } catch {
-                emit ContractSetupFailed("NFTBuyback-NFT", "Unknown error");
+                emit ContractSetupFailed("NFTBuyback-NFT", "Unknown");
             }
             try ISetTokenContract(_nftBuybackAddress).setTokenContract(_tokenAddress) {
                 emit ContractSetupSuccess("NFTBuyback-Token");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("NFTBuyback-Token", reason);
             } catch {
-                emit ContractSetupFailed("NFTBuyback-Token", "Unknown error");
+                emit ContractSetupFailed("NFTBuyback-Token", "Unknown");
             }
             if (_tokenBurnerAddress != address(0)) {
                 try INFTBuyback(_nftBuybackAddress).setTokenBurnerContract(_tokenBurnerAddress) {
@@ -534,7 +438,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                 } catch Error(string memory reason) {
                     emit ContractSetupFailed("NFTBuyback-TokenBurner", reason);
                 } catch {
-                    emit ContractSetupFailed("NFTBuyback-TokenBurner", "Unknown error");
+                    emit ContractSetupFailed("NFTBuyback-TokenBurner", "Unknown");
                 }
             }
             if (_nftUpdateAddress != address(0)) {
@@ -543,7 +447,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                 } catch Error(string memory reason) {
                     emit ContractSetupFailed("NFTBuyback-NFTUpdate", reason);
                 } catch {
-                    emit ContractSetupFailed("NFTBuyback-NFTUpdate", "Unknown error");
+                    emit ContractSetupFailed("NFTBuyback-NFTUpdate", "Unknown");
                 }
             }
             if (nftDataAddress != address(0)) {
@@ -552,7 +456,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                 } catch Error(string memory reason) {
                     emit ContractSetupFailed("NFTBuyback-NFTData", reason);
                 } catch {
-                    emit ContractSetupFailed("NFTBuyback-NFTData", "Unknown error");
+                    emit ContractSetupFailed("NFTBuyback-NFTData", "Unknown");
                 }
             }
         }
@@ -616,7 +520,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                 } catch Error(string memory reason) {
                     emit ContractSetupFailed("NFTMintCore-Breeding", reason);
                 } catch {
-                    emit ContractSetupFailed("NFTMintCore-Breeding", "Unknown error");
+                    emit ContractSetupFailed("NFTMintCore-Breeding", "Unknown");
                 }
             }
         }
@@ -818,6 +722,73 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _setupPriceAndUpgrade(priceOracleAddress, nftUpdateAddress, tokenAddress, usdtAddress);
         _setupNFTContracts(nftUpdateAddress, tokenBurnerAddress, nftMintCoreAddress, nftMintMetadataAddress, pancakeSwapRouterAddress);
         _setupOtherContracts(weightManagerAddress, battleHistoryAddress, battleSkillDataAddress, nftTradingAddress, feeReceiverAddress, arenaRankingManagerAddress, arenaRankingQueryAddress, rewardManagerAddress, arenaRewardAddress, arenaLeaderboardAddress, arenaPlayerAddress, arenaBattleAddress);
+    }
+
+    /**
+     * @dev 统一设置所有合约的authorizer地址
+     * 仅合约所有者可调用，用于authorizer合约升级后统一更新所有合约的authorizer引用
+     * @param _newAuthorizer 新的authorizer合约地址
+     */
+    function setAllAuthorizers(address _newAuthorizer) external onlyOwner whenNotPaused {
+        require(_newAuthorizer != address(0), "A: Invalid authorizer");
+        
+        address[] memory addrs = new address[](26);
+        addrs[0] = nftMintCoreAddress;
+        addrs[1] = nftMintBatchAddress;
+        addrs[2] = nftMintMetadataAddress;
+        addrs[3] = nftDataAddress;
+        addrs[4] = nftUpdateAddress;
+        addrs[5] = nftTradingAddress;
+        addrs[6] = nftBuybackAddress;
+        addrs[7] = stakingAddress;
+        addrs[8] = tokenStakingAddress;
+        addrs[9] = rewardManagerAddress;
+        addrs[10] = dividendManagerAddress;
+        addrs[11] = poolManagerAddress;
+        addrs[12] = weightManagerAddress;
+        addrs[13] = battleAddress;
+        addrs[14] = battleSkillDataAddress;
+        addrs[15] = battleHistoryAddress;
+        addrs[16] = breedingCoreAddress;
+        addrs[17] = breedingMarketAddress;
+        addrs[18] = arenaRankingManagerAddress;
+        addrs[19] = arenaRankingQueryAddress;
+        addrs[20] = arenaRewardAddress;
+        addrs[21] = arenaLeaderboardAddress;
+        addrs[22] = arenaPlayerAddress;
+        addrs[23] = arenaBattleAddress;
+        addrs[24] = tokenBurnerAddress;
+        addrs[25] = priceOracleAddress;
+        
+        string[] memory names = new string[](26);
+        names[0] = "NFTMintCore-Authorizer";
+        names[1] = "NFTMintBatch-Authorizer";
+        names[2] = "NFTMintMetadata-Authorizer";
+        names[3] = "NFTData-Authorizer";
+        names[4] = "NFTUpdate-Authorizer";
+        names[5] = "NFTTrading-Authorizer";
+        names[6] = "NFTBuyback-Authorizer";
+        names[7] = "Staking-Authorizer";
+        names[8] = "TokenStaking-Authorizer";
+        names[9] = "RewardManager-Authorizer";
+        names[10] = "DividendManager-Authorizer";
+        names[11] = "PoolManager-Authorizer";
+        names[12] = "WeightManager-Authorizer";
+        names[13] = "Battle-Authorizer";
+        names[14] = "BattleSkillData-Authorizer";
+        names[15] = "BattleHistory-Authorizer";
+        names[16] = "BreedingCore-Authorizer";
+        names[17] = "BreedingMarket-Authorizer";
+        names[18] = "ArenaRankingManager-Authorizer";
+        names[19] = "ArenaRankingQuery-Authorizer";
+        names[20] = "ArenaReward-Authorizer";
+        names[21] = "ArenaLeaderboard-Authorizer";
+        names[22] = "ArenaPlayer-Authorizer";
+        names[23] = "ArenaBattle-Authorizer";
+        names[24] = "TokenBurner-Authorizer";
+        names[25] = "PriceOracle-Authorizer";
+        
+        AuthorizerLib.batchSetAuthorizer(addrs, names, _newAuthorizer);
     }
 
     /**

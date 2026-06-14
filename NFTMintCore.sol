@@ -182,20 +182,22 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     
     /**
      * @dev 初始化函数
-     * @param _nftDataContract NFT数据合约地址
-     * @param _tokenBurnerContract 代币销毁合约地址
-     * @param _authorizer 授权合约地址
+     * @param _nftDataContractAddress NFT数据合约地址
+     * @param _tokenBurnerContractAddress 代币销毁合约地址
+     * @param _authorizerAddress 授权合约地址
+     * @param _breedingContractAddress 繁殖合约地址
      */
-    function initialize(address _nftDataContract, address _tokenBurnerContract, address _authorizer) public initializer {
+    function initialize(address _nftDataContractAddress, address _tokenBurnerContractAddress, address _authorizerAddress, address _breedingContractAddress) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         
         elementProbabilities = [32, 32, 32, 2, 2];
         rareElementProbabilities = [50, 50];
-        nftDataContract = _nftDataContract;
-        tokenBurnerContract = _tokenBurnerContract;
-        authorizer = _authorizer;
+        nftDataContract = _nftDataContractAddress;
+        tokenBurnerContract = _tokenBurnerContractAddress;
+        authorizer = _authorizerAddress;
+        breedingContract = _breedingContractAddress;
         _nextCardId = 1;
     }
     
@@ -464,31 +466,31 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         failedSyncCount--;
     }
     
-    function setNftDataContract(address _nftDataContract) external onlyOwnerOrAuthorizer {
+    function setNftDataContract(address _nftDataContractAddress) external onlyOwnerOrAuthorizer {
         // 修复：零地址检查，防止错误配置导致所有 mint 失败
-        require(_nftDataContract != address(0), "NFTMint: nftDataContract cannot be zero address");
-        nftDataContract = _nftDataContract;
+        require(_nftDataContractAddress != address(0), "NFTMint: nftDataContract cannot be zero address");
+        nftDataContract = _nftDataContractAddress;
     }
     
-    function setTokenBurnerContract(address _tokenBurnerContract) external onlyOwnerOrAuthorizer {
+    function setTokenBurnerContract(address _tokenBurnerContractAddress) external onlyOwnerOrAuthorizer {
         // 修复：零地址检查，防止错误配置导致 burner mint 失败
-        require(_tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract cannot be zero address");
-        tokenBurnerContract = _tokenBurnerContract;
+        require(_tokenBurnerContractAddress != address(0), "NFTMint: tokenBurnerContract cannot be zero address");
+        tokenBurnerContract = _tokenBurnerContractAddress;
     }
     
-    function setBreedingContract(address _breedingContract) external onlyOwnerOrAuthorizer {
+    function setBreedingContract(address _breedingContractAddress) external onlyOwnerOrAuthorizer {
         // 修复：零地址检查，防止错误配置导致 breeding mint 失败
-        require(_breedingContract != address(0), "NFTMint: breedingContract cannot be zero address");
-        breedingContract = _breedingContract;
+        require(_breedingContractAddress != address(0), "NFTMint: breedingContract cannot be zero address");
+        breedingContract = _breedingContractAddress;
     }
     
     /**
      * @dev 设置授权器合约地址
-     * @param _authorizer 授权器合约地址
+     * @param _authorizerAddress 授权器合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "NFTMint: authorizer cannot be zero address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "NFTMint: authorizer cannot be zero address");
+        authorizer = _authorizerAddress;
     }
     
     function pause() external onlyOwner {

@@ -11,63 +11,69 @@ import "./NFTInterface.sol";
  * @title NFTData
  * @dev NFT数据存储合约
  *
- * 本合约采�?分离存储"模式，将NFT的元数据（类型、等级、成长值、铸造时间）
- * 与ERC721代币所有权数据（由 NFTMint 管理）分离存储，以提高存储效率和合约升级灵活性�?
+ * 本合约采用"分离存储"模式，将NFT的元数据（类型、等级、成长值、铸造时间）
+ * 与ERC721代币所有权数据（由 NFTMint 管理）分离存储，以提高存储效率和合约升级灵活性。
  *
- * 设计动机�?
+ * 设计动机：
  * - ERC721 主合约（NFTMint）负责所有权转移和铸造，不可轻易替换
  * - 元数据可以在不影响代币所有权的情况下扩展（例如新增成长值字段）
  * - 前端可以只查询本合约获取 NFT 详情，减轻主合约负担
  *
- * 存储结构�?
- * - _nftInfo[tokenId] �?NFTInfo { tokenId, zodiacType, level, growth, mintTime }
- *   每一�?NFT 的完整信息，�?Battle、Staking、Breeding 等业务合约读�?
- * - _nftTypeOwners[zodiacType] �?address[] 每种类型的持有者列表（用于市场统计�?
- * - _userNFTs[owner] �?tokenId[] 每个用户持有�?NFT 列表（用于前端分页）
- * - _userNFTsByType[owner][zodiacType] �?tokenId[] 每个用户按类型分组的 NFT（用于快速计算权重）
+ * 存储结构：
+ * - _nftInfo[tokenId] → NFTInfo { tokenId, zodiacType, level, growth, mintTime }
+ *   每一个 NFT 的完整信息，供 Battle、Staking、Breeding 等业务合约读取
+ * - _nftTypeOwners[zodiacType] → address[] 每种类型的持有者列表（用于市场统计）
+ * - _userNFTs[owner] → tokenId[] 每个用户持有的 NFT 列表（用于前端分页）
+ * - _userNFTsByType[owner][zodiacType] → tokenId[] 每个用户按类型分组的 NFT（用于快速计算权重）
  *
- * 数据模型说明�?
- * - RARE_TYPE_START = 72：zodiacType >= 72 为稀有属性（�?光）
- * - MAX_ZODIAC_TYPE = 119：最大合�?zodiacType（共 120 种，0-119�?
- * - level �?[1, 5]：等级由 NFTUpdate 升级，影响战斗属性和权重
- * - growth �?[10, 100]：成长值，铸造时随机生成，影响基础属性加�?
+ * 数据模型说明：
+ * - RARE_TYPE_START = 72：zodiacType >= 72 为稀有属性（闪光）
+ * - MAX_ZODIAC_TYPE = 119：最大合法 zodiacType（共 120 种，0-119）
+ * - level ∈ [1, 5]：等级由 NFTUpdate 升级，影响战斗属性和权重
+ * - growth ∈ [10, 100]：成长值，铸造时随机生成，影响基础属性加成
  *
  * 数据写入权限（严格隔离，防止篡改）：
  * - onlyMintContract：NFTMint 调用 setNFTInfo() 写入新铸造的 NFT
  * - onlyUpdateContract：NFTUpdate 调用 updateLevel() 更新等级
- * - onlyTradingContract / onlyStakingContract / onlyBreedingContract�?
- *   各自�?NFT 转入转出时维�?_userNFTs �?_nftTypeOwners 的索�?
+ * - onlyTradingContract / onlyStakingContract / onlyBreedingContract：
+ *   各自在 NFT 转入转出时维护 _userNFTs 和 _nftTypeOwners 的索引
  *
  * 数据读取（全部公开 view，Gas 免费）：
- * - getNFTInfo(tokenId)：返回完�?NFTInfo
- * - getNFTLevel(tokenId)：返回等级（�?Battle/Staking 快速查询）
+ * - getNFTInfo(tokenId)：返回完整 NFTInfo
+ * - getNFTLevel(tokenId)：返回等级（供 Battle/Staking 快速查询）
  * - getNFTType(tokenId)：返回生肖类型（供属性克制判断）
  * - getUserAllTokens(owner)：返回用户的全部 NFT ID 数组
  * - getUserTokensByPage(owner, page, pageSize)：分页返回，优化前端加载
- * - getUserWeight(owner)：计算用户加权权重（供分红池使用�?
+ * - getUserWeight(owner)：计算用户加权权重（供分红池使用）
  *
- * 与其他合约的联动�?
- * - NFTMint.mintForUser �?NFTData.setNFTInfo（新增记录）
- * - NFTUpdate.upgradeWithNFT �?NFTData.updateLevel（更新等级）
- * - NFTTrading.buyNFT �?NFTData.transferOwnership（在买卖双方间转移索引）
- * - Staking.stakeNFT �?NFTData.staked(tokenId) 标记（如果实现）
+ * 与其他合约的联动：
+ * - NFTMint.mintForUser → NFTData.setNFTInfo（新增记录）
+ * - NFTUpdate.upgradeWithNFT → NFTData.updateLevel（更新等级）
+ * - NFTTrading.buyNFT → NFTData.transferOwnership（在买卖双方间转移索引）
+ * - Staking.stakeNFT → NFTData.staked(tokenId) 标记（如果实现）
  * - WeightManager / DividendManager 通过 getUserWeight 计算分红
  *
  * 升级与迁移支持：
  * - UUPS 可升级：未来可在不改变代币地址的情况下替换数据访问逻辑
- * - 所�?mapping 使用 storage，代理升级后数据完整保留
+ * - 所有 mapping 使用 storage，代理升级后数据完整保留
  *
- * 典型数据查询流程�?
+ * 典型数据查询流程：
  * 1. 用户打开"我的 NFT"页面
- * 2. 前端调用 getUserTokensByPage(user, 0, 20) 获得第一�?ID
- * 3. 前端逐个 ID 调用 getNFTInfo 获取详情（或批量查询�?
- * 4. 前端展示等级、属性、成长值，并调�?Battle/Staking 等其他合约获取附加信�?
+ * 2. 前端调用 getUserTokensByPage(user, 0, 20) 获得第一批 ID
+ * 3. 前端逐个 ID 调用 getNFTInfo 获取详情（或批量查询）
+ * 4. 前端展示等级、属性、成长值，并调用 Battle/Staking 等其他合约获取附加信息
  */
 contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     using NFTDataTypes for uint256;
 
     uint256 public constant RARE_TYPE_START = 72;
     uint256 public constant MAX_ZODIAC_TYPE = 119;
+    
+    /// @dev 授权合约地址
+    address public authorizer;
+    
+    /// @dev 分红管理合约地址
+    address public dividendManager;
     
     event LevelUpdated(uint256 indexed tokenId, uint8 oldLevel, uint8 newLevel, uint64 timestamp);
 
@@ -81,12 +87,12 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev NFT信息映射
      *
-     * key: tokenId (�?开�?
-     * value: NFTInfo结构�?
+     * key: tokenId (从开始)
+     * value: NFTInfo结构体
      *
-     * 访问控制�?
+     * 访问控制：
      * - 读取：公开
-     * - 写入：仅NFT主合�?
+     * - 写入：仅NFT主合约
      */
     mapping(uint256 => struct_NFTInfo) internal _nftInfo;
     
@@ -96,9 +102,9 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     mapping(address => mapping(uint256 => uint256[])) internal _userNFTsByType; // user => zodiacType => tokenIds
 
     /**
-     * @dev 每种NFT类型的持有者列�?
+     * @dev 每种NFT类型的持有者列表
      *
-     * 用于统计和市场分�?
+     * 用于统计和市场分析
      * key: nftType (0-119)
      * value: 持有者地址数组
      */
@@ -123,38 +129,37 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     mapping(address => uint256) internal _userNFTCount;
 
     /**
-     * @dev NFT信息结构�?
+     * @dev NFT信息结构体
      *
      * 注意：此结构体定义与NFTDataType.sol中的NFTInfo兼容
-     * 但在此处内联定义以避免循环依�?
+     * 但在此处内联定义以避免循环依赖
      */
     struct struct_NFTInfo {
         uint256 tokenId;         // NFT唯一ID
-        uint256 zodiacType;       // 生肖类型�?-119�?
-        uint8 level;              // 等级�?-5，使用uint8但限制为1-5�?
-        uint8 growth;             // 成长值（10-100�?
+        uint256 zodiacType;       // 生肖类型（0-119）
+        uint8 level;              // 等级（1-5），使用uint8但限制为1-5
+        uint8 growth;             // 成长值（10-100）
         uint256 mintTime;         // 铸造时间戳
     }
     
-    /** @dev 最大等级限�?*/
+    /** @dev 最大等级限制 */
     uint8 public constant MAX_LEVEL = 5;
-    /** @dev 最小等级限�?*/
+    /** @dev 最小等级限制 */
     uint8 public constant MIN_LEVEL = 1;
 
     /**
-     * @dev 授权合约地址（Authorizer�?
+     * @dev 初始化函数
+     * @param _authorizerAddress 授权合约地址
+     * @param _dividendManagerAddress 分红管理合约地址
      */
-    address public authorizer;
-
-    /**
-     * @dev 初始化函�?
-     * @param _authorizer 授权合约地址
-     */
-    function initialize(address _authorizer) external initializer {
-        require(_authorizer != address(0), "NFTData: Invalid authorizer address");
+    function initialize(address _authorizerAddress, address _dividendManagerAddress) external initializer {
+        require(_authorizerAddress != address(0), "NFTData: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
-        authorizer = _authorizer;
+        authorizer = _authorizerAddress;
+        if (_dividendManagerAddress != address(0)) {
+            dividendManager = _dividendManagerAddress;
+        }
     }
 
     /**
@@ -164,15 +169,15 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "NFTData: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "NFTData: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
     /**
-     * @dev 检查是否为授权调用者（owner或authorizer�?
+     * @dev 检查是否为授权调用者（owner或authorizer）
      */
     modifier onlyOwnerOrAuthorizer() {
         require(msg.sender == owner() || msg.sender == authorizer, "NFTData: Not authorized");
@@ -191,7 +196,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         uint256 mintTime;
         uint256 fatherId;         // 父亲NFT ID
         uint256 motherId;         // 母亲NFT ID
-        uint256 generation;        // 代数�?为初始铸造，1为第一代繁殖后代）
+        uint256 generation;        // 代数（0为初始铸造，1为第一代繁殖后代）
     }
 
     /**
@@ -200,7 +205,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param tokenId NFT ID
      * @param zodiacType 生肖类型
      * @param level 等级
-     * @param mintTime 铸造时�?
+     * @param mintTime 铸造时间
      */
     function _setNFTInfo(
         uint256 tokenId,
@@ -234,20 +239,20 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @dev 获取NFT成长�?
+     * @dev 获取NFT成长值
      *
      * @param tokenId NFT ID
-     * @return uint8 成长值（10-100�?
+     * @return uint8 成长值（10-100）
      */
     function _getNFTGrowth(uint256 tokenId) internal view returns (uint8) {
         return _nftInfo[tokenId].growth;
     }
 
     /**
-     * @dev 设置NFT成长�?
+     * @dev 设置NFT成长值
      *
      * @param tokenId NFT ID
-     * @param growth 成长值（10-100�?
+     * @param growth 成长值（10-100）
      */
     function _setNFTGrowth(uint256 tokenId, uint8 growth) internal {
         require(growth >= 10 && growth <= 100, "NFTData: Invalid growth value");
@@ -258,7 +263,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @dev 获取NFT类型
      *
      * @param tokenId NFT ID
-     * @return uint256 生肖类型�?-119�?
+     * @return uint256 生肖类型（0-119）
      */
     function _getNFTType(uint256 tokenId) internal view returns (uint256) {
         return _nftInfo[tokenId].zodiacType;
@@ -268,7 +273,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @dev 获取NFT等级
      *
      * @param tokenId NFT ID
-     * @return uint8 等级�?-5�?
+     * @return uint8 等级（1-5）
      */
     function _getNFTLevel(uint256 tokenId) internal view returns (uint8) {
         return _nftInfo[tokenId].level;
@@ -278,7 +283,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @dev 设置NFT等级
      *
      * @param tokenId NFT ID
-     * @param newLevel 新等�?
+     * @param newLevel 新等级
      */
     function _setNFTLevel(uint256 tokenId, uint8 newLevel) internal {
         require(newLevel >= 1 && newLevel <= 5, "NFTData: Invalid level");
@@ -290,7 +295,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @dev 获取NFT铸造时间（内部�?
+     * @dev 获取NFT铸造时间（内部）
      *
      * @param tokenId NFT ID
      * @return uint256 铸造时间戳
@@ -300,7 +305,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @dev 获取NFT铸造时间（外部�?
+     * @dev 获取NFT铸造时间（外部）
      *
      * @param tokenId NFT ID
      * @return uint256 铸造时间戳
@@ -370,24 +375,24 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @dev 添加到类型持有者列�?
+     * @dev 添加到类型持有者列表
      *
      * @param nftType 生肖类型
      * @param owner 持有者地址
      */
     function _addToTypeOwners(uint256 nftType, address owner) internal {
-        // 修复：检�?owner 是否已在列表中，避免重复添加
+        // 修复：检查 owner 是否已在列表中，避免重复添加
         address[] storage owners = _nftTypeOwners[nftType];
         for (uint256 i = 0; i < owners.length; i++) {
             if (owners[i] == owner) {
-                return; // 已存在，不需要重复添�?
+                return; // 已存在，不需要重复添加
             }
         }
         _nftTypeOwners[nftType].push(owner);
     }
 
     /**
-     * @dev 从类型持有者列表移�?
+     * @dev 从类型持有者列表移除
      *
      * @param nftType 生肖类型
      * @param owner 持有者地址
@@ -412,10 +417,10 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @dev 获取类型持有者数�?
+     * @dev 获取类型持有者数量
      *
      * @param nftType 生肖类型
-     * @return uint256 持有者数�?
+     * @return uint256 持有者数量
      */
     function _getTypeOwnerCount(uint256 nftType) internal view returns (uint256) {
         return _nftTypeOwners[nftType].length;
@@ -505,7 +510,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             uint256 tokenId = userTokens[i];
             struct_NFTInfo memory info = _nftInfo[tokenId];
 
-            // 稀有属性权重（�?光属性，zodiacType >= 72�?
+            // 稀有属性权重（闪光属性，zodiacType >= 72）
             bool isRare = info.zodiacType >= RARE_TYPE_START;
 
             // 基础权重基于等级
@@ -524,7 +529,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
     
     /**
-     * @dev 设置NFT信息（用于初始化�?
+     * @dev 设置NFT信息（用于初始化）
      */
     function setNFTInfo(
         uint256 tokenId,
@@ -540,18 +545,17 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @dev 同步NFT铸造数据（由NFTMintCore调用�?
+     * @dev 同步NFT铸造数据（由NFTMintCore调用）
      */
-    function syncNFTData(
-        uint256 tokenId,
-        uint256 zodiacType,
-        uint8 level,
-        uint8 growth,
-        address to
-    ) external onlyOwnerOrAuthorizer {
+    function syncNFTData(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to) external onlyOwnerOrAuthorizer {
         _setNFTInfo(tokenId, zodiacType, level, growth, block.timestamp);
         _addUserNFT(to, tokenId);
         _addToTypeOwners(zodiacType, to);
+        
+        if (dividendManager != address(0)) {
+            uint8 element = uint8(zodiacType < 72 ? 0 : 1);
+            IDividendManager(dividendManager).updateUserWeight(to, uint256(level), true, element);
+        }
     }
     
     /**
@@ -585,7 +589,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param offset 起始索引
      * @param limit 返回数量限制
      * @return nfts NFT列表
-     * @return total 总数�?
+     * @return total 总数量
      */
     function getUserNFTsPaginated(address user, uint256 offset, uint256 limit) external view returns (uint256[] memory nfts, uint256 total) {
         uint256[] storage allNFTs = _userNFTs[user];
@@ -607,7 +611,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁�?
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
      */
     receive() external payable {}
 

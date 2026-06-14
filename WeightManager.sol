@@ -7,7 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 
 /**
- * @dev 零地址错误 - 当传入的地址为零地址时抛�?
+ * @dev 零地址错误 - 当传入的地址为零地址时抛出
  */
 error ZeroAddress();
 /**
@@ -15,7 +15,7 @@ error ZeroAddress();
  */
 error InvalidAmount();
 /**
- * @dev 非操作者错�?- 当调用者不具备操作者权限时抛出
+ * @dev 非操作者错误 - 当调用者不具备操作者权限时抛出
  */
 error NotOperator();
 
@@ -23,24 +23,24 @@ error NotOperator();
  * @title WeightManager
  * @dev 用户权重管理合约，负责计算、缓存和管理所有用户的NFT权重
  *
- * 核心功能�?
+ * 核心功能：
  * 1. 权重计算：根据用户持有的NFT数量和稀有度计算用户权重
- * 2. 权重缓存：使用时间戳缓存机制减少重复计算，降低Gas消�?
+ * 2. 权重缓存：使用时间戳缓存机制减少重复计算，降低Gas消耗
  * 3. 资格管理：维护符合最低权重要求的用户双向链表
  * 4. 批量更新：支持批量更新多个用户权重，提高运营效率
  *
- * 数据结构�?
- * - userWeight: 用户当前权重映射（持久化存储�?
+ * 数据结构：
+ * - userWeight: 用户当前权重映射（持久化存储）
  * - cachedUserWeight: 用户权重缓存映射（快速查询）
- * - cachedWeightTimestamp: 缓存时间戳映射（用于缓存过期判断�?
+ * - cachedWeightTimestamp: 缓存时间戳映射（用于缓存过期判断）
  * - eligibleUserPrev/Next: 合格用户双向链表，便于遍历和奖励分配
  *
- * 缓存策略�?
- * - 缓存有效期：默认15分钟（可配置�?
+ * 缓存策略：
+ * - 缓存有效期：默认15分钟（可配置）
  * - 缓存更新：主动更新（操作者调用）或被动更新（查询时自动计算）
- * - 缓存清除：紧急情况下可手动清除特定用户缓�?
+ * - 缓存清除：紧急情况下可手动清除特定用户缓存
  *
- * 权限设计�?
+ * 权限设计：
  * - onlyOwner: 合约所有者，可配置参数和升级合约
  * - onlyOwnerOrAuthorizer: 所有者或授权器，可配置合约地址
  * - onlyOperator: 仅所有者，可执行权重更新和缓存管理
@@ -58,7 +58,7 @@ contract WeightManager is
     }
 
     /**
-     * @dev 暂停状态标志，true表示合约已暂�?
+     * @dev 暂停状态标志，true表示合约已暂停
      */
     bool public paused;
     /**
@@ -67,7 +67,7 @@ contract WeightManager is
     string public pauseReason;
 
     /**
-     * @dev 合约暂停事件，记录执行暂停的账户和原�?
+     * @dev 合约暂停事件，记录执行暂停的账户和原因
      */
     event Paused(address account, string reason);
     /**
@@ -86,7 +86,7 @@ contract WeightManager is
     /**
      * @dev 暂停合约，停止权重更新和缓存管理操作
      * 仅合约所有者可调用，用于紧急情况下暂停服务
-     * @param reason 暂停原因，将被记录在事件日志�?
+     * @param reason 暂停原因，将被记录在事件日志中
      */
     function pause(string memory reason) external onlyOwner {
         paused = true;
@@ -95,7 +95,7 @@ contract WeightManager is
     }
 
     /**
-     * @dev 取消合约暂停，恢复权重管理功�?
+     * @dev 取消合约暂停，恢复权重管理功能
      * 仅合约所有者可调用
      */
     function unpause() external onlyOwner {
@@ -105,7 +105,7 @@ contract WeightManager is
     }
 
     /**
-     * @dev NFT数据合约地址，用于查询用户NFT持有情况和计算权�?
+     * @dev NFT数据合约地址，用于查询用户NFT持有情况和计算权重
      */
     address public nftDataContract;
     /**
@@ -114,7 +114,7 @@ contract WeightManager is
     address public authorizer;
     /**
      * @dev 最低持有权重要求，用于判断用户是否具备资格
-     * 用户权重必须大于等于此值才能进入合格用户列�?
+     * 用户权重必须大于等于此值才能进入合格用户列表
      */
     uint256 public minOwnerWeight;
     /**
@@ -123,7 +123,7 @@ contract WeightManager is
     uint256 public ownerWeight;
     
     /**
-     * @dev 用户当前权重映射（持久化存储�?
+     * @dev 用户当前权重映射（持久化存储）
      * address: 用户钱包地址
      * uint256: 用户权重值，由NFT数量和稀有度决定
      */
@@ -133,82 +133,89 @@ contract WeightManager is
      */
     mapping(address => uint256) public cachedUserWeight;
     /**
-     * @dev 权重缓存时间戳映射，记录缓存更新时间，用于判断缓存是否过�?
+     * @dev 权重缓存时间戳映射，记录缓存更新时间，用于判断缓存是否过期
      */
     mapping(address => uint256) public cachedWeightTimestamp;
     /**
      * @dev 权重缓存持续时间（秒），默认15分钟
-     * 超过此时间后查询将触发重新计�?
+     * 超过此时间后查询将触发重新计算
      */
     uint256 public weightCacheDuration = 15 minutes;
     
     /**
-     * @dev 合格用户链表：前一个用户映�?
-     * 用于构建双向链表，便于遍历所有合格用�?
+     * @dev 合格用户链表：前一个用户映射
+     * 用于构建双向链表，便于遍历所有合格用户
      */
     mapping(address => address) public eligibleUserPrev;
     /**
-     * @dev 合格用户链表：后一个用户映�?
+     * @dev 合格用户链表：后一个用户映射
      */
     mapping(address => address) public eligibleUserNext;
     /**
-     * @dev 用户是否在合格列表中的标志映�?
+     * @dev 用户是否在合格列表中的标志映射
      */
     mapping(address => bool) public inEligibleList;
     /**
-     * @dev 合格用户链表头地址，链表的第一个用�?
+     * @dev 合格用户链表头地址，链表的第一个用户
      */
     address public eligibleUserHead;
     /**
-     * @dev 合格用户链表尾地址，链表的最后一个用�?
+     * @dev 合格用户链表尾地址，链表的最后一个用户
      */
     address public eligibleUserTail;
     
     /**
-     * @dev 用户权重更新事件，记录用户权重变�?
+     * @dev 用户权重更新事件，记录用户权重变化
      * @param user 用户地址（索引）
-     * @param oldWeight 更新前的权重�?
-     * @param newWeight 更新后的权重�?
-     * @param timestamp 更新时间�?
+     * @param oldWeight 更新前的权重值
+     * @param newWeight 更新后的权重值
+     * @param timestamp 更新时间戳
      */
     event UserWeightUpdated(address indexed user, uint256 oldWeight, uint256 newWeight, uint256 timestamp);
     /**
-     * @dev 总权重更新事件（保留用于未来扩展�?
+     * @dev 总权重更新事件（保留用于未来扩展）
      */
     event TotalWeightUpdated(uint256 oldWeight, uint256 newWeight, uint256 timestamp);
     
     /**
      * @dev 合约初始化函数（仅可调用一次）
      * 初始化OpenZeppelin升级组件和基础参数
-     * @param _authorizer 授权管理合约地址，不可为零地址
+     * @param _authorizerAddress 授权管理合约地址，不可为零地址
+     * @param _nftDataContractAddress NFT数据合约地址
      */
-    function initialize(address _authorizer) external initializer {
-        require(_authorizer != address(0), "WeightManager: Invalid authorizer address");
+    function initialize(address _authorizerAddress, address _nftDataContractAddress) external initializer {
+        require(_authorizerAddress != address(0), "WeightManager: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         minOwnerWeight = 0;
         ownerWeight = 100;
-        authorizer = _authorizer;
+        authorizer = _authorizerAddress;
+        if (_nftDataContractAddress != address(0)) {
+            nftDataContract = _nftDataContractAddress;
+        }
+        
+        // 初始化带默认值的参数
+        weightCacheDuration = 15 minutes;
     }
     
     /**
      * @dev UUPS升级授权函数
-     * 仅允许合约所有者升级合约实�?
+     * 仅允许合约所有者升级合约实现
      */
     function _authorizeUpgrade(address) internal override onlyOwner {}
     
     /**
      * @dev 设置授权器地址
      * 仅所有者可调用，用于更改授权管理合约
-     * @param _authorizer 新的授权器地址，不可为零地址
+     * @param _authorizerAddress 新的授权器地址，不可为零地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "WeightManager: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "WeightManager: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
     /**
-     * @dev 修饰器：仅授权的地址（所有者或授权器）可调�?
+     * @dev 修饰器：仅授权的地址（所有者或授权器）可调用
      * 用于保护合约配置更新函数
      */
     modifier onlyOwnerOrAuthorizer() {
@@ -219,7 +226,7 @@ contract WeightManager is
     /**
      * @dev 修饰器：仅合约所有者可调用
      * 用于保护权重更新和缓存管理等敏感操作
-     * 修复：统一使用 require 保持一致�?
+     * 修复：统一使用 require 保持一致性
      */
     modifier onlyOperator() {
         require(msg.sender == owner(), "WeightManager: Not operator");
@@ -228,33 +235,33 @@ contract WeightManager is
     
     /**
      * @dev 设置NFT数据合约地址
-     * 此合约用于查询用户NFT持有情况和计算权�?
+     * 此合约用于查询用户NFT持有情况和计算权重
      * @param _nftDataContract 新的NFT数据合约地址，不可为零地址
      */
-    function setNFTDataContract(address _nftDataContract) external onlyOwnerOrAuthorizer {
-        if (_nftDataContract == address(0)) revert ZeroAddress();
-        nftDataContract = _nftDataContract;
+    function setNFTDataContract(address _nftDataContractAddress) external onlyOwnerOrAuthorizer {
+        if (_nftDataContractAddress == address(0)) revert ZeroAddress();
+        nftDataContract = _nftDataContractAddress;
     }
     
     /**
-     * @dev 设置最低持有权重要�?
-     * 用户权重必须大于等于此值才能进入合格用户列�?
-     * 如果当前所有者权重低于新最小值，将自动提升所有者权�?
+     * @dev 设置最低持有权重要求
+     * 用户权重必须大于等于此值才能进入合格用户列表
+     * 如果当前所有者权重低于新最小值，将自动提升所有者权重
      * @param _minWeight 新的最低权重值，必须大于0
      */
     function setMinOwnerWeight(uint256 _minWeight) external onlyOwner {
         if (_minWeight == 0) revert InvalidAmount();
         minOwnerWeight = _minWeight;
-        // 修复：确�?ownerWeight 不低于最小�?
+        // 修复：确保 ownerWeight 不低于最小值
         if (ownerWeight < _minWeight) {
             ownerWeight = _minWeight;
         }
     }
     
     /**
-     * @dev 设置所有者固定权重�?
+     * @dev 设置所有者固定权重。
      * 所有者可使用自定义权重值，不受NFT持有情况影响
-     * @param _w 新的所有者权重值，必须大于等于最低要�?
+     * @param _w 新的所有者权重值，必须大于等于最低要求
      */
     function setOwnerWeight(uint256 _w) external onlyOwner {
         if (_w < minOwnerWeight) revert InvalidAmount();
@@ -262,10 +269,10 @@ contract WeightManager is
     }
     
     /**
-     * @dev 内部函数：计算用户实际权�?
+     * @dev 内部函数：计算用户实际权重
      * 所有者返回固定ownerWeight，其他用户从NFTData合约查询
      * @param user 目标用户地址
-     * @return 计算后的权重�?
+     * @return 计算后的权重值
      */
     function _calcUserWeight(address user) internal view returns (uint256) {
         if (user == owner()) return ownerWeight;
@@ -279,7 +286,7 @@ contract WeightManager is
      * @dev 查询用户权重（外部接口）
      * 优先使用缓存（如果未过期），否则实时计算
      * @param user 目标用户地址
-     * @return 用户当前权重�?
+     * @return 用户当前权重值
      */
     function getUserWeight(address user) external view returns (uint256) {
         if (user == owner()) return ownerWeight;
@@ -309,7 +316,7 @@ contract WeightManager is
     
     /**
      * @dev 批量更新用户权重
-     * 最多支�?00个用户，用于批量维护权重数据
+     * 最多支持100个用户，用于批量维护权重数据
      * @param users 用户地址数组
      */
     function batchUpdateUserWeight(address[] calldata users) external onlyOperator whenNotPaused {
@@ -327,7 +334,7 @@ contract WeightManager is
     /**
      * @dev 批量权重更新完成事件
      * @param operator 操作者地址（索引）
-     * @param count 成功更新的用户数�?
+     * @param count 成功更新的用户数量
      */
     event BatchWeightUpdateCompleted(address indexed operator, uint256 count);
 
@@ -343,7 +350,7 @@ contract WeightManager is
     
     /**
      * @dev 清除用户权重缓存
-     * 用于紧急情况下强制刷新特定用户的权重数�?
+     * 用于紧急情况下强制刷新特定用户的权重数据
      * @param user 目标用户地址
      */
     function clearUserWeightCache(address user) external onlyOperator {
@@ -352,8 +359,8 @@ contract WeightManager is
     }
     
     /**
-     * @dev 内部函数：检查用户是否具备合格资�?
-     * 判断用户权重是否达到最低要�?
+     * @dev 内部函数：检查用户是否具备合格资格
+     * 判断用户权重是否达到最低要求
      * @param user 目标用户地址
      * @return bool 是否具备资格
      */
@@ -373,7 +380,7 @@ contract WeightManager is
     
     /**
      * @dev 内部函数：更新用户权重并管理资格列表
-     * 流程：计算新权重 -> 更新存储和缓�?-> 触发事件 -> 管理资格列表
+     * 流程：计算新权重 -> 更新存储和缓存 -> 触发事件 -> 管理资格列表
      * @param user 目标用户地址
      */
     function _updateUserWeight(address user) internal {
@@ -392,7 +399,7 @@ contract WeightManager is
     
     /**
      * @dev 更新用户权重（外部接口）
-     * 仅操作者可调用，用于主动更新单个用户权�?
+     * 仅操作者可调用，用于主动更新单个用户权重
      * @param user 目标用户地址
      */
     function updateUserWeight(address user) external onlyOperator whenNotPaused {
@@ -400,8 +407,8 @@ contract WeightManager is
     }
     
     /**
-     * @dev 内部函数：管理用户资格列�?
-     * 根据权重变化，动态添加或移除用户从合格列�?
+     * @dev 内部函数：管理用户资格列表
+     * 根据权重变化，动态添加或移除用户从合格列表
      * @param user 目标用户地址
      */
     function _manageEligibleList(address user) internal {
@@ -416,7 +423,7 @@ contract WeightManager is
     }
     
     /**
-     * @dev 内部函数：将用户添加到合格列表末�?
+     * @dev 内部函数：将用户添加到合格列表末尾
      * 维护双向链表结构，便于后续遍历和奖励分配
      * @param user 目标用户地址
      */
@@ -462,8 +469,8 @@ contract WeightManager is
     }
     
     /**
-     * @dev 添加持有者并更新其权�?
-     * 用于新用户首次加入或重新计算持有者权�?
+     * @dev 添加持有者并更新其权重
+     * 用于新用户首次加入或重新计算持有者权重
      * @param user 目标用户地址
      * @return 操作是否成功
      */
@@ -487,7 +494,7 @@ contract WeightManager is
     }
 
     /**
-     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁�?
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
      */
     receive() external payable {}
 

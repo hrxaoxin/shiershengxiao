@@ -12,73 +12,73 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * @title DividendManager
  * @dev 分红管理合约，管理NFT持有者的分红分发
  *
- * 核心职责�?
- * 1. 维护每个地址�?分红权重"（基于持�?NFT 的等级和稀有度�?
+ * 核心职责：
+ * 1. 维护每个地址的分红权重（基于持有 NFT 的等级和稀有度）
  * 2. 接收来自游戏生态的手续费（交易、战斗、繁殖、铸造）作为分红资金
- * 3. 允许用户按比例领取累计分红（代币�?BNB 两种分红池）
+ * 3. 允许用户按比例领取累计分红（代币和 BNB 两种分红池）
  *
- * 分红资金来源�?
- * - NFTTrading.sol：交易手续费�?3% 进入分红�?
+ * 分红资金来源：
+ * - NFTTrading.sol：交易手续费（3%）进入分红池
  * - Battle.sol：战斗入场费的部分进入分红池
- * - Breeding.sol：繁殖费用的部分进入分红�?
- * - TokenBurner.sol：铸造费用的部分进入分红�?
+ * - Breeding.sol：繁殖费用的部分进入分红池
+ * - TokenBurner.sol：铸造费用的部分进入分红池
  * - 其他游戏收益（如限时活动、付费宝箱）
  *
- * 权重体系（决定每位用户在分红池中的份额）�?
- * 普�?NFT（水/�?火属性，zodiacType < 72）：
- *   - 1�? 权重 1
- *   - 2�? 权重 2
- *   - 3�? 权重 6
- *   - 4�? 权重 18
- *   - 5�? 权重 66
- * 稀�?NFT（暗/光属性，zodiacType >= 72）：
- *   - 1�? 权重 10
- *   - 2�? 权重 12
- *   - 3�? 权重 16
- *   - 4�? 权重 28
- *   - 5�? 权重 76
- * 注意：用户总权�?= Σ(其每�?NFT 的权�?；质押中�?NFT 同样计入权重
+ * 权重体系（决定每位用户在分红池中的份额）：
+ * 普通 NFT（水/风/火属性，zodiacType < 72）：
+ *   - 1级 权重 1
+ *   - 2级 权重 2
+ *   - 3级 权重 6
+ *   - 4级 权重 18
+ *   - 5级 权重 66
+ * 稀有 NFT（暗/光属性，zodiacType >= 72）：
+ *   - 1级 权重 10
+ *   - 2级 权重 12
+ *   - 3级 权重 16
+ *   - 4级 权重 28
+ *   - 5级 权重 76
+ * 注意：用户总权重 = Σ（其每张 NFT 的权重）；质押中的 NFT 同样计入权重
  *
- * 分红计算公式�?
- * 用户应得分红 = 分红池总余�?× (用户权重 / 全网总权�?
+ * 分红计算公式：
+ * 用户应得分红 = 分红池总余额 × (用户权重 / 全网总权重)
  * - 通过 WeightManager 获取用户实时权重
- * - 用户领取时按比例从池中扣除对应金�?
- * - 支持按周期（每日/每周）结算，也支持累计随时领�?
+ * - 用户领取时按比例从池中扣除对应金额
+ * - 支持按周期（每日/每周）结算，也支持累计随时领取
  *
  * 两种分红池：
  * 1. 代币分红池（tokenDividendPool）：接收代币形式的手续费
  * 2. BNB 分红池（bnbDividendPool）：接收 BNB 形式的手续费
- * 用户可分别调�?claimTokenDividend() / claimBnbDividend() 领取
+ * 用户可分别调用 claimTokenDividend() / claimBnbDividend() 领取
  *
  * 分红事件与提醒：
  * - DividendClaimed(user, amount)：用户领取分红时触发
- * - DividendClaimWarning(user, daysSinceLastClaim)：当用户超过 30 天未领取时触�?
- *   （供前端提醒用户及时领取分红�?
+ * - DividendClaimWarning(user, daysSinceLastClaim)：当用户超过 30 天未领取时触发
+ *   （供前端提醒用户及时领取分红）
  *
- * 权重更新流程�?
- * - NFTMint 铸�?�?addWeight(user, type)
- * - NFTTrading 交易 �?removeWeight(oldUser) + addWeight(newUser)
- * - NFTUpdate 升级 �?�?remove 旧等级权重，�?add 新等级权�?
- * - Staking 质押 �?权重保留（仍计入用户分红�?
- * - Breeding 繁殖 �?�?NFT 给用户，增加权重
+ * 权重更新流程：
+ * - NFTMint 铸造 → addWeight(user, type)
+ * - NFTTrading 交易 → removeWeight(oldUser) + addWeight(newUser)
+ * - NFTUpdate 升级 → 先 remove 旧等级权重，再 add 新等级权重
+ * - Staking 质押 → 权重保留（仍计入用户分红）
+ * - Breeding 繁殖 → 新 NFT 给用户，增加权重
  *
- * 安全限制�?
+ * 安全限制：
  * - ReentrancyGuard：领取分红时外部转账需防止重入
- * - Pausable：可暂停分红领取（维�?攻击时）
+ * - Pausable：可暂停分红领取（维护/攻击时）
  * - 最小领取金额：防止微小金额领取浪费 Gas
  * - 地址校验：零地址校验，防止资金误转入黑洞
  *
- * 典型分红流程�?
- * 1. 游戏中产生手续费 �?NFTTrading/Battle/Breeding 转账�?DividendManager
- * 2. DividendManager 将资金计�?tokenDividendPool / bnbDividendPool
- * 3. 用户在前端点�?领取分红"按钮
- * 4. 前端调用 claimTokenDividend() �?claimBnbDividend()
- * 5. 合约按用户当前权重比例计算分红，转账给用�?
+ * 典型分红流程：
+ * 1. 游戏中产生手续费 → NFTTrading/Battle/Breeding 转账给 DividendManager
+ * 2. DividendManager 将资金计入 tokenDividendPool / bnbDividendPool
+ * 3. 用户在前端点击"领取分红"按钮
+ * 4. 前端调用 claimTokenDividend() 或 claimBnbDividend()
+ * 5. 合约按用户当前权重比例计算分红，转账给用户
  * 6. 事件 DividendClaimed 被触发，前端展示领取成功
  *
  * 升级与治理：
- * - UUPS 可升级：未来可调整权重表 / 分红比例 / 增加新资金来�?
- * - �?owner 可调整权重表和分红分配参�?
+ * - UUPS 可升级：未来可调整权重表 / 分红比例 / 增加新资金来源
+ * - 由 owner 可调整权重表和分红分配参数
  */
 contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
@@ -120,21 +120,26 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     event DividendClaimed(address indexed user, uint256 amount);
 
     /**
-     * @dev 分红领取警告事件（用户超�?0天未领取�?
+     * @dev 分红领取警告事件（用户超过30天未领取）
      * @param user 用户地址
-     * @param daysSinceLastClaim 距离上次领取的天�?
+     * @param daysSinceLastClaim 距离上次领取的天数
      */
     event DividendClaimWarning(address indexed user, uint256 daysSinceLastClaim);
 
     /**
-     * @dev 分红池增加事�?
+     * @dev 分红池增加事件
      */
     event DividendPoolAdded(uint256 amount, uint256 totalDividend, uint256 perWeightDividendIncrement);
 
     /**
-     * @dev 授权合约地址（Authorizer�?
+     * @dev 授权合约地址（Authorizer）
      */
     address public authorizer;
+
+    /**
+     * @dev 权重管理合约地址（WeightManager）
+     */
+    address public weightManagerContract;
 
     /**
      * @dev NFT 升级合约地址（NFTUpdate），有权调用 updateUserWeight
@@ -158,7 +163,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     uint256 public constant MAX_SNAPSHOTS = 100;
     
     /**
-     * @dev 分红领取警告阈值（秒）- 用户超过此时间未领取分红将触发警�?
+     * @dev 分红领取警告阈值（秒）- 用户超过此时间未领取分红将触发警告
      */
     uint256 public constant DIVIDEND_CLAIM_WARNING_THRESHOLD = 30 days;
     
@@ -168,15 +173,32 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     mapping(address => uint256) public lastClaimTime;
 
     /**
-     * @dev 初始化函�?
-     * @param _authorizer 授权合约地址
+     * @dev 初始化函数
+     * @param _authorizerAddress 授权合约地址
+     * @param _tokenContractAddress 代币合约地址
+     * @param _weightManagerAddress 权重管理合约地址
+     * @param _nftUpdateAddress NFT升级合约地址
      */
-    function initialize(address _authorizer) external initializer {
-        require(_authorizer != address(0), "DividendManager: Invalid authorizer address");
+    function initialize(
+        address _authorizerAddress,
+        address _tokenContractAddress,
+        address _weightManagerAddress,
+        address _nftUpdateAddress
+    ) external initializer {
+        require(_authorizerAddress != address(0), "DividendManager: Invalid authorizer address");
+        require(_tokenContractAddress != address(0), "DividendManager: Invalid token contract address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        authorizer = _authorizer;
+        authorizer = _authorizerAddress;
+        tokenContract = _tokenContractAddress;
+        
+        if (_weightManagerAddress != address(0)) {
+            weightManagerContract = _weightManagerAddress;
+        }
+        if (_nftUpdateAddress != address(0)) {
+            nftUpdateContract = _nftUpdateAddress;
+        }
     }
 
     /**
@@ -186,20 +208,29 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "DividendManager: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "DividendManager: Invalid authorizer address");
+        authorizer = _authorizerAddress;
+    }
+
+    /**
+     * @dev 设置权重管理合约地址（WeightManager）
+     * @param _weightManagerAddress 权重管理合约地址
+     */
+    function setWeightManager(address _weightManagerAddress) external onlyOwnerOrAuthorizer {
+        require(_weightManagerAddress != address(0), "DividendManager: Invalid weight manager address");
+        weightManagerContract = _weightManagerAddress;
     }
 
     /**
      * @dev 设置 NFT 升级合约地址（NFTUpdate）
-     * @param _nftUpdateContract NFT 升级合约地址
+     * @param _nftUpdateAddress NFT 升级合约地址
      */
-    function setNFTUpdateContract(address _nftUpdateContract) external onlyOwnerOrAuthorizer {
-        require(_nftUpdateContract != address(0), "DividendManager: Invalid NFT update address");
-        nftUpdateContract = _nftUpdateContract;
+    function setNFTUpdateContract(address _nftUpdateAddress) external onlyOwnerOrAuthorizer {
+        require(_nftUpdateAddress != address(0), "DividendManager: Invalid NFT update address");
+        nftUpdateContract = _nftUpdateAddress;
     }
 
     /**
@@ -212,31 +243,31 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 检查是否为授权调用者（owner、authorizer、nftUpdateContract �?rewardManagerContract�?
+     * @dev 检查是否为授权调用者（owner、authorizer、nftUpdateContract 或 rewardManagerContract）
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == nftUpdateContract || msg.sender == rewardManagerContract, "DividendManager: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == nftUpdateContract || msg.sender == rewardManagerContract || msg.sender == weightManagerContract, "DividendManager: Not authorized");
         _;
     }
 
     /**
-     * @dev 用户待领取分红映�?
+     * @dev 用户待领取分红映射
      * user => pendingDividend
      */
     mapping(address => uint256) public pendingDividends;
 
     /**
-     * @dev 总权�?
+     * @dev 总权重
      */
     uint256 public totalWeight;
 
     /**
-     * @dev 分红池余�?
+     * @dev 分红池余额
      */
     uint256 public dividendPoolBalance;
 
     /**
-     * @dev 分红池地址（用于查询外部池余额�?
+     * @dev 分红池地址（用于查询外部池余额）
      */
     address public dividendPool;
 
@@ -246,7 +277,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     address public tokenContract;
 
     /**
-     * @dev 最后更新快照时�?
+     * @dev 最后更新快照时间
      */
     uint256 public lastSnapshotTime;
 
@@ -261,12 +292,12 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 历史快照 - 使用环形缓冲区限制数�?
+     * @dev 历史快照 - 使用环形缓冲区限制数量
      */
     DividendSnapshot[] public snapshots;
     
     /**
-     * @dev 快照数组起始索引（用于环形缓冲区�?
+     * @dev 快照数组起始索引（用于环形缓冲区）
      */
     uint256 public snapshotStartIndex;
 
@@ -276,7 +307,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     uint256 public lastSyncedBalance;
     
     /**
-     * @dev 自动同步的最小时间间隔（6小时�?
+     * @dev 自动同步的最小时间间隔（6小时）
      */
     uint256 public constant AUTO_SYNC_INTERVAL = 6 hours;
     
@@ -314,7 +345,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
     
     /**
-     * @dev 自动同步分红池（在用户操作时调用�?
+     * @dev 自动同步分红池（在用户操作时调用）
      */
     function _autoSyncDividendPool() internal {
         if (tokenContract == address(0)) return;
@@ -334,10 +365,10 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 内部函数：将金额添加到分红池并创建快�?
+     * @dev 内部函数：将金额添加到分红池并创建快照
      */
     /**
-     * @dev 累计的每权重分红�?
+     * @dev 累计的每权重分红额
      */
     uint256 public cumulativePerWeightDividend;
     
@@ -347,14 +378,14 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     mapping(address => uint256) public userCumulativeSnapshots;
 
     function _addToDividendPool(uint256 amount) internal {
-        // 修复：使�?SafeMath 风格的检查防止溢�?
+        // 修复：使用 SafeMath 风格的检查防止溢出
         uint256 newBalance = dividendPoolBalance + amount;
         require(newBalance >= dividendPoolBalance, "DividendManager: Overflow");
         dividendPoolBalance = newBalance;
 
         uint256 perWeightDividendIncrement = 0;
         if (totalWeight > 0) {
-            // 修复：在乘法之前检�?amount * 1e18 是否会溢�?
+            // 修复：在乘法之前检查 amount * 1e18 是否会溢出
             if (amount > 0) {
                 require(type(uint256).max / amount >= 1e18, "DividendManager: Amount scaling overflow");
             }
@@ -416,7 +447,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256 userWeight = userWeights[msg.sender];
         require(userWeight > 0, "DividendManager: No weight");
 
-        // 检查用户是否长时间未领取分�?
+        // 检查用户是否长时间未领取分红
         if (lastClaimTime[msg.sender] > 0 &&
             block.timestamp - lastClaimTime[msg.sender] > DIVIDEND_CLAIM_WARNING_THRESHOLD) {
             emit DividendClaimWarning(msg.sender, block.timestamp - lastClaimTime[msg.sender]);
@@ -424,7 +455,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
         uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[msg.sender];
 
-        // 修复：使用安全乘法并检查溢�?
+        // 修复：使用安全乘法并检查溢出
         uint256 newDividend;
         newDividend = (userWeight * cumulativeDiff) / 1e18;
 
@@ -439,7 +470,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         require(tokenContract != address(0), "DividendManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= totalDividend, "DividendManager: Insufficient contract balance");
-        // 修复：使�?safeTransfer 替代 transfer 确保安全
+        // 修复：使用 safeTransfer 替代 transfer 确保安全
         token.safeTransfer(msg.sender, totalDividend);
 
         emit DividendClaimed(msg.sender, totalDividend);
@@ -447,7 +478,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 领取分红并转账（供前端直接调用，委托�?claim() 以消除代码重复）
+     * @dev 领取分红并转账（供前端直接调用，委托给 claim() 以消除代码重复）
      */
     function claimDividend() external nonReentrant whenNotPaused {
         this.claim();
@@ -474,11 +505,11 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
     /**
      * @dev 设置代币合约地址
-     * @param _tokenContract 代币合约地址
+     * @param _tokenContractAddress 代币合约地址
      */
-    function setTokenContract(address _tokenContract) external onlyOwnerOrAuthorizer {
-        require(_tokenContract != address(0), "DividendManager: Invalid token contract");
-        tokenContract = _tokenContract;
+    function setTokenContract(address _tokenContractAddress) external onlyOwnerOrAuthorizer {
+        require(_tokenContractAddress != address(0), "DividendManager: Invalid token contract");
+        tokenContract = _tokenContractAddress;
     }
 
     /**
@@ -487,7 +518,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     receive() external payable {}
 
     /**
-     * @dev 获取可领取分�?
+     * @dev 获取可领取分红
      */
     function getClaimableDividend(address user) external view returns (uint256) {
         uint256 userWeight = userWeights[user];
@@ -506,7 +537,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 获取总权�?
+     * @dev 获取总权重
      */
     function getTotalWeight() external view returns (uint256) {
         return totalWeight;
@@ -521,10 +552,10 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     function setUserWeight(address user, uint256 weight) external onlyOwnerOrAuthorizer {
         require(weight <= MAX_USER_WEIGHT, "DividendManager: Weight exceeds maximum");
         
-        // 先结算用户当前未领取的分�?
+        // 先结算用户当前未领取的分红
         if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
             uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-            // 修复：移�?unchecked 块，使用显式溢出检�?
+            // 修复：移除 unchecked 块，使用显式溢出检查
             uint256 weightedProduct = userWeights[user] * cumulativeDiff;
             require(weightedProduct / userWeights[user] == cumulativeDiff, "DividendManager: Pending calculation overflow");
             uint256 pending = weightedProduct / 1e18;
@@ -537,14 +568,14 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 更新用户权重（支持等级和元素计算�?
+     * @dev 更新用户权重（支持等级和元素计算）
      * @param user 用户地址
      * @param level NFT等级
-     * @param isAdd 是否增加权重（true=增加，false=减少�?
-     * @param element 元素类型�?-4对应水风火暗光）
+     * @param isAdd 是否增加权重（true=增加，false=减少）
+     * @param element 元素类型（0-4对应水风火暗光）
      */
-    /** @dev 最小权重更新间隔（秒）- 防止频繁操作，默�?秒（不限制）
-     * 可由 owner 调整以控制更新频�?
+    /** @dev 最小权重更新间隔（秒）- 防止频繁操作，默认0秒（不限制）
+     * 可由 owner 调整以控制更新频率
      */
     uint256 public minWeightUpdateInterval = 0;
     
@@ -555,16 +586,16 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         require(user != address(0), "DividendManager: Zero user address");
         uint256 weight = _calculateWeight(level, element);
 
-        // 检查最小更新间隔（仅当设置了大�?的值时才检查）
+        // 检查最小更新间隔（仅当设置了大于0的值时才检查）
         if (minWeightUpdateInterval > 0) {
             require(block.timestamp >= lastWeightUpdateTime[user] + minWeightUpdateInterval, 
                 "DividendManager: Weight update too frequent");
         }
         
-        // 先结算用户当前未领取的分�?
+        // 先结算用户当前未领取的分红
         if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
             uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-            // 修复：移�?unchecked 块，使用显式溢出检�?
+            // 修复：移除 unchecked 块，使用显式溢出检查
             uint256 weightedProduct = userWeights[user] * cumulativeDiff;
             require(weightedProduct / userWeights[user] == cumulativeDiff, "DividendManager: Weight calculation overflow");
             uint256 pending = weightedProduct / 1e18;
@@ -592,7 +623,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 设置最小权重更新间�?
+     * @dev 设置最小权重更新间隔
      * @param seconds_ 间隔秒数
      */
     function setMinWeightUpdateInterval(uint256 seconds_) external onlyOwner {
@@ -602,7 +633,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     uint256 public constant MAX_NFT_LEVEL = 5;
 
     /**
-     * @dev 根据等级和元素计算权�?
+     * @dev 根据等级和元素计算权重
      * @param level NFT等级 (1-5)
      * @param element 元素类型 (0-4)
      * @return uint256 计算后的权重
@@ -630,8 +661,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /**
      * @dev 公开获取NFT权重（根据等级和是否稀有）
      * @param level NFT等级
-     * @param isRare 是否稀�?
-     * @return uint256 权重�?
+     * @param isRare 是否稀有
+     * @return uint256 权重值
      */
     function getNFTWeight(uint256 level, bool isRare) external pure returns (uint256) {
         if (level == 0) return 0;
@@ -652,7 +683,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 获取所有权重配�?
+     * @dev 获取所有权重配置
      * @return normalWeights 普通NFT权重数组 [level1, level2, level3, level4, level5]
      * @return rareWeights 稀有NFT权重数组 [level1, level2, level3, level4, level5]
      */
@@ -705,8 +736,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 计算每权重分�?
-     * @param amount 分红池总金�?
+     * @dev 计算每权重分红
+     * @param amount 分红池总金额
      * @return 每权重的分红金额
      */
     function calculateDividend(uint256 amount) external view returns (uint256) {
@@ -784,11 +815,11 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 获取分红池统�?
-     * @return currentPool 当前池余�?
-     * @return totalWeight 总权�?
+     * @dev 获取分红池统计
+     * @return currentPool 当前池余额
+     * @return totalWeight 总权重
      * @return snapshotCount 快照数量
-     * @return lastSnapshotTime 最后快照时�?
+     * @return lastSnapshotTime 最后快照时间
      */
     function getDividendPoolStats() external view returns (
         uint256 currentPool,
@@ -809,13 +840,13 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         }
     }
 
-    /** @dev 紧急提现时间锁（秒�? 默认24小时 */
+    /** @dev 紧急提现时间锁（秒），默认24小时 */
     uint256 public emergencyWithdrawTimelock = 86400;
     
-    /** @dev 紧急提现请求时�?*/
+    /** @dev 紧急提现请求时间 */
     uint256 public emergencyWithdrawRequestedAt;
     
-    /** @dev 是否已请求紧急提�?*/
+    /** @dev 是否已请求紧急提现 */
     bool public emergencyWithdrawRequested;
 
     function requestEmergencyWithdraw() external onlyOwner {

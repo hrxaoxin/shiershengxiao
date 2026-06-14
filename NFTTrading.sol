@@ -13,54 +13,54 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * @title NFTTrading
  * @dev NFT交易市场合约，支持NFT的挂牌、购买和下架
  *
- * 核心功能�?
- * 1. 挂牌（listNFT）：NFT所有者将其NFT以固定价格（BNB）挂牌出�?
+ * 核心功能：
+ * 1. 挂牌（listNFT）：NFT所有者将其NFT以固定价格（BNB）挂牌出售
  * 2. 购买（buyNFT）：买家支付 BNB 获得 NFT，卖家获得扣除手续费后的 BNB
- * 3. 下架（delistNFT）：卖家在未售出前可随时下架，取�?NFT
+ * 3. 下架（delistNFT）：卖家在未售出前可随时下架，取回NFT
  * 4. 批量挂牌 / 下架（可选前端批量调用）
  *
- * 交易规则�?
- * - 挂牌者必须是 NFT 所有者（ERC721 ownerOf 验证�?
- * - 挂牌者必须授权本合约转移 NFT（approve / setApprovalForAll�?
- * - 价格�?BNB（原生代币）计价，不可为 0
- * - 手续费率 feePercent（默�?5%），�?BNB 形式扣除
- * - 5% 手续费全部转�?feeReceiver 地址（由 owner 设置�?
- * - 手续费中的部分会进一步分配到 PoolManager 供质�?分红使用
+ * 交易规则：
+ * - 挂牌者必须是 NFT 所有者（ERC721 ownerOf 验证）
+ * - 挂牌者必须授权本合约转移 NFT（approve / setApprovalForAll）
+ * - 价格以 BNB（原生代币）计价，不可为 0
+ * - 手续费率 feePercent（默认 5%），以 BNB 形式扣除
+ * - 5% 手续费全部转给 feeReceiver 地址（由 owner 设置）
+ * - 手续费中的部分会进一步分配到 PoolManager 供质押分红使用
  *
- * 数据结构�?
- * - listings[tokenId] �?Listing { seller, priceWei, listTime }
- *   记录每个被挂�?NFT 的卖家和价格信息
- * - listedNFTs[] �?当前在售�?NFT ID 列表，供前端快速获取在售列�?
+ * 数据结构：
+ * - listings[tokenId] 是 Listing { seller, priceWei, listTime }
+ *   记录每个被挂牌 NFT 的卖家和价格信息
+ * - listedNFTs[] 是当前在售的 NFT ID 列表，供前端快速获取在售列表
  *
- * 价格更新�?
+ * 价格更新：
  * - updatePrice(tokenId, newPrice)：卖家可调整挂牌价格
- * - 必须高于某个最小价格（防止误操作设�?0�?
+ * - 必须高于某个最小价格（防止误操作设置为 0）
  *
  * 与其他合约联动：
- * - NFTMint / NFTData：读�?NFT 类型和等级，前端展示并判断稀有度
+ * - NFTMint / NFTData：读取 NFT 类型和等级，前端展示并判断稀有度
  * - WeightManager / DividendManager：NFT 所有权转移后更新权重，影响分红计算
  * - PoolManager：手续费中部分比例作为游戏生态奖励池资金
  * - Authorizer：通过 Authorizer 设置 feeReceiver 等地址
  *
- * 权限控制�?
- * - onlyOwner：设�?feePercent、feeReceiver、paused
- * - onlySeller：只有卖家才能下架或调整自己的挂�?
- * - 任何人（非卖家）可调�?buyNFT 购买（需发送足�?BNB�?
+ * 权限控制：
+ * - onlyOwner：设置 feePercent、feeReceiver、paused
+ * - onlySeller：只有卖家才能下架或调整自己的挂牌
+ * - 任何人（非卖家）可调用 buyNFT 购买（需发送足够 BNB）
  *
- * 安全限制�?
+ * 安全限制：
  * - ReentrancyGuard：购买流程的 BNB 转账 + NFT 转账需防止重入
- * - Pausable：可暂停新挂牌和购买（用于维�?安全事件�?
- * - 价格校验�? 0 �?< 某个上限（防�?overflow�?
+ * - Pausable：可暂停新挂牌和购买（用于维护安全事件）
+ * - 价格校验：> 0 且 < 某个上限（防止 overflow）
  * - 所有权校验：购买时再次验证卖家仍是 NFT 拥有者（防止已转移后被购买）
- * - 未授权的购买金额不足：直接回滚并退�?
+ * - 未授权的购买金额不足：直接回滚并退款
  *
- * 典型交易流程�?
- * 1. 卖家�?NFTMint 合约授权 NFTTrading 转移 NFT
- * 2. 卖家调用 listNFT(tokenId, priceWei) �?NFT 被转入合约，加入 listedNFTs
- * 3. 买家浏览市场，选中 NFT 调用 buyNFT(tokenId) 并附�?BNB
- * 4. 合约验证金额 �?priceWei �?�?BNB 给卖家（�?5% 手续费），转 NFT 给买�?
- * 5. emit NFTTraded 事件，前端刷新页�?
- * 6. 若卖家取消：调用 delistNFT(tokenId) �?NFT 返回卖家，从 listedNFTs 移除
+ * 典型交易流程：
+ * 1. 卖家在 NFTMint 合约授权 NFTTrading 转移 NFT
+ * 2. 卖家调用 listNFT(tokenId, priceWei) 后 NFT 被转入合约，加入 listedNFTs
+ * 3. 买家浏览市场，选中 NFT 调用 buyNFT(tokenId) 并附带 BNB
+ * 4. 合约验证金额 ≥ priceWei 后转 BNB 给卖家（扣 5% 手续费），转 NFT 给买家
+ * 5. emit NFTTraded 事件，前端刷新页面
+ * 6. 若卖家取消：调用 delistNFT(tokenId) 后 NFT 返回卖家，从 listedNFTs 移除
  */
 contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
@@ -73,11 +73,11 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 挂牌信息结构�?
+     * @dev 挂牌信息结构体
      */
     struct Listing {
         address seller;       // 卖家地址
-        uint256 priceWei;    // 价格（BNB�?
+        uint256 priceWei;    // 价格（BNB）
         uint256 listTime;    // 挂牌时间
     }
 
@@ -93,7 +93,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     uint256[] public listedNFTs;
 
     /**
-     * @dev 手续费率（百分比�?
+     * @dev 手续费率（百分比）
      */
     uint256 public feePercent = 5;
     uint256 public totalVolume;
@@ -104,13 +104,13 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     address public feeReceiver;
 
     /**
-     * @dev 紧急暂�?
+     * @dev 紧急暂停
      */
     bool public paused;
     string public pauseReason;
 
     /**
-     * @dev 授权合约地址（Authorizer�?
+     * @dev 授权合约地址（Authorizer）
      */
     address public authorizer;
 
@@ -120,20 +120,29 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     address public nftContract;
 
     /**
-     * @dev 代币合约地址（ERC20�?
+     * @dev 代币合约地址（ERC20）
      */
     address public tokenContract;
 
     /**
-     * @dev 初始化函�?
-     * @param _authorizer 授权合约地址
+     * @dev 初始化函数
+     * @param _nftContractAddress NFT合约地址
+     * @param _tokenContractAddress 代币合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address _authorizer) external initializer {
-        require(_authorizer != address(0), "NFTTrading: Invalid authorizer address");
+    function initialize(address _nftContractAddress, address _tokenContractAddress, address _authorizerAddress) external initializer {
+        require(_nftContractAddress != address(0), "NFTTrading: Invalid NFT contract address");
+        require(_tokenContractAddress != address(0), "NFTTrading: Invalid token contract address");
+        require(_authorizerAddress != address(0), "NFTTrading: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        authorizer = _authorizer;
+        nftContract = _nftContractAddress;
+        tokenContract = _tokenContractAddress;
+        authorizer = _authorizerAddress;
+        
+        // 初始化带默认值的参数
+        feePercent = 5;
     }
 
     /**
@@ -143,11 +152,11 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "NFTTrading: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "NFTTrading: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
     function pause(string memory reason) external onlyOwner {
@@ -163,7 +172,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 检查是否为授权调用者（owner或authorizer�?
+     * @dev 检查是否为授权调用者（owner或authorizer）
      */
     modifier onlyOwnerOrAuthorizer() {
         require(msg.sender == owner() || msg.sender == authorizer, "NFTTrading: Not authorized");
@@ -199,7 +208,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 上架NFT（将NFT转入合约托管�?
+     * @dev 上架NFT（将NFT转入合约托管）
      */
     function listNFT(uint256 tokenId, uint256 priceWei) external whenNotPaused nonReentrant {
         require(priceWei > 0, "NFTTrading: Invalid price");
@@ -208,7 +217,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(INFTMint(nftContract).ownerOf(tokenId) == msg.sender, "NFTTrading: Not token owner");
         require(listings[tokenId].seller == address(0), "NFTTrading: Already listed");
 
-        // �?NFT 转入合约托管（escrow），使用 safeTransferFrom 确保接收合约有效
+        // 将 NFT 转入合约托管（escrow），使用 safeTransferFrom 确保接收合约有效
         try INFT(nftContract).safeTransferFrom(msg.sender, address(this), tokenId) {
             // 成功转入
         } catch {
@@ -234,11 +243,11 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
         address seller = listings[tokenId].seller;
 
-        // 先删除挂牌信息（Checks-Effects-Interactions 模式�?
+        // 先删除挂牌信息（Checks-Effects-Interactions 模式）
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
 
-        // �?NFT 从合约转回卖�?
+        // 将 NFT 从合约转回卖家
         try INFT(nftContract).safeTransferFrom(address(this), seller, tokenId) {
             // 成功转回
         } catch {
@@ -249,7 +258,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 购买NFT（从合约转出NFT给买家，支付代币给卖家和feeReceiver�?
+     * @dev 购买NFT（从合约转出NFT给买家，支付代币给卖家和feeReceiver）
      */
     function buyNFT(uint256 tokenId) external whenNotPaused nonReentrant {
         require(tokenId > 0, "NFTTrading: Invalid token ID");
@@ -273,18 +282,18 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 fee = (price * feePercent) / 100;
         uint256 sellerAmount = price - fee;
         
-        // Checks-Effects-Interactions 模式：先清除挂牌状�?
+        // Checks-Effects-Interactions 模式：先清除挂牌状态
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
 
-        // 先转�?NFT（从合约中转给买家）
+        // 先转移 NFT（从合约中转给买家）
         try INFT(nftContract).safeTransferFrom(address(this), msg.sender, tokenId) {
             // NFT 转移成功
         } catch {
             revert("NFTTrading: NFT transfer failed");
         }
 
-        // 从买家转移代�?
+        // 从买家转移代币
         token.safeTransferFrom(msg.sender, address(this), price);
 
         // 支付手续费给 feeReceiver
@@ -312,18 +321,18 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     /**
      * @dev 设置NFT合约地址
      */
-    function setNFTContract(address _nftContract) external onlyOwnerOrAuthorizer {
-        require(_nftContract != address(0), "NFTTrading: Invalid NFT contract address");
-        nftContract = _nftContract;
+    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
+        require(_nftContractAddress != address(0), "NFTTrading: Invalid NFT contract address");
+        nftContract = _nftContractAddress;
     }
 
     /**
      * @dev 设置代币合约地址
      */
-    function setTokenContract(address _tokenContract) external onlyOwnerOrAuthorizer {
-        require(_tokenContract != address(0), "NFTTrading: Invalid token contract address");
-        tokenContract = _tokenContract;
-        emit TokenContractUpdated(_tokenContract);
+    function setTokenContract(address _tokenContractAddress) external onlyOwnerOrAuthorizer {
+        require(_tokenContractAddress != address(0), "NFTTrading: Invalid token contract address");
+        tokenContract = _tokenContractAddress;
+        emit TokenContractUpdated(_tokenContractAddress);
     }
 
     event TokenContractUpdated(address newTokenContract);
@@ -387,7 +396,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     event FeePercentUpdated(uint256 newFeePercent);
 
     /**
-     * @dev 从列表移�?
+     * @dev 从列表移除
      */
     function _removeFromListedNFTs(uint256 tokenId) internal {
         for (uint256 i = 0; i < listedNFTs.length; i++) {
@@ -400,7 +409,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 获取用户的挂牌数�?
+     * @dev 获取用户的挂牌数量
      * @param user 用户地址
      * @return count 挂牌数量
      */
@@ -414,7 +423,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 获取用户的挂牌列�?
+     * @dev 获取用户的挂牌列表
      * @param user 用户地址
      * @return tokenIds 用户挂牌的NFT ID列表
      */
@@ -440,7 +449,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     /**
      * @dev 获取市场统计信息
      * @return totalListings 总挂牌数
-     * @return activeListings 有效挂牌�?
+     * @return activeListings 有效挂牌数
      * @return floorPrice 最低价
      * @return totalVolume 总交易额
      */
@@ -470,9 +479,9 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 获取指定价格范围的挂�?
-     * @param minPrice 最低价�?
-     * @param maxPrice 最高价�?
+     * @dev 获取指定价格范围的挂牌
+     * @param minPrice 最低价格
+     * @param maxPrice 最高价格
      * @return tokenIds 符合条件的NFT ID列表
      */
     function getListingsByPriceRange(uint256 minPrice, uint256 maxPrice) external view returns (uint256[] memory tokenIds) {

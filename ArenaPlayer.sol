@@ -10,31 +10,31 @@ import "./NFTInterface.sol";
 
 /**
  * @title ArenaPlayer
- * @dev 竞技场玩家合约，管理玩家�?NFT 质押、战斗队伍和挑战次数
+ * @dev 竞技场玩家合约，管理玩家的 NFT 质押、战斗队伍和挑战次数
  * 
- * 核心职责�?
- * 1. NFT 质押管理：玩家质�?NFT 用于竞技场战�?
- * 2. 战斗队伍配置：设置和清除玩家的战斗队�?
- * 3. 挑战次数管理：跟踪玩家的每日挑战次数，支持充�?
- * 4. 模拟玩家生成：生成用�?PvE 战斗的模拟对手队�?
+ * 核心职责：
+ * 1. NFT 质押管理：玩家质押 NFT 用于竞技场战斗
+ * 2. 战斗队伍配置：设置和清除玩家的战斗队伍
+ * 3. 挑战次数管理：跟踪玩家的每日挑战次数，支持充值
+ * 4. 模拟玩家生成：生成用于 PvE 战斗的模拟对手队伍
  * 
- * 与其他合约的交互�?
+ * 与其他合约的交互：
  * - ArenaRanking / ArenaRankingManager：战斗发起时验证 NFT 所有权
- * - NFT 合约：验�?NFT 所有权，管�?NFT 转移
+ * - NFT 合约：验证 NFT 所有权，管理 NFT 转移
  * 
- * 挑战机制�?
- * - 每日免费挑战次数：默�?3 �?
- * - 充值挑战次数：每次 3 次（代币支付�?
- * - 每日重置：挑战次数每天重�?
+ * 挑战机制：
+ * - 每日免费挑战次数：默认 3 次
+ * - 充值挑战次数：每次 3 次（代币支付）
+ * - 每日重置：挑战次数每天重置
  * 
- * 安全机制�?
- * - ReentrancyGuard：防止重入攻�?
- * - Pausable：可暂停所有操�?
- * - NFT 所有权验证：确保质押的 NFT 属于调用�?
+ * 安全机制：
+ * - ReentrancyGuard：防止重入攻击
+ * - Pausable：可暂停所有操作
+ * - NFT 所有权验证：确保质押的 NFT 属于调用者
  * 
- * 权限控制�?
- * - onlyOwner：暂停合约、设置参�?
- * - onlyAuthorized：质�?解除质押、设置队�?
+ * 权限控制：
+ * - onlyOwner：暂停合约、设置参数
+ * - onlyAuthorized：质押、解除质押、设置队伍
  */
 contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     /**
@@ -51,20 +51,20 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     address public authorizer;
     
     /**
-     * @dev 最大队伍大小（NFT 数量�?
+     * @dev 最大队伍大小（NFT 数量）
      */
     uint256 public constant MAX_TEAM_SIZE = 6;
     /**
-     * @dev 模拟玩家索引偏移�?
+     * @dev 模拟玩家索引偏移量
      */
     uint256 public constant MOCK_PLAYER_INDEX_OFFSET = 1000000;
     
     /**
-     * @dev 最大充值次数限�?
+     * @dev 最大充值次数限制
      */
     uint256 public maxRechargeAttempts = 5;
     /**
-     * @dev 充值成本（BNB�?
+     * @dev 充值成本（BNB）
      */
     uint256 public rechargeCost = 1000000000000000000; // 1 BNB
     
@@ -73,11 +73,11 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     mapping(address => uint256[]) public playerBattleTeams;
     /**
-     * @dev NFT 质押所有者映�?
+     * @dev NFT 质押所有者映射
      */
     mapping(uint256 => address) public nftStakedOwner;
     /**
-     * @dev 用户质押�?NFT 列表
+     * @dev 用户质押的 NFT 列表
      */
     mapping(address => uint256[]) public userStakedNFTs;
     /**
@@ -93,12 +93,12 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     mapping(address => uint256) public playerLastResetTime;
     /**
-     * @dev 玩家充值次�?
+     * @dev 玩家充值次数
      */
     mapping(address => uint256) public rechargeCount;
     
     /**
-     * @dev 每日挑战次数默认�?
+     * @dev 每日挑战次数默认值
      */
     uint256 public constant DAILY_ATTEMPTS = 3;
     /**
@@ -127,7 +127,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     event NFTsUnstaked(address indexed player, uint256[] tokenIds);
     /**
-     * @dev 挑战次数充值事�?
+     * @dev 挑战次数充值事件
      */
     event ChallengeAttemptsRecharged(address indexed player, uint256 attempts);
     /**
@@ -144,28 +144,32 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 初始化函�?
-     * @param _arenaRankingManagerContract 竞技场排名管理合约地址
-     * @param _nftContract NFT 合约地址
-     * @param _authorizer 授权合约地址
+     * @dev 初始化函数
+     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
+     * @param _nftContractAddress NFT 合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address _arenaRankingManagerContract, address _nftContract, address _authorizer) external initializer {
+    function initialize(
+        address _arenaRankingManagerContractAddress,
+        address _nftContractAddress,
+        address _authorizerAddress
+    ) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        arenaRankingManagerContract = _arenaRankingManagerContract;
-        nftContract = _nftContract;
-        authorizer = _authorizer;
+        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
+        nftContract = _nftContractAddress;
+        authorizer = _authorizerAddress;
     }
     
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "ArenaPlayer: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "ArenaPlayer: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
     /**
@@ -189,18 +193,18 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 设置竞技场排名管理合约地址
-     * @param _arenaRankingManagerContract 竞技场排名管理合约地址
+     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
      */
-    function setArenaRankingManagerContract(address _arenaRankingManagerContract) external onlyOwnerOrAuthorizer {
-        arenaRankingManagerContract = _arenaRankingManagerContract;
+    function setArenaRankingManagerContract(address _arenaRankingManagerContractAddress) external onlyOwnerOrAuthorizer {
+        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
     }
 
     /**
      * @dev 设置 NFT 合约地址
-     * @param _nftContract NFT 合约地址
+     * @param _nftContractAddress NFT 合约地址
      */
-    function setNFTContract(address _nftContract) external onlyOwnerOrAuthorizer {
-        nftContract = _nftContract;
+    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
+        nftContract = _nftContractAddress;
     }
 
     /**
@@ -322,10 +326,10 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         
         _checkAndResetAttempts(msg.sender);
         require(rechargeCount[msg.sender] < maxRechargeAttempts, "ArenaPlayer: Max recharge attempts reached");
-        // 修复：校�?msg.value >= rechargeCost，恢复付费充值机�?
+        // 修复：校验 msg.value >= rechargeCost，恢复付费充值机制
         require(msg.value >= rechargeCost, "ArenaPlayer: Insufficient BNB for recharge");
         
-        // 退还多�?BNB
+        // 退还多余 BNB
         if (msg.value > rechargeCost) {
             (bool refundOk, ) = payable(msg.sender).call{value: msg.value - rechargeCost}("");
             require(refundOk, "ArenaPlayer: Refund failed");

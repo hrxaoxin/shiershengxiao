@@ -86,13 +86,13 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
     /**
      * @dev 初始化函数（仅部署时调用一次）
-     * @param _authorizer 授权合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address _authorizer) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
-        require(_authorizer != address(0), "BattleSkillData: Invalid authorizer address");
-        authorizer = _authorizer;
+        require(_authorizerAddress != address(0), "BattleSkillData: Invalid authorizer address");
+        authorizer = _authorizerAddress;
         skillsInitializationPending = true;
     }
 
@@ -131,11 +131,11 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 新的授权合约地址
+     * @param _authorizerAddress 新的授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "BattleSkillData: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "BattleSkillData: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
     /**

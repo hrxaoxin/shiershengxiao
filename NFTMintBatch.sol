@@ -85,17 +85,17 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     
     /**
      * @dev 初始化函数
-     * @param _nftMintCore NFT铸造核心合约地址
-     * @param _authorizer 授权合约地址
+     * @param _nftMintCoreAddress NFT铸造核心合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address _nftMintCore, address _authorizer) public initializer {
+    function initialize(address _nftMintCoreAddress, address _authorizerAddress) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        require(_nftMintCore != address(0), "NFTMintBatch: Invalid NFTMintCore address");
-        require(_authorizer != address(0), "NFTMintBatch: Invalid authorizer address");
-        nftMintCore = _nftMintCore;
-        authorizer = _authorizer;
+        require(_nftMintCoreAddress != address(0), "NFTMintBatch: Invalid NFTMintCore address");
+        require(_authorizerAddress != address(0), "NFTMintBatch: Invalid authorizer address");
+        nftMintCore = _nftMintCoreAddress;
+        authorizer = _authorizerAddress;
     }
     
     /**
@@ -223,18 +223,18 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return NFTLib.calculateZodiacType(element, zodiac, gender);
     }
     
-    function setNftMintCore(address _nftMintCore) external onlyOwnerOrAuthorizer {
-        require(_nftMintCore != address(0), "NFTMintBatch: Invalid address");
-        nftMintCore = _nftMintCore;
+    function setNftMintCore(address _nftMintCoreAddress) external onlyOwnerOrAuthorizer {
+        require(_nftMintCoreAddress != address(0), "NFTMintBatch: Invalid address");
+        nftMintCore = _nftMintCoreAddress;
     }
     
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 新的授权合约地址
+     * @param _authorizerAddress 新的授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "NFTMintBatch: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "NFTMintBatch: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
     
     function pause() external onlyOwner {

@@ -14,57 +14,57 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * @title NFTUpdate
  * @dev NFT升级合约
  * 支持使用NFT、代币或USD价值升级NFT等级
- * 基于OpenZeppelin UUPS可升级合约实�?
+ * 基于OpenZeppelin UUPS可升级合约实现
  *
- * NOTE: 数据存储双轨�?
- * - NFTMint (nftContract): 链上主存�?tokenType[] �?tokenLevel[]（ERC721 合约自管�?
- * - NFTData (metadataContract): 分离数据层，存储详细�?ZodiacType、用户代币列表等
- * 本合约通过 metadataContract 读写 NFT 数据以保持与 NFTMint 的同步�?
- * 部署时需确保 metadataContract 正确初始化并�?NFTMint 数据对齐�?
+ * NOTE: 数据存储双轨机制：
+ * - NFTMint (nftContract): 链上主存储 tokenType[] 和 tokenLevel[]（ERC721 合约自管理）
+ * - NFTData (metadataContract): 分离数据层，存储详细的 ZodiacType、用户代币列表等
+ * 本合约通过 metadataContract 读写 NFT 数据以保持与 NFTMint 的同步状态
+ * 部署时需确保 metadataContract 正确初始化并与 NFTMint 数据对齐
  *
- * 升级方式�? 种）�?
+ * 升级方式（3种）：
  * 1. 消耗同类型 NFT（upgradeWithNFT）：
- *    - 消�?N 张同等级 NFT 升级 1 �?
- *    - 例如�?级→2级需�?1 张同级NFT�?级→3级需�?2 张；以此类推
+ *    - 消耗 N 张同等级 NFT 升级 1 级
+ *    - 例如：1级→2级需要 1 张同级NFT；2级→3级需要 2 张；以此类推
  *    - 被消耗的 NFT 转入 BLACK_HOLE 永久锁定（实际销毁）
  *
  * 2. 消耗代币（upgradeWithToken）：
- *    - 按等级阶梯缴纳代币：1�? = 10000�?�? = 40000�?�? = 120000�?�? = 480000
- *    - 代币转入 TokenBurner 合约销毁，保持经济模型的紧缩�?
+ *    - 按等级阶梯缴纳代币：1级=10000，2级=40000，3级=120000，4级=480000
+ *    - 代币转入 TokenBurner 合约销毁，保持经济模型的紧缩性
  *
- * 3. 消耗等�?USD 价值的代币（upgradeWithUSDValue）：
- *    - 根据 PriceOracle 提供的当前代�?USD 价格动态计算消耗数�?
+ * 3. 消耗等值 USD 价值的代币（upgradeWithUSDValue）：
+ *    - 根据 PriceOracle 提供的当前代币/USD 价格动态计算消耗数量
  *    - 公式：tokenAmount = usdAmount / tokenPriceUSD
- *    - 防止代币价格波动导致升级费用实际价值严重失�?
+ *    - 防止代币价格波动导致升级费用实际价值严重失衡
  *
- * 等级成长曲线�?
- * - 等级 1：初始铸造等级（基础属�?100%�?
- * - 等级 2：属�?+20%（约�?
- * - 等级 3：属�?+50%（约�?
- * - 等级 4：属�?+100%（约�?
- * - 等级 5：属�?+200%（约），可参与繁�?
+ * 等级成长曲线：
+ * - 等级 1：初始铸造等级（基础属性 100%）
+ * - 等级 2：属性 +20%（约）
+ * - 等级 3：属性 +50%（约）
+ * - 等级 4：属性 +100%（约）
+ * - 等级 5：属性 +200%（约），可参与繁殖
  *
- * 权重联动�?
- * - 每次升级后调�?DividendManager.updateUserWeight() 更新用户在分红池中的权重
+ * 权重联动：
+ * - 每次升级后调用 DividendManager.updateUserWeight() 更新用户在分红池中的权重
  * - 同时更新 WeightManager 中的用户权重快照
- * - 权重越高，分红越多；稀有属性（�?光）基础权重更高
+ * - 权重越高，分红越多；稀有属性（闪光）基础权重更高
  *
- * 价格验证�?
- * - priceExpirySeconds（默�?小时）：防止使用已失效的旧价�?
- * - priceDeviationThreshold（默�?5000 = 50%）：价格相对 PancakeSwap 现货偏离过大时拒绝升�?
- * - 防止在预言机被操纵时产生异常便�?昂贵的升�?
+ * 价格验证：
+ * - priceExpirySeconds（默认1小时）：防止使用已失效的旧价格
+ * - priceDeviationThreshold（默认 5000 = 50%）：价格相对 PancakeSwap 现货偏离过大时拒绝升级
+ * - 防止在预言机被操纵时产生异常便宜/昂贵的升级
  *
  * 冷却期：
- * - upgradeCooldown 防止同一 NFT 被反复刷级（配合重入保护�?
+ * - upgradeCooldown 防止同一 NFT 被反复刷级（配合重入保护）
  *
- * 安全限制�?
- * - 必须拥有 NFT 才能升级（ownerOf 验证�?
- * - 每次只能�?1 级（不可越级�?
+ * 安全限制：
+ * - 必须拥有 NFT 才能升级（ownerOf 验证）
+ * - 每次只能升 1 级（不可越级）
  * - 5 级为上限，达到后不可再升
- * - ReentrancyGuard 防止跨合约重�?
- * - paused 可暂停所有升级操�?
+ * - ReentrancyGuard 防止跨合约重入
+ * - paused 可暂停所有升级操作
  *
- * 典型用户流程�?
+ * 典型用户流程：
  * 1. 集齐 N 张同等级 NFT 或准备好足够代币
  * 2. 前端根据价格预言机计算费用并展示
  * 3. 用户批准 NFT/代币转移
@@ -106,7 +106,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         emit Unpaused(msg.sender);
     }
 
-    /** @dev 黑洞地址，用于销毁NFT和代�?*/
+    /** @dev 黑洞地址，用于销毁NFT和代币 */
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
     
     /** @dev NFT合约地址 */
@@ -122,9 +122,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /** @dev 授权合约地址 */
     address public authorizer;
 
-    /** @dev 价格过期时间（秒�? 默认1小时 */
+    /** @dev 价格过期时间（秒），默认1小时 */
     uint256 public priceExpirySeconds = 3600;
-    /** @dev 价格波动保护阈值（千分比，默认5000 = 50%�?*/
+    /** @dev 价格波动保护阈值（千分比，默认5000 = 50%） */
     uint256 public priceDeviationThreshold = 5000;
     /** @dev 上次价格 */
     uint256 public lastPrice;
@@ -137,39 +137,54 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /** @dev 价格更新最小时间间隔（秒）- 防止快速出块链上的时间窗口攻击 */
     uint256 public minPriceUpdateSeconds = 60;
 
-    /** @dev 各级别升级费用（代币数量，含精度18�?*/
+    /** @dev 各级别升级费用（代币数量，含精度18位） */
     uint256 public level1UpgradeCost = 10000 * 10**18;
     uint256 public level2UpgradeCost = 40000 * 10**18;
     uint256 public level3UpgradeCost = 120000 * 10**18;
     uint256 public level4UpgradeCost = 480000 * 10**18;
     
-    /** @dev USD价值升级方式是否隐藏（默认隐藏�?*/
+    /** @dev USD价值升级方式是否隐藏（默认隐藏） */
     bool public usdUpgradeHidden = true;
 
-    /** @dev 存储间隙，用于合约升级兼容�?*/
+    /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[49] private __gap;
 
-    /** @dev 初始化函�?
+    /** @dev 初始化函数
      * @param initialOwner 初始所有者地址
-     * @param _nftContract NFT合约地址
-     * @param _metadataContract 元数据合约地址
-     * @param _dividendManager 分红管理合约地址
-     * @param _authorizer 授权合约地址
+     * @param _nftContractAddress NFT合约地址
+     * @param _metadataContractAddress 元数据合约地址
+     * @param _tokenContractAddress 代币合约地址
+     * @param _dividendManagerAddress 分红管理合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address initialOwner, address _nftContract, address _metadataContract, address _dividendManager, address _authorizer) external initializer {
+    function initialize(address initialOwner, address _nftContractAddress, address _metadataContractAddress, address _tokenContractAddress, address _dividendManagerAddress, address _authorizerAddress) external initializer {
         require(initialOwner != address(0), "NFTUpdate: Invalid initial owner address");
-        require(_nftContract != address(0), "NFTUpdate: Invalid NFT contract address");
-        require(_metadataContract != address(0), "NFTUpdate: Invalid metadata contract address");
-        require(_dividendManager != address(0), "NFTUpdate: Invalid dividend manager address");
-        require(_authorizer != address(0), "NFTUpdate: Invalid authorizer address");
+        require(_nftContractAddress != address(0), "NFTUpdate: Invalid NFT contract address");
+        require(_metadataContractAddress != address(0), "NFTUpdate: Invalid metadata contract address");
+        require(_tokenContractAddress != address(0), "NFTUpdate: Invalid token contract address");
+        require(_dividendManagerAddress != address(0), "NFTUpdate: Invalid dividend manager address");
+        require(_authorizerAddress != address(0), "NFTUpdate: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         transferOwnership(initialOwner);
-        nftContract = _nftContract;
-        metadataContract = _metadataContract;
-        dividendManager = _dividendManager;
-        authorizer = _authorizer;
+        nftContract = _nftContractAddress;
+        metadataContract = _metadataContractAddress;
+        tokenContract = _tokenContractAddress;
+        dividendManager = _dividendManagerAddress;
+        authorizer = _authorizerAddress;
+        
+        // 初始化带默认值的参数
+        priceExpirySeconds = 3600;
+        priceDeviationThreshold = 5000;
+        minPriceUpdateBlocks = 1;
+        minPriceUpdateSeconds = 60;
+        level1UpgradeCost = 10000 * 10**18;
+        level2UpgradeCost = 40000 * 10**18;
+        level3UpgradeCost = 120000 * 10**18;
+        level4UpgradeCost = 480000 * 10**18;
+        usdUpgradeHidden = true;
+        minPancakeSwapLiquidity = 10**15;
     }
 
     /**
@@ -196,38 +211,38 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     /**
      * @dev 设置授权合约地址
-     * @param _authorizer 授权合约地址
+     * @param _authorizerAddress 授权合约地址
      */
-    function setAuthorizer(address _authorizer) external onlyOwner {
-        require(_authorizer != address(0), "NFTUpdate: Invalid authorizer address");
-        authorizer = _authorizer;
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "NFTUpdate: Invalid authorizer address");
+        authorizer = _authorizerAddress;
     }
 
     /**
      * @dev 设置NFT合约地址
-     * @param _nftContract NFT合约地址
+     * @param _nftContractAddress NFT合约地址
      */
-    function setNFTContract(address _nftContract) external onlyOwnerOrAuthorizer {
-        require(_nftContract != address(0), "NFTUpdate: Invalid NFT contract address");
-        nftContract = _nftContract;
+    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
+        require(_nftContractAddress != address(0), "NFTUpdate: Invalid NFT contract address");
+        nftContract = _nftContractAddress;
     }
 
     /**
      * @dev 设置元数据合约地址
-     * @param _metadataContract 元数据合约地址
+     * @param _metadataContractAddress 元数据合约地址
      */
-    function setMetadataContract(address _metadataContract) external onlyOwnerOrAuthorizer {
-        require(_metadataContract != address(0), "NFTUpdate: Invalid metadata contract address");
-        metadataContract = _metadataContract;
+    function setMetadataContract(address _metadataContractAddress) external onlyOwnerOrAuthorizer {
+        require(_metadataContractAddress != address(0), "NFTUpdate: Invalid metadata contract address");
+        metadataContract = _metadataContractAddress;
     }
 
     /**
      * @dev 设置代币合约地址
-     * @param _tokenContract 代币合约地址
+     * @param _tokenContractAddress 代币合约地址
      */
-    function setTokenContract(address _tokenContract) external onlyOwnerOrAuthorizer {
-        require(_tokenContract != address(0), "NFTUpdate: Invalid token contract address");
-        tokenContract = _tokenContract;
+    function setTokenContract(address _tokenContractAddress) external onlyOwnerOrAuthorizer {
+        require(_tokenContractAddress != address(0), "NFTUpdate: Invalid token contract address");
+        tokenContract = _tokenContractAddress;
     }
 
     /**
@@ -241,7 +256,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     /**
      * @dev 设置价格过期时间
-     * @param seconds_ 过期时间（秒�?
+     * @param seconds_ 过期时间（秒）
      */
     function setPriceExpirySeconds(uint256 seconds_) external onlyOwner {
         require(seconds_ > 0, "NFTUpdate: expiry must be > 0");
@@ -250,7 +265,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     /**
      * @dev 设置价格波动保护阈值（千分比）
-     * @param threshold 阈值（0-10000�?
+     * @param threshold 阈值（0-10000）
      */
     function setPriceDeviationThreshold(uint256 threshold) external onlyOwner {
         require(threshold <= 10000, "NFTUpdate: threshold <= 10000");
@@ -267,7 +282,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev 设置1级升级费�?
+     * @dev 设置1级升级费用
      * @param cost 升级费用（代币数量）
      */
     function setLevel1UpgradeCost(uint256 cost) external onlyOwner {
@@ -276,7 +291,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev 设置2级升级费�?
+     * @dev 设置2级升级费用
      * @param cost 升级费用（代币数量）
      */
     function setLevel2UpgradeCost(uint256 cost) external onlyOwner {
@@ -285,7 +300,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev 设置3级升级费�?
+     * @dev 设置3级升级费用
      * @param cost 升级费用（代币数量）
      */
     function setLevel3UpgradeCost(uint256 cost) external onlyOwner {
@@ -294,7 +309,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev 设置4级升级费�?
+     * @dev 设置4级升级费用
      * @param cost 升级费用（代币数量）
      */
     function setLevel4UpgradeCost(uint256 cost) external onlyOwner {
@@ -304,7 +319,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     /**
      * @dev 批量设置所有等级的升级费用
-     * @param costs 所有等级的升级费用数组（长�?，索�?�?对应等级1�?�?
+     * @param costs 所有等级的升级费用数组（长度4，索引0对应等级1）
      */
     function setAllLevelUpgradeCosts(uint256[4] calldata costs) external onlyOwner {
         uint256 maxCost = 1e30;
@@ -320,8 +335,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev 设置USD价值升级方式的显示/隐藏状�?
-     * @param hidden 是否隐藏（true=隐藏，false=显示�?
+     * @dev 设置USD价值升级方式的显示/隐藏状态
+     * @param hidden 是否隐藏（true=隐藏，false=显示）
      */
     function setUSDUpgradeHidden(bool hidden) external onlyOwner {
         usdUpgradeHidden = hidden;
@@ -342,46 +357,46 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev 从PancakeSwap获取代币价格（USD�?
-     * @return uint256 代币价格（精�?8位）
+     * @dev 从PancakeSwap获取代币价格（USD）
+     * @return uint256 代币价格（精度18位）
      */
     /**
      * @dev 预言机读取时所需的最小流动性（防止 pair 中人为设置极低流动性操纵价格）
-     * 使用万分比精度：100 = 1% 偏差即失效。默�?10**15�?.001 token 单位，对 18 位小数代币）
+     * 使用万分比精度：100 = 1% 偏差即失效。默认 10**15（0.001 token 单位，对 18 位小数代币）
      */
     uint256 public minPancakeSwapLiquidity = 10**15;
 
     /**
-     * @dev 设置预言机读取所需的最小流动�?
-     * @param minLiq 最小流动性（代币单位，按 token �?decimals 计）
+     * @dev 设置预言机读取所需的最小流动性
+     * @param minLiq 最小流动性（代币单位，按 token 的 decimals 计）
      */
     function setMinPancakeSwapLiquidity(uint256 minLiq) external onlyOwner {
         minPancakeSwapLiquidity = minLiq;
     }
 
     /**
-     * @dev 从PancakeSwap获取代币价格（USD�?
-     * @return uint256 代币价格（精�?8位）
+     * @dev 从PancakeSwap获取代币价格（USD）
+     * @return uint256 代币价格（精度18位）
      */
     function getTokenPriceFromPancakeSwap() public view returns (uint256) {
         require(pancakeSwapPair != address(0), "E24: PancakeSwap pair not set");
         
         IPancakeSwapPair pair = IPancakeSwapPair(pancakeSwapPair);
         (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
-        // 修复：添加最小流动性检查，防止低流动�?pair 被操纵价�?
+        // 修复：添加最小流动性检查，防止低流动性 pair 被操纵价格
         require(reserve0 > 0 && reserve1 > 0, "E25: Insufficient liquidity");
         
         address token0 = pair.token0();
         address token1 = pair.token1();
 
-        // 修复：校�?pair 确实包含 tokenContract，防止设置假 pair 导致价格异常
+        // 修复：校验 pair 确实包含 tokenContract，防止设置假 pair 导致价格异常
         require(token0 == tokenContract || token1 == tokenContract, "E26: Token not in pair");
         
         uint8 decimals0 = 18;
         uint8 decimals1 = 18;
         
         if (token0 == tokenContract) {
-            // 修复：对代币侧（本项目代币）的流动性进行下限校�?
+            // 修复：对代币侧（本项目代币）的流动性进行下限校验
             require(uint256(reserve0) >= minPancakeSwapLiquidity, "E25: Token side liquidity too low");
             try IBEP20(token1).decimals() returns (uint8 d) {
                 decimals1 = d;
@@ -391,7 +406,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             return _adjustPriceDecimals(price, decimals1);
         } else {
             // token1 == tokenContract
-            // 修复：对代币侧（本项目代币）的流动性进行下限校�?
+            // 修复：对代币侧（本项目代币）的流动性进行下限校验
             require(uint256(reserve1) >= minPancakeSwapLiquidity, "E25: Token side liquidity too low");
             try IBEP20(token0).decimals() returns (uint8 d) {
                 decimals0 = d;
@@ -414,10 +429,10 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     /**
      * @dev 调整小数位数（内部函数）
-     * @param value 原始�?
+     * @param value 原始值
      * @param fromDecimals 原始小数位数
      * @param toDecimals 目标小数位数
-     * @return uint256 调整后的�?
+     * @return uint256 调整后的值
      */
     function adjustDecimals(uint256 value, uint8 fromDecimals, uint8 toDecimals) internal pure returns (uint256) {
         if (fromDecimals == toDecimals) {
@@ -430,9 +445,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev 使用NFT升级（消耗同类型同等级的其他NFT�?
+     * @dev 使用NFT升级（消耗同类型同等级的其他NFT）
      * @param tokenId 要升级的NFT ID
-     * @return uint8 新等�?
+     * @return uint8 新等级
      */
     function upgradeWithNFT(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
         require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
@@ -446,7 +461,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(lv < 5, "E16");
         
         uint256[] memory burnCandidates = _findBurnCandidates(tokenId, lv, tokenTypeValue, nft);
-        // 修复：先完成升级逻辑（状态变更、跨合约权重更新）再销�?NFT，避免升级失败导�?NFT 永久损失
+        // 修复：先完成升级逻辑（状态变更、跨合约权重更新）再销毁 NFT，避免升级失败导致 NFT 永久损失
         _completeUpgrade(tokenId, lv, t, m, nft);
         _burnNFTs(burnCandidates, t, nft);
         
@@ -454,10 +469,10 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev 查找可销毁的NFT候�?
+     * @dev 查找可销毁的NFT候选
      * @param tokenId 要升级的NFT ID
      * @param lv 当前等级
-     * @param tokenTypeValue NFT类型�?
+     * @param tokenTypeValue NFT类型值
      * @param nft NFT合约实例
      * @return 可销毁的NFT ID数组
      */
@@ -484,8 +499,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
                 }
             }
         }
-        // 修复：升级到 lv+1 需要销�?lv 张同类型同级 NFT，count 要包�?tokenId 本身
-        // 逻辑�?count 是所有同�?NFT 数（包括 tokenId 自己），需�?>= lv+1（销�?lv �?+ �?1 张升级）
+        // 修复：升级到 lv+1 需要销毁 lv 张同类型同级 NFT，count 要包含 tokenId 本身
+        // 逻辑：count 是所有同级 NFT 数（包括 tokenId 自己），需要 >= lv+1（销毁 lv 张 + 留 1 张升级）
         require(count >= lv + 1, "E17");
         
         uint256[] memory burnCandidates = new uint256[](lv);
@@ -521,9 +536,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param tokenId 要升级的NFT ID
      * @param lv 当前等级
      * @param t NFT类型
-     * @param m 元数据合约实�?
+     * @param m 元数据合约实例
      * @param nft NFT合约实例
-     * @return 新等�?
+     * @return 新等级
      */
     function _completeUpgrade(uint256 tokenId, uint8 lv, NFTDataTypes.ZodiacType t, INFTDataInterface m, INFTMint nft) internal returns (uint8) {
         uint8 newLv = lv + 1;
@@ -546,7 +561,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param user 用户地址
      * @param level 等级
      * @param isAdd 是否增加
-     * @param element 属性类�?
+     * @param element 属性类型
      */
     function _updateUserWeight(address user, uint8 level, bool isAdd, NFTDataTypes.ElementType element) internal {
         try IDividendManager(dividendManager).updateUserWeight(user, uint256(level), isAdd, uint8(element)) {
@@ -561,7 +576,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /**
      * @dev 使用代币升级
      * @param tokenId 要升级的NFT ID
-     * @return uint8 新等�?
+     * @return uint8 新等级
      */
     function upgradeWithToken(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
         require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
@@ -583,7 +598,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         IToken t = IToken(tokenContract);
         require(t.balanceOf(msg.sender) >= cost, "E8: Insufficient balance");
         require(t.allowance(msg.sender, address(this)) >= cost, "E8: Insufficient allowance");
-        t.transferFrom(msg.sender, BLACK_HOLE, cost);
+        t.safeTransferFrom(msg.sender, BLACK_HOLE, cost);
         
         NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
         uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);
@@ -592,9 +607,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev 使用USD价值升�?
+     * @dev 使用USD价值升级
      * @param tokenId 要升级的NFT ID
-     * @return uint8 新等�?
+     * @return uint8 新等级
      */
     function upgradeWithUSDValue(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
         require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
@@ -616,9 +631,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         uint256 price = getTokenPriceFromPancakeSwap();
         require(price > 0, "E20: Price oracle returned zero");
         
-        // 防御同一区块内的价格操纵：要求至少间�?minPriceUpdateBlocks 个区�?
+        // 防御同一区块内的价格操纵：要求至少间隔 minPriceUpdateBlocks 个区块
         require(block.number >= lastPriceUpdateBlock + minPriceUpdateBlocks, "E31: Price update too frequent");
-        // 防御时间窗口攻击：要求至少间�?minPriceUpdateSeconds �?
+        // 防御时间窗口攻击：要求至少间隔 minPriceUpdateSeconds 秒
         require(block.timestamp >= lastPriceUpdateTime + minPriceUpdateSeconds, "E32: Price update too frequent (time)");
         
         // 首次价格获取：直接使用，同时缓存
@@ -650,7 +665,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         IToken t = IToken(tokenContract);
         require(t.balanceOf(msg.sender) >= cost, "E8: Insufficient balance");
         require(t.allowance(msg.sender, address(this)) >= cost, "E8: Insufficient allowance");
-        t.transferFrom(msg.sender, BLACK_HOLE, cost);
+        t.safeTransferFrom(msg.sender, BLACK_HOLE, cost);
         
         NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
         uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);
@@ -659,7 +674,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev NFT销毁事�?
+     * @dev NFT销毁事件
      * @param cardId NFT ID
      * @param cardType NFT类型
      * @param owner 持有者地址
@@ -670,20 +685,20 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev NFT升级事件
      * @param cardId NFT ID
      * @param cardType NFT类型
-     * @param oldLevel 旧等�?
-     * @param newLevel 新等�?
+     * @param oldLevel 旧等级
+     * @param newLevel 新等级
      * @param owner 持有者地址
-     * @param timestamp 时间�?
+     * @param timestamp 时间戳
      */
     event CardUpgraded(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, address indexed owner, uint64 timestamp);
     
     /**
-     * @dev 权重更新失败事件（用于追踪和手动修复�?
+     * @dev 权重更新失败事件（用于追踪和手动修复）
      * @param user 用户地址
      * @param tokenId NFT ID
-     * @param oldLevel 旧等�?
-     * @param newLevel 新等�?
-     * @param failureType 失败类型（old_weight/new_weight�?
+     * @param oldLevel 旧等级
+     * @param newLevel 新等级
+     * @param failureType 失败类型（old_weight/new_weight）
      */
     event WeightUpdateFailed(address indexed user, uint256 indexed tokenId, uint8 oldLevel, uint8 newLevel, string failureType);
     
@@ -691,37 +706,37 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 使用代币升级事件
      * @param cardId NFT ID
      * @param cardType NFT类型
-     * @param oldLevel 旧等�?
-     * @param newLevel 新等�?
-     * @param tokensBurned 销毁代币数�?
+     * @param oldLevel 旧等级
+     * @param newLevel 新等级
+     * @param tokensBurned 销毁代币数量
      * @param owner 持有者地址
-     * @param timestamp 时间�?
+     * @param timestamp 时间戳
      */
     event TokenUpgraded(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, uint256 tokensBurned, address indexed owner, uint64 timestamp);
     
     /**
-     * @dev 使用USD价值升级事�?
+     * @dev 使用USD价值升级事件
      * @param cardId NFT ID
      * @param cardType NFT类型
-     * @param oldLevel 旧等�?
-     * @param newLevel 新等�?
-     * @param usdValue USD价�?
-     * @param tokensBurned 销毁代币数�?
+     * @param oldLevel 旧等级
+     * @param newLevel 新等级
+     * @param usdValue USD价值
+     * @param tokensBurned 销毁代币数量
      * @param tokenPrice 代币价格
      * @param owner 持有者地址
-     * @param timestamp 时间�?
+     * @param timestamp 时间戳
      */
     event USDValueUpgraded(uint256 indexed cardId, NFTDataTypes.ZodiacType indexed cardType, uint8 oldLevel, uint8 newLevel, uint256 usdValue, uint256 tokensBurned, uint256 tokenPrice, address indexed owner, uint64 timestamp);
     
     /**
      * @dev 价格更新事件
      * @param price 价格
-     * @param timestamp 时间�?
+     * @param timestamp 时间戳
      */
     event PriceUpdated(uint256 price, uint256 timestamp);
     
     /**
-     * @dev USD价值升级方式显�?隐藏状态变更事�?
+     * @dev USD价值升级方式显示/隐藏状态变更事件
      * @param hidden 是否隐藏
      */
     event USDUpgradeHiddenChanged(bool hidden);
@@ -745,9 +760,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "NFTUpdate: Amount must be > 0");
         require(tokenContract != address(0), "NFTUpdate: Token contract not set");
-        IToken token = IToken(tokenContract);
+        IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "NFTUpdate: Insufficient token balance");
-        token.transfer(owner(), amount);
+        token.safeTransfer(owner(), amount);
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
 
@@ -755,7 +770,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
     /**
-     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁�?
+     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
      */
     receive() external payable {}
 
