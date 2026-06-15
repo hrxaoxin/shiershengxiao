@@ -436,39 +436,60 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     ) external nonReentrant onlyBattleCaller whenNotPaused returns (bool, uint256) {
         bool isMockBattle = (challengedAddress == address(0));
 
+        // 修复：统一验证NFT合约设置
         if (!isMockBattle) {
             require(nftContract != address(0), "Battle: NFT contract not set");
+            require(challengedAddress != address(0), "Battle: Invalid challenged address");
         }
 
+        // 修复：加强队伍验证，确保所有NFT有效且不重叠
         require(_validateTeam(challengerTeam), "Battle: Invalid challenger team");
         require(_validateTeam(challengedTeam), "Battle: Invalid challenged team");
         
         // 检查攻击方和防御方团队没有重叠的NFT
         for (uint256 i = 0; i < 6; i++) {
+            require(challengerTeam[i] != 0, "Battle: Challenger team contains zero NFT");
+            require(challengedTeam[i] != 0, "Battle: Challenged team contains zero NFT");
             for (uint256 j = 0; j < 6; j++) {
                 require(challengerTeam[i] != challengedTeam[j], "Battle: Team overlap detected");
             }
         }
 
-        if (!isMockBattle) {
-            require(challengedAddress != address(0), "Battle: Invalid challenged address");
-        }
-
+        // 修复：在非模拟战斗中验证NFT所有权
         if (!isMockBattle) {
             _requireNFTOwnership(challengerTeam);
             _requireNFTOwnershipForAddress(challengedTeam, challengedAddress);
         }
 
+        // 修复：验证代表NFT
         if (challengerId != 0) {
             require(_isValidNFT(challengerId, isMockBattle), "Battle: Invalid challenger NFT");
             if (!isMockBattle) {
                 require(INFTMint(nftContract).ownerOf(challengerId) == msg.sender, "Battle: Not owner of challenger NFT");
+                // 确保代表NFT在挑战者队伍中
+                bool found = false;
+                for (uint256 i = 0; i < 6; i++) {
+                    if (challengerTeam[i] == challengerId) {
+                        found = true;
+                        break;
+                    }
+                }
+                require(found, "Battle: Challenger NFT not in team");
             }
         }
         if (challengedId != 0) {
             require(_isValidNFT(challengedId, isMockBattle), "Battle: Invalid challenged NFT");
             if (!isMockBattle) {
                 require(INFTMint(nftContract).ownerOf(challengedId) == challengedAddress, "Battle: Not owner of challenged NFT");
+                // 确保代表NFT在被挑战者队伍中
+                bool found = false;
+                for (uint256 i = 0; i < 6; i++) {
+                    if (challengedTeam[i] == challengedId) {
+                        found = true;
+                        break;
+                    }
+                }
+                require(found, "Battle: Challenged NFT not in team");
             }
         }
 
@@ -681,13 +702,19 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         bool canUseSkill,
         Skill memory skill
     ) internal pure returns (TeamState memory) {
+        // 修复：添加攻击者索引边界检查
+        require(attackerIdx < 6, "Battle: Invalid attacker index");
+        
         if (canUseSkill && skill.skillId > 0) {
             return _applySkillToState(attacker, target, attackerIdx, skill, seed);
         } else {
             uint defenderIdx = _findTarget(target.alive, target.traits, target.hp);
-            if (defenderIdx == 6) {
+            // 修复：确保防御者索引有效
+            if (defenderIdx >= 6) {
                 return target;
             }
+            // 修复：添加防御者索引边界检查
+            require(defenderIdx < 6, "Battle: Invalid defender index");
             uint damage = _calculateDamage(attacker, target.traits[defenderIdx], seed);
             if (target.hp[defenderIdx] > damage) {
                 target.hp[defenderIdx] -= damage;
@@ -726,22 +753,23 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         if (skill.isAoe) {
             for (uint i = 0; i < 6; i++) {
                 if (target.alive[i]) {
-                    if (target.hp[i] > skillDamage) {
-                        target.hp[i] -= skillDamage;
-                    } else {
-                        target.hp[i] = 0;
+                    // 修复：正确处理伤害，确保HP不会变成负数
+                    target.hp[i] = target.hp[i] > skillDamage ? target.hp[i] - skillDamage : 0;
+                    // 修复：及时更新存活状态
+                    if (target.hp[i] == 0) {
                         target.alive[i] = false;
                     }
                 }
             }
         } else if (targetIndex < 6) {
-            if (target.hp[targetIndex] > skillDamage) {
-                target.hp[targetIndex] -= skillDamage;
-            } else {
-                target.hp[targetIndex] = 0;
+            // 修复：确保目标索引有效时才处理
+            require(targetIndex < 6, "Battle: Invalid target index");
+            target.hp[targetIndex] = target.hp[targetIndex] > skillDamage ? target.hp[targetIndex] - skillDamage : 0;
+            if (target.hp[targetIndex] == 0) {
                 target.alive[targetIndex] = false;
             }
         }
+
         return target;
     }
 

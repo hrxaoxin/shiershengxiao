@@ -636,14 +636,11 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 fee = breedingType == BREEDING_TYPE_SELF ? selfBreedingFee : marketBreedingFee;
         if (fee == 0) return;
         IERC20 token = IERC20(tokenContract);
-        // 使用 SafeERC20 的 safeTransfer 来确保转账安全
-        // 同时检查合约余额是否充足
+        
+        // 修复：检查合约余额是否充足，不足则回滚整个繁殖完成操作
         uint256 contractBalance = token.balanceOf(address(this));
-        if (contractBalance < fee) {
-            // 如果余额不足，不执行销毁（防止因余额不足导致繁殖失败）
-            emit BreedingFeeBurned(0);
-            return;
-        }
+        require(contractBalance >= fee, "BC: Insufficient balance for fee burn");
+        
         token.safeTransfer(BLACK_HOLE, fee);
         emit BreedingFeeBurned(fee);
     }

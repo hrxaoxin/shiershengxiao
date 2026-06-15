@@ -275,6 +275,11 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev DEX价格获取事件
      */
     event PriceFetchedFromDEX(uint8 indexed dexType, uint256 tokenPrice, uint256 ethPrice);
+    
+    /**
+     * @dev 价格获取失败事件
+     */
+    event PriceFetchFailed(uint8 indexed dexType, string priceType, string reason);
 
     uint256 public maxPriceChangePercent = 5000;
     uint256 public priceUpdateCooldown = 5 minutes;
@@ -483,13 +488,25 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 tokenPrice = _fetchTokenPrice(router);
         uint256 ethPrice = _fetchETHPrice(router);
         
+        // 修复：要求至少有一个价格有效，防止两个价格都为0的情况
+        require(tokenPrice > 0 || ethPrice > 0, "PriceOracle: Failed to fetch any valid price from DEX");
+        
         if (tokenPrice > 0) {
+            // 修复：添加价格范围验证，防止异常价格
+            require(tokenPrice >= 10**10 && tokenPrice <= 10**27, "PriceOracle: Token price out of valid range");
             tokenPriceUSD = tokenPrice;
             tokenPriceUpdatedAt = block.timestamp;
+        } else {
+            emit PriceFetchFailed(activeDEX, "token", "DEX returned zero price");
         }
+        
         if (ethPrice > 0) {
+            // 修复：添加价格范围验证，防止异常价格
+            require(ethPrice >= 10**10 && ethPrice <= 10**24, "PriceOracle: ETH price out of valid range");
             ethPriceUSD = ethPrice;
             ethPriceUpdatedAt = block.timestamp;
+        } else {
+            emit PriceFetchFailed(activeDEX, "eth", "DEX returned zero price");
         }
         
         emit PriceFetchedFromDEX(activeDEX, tokenPrice, ethPrice);
