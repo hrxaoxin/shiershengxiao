@@ -7,6 +7,40 @@ library AuthorizerLib {
     event ContractSetupSuccess(string name);
     event ContractSetupFailed(string name, string reason);
 
+    // 合约地址结构体（用于 setupAllContracts）
+    struct ContractAddresses {
+        address token;
+        address usdt;
+        address nftMintCore;
+        address nftMintBatch;
+        address nftMintMetadata;
+        address nftUpdate;
+        address nftData;
+        address tokenBurner;
+        address nftTrading;
+        address nftBuyback;
+        address staking;
+        address tokenStaking;
+        address rewardManager;
+        address dividendManager;
+        address poolManager;
+        address priceOracle;
+        address battle;
+        address battleSkillData;
+        address battleHistory;
+        address breedingCore;
+        address breedingMarket;
+        address weightManager;
+        address arenaRankingManager;
+        address arenaRankingQuery;
+        address arenaReward;
+        address arenaLeaderboard;
+        address arenaPlayer;
+        address arenaBattle;
+        address feeReceiver;
+        address pancakeSwapRouter;
+    }
+
     function setupBattleAndBreeding(
         address _battleAddress,
         address _breedingCoreAddress,
@@ -540,19 +574,10 @@ library AuthorizerLib {
         }
     }
 
-    function setupAllAuthorizers(
-        address _newAuthorizer,
-        address _nftMintCore, address _nftMintBatch, address _nftMintMetadata,
-        address _nftData, address _nftUpdate, address _nftTrading, address _nftBuyback,
-        address _staking, address _tokenStaking, address _rewardManager,
-        address _dividendManager, address _poolManager, address _weightManager,
-        address _battle, address _battleSkillData, address _battleHistory,
-        address _breedingCore, address _breedingMarket, address _arenaRankingManager,
-        address _arenaRankingQuery, address _arenaReward, address _arenaLeaderboard,
-        address _arenaPlayer, address _arenaBattle, address _tokenBurner, address _priceOracle
-    ) internal {
-        if (_nftMintCore != address(0)) {
-            try ISetAuthorizer(_nftMintCore).setAuthorizer(_newAuthorizer) {
+    // 使用结构体避免 Stack too deep
+    function setupAllAuthorizers(address _newAuthorizer, ContractAddresses memory _addr) internal {
+        if (_addr.nftMintCore != address(0)) {
+            try ISetAuthorizer(_addr.nftMintCore).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("NFTMintCore-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("NFTMintCore-Authorizer", reason);
@@ -560,8 +585,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("NFTMintCore-Authorizer", "Unknown");
             }
         }
-        if (_nftMintBatch != address(0)) {
-            try ISetAuthorizer(_nftMintBatch).setAuthorizer(_newAuthorizer) {
+        if (_addr.nftMintBatch != address(0)) {
+            try ISetAuthorizer(_addr.nftMintBatch).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("NFTMintBatch-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("NFTMintBatch-Authorizer", reason);
@@ -569,8 +594,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("NFTMintBatch-Authorizer", "Unknown");
             }
         }
-        if (_nftMintMetadata != address(0)) {
-            try ISetAuthorizer(_nftMintMetadata).setAuthorizer(_newAuthorizer) {
+        if (_addr.nftMintMetadata != address(0)) {
+            try ISetAuthorizer(_addr.nftMintMetadata).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("NFTMintMetadata-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("NFTMintMetadata-Authorizer", reason);
@@ -578,8 +603,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("NFTMintMetadata-Authorizer", "Unknown");
             }
         }
-        if (_nftData != address(0)) {
-            try ISetAuthorizer(_nftData).setAuthorizer(_newAuthorizer) {
+        if (_addr.nftData != address(0)) {
+            try ISetAuthorizer(_addr.nftData).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("NFTData-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("NFTData-Authorizer", reason);
@@ -587,8 +612,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("NFTData-Authorizer", "Unknown");
             }
         }
-        if (_nftUpdate != address(0)) {
-            try ISetAuthorizer(_nftUpdate).setAuthorizer(_newAuthorizer) {
+        if (_addr.nftUpdate != address(0)) {
+            try ISetAuthorizer(_addr.nftUpdate).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("NFTUpdate-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("NFTUpdate-Authorizer", reason);
@@ -596,8 +621,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("NFTUpdate-Authorizer", "Unknown");
             }
         }
-        if (_nftTrading != address(0)) {
-            try ISetAuthorizer(_nftTrading).setAuthorizer(_newAuthorizer) {
+        if (_addr.nftTrading != address(0)) {
+            try ISetAuthorizer(_addr.nftTrading).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("NFTTrading-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("NFTTrading-Authorizer", reason);
@@ -605,8 +630,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("NFTTrading-Authorizer", "Unknown");
             }
         }
-        if (_nftBuyback != address(0)) {
-            try ISetAuthorizer(_nftBuyback).setAuthorizer(_newAuthorizer) {
+        if (_addr.nftBuyback != address(0)) {
+            try ISetAuthorizer(_addr.nftBuyback).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("NFTBuyback-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("NFTBuyback-Authorizer", reason);
@@ -614,8 +639,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("NFTBuyback-Authorizer", "Unknown");
             }
         }
-        if (_staking != address(0)) {
-            try ISetAuthorizer(_staking).setAuthorizer(_newAuthorizer) {
+        if (_addr.staking != address(0)) {
+            try ISetAuthorizer(_addr.staking).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("Staking-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("Staking-Authorizer", reason);
@@ -623,8 +648,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("Staking-Authorizer", "Unknown");
             }
         }
-        if (_tokenStaking != address(0)) {
-            try ISetAuthorizer(_tokenStaking).setAuthorizer(_newAuthorizer) {
+        if (_addr.tokenStaking != address(0)) {
+            try ISetAuthorizer(_addr.tokenStaking).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("TokenStaking-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("TokenStaking-Authorizer", reason);
@@ -632,8 +657,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("TokenStaking-Authorizer", "Unknown");
             }
         }
-        if (_rewardManager != address(0)) {
-            try ISetAuthorizer(_rewardManager).setAuthorizer(_newAuthorizer) {
+        if (_addr.rewardManager != address(0)) {
+            try ISetAuthorizer(_addr.rewardManager).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("RewardManager-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("RewardManager-Authorizer", reason);
@@ -641,8 +666,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("RewardManager-Authorizer", "Unknown");
             }
         }
-        if (_dividendManager != address(0)) {
-            try ISetAuthorizer(_dividendManager).setAuthorizer(_newAuthorizer) {
+        if (_addr.dividendManager != address(0)) {
+            try ISetAuthorizer(_addr.dividendManager).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("DividendManager-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("DividendManager-Authorizer", reason);
@@ -650,8 +675,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("DividendManager-Authorizer", "Unknown");
             }
         }
-        if (_poolManager != address(0)) {
-            try ISetAuthorizer(_poolManager).setAuthorizer(_newAuthorizer) {
+        if (_addr.poolManager != address(0)) {
+            try ISetAuthorizer(_addr.poolManager).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("PoolManager-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("PoolManager-Authorizer", reason);
@@ -659,8 +684,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("PoolManager-Authorizer", "Unknown");
             }
         }
-        if (_weightManager != address(0)) {
-            try ISetAuthorizer(_weightManager).setAuthorizer(_newAuthorizer) {
+        if (_addr.weightManager != address(0)) {
+            try ISetAuthorizer(_addr.weightManager).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("WeightManager-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("WeightManager-Authorizer", reason);
@@ -668,8 +693,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("WeightManager-Authorizer", "Unknown");
             }
         }
-        if (_battle != address(0)) {
-            try ISetAuthorizer(_battle).setAuthorizer(_newAuthorizer) {
+        if (_addr.battle != address(0)) {
+            try ISetAuthorizer(_addr.battle).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("Battle-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("Battle-Authorizer", reason);
@@ -677,8 +702,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("Battle-Authorizer", "Unknown");
             }
         }
-        if (_battleSkillData != address(0)) {
-            try ISetAuthorizer(_battleSkillData).setAuthorizer(_newAuthorizer) {
+        if (_addr.battleSkillData != address(0)) {
+            try ISetAuthorizer(_addr.battleSkillData).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("BattleSkillData-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("BattleSkillData-Authorizer", reason);
@@ -686,8 +711,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("BattleSkillData-Authorizer", "Unknown");
             }
         }
-        if (_battleHistory != address(0)) {
-            try ISetAuthorizer(_battleHistory).setAuthorizer(_newAuthorizer) {
+        if (_addr.battleHistory != address(0)) {
+            try ISetAuthorizer(_addr.battleHistory).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("BattleHistory-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("BattleHistory-Authorizer", reason);
@@ -695,8 +720,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("BattleHistory-Authorizer", "Unknown");
             }
         }
-        if (_breedingCore != address(0)) {
-            try ISetAuthorizer(_breedingCore).setAuthorizer(_newAuthorizer) {
+        if (_addr.breedingCore != address(0)) {
+            try ISetAuthorizer(_addr.breedingCore).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("BreedingCore-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("BreedingCore-Authorizer", reason);
@@ -704,8 +729,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("BreedingCore-Authorizer", "Unknown");
             }
         }
-        if (_breedingMarket != address(0)) {
-            try ISetAuthorizer(_breedingMarket).setAuthorizer(_newAuthorizer) {
+        if (_addr.breedingMarket != address(0)) {
+            try ISetAuthorizer(_addr.breedingMarket).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("BreedingMarket-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("BreedingMarket-Authorizer", reason);
@@ -713,8 +738,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("BreedingMarket-Authorizer", "Unknown");
             }
         }
-        if (_arenaRankingManager != address(0)) {
-            try ISetAuthorizer(_arenaRankingManager).setAuthorizer(_newAuthorizer) {
+        if (_addr.arenaRankingManager != address(0)) {
+            try ISetAuthorizer(_addr.arenaRankingManager).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("ArenaRankingManager-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("ArenaRankingManager-Authorizer", reason);
@@ -722,8 +747,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("ArenaRankingManager-Authorizer", "Unknown");
             }
         }
-        if (_arenaRankingQuery != address(0)) {
-            try ISetAuthorizer(_arenaRankingQuery).setAuthorizer(_newAuthorizer) {
+        if (_addr.arenaRankingQuery != address(0)) {
+            try ISetAuthorizer(_addr.arenaRankingQuery).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("ArenaRankingQuery-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("ArenaRankingQuery-Authorizer", reason);
@@ -731,8 +756,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("ArenaRankingQuery-Authorizer", "Unknown");
             }
         }
-        if (_arenaReward != address(0)) {
-            try ISetAuthorizer(_arenaReward).setAuthorizer(_newAuthorizer) {
+        if (_addr.arenaReward != address(0)) {
+            try ISetAuthorizer(_addr.arenaReward).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("ArenaReward-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("ArenaReward-Authorizer", reason);
@@ -740,8 +765,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("ArenaReward-Authorizer", "Unknown");
             }
         }
-        if (_arenaLeaderboard != address(0)) {
-            try ISetAuthorizer(_arenaLeaderboard).setAuthorizer(_newAuthorizer) {
+        if (_addr.arenaLeaderboard != address(0)) {
+            try ISetAuthorizer(_addr.arenaLeaderboard).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("ArenaLeaderboard-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("ArenaLeaderboard-Authorizer", reason);
@@ -749,8 +774,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("ArenaLeaderboard-Authorizer", "Unknown");
             }
         }
-        if (_arenaPlayer != address(0)) {
-            try ISetAuthorizer(_arenaPlayer).setAuthorizer(_newAuthorizer) {
+        if (_addr.arenaPlayer != address(0)) {
+            try ISetAuthorizer(_addr.arenaPlayer).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("ArenaPlayer-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("ArenaPlayer-Authorizer", reason);
@@ -758,8 +783,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("ArenaPlayer-Authorizer", "Unknown");
             }
         }
-        if (_arenaBattle != address(0)) {
-            try ISetAuthorizer(_arenaBattle).setAuthorizer(_newAuthorizer) {
+        if (_addr.arenaBattle != address(0)) {
+            try ISetAuthorizer(_addr.arenaBattle).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("ArenaBattle-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("ArenaBattle-Authorizer", reason);
@@ -767,8 +792,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("ArenaBattle-Authorizer", "Unknown");
             }
         }
-        if (_tokenBurner != address(0)) {
-            try ISetAuthorizer(_tokenBurner).setAuthorizer(_newAuthorizer) {
+        if (_addr.tokenBurner != address(0)) {
+            try ISetAuthorizer(_addr.tokenBurner).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("TokenBurner-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("TokenBurner-Authorizer", reason);
@@ -776,8 +801,8 @@ library AuthorizerLib {
                 emit ContractSetupFailed("TokenBurner-Authorizer", "Unknown");
             }
         }
-        if (_priceOracle != address(0)) {
-            try ISetAuthorizer(_priceOracle).setAuthorizer(_newAuthorizer) {
+        if (_addr.priceOracle != address(0)) {
+            try ISetAuthorizer(_addr.priceOracle).setAuthorizer(_newAuthorizer) {
                 emit ContractSetupSuccess("PriceOracle-Authorizer");
             } catch Error(string memory reason) {
                 emit ContractSetupFailed("PriceOracle-Authorizer", reason);
@@ -785,5 +810,19 @@ library AuthorizerLib {
                 emit ContractSetupFailed("PriceOracle-Authorizer", "Unknown");
             }
         }
+    }
+
+    // 统一设置所有合约的函数，使用结构体避免 Stack too deep
+    function setupAllContracts(ContractAddresses calldata _addr) internal {
+        setupBattleAndBreeding(_addr.battle, _addr.breedingCore, _addr.breedingMarket, _addr.nftMintCore, _addr.staking);
+        setupStakingAndReward(_addr.staking, _addr.rewardManager, _addr.dividendManager, _addr.tokenStaking, _addr.token,
+            _addr.arenaRankingManager, _addr.nftMintCore, _addr.nftBuyback, _addr.poolManager);
+        setupPriceAndUpgrade(_addr.priceOracle, _addr.token, _addr.usdt);
+        setupNFTContracts(_addr.nftUpdate, _addr.tokenBurner, _addr.nftMintCore, _addr.nftMintMetadata,
+            _addr.pancakeSwapRouter, _addr.token, _addr.dividendManager);
+        setupNFTBuyback(_addr.nftBuyback, _addr.nftMintCore, _addr.token, _addr.tokenBurner, _addr.nftUpdate, _addr.nftData);
+        setupOtherContracts(_addr.weightManager, _addr.battleHistory, _addr.nftTrading, _addr.feeReceiver,
+            _addr.arenaRankingManager, _addr.arenaRankingQuery, _addr.arenaReward, _addr.arenaLeaderboard,
+            _addr.arenaPlayer, _addr.arenaBattle, _addr.nftData, _addr.dividendManager, _addr.battle, _addr.token, _addr.nftMintCore);
     }
 }

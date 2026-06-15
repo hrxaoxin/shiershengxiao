@@ -7,65 +7,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "./NFTInterface.sol";
 import "./AuthorizerLib.sol";
 
-/**
- * @title Authorizer
- * @dev 合约授权管理器，负责管理系统中所有合约地址和权限控制
- *
- * 核心职责：
- * 1. 地址注册表：集中维护系统所有核心合约的地址，供其他合约查询
- * 2. 授权控制：通过 onlyAuthorized / onlyOwner 等修饰器，
- *    限定业务合约（铸造、战斗、交易、繁殖）可调用"受保护函数"
- * 3. 地址更新：当某个合约升级或迁移时，由 owner 更新注册表，
- *    所有依赖合约立即生效（无需逐个合约调用 setAddress）
- *
- * 注册的地址（每个地址通过 setXxxContract 形式的接口写入）：
- * - nftContract / nftMintAddress：ERC721 NFT 主合约（NFTMint）
- * - nftDataAddress：NFT 元数据合约（NFTData）
- * - nftUpdateAddress：NFT 升级合约（NFTUpdate）
- * - metadataAddress / mintModuleAddress / upgradeModuleAddress：铸造/升级模块地址
- * - priceOracleAddress：价格预言机合约（PriceOracle）
- * - battleAddress：战斗合约（Battle）
- * - breedingAddress：繁殖合约（Breeding）
- * - stakingAddress：NFT 质押合约（Staking）
- * - tokenStakingAddress：代币质押合约（TokenStaking）
- * - rewardManagerAddress：奖励管理器（RewardManager）
- * - dividendManagerAddress：分红管理器（DividendManager）
- * - poolManagerAddress：资金池管理器（PoolManager）
- * - arenaRankingAddress：竞技场排名合约（ArenaRanking）
- * - tradingAddress：交易市场合约（NFTTrading）
- * - tokenBurnerAddress：代币销毁合约（TokenBurner）
- * - feeReceiver：手续费接收地址（通常为 owner 或多签钱包）
- * - tokenAddress：游戏代币合约地址（ERC20）
- * - usdtAddress：USDT 稳定币地址
- * - pancakeSwapPair：PancakeSwap 流动池地址（用于价格验证）
- * - authorizer：本合约自身地址
- *
- * 权限模型：
- * - onlyOwner：可以更新任意地址（部署时的部署者或多签钱包）
- * - 授权业务合约：在业务合约内部通过 ISetXxx 接口写入地址时
- *   由其自身的 onlyOwner 或授权修饰器保护
- *
- * 使用示例（在业务合约中）：
- *   address public authorizer;
- *   modifier onlyBattleContract() {
- *       require(msg.sender == Authorizer(authorizer).battleAddress(),
- *           "only battle");
- *       _;
- *   }
- *
- * 安全注意：
- * - owner 应使用多签钱包或时间锁（Timelock），以防止单点故障
- * - 地址更新应在前端/后端广播前进行充分测试，错误地址可能导致系统瘫痪
- * - 建议在测试网完成全流程后再在主网设置最终地址
- *
- * 升级与治理：
- * - UUPS 可升级：未来可以扩展新的地址字段或引入角色权限（Role-Based Access Control）
- * - 所有状态均为 storage，代理升级后数据保留
- */
+// Authorizer: 合约地址注册表和权限管理
 contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
-    /**
-     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
-     */
     constructor() {
         _disableInitializers();
     }
@@ -73,366 +16,182 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     bool public paused;
     string public pauseReason;
 
-    /**
-     * @struct ContractAddresses
-     * @dev 系统合约地址结构体，集中管理所有核心合约地址
-     * 
-     * 分类说明：
-     * 1. 代币合约：tokenAddress, usdtAddress
-     * 2. NFT铸造相关：nftMintCoreAddress, nftMintBatchAddress, nftMintMetadataAddress
-     * 3. NFT升级和数据：nftUpdateAddress, nftDataAddress
-     * 4. 代币销毁和交易：tokenBurnerAddress, nftTradingAddress, nftBuybackAddress
-     * 5. 质押相关：stakingAddress, tokenStakingAddress
-     * 6. 奖励和分红：rewardManagerAddress, dividendManagerAddress, poolManagerAddress
-     * 7. 价格预言机：priceOracleAddress
-     * 8. 战斗相关：battleAddress, battleSkillDataAddress, battleHistoryAddress
-     * 9. 繁殖相关：breedingCoreAddress, breedingMarketAddress
-     * 10. 权重管理：weightManagerAddress
-     * 11. 竞技场相关：arenaRankingManagerAddress, arenaRankingQueryAddress, arenaRewardAddress, arenaLeaderboardAddress, arenaPlayerAddress, arenaBattleAddress
-     * 12. 其他：feeReceiverAddress, pancakeSwapRouterAddress
-     */
-    struct ContractAddresses {
-        // ========== 代币合约 ==========
-        address tokenAddress;              // 游戏代币合约地址（ERC20）
-        address usdtAddress;               // USDT代币合约地址
-        
-        // ========== NFT铸造相关合约 ==========
-        address nftMintCoreAddress;        // NFT铸造核心合约地址（NFTMintCore）
-        address nftMintBatchAddress;       // NFT批量铸造合约地址（NFTMintBatch）
-        address nftMintMetadataAddress;    // NFT元数据合约地址（NFTMintMetadata）
-        
-        // ========== NFT升级和数据合约 ==========
-        address nftUpdateAddress;          // NFT升级合约地址（NFTUpdate）
-        address nftDataAddress;            // NFT数据合约地址（NFTData）
-        
-        // ========== 代币销毁和交易合约 ==========
-        address tokenBurnerAddress;        // 代币销毁合约地址（TokenBurner）
-        address nftTradingAddress;         // NFT交易合约地址（NFTTrading）
-        address nftBuybackAddress;         // NFT回购合约地址（NFTBuyback）
-        
-        // ========== 质押相关合约 ==========
-        address stakingAddress;            // NFT质押合约地址（Staking）
-        address tokenStakingAddress;       // 代币质押合约地址（TokenStaking）
-        
-        // ========== 奖励和分红合约 ==========
-        address rewardManagerAddress;      // 奖励管理合约地址（RewardManager）
-        address dividendManagerAddress;    // 分红管理合约地址（DividendManager）
-        address poolManagerAddress;        // 资金池管理合约地址（PoolManager）
-        
-        // ========== 价格预言机 ==========
-        address priceOracleAddress;        // 价格预言机合约地址（PriceOracle）
-        
-        // ========== 战斗相关合约 ==========
-        address battleAddress;             // 战斗合约地址（Battle）
-        address battleSkillDataAddress;    // 战斗技能数据合约地址（BattleSkillData）
-        address battleHistoryAddress;      // 战斗历史合约地址（BattleHistory）
-        
-        // ========== 繁殖相关合约 ==========
-        address breedingCoreAddress;       // 繁殖核心合约地址（BreedingCore）
-        address breedingMarketAddress;     // 繁殖市场合约地址（BreedingMarket）
-        
-        // ========== 权重管理合约 ==========
-        address weightManagerAddress;      // 权重管理合约地址（WeightManager）
-        
-        // ========== 竞技场相关合约 ==========
-        address arenaRankingManagerAddress; // 竞技场排名管理合约地址（ArenaRankingManager）
-        address arenaRankingQueryAddress;   // 竞技场排名查询合约地址（ArenaRankingQuery）
-        address arenaRewardAddress;         // 竞技场奖励合约地址（ArenaReward）
-        address arenaLeaderboardAddress;    // 竞技场排行榜合约地址（ArenaLeaderboard）
-        address arenaPlayerAddress;         // 竞技场玩家合约地址（ArenaPlayer）
-        address arenaBattleAddress;         // 竞技场战斗合约地址（ArenaBattle）
-        
-        // ========== 其他地址 ==========
-        address feeReceiverAddress;        // 费用接收地址
-        address pancakeSwapRouterAddress;  // PancakeSwap路由器地址
-    }
+    // 地址键常量（不占用 storage）
+    bytes32 constant TOKEN = keccak256("token");
+    bytes32 constant USDT = keccak256("usdt");
+    bytes32 constant NFT_MINT_CORE = keccak256("nftMintCore");
+    bytes32 constant NFT_MINT_BATCH = keccak256("nftMintBatch");
+    bytes32 constant NFT_MINT_METADATA = keccak256("nftMintMetadata");
+    bytes32 constant NFT_UPDATE = keccak256("nftUpdate");
+    bytes32 constant NFT_DATA = keccak256("nftData");
+    bytes32 constant TOKEN_BURNER = keccak256("tokenBurner");
+    bytes32 constant NFT_TRADING = keccak256("nftTrading");
+    bytes32 constant NFT_BUYBACK = keccak256("nftBuyback");
+    bytes32 constant STAKING = keccak256("staking");
+    bytes32 constant TOKEN_STAKING = keccak256("tokenStaking");
+    bytes32 constant REWARD_MANAGER = keccak256("rewardManager");
+    bytes32 constant DIVIDEND_MANAGER = keccak256("dividendManager");
+    bytes32 constant POOL_MANAGER = keccak256("poolManager");
+    bytes32 constant PRICE_ORACLE = keccak256("priceOracle");
+    bytes32 constant BATTLE = keccak256("battle");
+    bytes32 constant BATTLE_SKILL_DATA = keccak256("battleSkillData");
+    bytes32 constant BATTLE_HISTORY = keccak256("battleHistory");
+    bytes32 constant BREEDING_CORE = keccak256("breedingCore");
+    bytes32 constant BREEDING_MARKET = keccak256("breedingMarket");
+    bytes32 constant WEIGHT_MANAGER = keccak256("weightManager");
+    bytes32 constant ARENA_RANKING_MANAGER = keccak256("arenaRankingManager");
+    bytes32 constant ARENA_RANKING_QUERY = keccak256("arenaRankingQuery");
+    bytes32 constant ARENA_REWARD = keccak256("arenaReward");
+    bytes32 constant ARENA_LEADERBOARD = keccak256("arenaLeaderboard");
+    bytes32 constant ARENA_PLAYER = keccak256("arenaPlayer");
+    bytes32 constant ARENA_BATTLE = keccak256("arenaBattle");
+    bytes32 constant FEE_RECEIVER = keccak256("feeReceiver");
+    bytes32 constant PANCAKE_SWAP_ROUTER = keccak256("pancakeSwapRouter");
+
+    // 使用 mapping 存储所有地址（减少 getter 函数）
+    mapping(bytes32 => address) private _addresses;
 
     event Paused(address account, string reason);
     event Unpaused(address account);
+    event ContractAddressUpdated(bytes32 key, address value);
 
-    /**
-     * @dev 修饰器：确保合约未暂停
-     */
     modifier whenNotPaused() {
-        require(!paused, "Authorizer: Paused");
+        require(!paused, "P");
         _;
     }
 
-    /**
-     * @dev 暂停合约
-     * @param reason - 暂停原因
-     */
     function pause(string memory reason) external onlyOwner {
         paused = true;
         pauseReason = reason;
         emit Paused(msg.sender, reason);
     }
 
-    /**
-     * @dev 取消暂停合约
-     */
     function unpause() external onlyOwner {
         paused = false;
         pauseReason = "";
         emit Unpaused(msg.sender);
     }
 
-    // ========== 代币合约 ==========
-    address public tokenAddress;              // 游戏代币合约地址（ERC20）
-    address public usdtAddress;               // USDT代币合约地址
-    
-    // ========== NFT铸造相关合约 ==========
-    address public nftMintCoreAddress;        // NFT铸造核心合约地址（NFTMintCore）
-    address public nftMintBatchAddress;       // NFT批量铸造合约地址（NFTMintBatch）
-    address public nftMintMetadataAddress;    // NFT元数据合约地址（NFTMintMetadata）
-    
-    // ========== NFT升级和数据合约 ==========
-    address public nftUpdateAddress;          // NFT升级合约地址（NFTUpdate）
-    address public nftDataAddress;            // NFT数据合约地址（NFTData）
-    
-    // ========== 代币销毁和交易合约 ==========
-    address public tokenBurnerAddress;        // 代币销毁合约地址（TokenBurner）
-    address public nftTradingAddress;         // NFT交易合约地址（NFTTrading）
-    address public nftBuybackAddress;         // NFT回购合约地址（NFTBuyback）
-    
-    // ========== 质押相关合约 ==========
-    address public stakingAddress;            // NFT质押合约地址（Staking）
-    address public tokenStakingAddress;       // 代币质押合约地址（TokenStaking）
-    
-    // ========== 奖励和分红合约 ==========
-    address public rewardManagerAddress;      // 奖励管理合约地址（RewardManager）
-    address public dividendManagerAddress;    // 分红管理合约地址（DividendManager）
-    address public poolManagerAddress;        // 资金池管理合约地址（PoolManager）
-    
-    // ========== 价格预言机 ==========
-    address public priceOracleAddress;        // 价格预言机合约地址（PriceOracle）
-    
-    // ========== 战斗相关合约 ==========
-    address public battleAddress;             // 战斗合约地址（Battle）
-    address public battleSkillDataAddress;    // 战斗技能数据合约地址（BattleSkillData）
-    address public battleHistoryAddress;      // 战斗历史合约地址（BattleHistory）
-    
-    // ========== 繁殖相关合约 ==========
-    address public breedingCoreAddress;       // 繁殖核心合约地址（BreedingCore）
-    address public breedingMarketAddress;     // 繁殖市场合约地址（BreedingMarket）
-    
-    // ========== 权重管理合约 ==========
-    address public weightManagerAddress;      // 权重管理合约地址（WeightManager）
-    
-    // ========== 竞技场相关合约 ==========
-    address public arenaRankingManagerAddress; // 竞技场排名管理合约地址（ArenaRankingManager）
-    address public arenaRankingQueryAddress;   // 竞技场排名查询合约地址（ArenaRankingQuery）
-    address public arenaRewardAddress;         // 竞技场奖励合约地址（ArenaReward）
-    address public arenaLeaderboardAddress;    // 竞技场排行榜合约地址（ArenaLeaderboard）
-    address public arenaPlayerAddress;         // 竞技场玩家合约地址（ArenaPlayer）
-    address public arenaBattleAddress;         // 竞技场战斗合约地址（ArenaBattle）
-    
-    // ========== 其他地址 ==========
-    address public feeReceiverAddress;        // 费用接收地址
-    address public pancakeSwapRouterAddress;  // PancakeSwap路由器地址
-
-    event ContractAddressesUpdated(address[] addresses);
-
-    /**
-     * @dev 初始化函数，设置合约部署者为管理员
-     */
     function initialize() external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
     }
 
-    /**
-     * @dev UUPS升级授权函数，仅允许合约所有者升级
-     * @param newImplementation - 新实现合约地址
-     */
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 
-    /**
-     * @dev 更新所有合约地址（立即生效）
-     * @param _addresses - 新的合约地址配置
-     */
-    function setAllContracts(ContractAddresses calldata _addresses) external onlyOwner whenNotPaused {
-        _setCoreAddresses(_addresses);
-        _setNFTAddresses(_addresses);
-        _setArenaAddresses(_addresses);
-        _setOtherAddresses(_addresses);
+    // ========== Getter 函数（保持向后兼容）==========
+    function tokenAddress() external view returns (address) { return _addresses[TOKEN]; }
+    function usdtAddress() external view returns (address) { return _addresses[USDT]; }
+    function nftMintCoreAddress() external view returns (address) { return _addresses[NFT_MINT_CORE]; }
+    function nftMintBatchAddress() external view returns (address) { return _addresses[NFT_MINT_BATCH]; }
+    function nftMintMetadataAddress() external view returns (address) { return _addresses[NFT_MINT_METADATA]; }
+    function nftUpdateAddress() external view returns (address) { return _addresses[NFT_UPDATE]; }
+    function nftDataAddress() external view returns (address) { return _addresses[NFT_DATA]; }
+    function tokenBurnerAddress() external view returns (address) { return _addresses[TOKEN_BURNER]; }
+    function nftTradingAddress() external view returns (address) { return _addresses[NFT_TRADING]; }
+    function nftBuybackAddress() external view returns (address) { return _addresses[NFT_BUYBACK]; }
+    function stakingAddress() external view returns (address) { return _addresses[STAKING]; }
+    function tokenStakingAddress() external view returns (address) { return _addresses[TOKEN_STAKING]; }
+    function rewardManagerAddress() external view returns (address) { return _addresses[REWARD_MANAGER]; }
+    function dividendManagerAddress() external view returns (address) { return _addresses[DIVIDEND_MANAGER]; }
+    function poolManagerAddress() external view returns (address) { return _addresses[POOL_MANAGER]; }
+    function priceOracleAddress() external view returns (address) { return _addresses[PRICE_ORACLE]; }
+    function battleAddress() external view returns (address) { return _addresses[BATTLE]; }
+    function battleSkillDataAddress() external view returns (address) { return _addresses[BATTLE_SKILL_DATA]; }
+    function battleHistoryAddress() external view returns (address) { return _addresses[BATTLE_HISTORY]; }
+    function breedingCoreAddress() external view returns (address) { return _addresses[BREEDING_CORE]; }
+    function breedingMarketAddress() external view returns (address) { return _addresses[BREEDING_MARKET]; }
+    function weightManagerAddress() external view returns (address) { return _addresses[WEIGHT_MANAGER]; }
+    function arenaRankingManagerAddress() external view returns (address) { return _addresses[ARENA_RANKING_MANAGER]; }
+    function arenaRankingQueryAddress() external view returns (address) { return _addresses[ARENA_RANKING_QUERY]; }
+    function arenaRewardAddress() external view returns (address) { return _addresses[ARENA_REWARD]; }
+    function arenaLeaderboardAddress() external view returns (address) { return _addresses[ARENA_LEADERBOARD]; }
+    function arenaPlayerAddress() external view returns (address) { return _addresses[ARENA_PLAYER]; }
+    function arenaBattleAddress() external view returns (address) { return _addresses[ARENA_BATTLE]; }
+    function feeReceiverAddress() external view returns (address) { return _addresses[FEE_RECEIVER]; }
+    function pancakeSwapRouterAddress() external view returns (address) { return _addresses[PANCAKE_SWAP_ROUTER]; }
 
-
-        AuthorizerLib.setupBattleAndBreeding(
-            _addresses.battleAddress, 
-            _addresses.breedingCoreAddress, 
-            _addresses.breedingMarketAddress, 
-            _addresses.nftMintCoreAddress, 
-            _addresses.stakingAddress
-        );
-        AuthorizerLib.setupStakingAndReward(
-            _addresses.stakingAddress, 
-            _addresses.rewardManagerAddress, 
-            _addresses.dividendManagerAddress, 
-            _addresses.tokenStakingAddress, 
-            _addresses.tokenAddress, 
-            _addresses.arenaRankingManagerAddress, 
-            _addresses.nftMintCoreAddress, 
-            _addresses.nftBuybackAddress, 
-            _addresses.poolManagerAddress
-        );
-        AuthorizerLib.setupPriceAndUpgrade(
-            _addresses.priceOracleAddress, 
-            _addresses.tokenAddress, 
-            _addresses.usdtAddress
-        );
-        AuthorizerLib.setupNFTContracts(
-            _addresses.nftUpdateAddress, 
-            _addresses.tokenBurnerAddress, 
-            _addresses.nftMintCoreAddress, 
-            _addresses.nftMintMetadataAddress, 
-            _addresses.pancakeSwapRouterAddress, 
-            _addresses.tokenAddress, 
-            _addresses.dividendManagerAddress
-        );
-        AuthorizerLib.setupNFTBuyback(
-            _addresses.nftBuybackAddress, 
-            _addresses.nftMintCoreAddress, 
-            _addresses.tokenAddress, 
-            _addresses.tokenBurnerAddress, 
-            _addresses.nftUpdateAddress, 
-            _addresses.nftDataAddress
-        );
-        AuthorizerLib.setupOtherContracts(
-            _addresses.weightManagerAddress, 
-            _addresses.battleHistoryAddress, 
-            _addresses.nftTradingAddress, 
-            _addresses.feeReceiverAddress, 
-            _addresses.arenaRankingManagerAddress, 
-            _addresses.arenaRankingQueryAddress, 
-            _addresses.arenaRewardAddress, 
-            _addresses.arenaLeaderboardAddress, 
-            _addresses.arenaPlayerAddress, 
-            _addresses.arenaBattleAddress, 
-            _addresses.nftDataAddress, 
-            _addresses.dividendManagerAddress, 
-            _addresses.battleAddress, 
-            _addresses.tokenAddress, 
-            _addresses.nftMintCoreAddress
-        );
-
-        _emitContractAddressesUpdated();
+    // ========== 设置单个地址（用于紧急更新）==========
+    function setAddress(bytes32 key, address value) external onlyOwner whenNotPaused {
+        _addresses[key] = value;
+        emit ContractAddressUpdated(key, value);
     }
 
-    /**
-     * @dev 设置核心合约地址
-     * @param _addresses - 合约地址配置
-     */
-    function _setCoreAddresses(ContractAddresses calldata _addresses) internal {
-        tokenAddress = _addresses.tokenAddress;
-        usdtAddress = _addresses.usdtAddress;
-        battleAddress = _addresses.battleAddress;
-        battleSkillDataAddress = _addresses.battleSkillDataAddress;
-        breedingCoreAddress = _addresses.breedingCoreAddress;
-        breedingMarketAddress = _addresses.breedingMarketAddress;
-        stakingAddress = _addresses.stakingAddress;
-        tokenStakingAddress = _addresses.tokenStakingAddress;
-        rewardManagerAddress = _addresses.rewardManagerAddress;
-        dividendManagerAddress = _addresses.dividendManagerAddress;
-        poolManagerAddress = _addresses.poolManagerAddress;
-        priceOracleAddress = _addresses.priceOracleAddress;
+    // ========== 批量设置所有合约地址 ==========
+    // 使用 AuthorizerLib 的结构体定义
+    using AuthorizerLib for AuthorizerLib.ContractAddresses;
+
+    function setAllContracts(AuthorizerLib.ContractAddresses calldata _addr) external onlyOwner whenNotPaused {
+        // 设置所有地址到 mapping
+        _addresses[TOKEN] = _addr.token;
+        _addresses[USDT] = _addr.usdt;
+        _addresses[NFT_MINT_CORE] = _addr.nftMintCore;
+        _addresses[NFT_MINT_BATCH] = _addr.nftMintBatch;
+        _addresses[NFT_MINT_METADATA] = _addr.nftMintMetadata;
+        _addresses[NFT_UPDATE] = _addr.nftUpdate;
+        _addresses[NFT_DATA] = _addr.nftData;
+        _addresses[TOKEN_BURNER] = _addr.tokenBurner;
+        _addresses[NFT_TRADING] = _addr.nftTrading;
+        _addresses[NFT_BUYBACK] = _addr.nftBuyback;
+        _addresses[STAKING] = _addr.staking;
+        _addresses[TOKEN_STAKING] = _addr.tokenStaking;
+        _addresses[REWARD_MANAGER] = _addr.rewardManager;
+        _addresses[DIVIDEND_MANAGER] = _addr.dividendManager;
+        _addresses[POOL_MANAGER] = _addr.poolManager;
+        _addresses[PRICE_ORACLE] = _addr.priceOracle;
+        _addresses[BATTLE] = _addr.battle;
+        _addresses[BATTLE_SKILL_DATA] = _addr.battleSkillData;
+        _addresses[BATTLE_HISTORY] = _addr.battleHistory;
+        _addresses[BREEDING_CORE] = _addr.breedingCore;
+        _addresses[BREEDING_MARKET] = _addr.breedingMarket;
+        _addresses[WEIGHT_MANAGER] = _addr.weightManager;
+        _addresses[ARENA_RANKING_MANAGER] = _addr.arenaRankingManager;
+        _addresses[ARENA_RANKING_QUERY] = _addr.arenaRankingQuery;
+        _addresses[ARENA_REWARD] = _addr.arenaReward;
+        _addresses[ARENA_LEADERBOARD] = _addr.arenaLeaderboard;
+        _addresses[ARENA_PLAYER] = _addr.arenaPlayer;
+        _addresses[ARENA_BATTLE] = _addr.arenaBattle;
+        _addresses[FEE_RECEIVER] = _addr.feeReceiver;
+        _addresses[PANCAKE_SWAP_ROUTER] = _addr.pancakeSwapRouter;
+
+        // 调用统一设置函数（传递结构体避免 Stack too deep）
+        AuthorizerLib.setupAllContracts(_addr);
     }
 
-    /**
-     * @dev 设置NFT相关合约地址
-     * @param _addresses - 合约地址配置
-     */
-    function _setNFTAddresses(ContractAddresses calldata _addresses) internal {
-        nftMintCoreAddress = _addresses.nftMintCoreAddress;
-        nftMintBatchAddress = _addresses.nftMintBatchAddress;
-        nftMintMetadataAddress = _addresses.nftMintMetadataAddress;
-        nftUpdateAddress = _addresses.nftUpdateAddress;
-        nftDataAddress = _addresses.nftDataAddress;
-        tokenBurnerAddress = _addresses.tokenBurnerAddress;
-        nftTradingAddress = _addresses.nftTradingAddress;
-        nftBuybackAddress = _addresses.nftBuybackAddress;
-        weightManagerAddress = _addresses.weightManagerAddress;
-        battleHistoryAddress = _addresses.battleHistoryAddress;
-    }
-
-    /**
-     * @dev 设置竞技场相关合约地址
-     * @param _addresses - 合约地址配置
-     */
-    function _setArenaAddresses(ContractAddresses calldata _addresses) internal {
-        arenaRankingManagerAddress = _addresses.arenaRankingManagerAddress;
-        arenaRankingQueryAddress = _addresses.arenaRankingQueryAddress;
-        arenaRewardAddress = _addresses.arenaRewardAddress;
-        arenaLeaderboardAddress = _addresses.arenaLeaderboardAddress;
-        arenaPlayerAddress = _addresses.arenaPlayerAddress;
-        arenaBattleAddress = _addresses.arenaBattleAddress;
-    }
-
-    /**
-     * @dev 设置其他地址
-     * @param _addresses - 合约地址配置
-     */
-    function _setOtherAddresses(ContractAddresses calldata _addresses) internal {
-        feeReceiverAddress = _addresses.feeReceiverAddress;
-        pancakeSwapRouterAddress = _addresses.pancakeSwapRouterAddress;
-    }
-
-    /**
-     * @dev 触发合约地址更新事件
-     */
-    function _emitContractAddressesUpdated() internal {
-        address[] memory addrs = new address[](22);
-        addrs[0] = tokenAddress;
-        addrs[1] = usdtAddress;
-        addrs[2] = nftMintCoreAddress;
-        addrs[3] = nftMintBatchAddress;
-        addrs[4] = nftMintMetadataAddress;
-        addrs[5] = nftUpdateAddress;
-        addrs[6] = nftDataAddress;
-        addrs[7] = tokenBurnerAddress;
-        addrs[8] = nftTradingAddress;
-        addrs[9] = nftBuybackAddress;
-        addrs[10] = stakingAddress;
-        addrs[11] = tokenStakingAddress;
-        addrs[12] = rewardManagerAddress;
-        addrs[13] = dividendManagerAddress;
-        addrs[14] = poolManagerAddress;
-        addrs[15] = priceOracleAddress;
-        addrs[16] = battleAddress;
-        addrs[17] = battleSkillDataAddress;
-        addrs[18] = battleHistoryAddress;
-        addrs[19] = breedingCoreAddress;
-        addrs[20] = breedingMarketAddress;
-        addrs[21] = weightManagerAddress;
-        emit ContractAddressesUpdated(addrs);
-    }
-
-    /**
-     * @dev 统一设置所有合约的authorizer地址
-     * @param _newAuthorizer 新的authorizer合约地址
-     */
+    // ========== 设置所有合约的 authorizer 地址 ==========
     function setAllAuthorizers(address _newAuthorizer) external onlyOwner whenNotPaused {
-        require(_newAuthorizer != address(0), "A: Invalid authorizer");
-        AuthorizerLib.setupAllAuthorizers(
-            _newAuthorizer,
-            nftMintCoreAddress, nftMintBatchAddress, nftMintMetadataAddress,
-            nftDataAddress, nftUpdateAddress, nftTradingAddress, nftBuybackAddress,
-            stakingAddress, tokenStakingAddress, rewardManagerAddress,
-            dividendManagerAddress, poolManagerAddress, weightManagerAddress,
-            battleAddress, battleSkillDataAddress, battleHistoryAddress,
-            breedingCoreAddress, breedingMarketAddress, arenaRankingManagerAddress,
-            arenaRankingQueryAddress, arenaRewardAddress, arenaLeaderboardAddress,
-            arenaPlayerAddress, arenaBattleAddress, tokenBurnerAddress, priceOracleAddress
-        );
+        require(_newAuthorizer != address(0), "IA");
+        // 构建结构体避免 Stack too deep
+        AuthorizerLib.ContractAddresses memory addr;
+        addr.nftMintCore = _addresses[NFT_MINT_CORE];
+        addr.nftMintBatch = _addresses[NFT_MINT_BATCH];
+        addr.nftMintMetadata = _addresses[NFT_MINT_METADATA];
+        addr.nftData = _addresses[NFT_DATA];
+        addr.nftUpdate = _addresses[NFT_UPDATE];
+        addr.nftTrading = _addresses[NFT_TRADING];
+        addr.nftBuyback = _addresses[NFT_BUYBACK];
+        addr.staking = _addresses[STAKING];
+        addr.tokenStaking = _addresses[TOKEN_STAKING];
+        addr.rewardManager = _addresses[REWARD_MANAGER];
+        addr.dividendManager = _addresses[DIVIDEND_MANAGER];
+        addr.poolManager = _addresses[POOL_MANAGER];
+        addr.weightManager = _addresses[WEIGHT_MANAGER];
+        addr.battle = _addresses[BATTLE];
+        addr.battleSkillData = _addresses[BATTLE_SKILL_DATA];
+        addr.battleHistory = _addresses[BATTLE_HISTORY];
+        addr.breedingCore = _addresses[BREEDING_CORE];
+        addr.breedingMarket = _addresses[BREEDING_MARKET];
+        addr.arenaRankingManager = _addresses[ARENA_RANKING_MANAGER];
+        addr.arenaRankingQuery = _addresses[ARENA_RANKING_QUERY];
+        addr.arenaReward = _addresses[ARENA_REWARD];
+        addr.arenaLeaderboard = _addresses[ARENA_LEADERBOARD];
+        addr.arenaPlayer = _addresses[ARENA_PLAYER];
+        addr.arenaBattle = _addresses[ARENA_BATTLE];
+        addr.tokenBurner = _addresses[TOKEN_BURNER];
+        addr.priceOracle = _addresses[PRICE_ORACLE];
+        AuthorizerLib.setupAllAuthorizers(_newAuthorizer, addr);
     }
 
-    /**
-     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
-     */
     receive() external payable {}
-
-    /**
-     * @dev Fallback 函数 - 处理未匹配的调用
-     */
     fallback() external payable {}
 }
