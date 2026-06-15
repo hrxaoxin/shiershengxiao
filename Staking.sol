@@ -121,7 +121,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     address public rewardTokenContract;
     address public nftContract;
     address public authorizer;
-    address public breedingContract;
     uint256 public globalPendingRewards;
     
     bool public paused;
@@ -140,8 +139,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function initialize(
         address _authorizerAddress,
         address _nftContractAddress,
-        address _rewardTokenContractAddress,
-        address _breedingContractAddress
+        address _rewardTokenContractAddress
     ) external initializer {
         require(_authorizerAddress != address(0), "Staking: Invalid authorizer address");
         __Ownable2Step_init();
@@ -153,9 +151,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         }
         if (_rewardTokenContractAddress != address(0)) {
             rewardTokenContract = _rewardTokenContractAddress;
-        }
-        if (_breedingContractAddress != address(0)) {
-            breedingContract = _breedingContractAddress;
         }
         
         // 初始化带默认值的参数
@@ -179,11 +174,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
         require(_nftContractAddress != address(0), "Staking: Invalid NFT contract address");
         nftContract = _nftContractAddress;
-    }
-
-    function setBreedingContract(address _breedingContractAddress) external onlyOwnerOrAuthorizer {
-        require(_breedingContractAddress != address(0), "Staking: Invalid breeding contract address");
-        breedingContract = _breedingContractAddress;
     }
 
     function setMinStakingLevel(uint8 _minLevel) external onlyOwnerOrAuthorizer {
@@ -224,11 +214,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             require(tokenId > 0, "Staking: Invalid token ID");
             require(stakingInfo[tokenId].owner == address(0), "Staking: Already staked");
             require(nft.ownerOf(tokenId) == msg.sender, "Staking: Not owner of token");
-            
-            // 检查 NFT 是否正在繁殖
-            if (breedingContract != address(0)) {
-                require(!IBreeding(breedingContract).isNFTInActiveBreeding(tokenId), "Staking: NFT is in breeding");
-            }
 
             // 检查 NFT 等级是否满足质押要求
             uint8 tokenLevel = nft.tokenLevel(tokenId);

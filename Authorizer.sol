@@ -350,16 +350,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                 }
             }
         }
-        // 设置Staking的Breeding合约地址
-        if (_stakingAddress != address(0) && _breedingCoreAddress != address(0)) {
-            try ISetBreedingContract(_stakingAddress).setBreedingContract(_breedingCoreAddress) {
-                emit ContractSetupSuccess("Staking-Breeding");
-            } catch Error(string memory reason) {
-                emit ContractSetupFailed("Staking-Breeding", reason);
-            } catch {
-                emit ContractSetupFailed("Staking-Breeding", "Unknown");
-            }
-        }
     }
 
  
