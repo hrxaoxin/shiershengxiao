@@ -514,6 +514,10 @@ interface ISetBattleContract {
     function setBattleContract(address _battleContract) external;
 }
 
+interface ISetDividendManager {
+    function setDividendManager(address _dividendManager) external;
+}
+
 interface ISetFeeReceiver {
     function setFeeReceiver(address _feeReceiver) external;
 }

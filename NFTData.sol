@@ -177,6 +177,15 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
+     * @dev 设置分红管理合约地址
+     * @param _dividendManagerAddress 分红管理合约地址
+     */
+    function setDividendManager(address _dividendManagerAddress) external onlyOwnerOrAuthorizer {
+        require(_dividendManagerAddress != address(0), "NFTData: Invalid dividend manager address");
+        dividendManager = _dividendManagerAddress;
+    }
+
+    /**
      * @dev 检查是否为授权调用者（owner或authorizer）
      */
     modifier onlyOwnerOrAuthorizer() {

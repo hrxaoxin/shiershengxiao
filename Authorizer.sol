@@ -548,6 +548,15 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         if (_weightManagerAddress != address(0)) {
             ISetNFTDataContract(_weightManagerAddress).setNFTDataContract(nftDataAddress);
         }
+        if (nftDataAddress != address(0) && dividendManagerAddress != address(0)) {
+            try ISetDividendManager(nftDataAddress).setDividendManager(dividendManagerAddress) {
+                emit ContractSetupSuccess("NFTData-DividendManager");
+            } catch Error(string memory reason) {
+                emit ContractSetupFailed("NFTData-DividendManager", reason);
+            } catch {
+                emit ContractSetupFailed("NFTData-DividendManager", "Unknown");
+            }
+        }
         if (_battleHistoryAddress != address(0)) {
             ISetBattleContract(_battleHistoryAddress).setBattleContract(battleAddress);
         }
