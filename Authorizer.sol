@@ -382,16 +382,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      */
     function _emitContractAddressesUpdated() internal {
         address[] memory addrs = new address[](22);
-        _fillAddressesPart1(addrs);
-        _fillAddressesPart2(addrs);
-        emit ContractAddressesUpdated(addrs);
-    }
-
-    /**
-     * @dev 填充地址数组第一部分
-     * @param addrs - 地址数组
-     */
-    function _fillAddressesPart1(address[] memory addrs) internal view {
         addrs[0] = tokenAddress;
         addrs[1] = usdtAddress;
         addrs[2] = nftMintCoreAddress;
@@ -403,13 +393,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         addrs[8] = nftTradingAddress;
         addrs[9] = nftBuybackAddress;
         addrs[10] = stakingAddress;
-    }
-
-    /**
-     * @dev 填充地址数组第二部分
-     * @param addrs - 地址数组
-     */
-    function _fillAddressesPart2(address[] memory addrs) internal view {
         addrs[11] = tokenStakingAddress;
         addrs[12] = rewardManagerAddress;
         addrs[13] = dividendManagerAddress;
@@ -421,136 +404,26 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         addrs[19] = breedingCoreAddress;
         addrs[20] = breedingMarketAddress;
         addrs[21] = weightManagerAddress;
-    }
-
-    /**
-     * @dev 同步所有合约地址配置（用于紧急修复）
-     */
-    function syncContractAddresses() external onlyOwner whenNotPaused {
-        AuthorizerLib.setupBattleAndBreeding(
-            battleAddress, 
-            breedingCoreAddress, 
-            breedingMarketAddress, 
-            nftMintCoreAddress, 
-            stakingAddress
-        );
-        AuthorizerLib.setupStakingAndReward(
-            stakingAddress, 
-            rewardManagerAddress, 
-            dividendManagerAddress, 
-            tokenStakingAddress, 
-            tokenAddress, 
-            arenaRankingManagerAddress, 
-            nftMintCoreAddress, 
-            nftBuybackAddress, 
-            poolManagerAddress
-        );
-        AuthorizerLib.setupPriceAndUpgrade(
-            priceOracleAddress, 
-            tokenAddress, 
-            usdtAddress
-        );
-        AuthorizerLib.setupNFTContracts(
-            nftUpdateAddress, 
-            tokenBurnerAddress, 
-            nftMintCoreAddress, 
-            nftMintMetadataAddress, 
-            pancakeSwapRouterAddress, 
-            tokenAddress, 
-            dividendManagerAddress
-        );
-        AuthorizerLib.setupNFTBuyback(
-            nftBuybackAddress, 
-            nftMintCoreAddress, 
-            tokenAddress, 
-            tokenBurnerAddress, 
-            nftUpdateAddress, 
-            nftDataAddress
-        );
-        AuthorizerLib.setupOtherContracts(
-            weightManagerAddress, 
-            battleHistoryAddress, 
-            nftTradingAddress, 
-            feeReceiverAddress, 
-            arenaRankingManagerAddress, 
-            arenaRankingQueryAddress, 
-            arenaRewardAddress, 
-            arenaLeaderboardAddress, 
-            arenaPlayerAddress, 
-            arenaBattleAddress, 
-            nftDataAddress, 
-            dividendManagerAddress, 
-            battleAddress, 
-            tokenAddress, 
-            nftMintCoreAddress
-        );
+        emit ContractAddressesUpdated(addrs);
     }
 
     /**
      * @dev 统一设置所有合约的authorizer地址
-     * 仅合约所有者可调用，用于authorizer合约升级后统一更新所有合约的authorizer引用
      * @param _newAuthorizer 新的authorizer合约地址
      */
     function setAllAuthorizers(address _newAuthorizer) external onlyOwner whenNotPaused {
         require(_newAuthorizer != address(0), "A: Invalid authorizer");
-        
-        address[] memory addrs = new address[](26);
-        addrs[0] = nftMintCoreAddress;
-        addrs[1] = nftMintBatchAddress;
-        addrs[2] = nftMintMetadataAddress;
-        addrs[3] = nftDataAddress;
-        addrs[4] = nftUpdateAddress;
-        addrs[5] = nftTradingAddress;
-        addrs[6] = nftBuybackAddress;
-        addrs[7] = stakingAddress;
-        addrs[8] = tokenStakingAddress;
-        addrs[9] = rewardManagerAddress;
-        addrs[10] = dividendManagerAddress;
-        addrs[11] = poolManagerAddress;
-        addrs[12] = weightManagerAddress;
-        addrs[13] = battleAddress;
-        addrs[14] = battleSkillDataAddress;
-        addrs[15] = battleHistoryAddress;
-        addrs[16] = breedingCoreAddress;
-        addrs[17] = breedingMarketAddress;
-        addrs[18] = arenaRankingManagerAddress;
-        addrs[19] = arenaRankingQueryAddress;
-        addrs[20] = arenaRewardAddress;
-        addrs[21] = arenaLeaderboardAddress;
-        addrs[22] = arenaPlayerAddress;
-        addrs[23] = arenaBattleAddress;
-        addrs[24] = tokenBurnerAddress;
-        addrs[25] = priceOracleAddress;
-        
-        string[] memory names = new string[](26);
-        names[0] = "NFTMintCore-Authorizer";
-        names[1] = "NFTMintBatch-Authorizer";
-        names[2] = "NFTMintMetadata-Authorizer";
-        names[3] = "NFTData-Authorizer";
-        names[4] = "NFTUpdate-Authorizer";
-        names[5] = "NFTTrading-Authorizer";
-        names[6] = "NFTBuyback-Authorizer";
-        names[7] = "Staking-Authorizer";
-        names[8] = "TokenStaking-Authorizer";
-        names[9] = "RewardManager-Authorizer";
-        names[10] = "DividendManager-Authorizer";
-        names[11] = "PoolManager-Authorizer";
-        names[12] = "WeightManager-Authorizer";
-        names[13] = "Battle-Authorizer";
-        names[14] = "BattleSkillData-Authorizer";
-        names[15] = "BattleHistory-Authorizer";
-        names[16] = "BreedingCore-Authorizer";
-        names[17] = "BreedingMarket-Authorizer";
-        names[18] = "ArenaRankingManager-Authorizer";
-        names[19] = "ArenaRankingQuery-Authorizer";
-        names[20] = "ArenaReward-Authorizer";
-        names[21] = "ArenaLeaderboard-Authorizer";
-        names[22] = "ArenaPlayer-Authorizer";
-        names[23] = "ArenaBattle-Authorizer";
-        names[24] = "TokenBurner-Authorizer";
-        names[25] = "PriceOracle-Authorizer";
-        
-        AuthorizerLib.batchSetAuthorizer(addrs, names, _newAuthorizer);
+        AuthorizerLib.setupAllAuthorizers(
+            _newAuthorizer,
+            nftMintCoreAddress, nftMintBatchAddress, nftMintMetadataAddress,
+            nftDataAddress, nftUpdateAddress, nftTradingAddress, nftBuybackAddress,
+            stakingAddress, tokenStakingAddress, rewardManagerAddress,
+            dividendManagerAddress, poolManagerAddress, weightManagerAddress,
+            battleAddress, battleSkillDataAddress, battleHistoryAddress,
+            breedingCoreAddress, breedingMarketAddress, arenaRankingManagerAddress,
+            arenaRankingQueryAddress, arenaRewardAddress, arenaLeaderboardAddress,
+            arenaPlayerAddress, arenaBattleAddress, tokenBurnerAddress, priceOracleAddress
+        );
     }
 
     /**
