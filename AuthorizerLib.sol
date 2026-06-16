@@ -62,6 +62,11 @@ library AuthorizerLib {
         if (_addr.nftMintCore != address(0) && _addr.breedingCore != address(0)) {
             ISetBreedingContract(_addr.nftMintCore).setBreedingContract(_addr.breedingCore);
         }
+        
+        // nftMintCore + nftMintMetadata
+        if (_addr.nftMintCore != address(0) && _addr.nftMintMetadata != address(0)) {
+            ISetNFTMintMetadata(_addr.nftMintCore).setNFTMintMetadata(_addr.nftMintMetadata);
+        }
 
         // staking
         if (_addr.staking != address(0)) {

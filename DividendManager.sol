@@ -260,7 +260,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 检查是否为授权调用者（owner、authorizer、nftUpdateContract、nftDataContract、rewardManagerContract 或 weightManagerContract）
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == nftUpdateContract || msg.sender == nftDataContract || msg.sender == rewardManagerContract || msg.sender == weightManagerContract, "DividendManager: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || (nftUpdateContract != address(0) && msg.sender == nftUpdateContract) || (nftDataContract != address(0) && msg.sender == nftDataContract) || (rewardManagerContract != address(0) && msg.sender == rewardManagerContract) || (weightManagerContract != address(0) && msg.sender == weightManagerContract), "DividendManager: Not authorized");
         _;
     }
 

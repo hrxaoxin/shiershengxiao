@@ -112,6 +112,10 @@ interface INFTMintCore {
     function setApprovalForAll(address operator, bool approved) external;
 }
 
+interface INFTMintMetadata {
+    function tokenURI(uint256 tokenId) external view returns (string memory);
+}
+
 /**
  * @title INFT
  * @dev 标准NFT接口，提供所有权查询、转移等功能
@@ -516,6 +520,10 @@ interface ISetNFTDataContract {
 
 interface ISetNFTMintCore {
     function setNFTMintCore(address _nftMintCore) external;
+}
+
+interface ISetNFTMintMetadata {
+    function setNFTMintMetadata(address _nftMintMetadata) external;
 }
 
 interface ISetWeightManager {

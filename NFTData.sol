@@ -213,7 +213,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @dev 检查是否为授权调用者（owner、authorizer或nftMintCore）
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == nftMintCore, "NFTData: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || (nftMintCore != address(0) && msg.sender == nftMintCore), "NFTData: Not authorized");
         _;
     }
 

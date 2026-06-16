@@ -228,7 +228,7 @@ contract WeightManager is
      * 用于保护权重更新和缓存管理等敏感操作
      */
     modifier onlyOperator() {
-        require(msg.sender == owner() || msg.sender == authorizer, "WeightManager: Not operator");
+        require(msg.sender == owner() || msg.sender == authorizer || (nftDataContract != address(0) && msg.sender == nftDataContract), "WeightManager: Not operator");
         _;
     }
     
@@ -473,11 +473,7 @@ contract WeightManager is
      * @param user 目标用户地址
      * @return 操作是否成功
      */
-    function addHolder(address user) external whenNotPaused returns (bool) {
-        require(
-            msg.sender == owner() || msg.sender == authorizer || msg.sender == nftDataContract,
-            "WeightManager: Not authorized"
-        );
+    function addHolder(address user) external onlyOperator whenNotPaused returns (bool) {
         _updateUserWeight(user);
         return true;
     }

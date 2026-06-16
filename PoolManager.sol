@@ -146,7 +146,7 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 检查是否为授权调用者（owner、authorizer或rewardManager）
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == rewardManager, "PoolManager: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || (rewardManager != address(0) && msg.sender == rewardManager), "PoolManager: Not authorized");
         _;
     }
 

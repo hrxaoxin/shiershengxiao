@@ -113,6 +113,18 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 授权器合约地址（Authorizer）
      */
     address public authorizer;
+    /**
+     * @dev NFT元数据合约地址（NFTMintMetadata）
+     */
+    address public nftMintMetadata;
+    /**
+     * @dev NFT名称（ERC-721标准）
+     */
+    string public name;
+    /**
+     * @dev NFT符号（ERC-721标准）
+     */
+    string public symbol;
     
     /**
      * @dev 是否暂停铸造
@@ -166,9 +178,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 修饰器：仅授权合约可调用（TokenBurner或Breeding）
      */
     modifier onlyAuthorized() {
-        require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
-        require(breedingContract != address(0), "NFTMint: breedingContract not set");
-        require(msg.sender == tokenBurnerContract || msg.sender == breedingContract, "NFTMint: Unauthorized");
+        require((tokenBurnerContract != address(0) && msg.sender == tokenBurnerContract) || (breedingContract != address(0) && msg.sender == breedingContract), "NFTMint: Unauthorized");
         _;
     }
     
@@ -199,6 +209,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         authorizer = _authorizerAddress;
         breedingContract = _breedingContractAddress;
         _nextCardId = 1;
+        name = "Zodiac Beast";
+        symbol = "ZODIAC";
     }
     
     /**
@@ -437,14 +449,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         FailedSync storage sync = failedSyncs[syncId];
         require(sync.retryCount < MAX_RETRY_COUNT, "NFTMint: Max retry count exceeded");
         
-        try INFTDataInterface(nftDataContract).syncNFTData(sync.tokenId, sync.zodiacType, sync.level, sync.growth, sync.to) {
-            _removeFailedSync(syncId);
-        } catch {
-            sync.retryCount++;
-            if (sync.retryCount >= MAX_RETRY_COUNT) {
-                _removeFailedSync(syncId);
-            }
-        }
+        INFTDataInterface(nftDataContract).syncNFTData(sync.tokenId, sync.zodiacType, sync.level, sync.growth, sync.to);
+        _removeFailedSync(syncId);
     }
 
     function retryAllFailedSyncs() external onlyOwner {
@@ -455,12 +461,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
                 continue;
             }
 
-            try INFTDataInterface(nftDataContract).syncNFTData(sync.tokenId, sync.zodiacType, sync.level, sync.growth, sync.to) {
-                _removeFailedSync(i);
-            } catch {
-                sync.retryCount++;
-                i++;
-            }
+            INFTDataInterface(nftDataContract).syncNFTData(sync.tokenId, sync.zodiacType, sync.level, sync.growth, sync.to);
+            _removeFailedSync(i);
         }
     }
 
@@ -499,6 +501,10 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         authorizer = _authorizerAddress;
     }
     
+    function setNFTMintMetadata(address _nftMintMetadataAddress) external onlyOwnerOrAuthorizer {
+        nftMintMetadata = _nftMintMetadataAddress;
+    }
+    
     function pause() external onlyOwner {
         paused = true;
     }
@@ -535,6 +541,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     
     mapping(uint256 => address) internal _ownerOf;
     mapping(address => uint256) internal _balanceOf;
+    mapping(uint256 => address) internal _tokenApprovals;
     mapping(address => mapping(address => bool)) internal _operatorApprovals;
     mapping(address => uint256[]) internal _ownedTokens;
     mapping(uint256 => uint256) internal _ownedTokensIndex;
@@ -583,7 +590,15 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function _isApprovedOrOwner(address spender, uint256 tokenId) internal view returns (bool) {
         address owner = _ownerOf[tokenId];
-        return (spender == owner || _operatorApprovals[owner][spender]);
+        return (spender == owner || _tokenApprovals[tokenId] == spender || _operatorApprovals[owner][spender]);
+    }
+    
+    function approve(address to, uint256 tokenId) external {
+        address owner = _ownerOf[tokenId];
+        require(to != owner, "ERC721: approval to current owner");
+        require(msg.sender == owner || _operatorApprovals[owner][msg.sender], "ERC721: approve caller is not owner nor approved for all");
+        _tokenApprovals[tokenId] = to;
+        emit Approval(owner, to, tokenId);
     }
     
     function _removeTokenFromOwnerEnumeration(address from, uint256 tokenId) private {
@@ -613,6 +628,25 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _operatorApprovals[msg.sender][operator] = approved;
     }
     
+    function getApproved(uint256 tokenId) external view returns (address) {
+        require(_exists(tokenId), "ERC721: invalid token ID");
+        return _tokenApprovals[tokenId];
+    }
+    
+    function tokenURI(uint256 tokenId) external view returns (string memory) {
+        require(_exists(tokenId), "ERC721: invalid token ID");
+        if (nftMintMetadata != address(0)) {
+            return INFTMintMetadata(nftMintMetadata).tokenURI(tokenId);
+        }
+        return "";
+    }
+    
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == 0x80ac58cd || 
+               interfaceId == 0x5b5e139f || 
+               interfaceId == 0x780e9d63;
+    }
+    
     function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256) {
         require(index < _ownedTokens[owner].length, "ERC721: owner index out of bounds");
         return _ownedTokens[owner][index];
@@ -628,6 +662,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
     
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+    event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
     
     function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal virtual {}
     function _afterTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal virtual {}

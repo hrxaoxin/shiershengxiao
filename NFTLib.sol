@@ -643,8 +643,7 @@ library NFTLib {
         string memory tokenIdStr = tokenId.toString();
         
         string memory namePart = concat5(
-            '{"name":"Zodiac NFT #', tokenIdStr, ' - ',
-            concat2(elementName, concat2(zodiacName, unicode"\u00B7")),
+            '{"name":"', elementName, zodiacName, unicode"\u00B7",
             concat2(genderName, '"')
         );
         

@@ -231,6 +231,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * 用于战斗发起类函数（如 challenge）
      */
     modifier onlyBattleCaller() {
+        require(battleCaller != address(0), "Battle: battleCaller not set");
         require(msg.sender == owner() || msg.sender == battleCaller, "Battle: Only authorized caller");
         _;
     }
