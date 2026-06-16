@@ -3,6 +3,10 @@ window.ZODIAC_CONFIG = (function() {
     const NETWORK_NAME = 'Binance Mainnet';
     const NETWORK_LABEL = 'BNB主网';
 
+    const NETWORK_CONFIG = {
+        explorerUrl: 'https://bscscan.com'
+    };
+
     const ERROR_CODES = {
         4001: '用户拒绝了操作',
         '-32000': 'RPC错误',
@@ -25351,6 +25355,7 @@ window.ZODIAC_CONFIG = (function() {
         NETWORK_ID,
         NETWORK_NAME,
         NETWORK_LABEL,
+        NETWORK_CONFIG,
         getContractAddresses,
         MINT_COSTS,
         UPGRADE_COSTS,
