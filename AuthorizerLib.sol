@@ -88,6 +88,9 @@ library AuthorizerLib {
             if (_addr.nftUpdate != address(0)) {
                 ISetNFTUpdateContract(_addr.dividendManager).setNFTUpdateContract(_addr.nftUpdate);
             }
+            if (_addr.nftData != address(0)) {
+                ISetNFTDataContract(_addr.dividendManager).setNFTDataContract(_addr.nftData);
+            }
         }
         
         // tokenStaking
