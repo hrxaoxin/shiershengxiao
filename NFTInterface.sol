@@ -518,6 +518,10 @@ interface ISetNFTMintCore {
     function setNFTMintCore(address _nftMintCore) external;
 }
 
+interface ISetWeightManager {
+    function setWeightManager(address _weightManager) external;
+}
+
 interface ISetBattleContract {
     function setBattleContract(address _battleContract) external;
 }
@@ -592,6 +596,14 @@ interface ISetAuthorizer {
 
 interface IBreedingMarket {
     function setBreedingCore(address _breedingCore) external;
+}
+
+/**
+ * @title IWeightManager
+ * @dev 权重管理合约接口
+ */
+interface IWeightManager {
+    function addHolder(address user) external returns (bool);
 }
 
 /**

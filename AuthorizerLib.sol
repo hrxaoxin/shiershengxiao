@@ -161,6 +161,11 @@ library AuthorizerLib {
             ISetNFTMintCore(_addr.nftData).setNFTMintCore(_addr.nftMintCore);
         }
         
+        // nftData + weightManager
+        if (_addr.nftData != address(0) && _addr.weightManager != address(0)) {
+            ISetWeightManager(_addr.nftData).setWeightManager(_addr.weightManager);
+        }
+        
         // battleHistory
         if (_addr.battleHistory != address(0)) {
             ISetBattleContract(_addr.battleHistory).setBattleContract(_addr.battle);

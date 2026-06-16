@@ -473,7 +473,11 @@ contract WeightManager is
      * @param user 目标用户地址
      * @return 操作是否成功
      */
-    function addHolder(address user) external onlyOperator whenNotPaused returns (bool) {
+    function addHolder(address user) external whenNotPaused returns (bool) {
+        require(
+            msg.sender == owner() || msg.sender == authorizer || msg.sender == nftDataContract,
+            "WeightManager: Not authorized"
+        );
         _updateUserWeight(user);
         return true;
     }
