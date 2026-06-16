@@ -72,14 +72,8 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /// @dev 授权合约地址
     address public authorizer;
     
-    /// @dev NFT铸造核心合约地址（NFTMintCore），有权调用syncNFTData
-    address public nftMintCore;
-    
     /// @dev 分红管理合约地址
     address public dividendManager;
-    
-    /// @dev 权重管理合约地址
-    address public weightManager;
     
     event LevelUpdated(uint256 indexed tokenId, uint8 oldLevel, uint8 newLevel, uint64 timestamp);
 
@@ -192,28 +186,10 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @dev 设置NFT铸造核心合约地址（NFTMintCore）
-     * @param _nftMintCoreAddress NFT铸造核心合约地址
-     */
-    function setNFTMintCore(address _nftMintCoreAddress) external onlyOwnerOrAuthorizer {
-        require(_nftMintCoreAddress != address(0), "NFTData: Invalid NFT mint core address");
-        nftMintCore = _nftMintCoreAddress;
-    }
-
-    /**
-     * @dev 设置权重管理合约地址
-     * @param _weightManagerAddress 权重管理合约地址
-     */
-    function setWeightManager(address _weightManagerAddress) external onlyOwnerOrAuthorizer {
-        require(_weightManagerAddress != address(0), "NFTData: Invalid weight manager address");
-        weightManager = _weightManagerAddress;
-    }
-
-    /**
-     * @dev 检查是否为授权调用者（owner、authorizer或nftMintCore）
+     * @dev 检查是否为授权调用者（owner或authorizer）
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer || (nftMintCore != address(0) && msg.sender == nftMintCore), "NFTData: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer, "NFTData: Not authorized");
         _;
     }
 
@@ -588,10 +564,6 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         if (dividendManager != address(0)) {
             uint8 element = uint8(zodiacType / 24);
             IDividendManager(dividendManager).updateUserWeight(to, uint256(level), true, element);
-        }
-        
-        if (weightManager != address(0)) {
-            IWeightManager(weightManager).addHolder(to);
         }
     }
     

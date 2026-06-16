@@ -111,7 +111,6 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 仅允许战斗合约调用的修饰器
      */
     modifier onlyBattleContract() {
-        require(battleContract != address(0), "BattleHistory: battleContract not set");
         require(msg.sender == battleContract, "BattleHistory: Only battle contract");
         _;
     }

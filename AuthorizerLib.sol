@@ -41,9 +41,6 @@ library AuthorizerLib {
         // battle
         if (_addr.battle != address(0)) {
             ISetNFTContract(_addr.battle).setNFTContract(_addr.nftMintCore);
-            if (_addr.arenaBattle != address(0)) {
-                ISetBattleCaller(_addr.battle).setBattleCaller(_addr.arenaBattle);
-            }
         }
         
         // breedingCore
@@ -61,11 +58,6 @@ library AuthorizerLib {
         // nftMintCore + breedingCore
         if (_addr.nftMintCore != address(0) && _addr.breedingCore != address(0)) {
             ISetBreedingContract(_addr.nftMintCore).setBreedingContract(_addr.breedingCore);
-        }
-        
-        // nftMintCore + nftMintMetadata
-        if (_addr.nftMintCore != address(0) && _addr.nftMintMetadata != address(0)) {
-            ISetNFTMintMetadata(_addr.nftMintCore).setNFTMintMetadata(_addr.nftMintMetadata);
         }
 
         // staking
@@ -89,20 +81,12 @@ library AuthorizerLib {
             }
         }
         
-        // poolManager + rewardManager
-        if (_addr.poolManager != address(0) && _addr.rewardManager != address(0)) {
-            ISetRewardManager(_addr.poolManager).setRewardManager(_addr.rewardManager);
-        }
-        
         // dividendManager
         if (_addr.dividendManager != address(0)) {
             ISetTokenContract(_addr.dividendManager).setTokenContract(_addr.token);
             ISetRewardManagerContract(_addr.dividendManager).setRewardManagerContract(_addr.rewardManager);
             if (_addr.nftUpdate != address(0)) {
                 ISetNFTUpdateContract(_addr.dividendManager).setNFTUpdateContract(_addr.nftUpdate);
-            }
-            if (_addr.nftData != address(0)) {
-                ISetNFTDataContract(_addr.dividendManager).setNFTDataContract(_addr.nftData);
             }
         }
         
@@ -159,16 +143,6 @@ library AuthorizerLib {
         // nftData + dividendManager
         if (_addr.nftData != address(0) && _addr.dividendManager != address(0)) {
             ISetDividendManager(_addr.nftData).setDividendManager(_addr.dividendManager);
-        }
-        
-        // nftData + nftMintCore
-        if (_addr.nftData != address(0) && _addr.nftMintCore != address(0)) {
-            ISetNFTMintCore(_addr.nftData).setNFTMintCore(_addr.nftMintCore);
-        }
-        
-        // nftData + weightManager
-        if (_addr.nftData != address(0) && _addr.weightManager != address(0)) {
-            ISetWeightManager(_addr.nftData).setWeightManager(_addr.weightManager);
         }
         
         // battleHistory

@@ -10889,19 +10889,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "nftMintCore",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "owner",
 		"outputs": [
 			{
@@ -11031,19 +11018,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_nftMintCoreAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTMintCore",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "tokenId",
 				"type": "uint256"
@@ -11055,19 +11029,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setTokenLevel",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_weightManagerAddress",
-				"type": "address"
-			}
-		],
-		"name": "setWeightManager",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -11185,19 +11146,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "upgradeToAndCall",
 		"outputs": [],
 		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "weightManager",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -22526,19 +22474,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "nftDataContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "nftUpdateContract",
 		"outputs": [
 			{
@@ -22709,19 +22644,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setMinWeightUpdateInterval",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftDataAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTDataContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"

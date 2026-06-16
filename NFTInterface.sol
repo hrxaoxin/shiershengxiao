@@ -112,10 +112,6 @@ interface INFTMintCore {
     function setApprovalForAll(address operator, bool approved) external;
 }
 
-interface INFTMintMetadata {
-    function tokenURI(uint256 tokenId) external view returns (string memory);
-}
-
 /**
  * @title INFT
  * @dev 标准NFT接口，提供所有权查询、转移等功能
@@ -439,11 +435,7 @@ interface ISetNFTContract {
 }
 
 interface ISetRewardTokenContract {
-    function setRewardTokenContract(address _rewardTokenContract) external;
-}
-
-interface ISetRewardManager {
-    function setRewardManager(address _rewardManager) external;
+    function setRewardTokenContract(address _tokenContract) external;
 }
 
 interface ISetDividendPool {
@@ -518,24 +510,8 @@ interface ISetNFTDataContract {
     function setNFTDataContract(address _nftDataContract) external;
 }
 
-interface ISetNFTMintCore {
-    function setNFTMintCore(address _nftMintCore) external;
-}
-
-interface ISetNFTMintMetadata {
-    function setNFTMintMetadata(address _nftMintMetadata) external;
-}
-
-interface ISetWeightManager {
-    function setWeightManager(address _weightManager) external;
-}
-
 interface ISetBattleContract {
     function setBattleContract(address _battleContract) external;
-}
-
-interface ISetBattleCaller {
-    function setBattleCaller(address _battleCaller) external;
 }
 
 interface ISetDividendManager {
@@ -604,14 +580,6 @@ interface ISetAuthorizer {
 
 interface IBreedingMarket {
     function setBreedingCore(address _breedingCore) external;
-}
-
-/**
- * @title IWeightManager
- * @dev 权重管理合约接口
- */
-interface IWeightManager {
-    function addHolder(address user) external returns (bool);
 }
 
 /**

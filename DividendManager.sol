@@ -147,11 +147,6 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     address public nftUpdateContract;
 
     /**
-     * @dev NFT数据合约地址（NFTData），有权调用 updateUserWeight
-     */
-    address public nftDataContract;
-
-    /**
      * @dev 奖励管理合约地址（RewardManager），有权调用 syncDividendPool
      */
     address public rewardManagerContract;
@@ -239,15 +234,6 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 设置NFT数据合约地址（NFTData）
-     * @param _nftDataAddress NFT数据合约地址
-     */
-    function setNFTDataContract(address _nftDataAddress) external onlyOwnerOrAuthorizer {
-        require(_nftDataAddress != address(0), "DividendManager: Invalid NFT data address");
-        nftDataContract = _nftDataAddress;
-    }
-
-    /**
      * @dev 设置奖励管理合约地址（RewardManager）
      * @param _rewardManagerContract 奖励管理合约地址
      */
@@ -257,10 +243,10 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 检查是否为授权调用者（owner、authorizer、nftUpdateContract、nftDataContract、rewardManagerContract 或 weightManagerContract）
+     * @dev 检查是否为授权调用者（owner、authorizer、nftUpdateContract 或 rewardManagerContract）
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer || (nftUpdateContract != address(0) && msg.sender == nftUpdateContract) || (nftDataContract != address(0) && msg.sender == nftDataContract) || (rewardManagerContract != address(0) && msg.sender == rewardManagerContract) || (weightManagerContract != address(0) && msg.sender == weightManagerContract), "DividendManager: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == nftUpdateContract || msg.sender == rewardManagerContract || msg.sender == weightManagerContract, "DividendManager: Not authorized");
         _;
     }
 
