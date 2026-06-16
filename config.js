@@ -22474,6 +22474,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "nftDataContract",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "nftUpdateContract",
 		"outputs": [
 			{
@@ -22644,6 +22657,19 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setMinWeightUpdateInterval",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_nftDataAddress",
+				"type": "address"
+			}
+		],
+		"name": "setNFTDataContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
