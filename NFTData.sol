@@ -562,7 +562,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _addToTypeOwners(zodiacType, to);
         
         if (dividendManager != address(0)) {
-            uint8 element = uint8(zodiacType < 72 ? 0 : 1);
+            uint8 element = uint8(zodiacType / 24);
             IDividendManager(dividendManager).updateUserWeight(to, uint256(level), true, element);
         }
     }

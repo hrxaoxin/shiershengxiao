@@ -720,7 +720,7 @@
             
             const cardType = parseInt(cardInfo.cardType, 10);
             const nftInfo = ZODIAC_UTILS.getNFTInfo(cardType);
-            const desc = `${nftInfo.attrName}属性生肖·${nftInfo.zodiac}·${nftInfo.gender} · 持有可享受税收分红`;
+            const desc = `${nftInfo.attrName}属性生肖·${nftInfo.animalName}·${nftInfo.genderName} · 持有可享受税收分红`;
 
             document.getElementById('cardImage').querySelector('img').src = nftInfo.imagePath;
             document.getElementById('cardName').textContent = nftInfo.name;
