@@ -38,25 +38,35 @@ library AuthorizerLib {
     }
 
     function setupAllContracts(ContractAddresses calldata _addr) external {
+        // battle
         if (_addr.battle != address(0)) {
             ISetNFTContract(_addr.battle).setNFTContract(_addr.nftMintCore);
         }
+        
+        // breedingCore
         if (_addr.breedingCore != address(0)) {
             ISetNFTContract(_addr.breedingCore).setNFTContract(_addr.nftMintCore);
             ISetTokenContract(_addr.breedingCore).setTokenContract(_addr.staking);
         }
+        
+        // breedingMarket
         if (_addr.breedingMarket != address(0)) {
             ISetBreedingContract(_addr.breedingMarket).setBreedingContract(_addr.breedingCore);
             ISetNFTContract(_addr.breedingMarket).setNFTContract(_addr.nftMintCore);
         }
+        
+        // nftMintCore + breedingCore
         if (_addr.nftMintCore != address(0) && _addr.breedingCore != address(0)) {
             ISetBreedingContract(_addr.nftMintCore).setBreedingContract(_addr.breedingCore);
         }
 
+        // staking
         if (_addr.staking != address(0)) {
             ISetRewardTokenContract(_addr.staking).setRewardTokenContract(_addr.token);
             ISetNFTContract(_addr.staking).setNFTContract(_addr.nftMintCore);
         }
+        
+        // rewardManager
         if (_addr.rewardManager != address(0)) {
             ISetDividendPool(_addr.rewardManager).setDividendPool(_addr.dividendManager);
             ISetNFTStakingPool(_addr.rewardManager).setNFTStakingPool(_addr.staking);
@@ -70,6 +80,8 @@ library AuthorizerLib {
                 ISetPoolManager(_addr.rewardManager).setPoolManager(_addr.poolManager);
             }
         }
+        
+        // dividendManager
         if (_addr.dividendManager != address(0)) {
             ISetTokenContract(_addr.dividendManager).setTokenContract(_addr.token);
             ISetRewardManagerContract(_addr.dividendManager).setRewardManagerContract(_addr.rewardManager);
@@ -77,29 +89,38 @@ library AuthorizerLib {
                 ISetNFTUpdateContract(_addr.dividendManager).setNFTUpdateContract(_addr.nftUpdate);
             }
         }
+        
+        // tokenStaking
         if (_addr.tokenStaking != address(0)) {
             ISetTokenAddress(_addr.tokenStaking).setTokenAddress(_addr.token);
         }
 
+        // priceOracle
         if (_addr.priceOracle != address(0)) {
             ISetTokenContract(_addr.priceOracle).setTokenContract(_addr.token);
             ISetUSDTContract(_addr.priceOracle).setUSDTContract(_addr.usdt);
         }
 
+        // nftUpdate
         if (_addr.nftUpdate != address(0)) {
             ISetNFTContract(_addr.nftUpdate).setNFTContract(_addr.nftMintCore);
             ISetMetadataContract(_addr.nftUpdate).setMetadataContract(_addr.nftMintMetadata);
             ISetTokenContract(_addr.nftUpdate).setTokenContract(_addr.token);
             ISetPancakeSwapPair(_addr.nftUpdate).setPancakeSwapPair(_addr.pancakeSwapRouter);
         }
+        
+        // tokenBurner
         if (_addr.tokenBurner != address(0)) {
             ISetNFTContract(_addr.tokenBurner).setNFTContract(_addr.nftMintCore);
             ISetTokenContract(_addr.tokenBurner).setTokenContract(_addr.token);
         }
+        
+        // nftMintCore + tokenBurner
         if (_addr.nftMintCore != address(0) && _addr.tokenBurner != address(0)) {
             ISetTokenBurner(_addr.nftMintCore).setTokenBurnerContract(_addr.tokenBurner);
         }
 
+        // nftBuyback
         if (_addr.nftBuyback != address(0)) {
             ISetNFTContract(_addr.nftBuyback).setNFTContract(_addr.nftMintCore);
             ISetTokenContract(_addr.nftBuyback).setTokenContract(_addr.token);
@@ -114,20 +135,28 @@ library AuthorizerLib {
             }
         }
 
+        // weightManager + nftData
         if (_addr.weightManager != address(0) && _addr.nftData != address(0)) {
             ISetNFTDataContract(_addr.weightManager).setNFTDataContract(_addr.nftData);
         }
+        
+        // nftData + dividendManager
         if (_addr.nftData != address(0) && _addr.dividendManager != address(0)) {
             ISetDividendManager(_addr.nftData).setDividendManager(_addr.dividendManager);
         }
+        
+        // battleHistory
         if (_addr.battleHistory != address(0)) {
             ISetBattleContract(_addr.battleHistory).setBattleContract(_addr.battle);
         }
+        
+        // nftTrading
         if (_addr.nftTrading != address(0)) {
             ISetNFTContract(_addr.nftTrading).setNFTContract(_addr.nftMintCore);
             ISetFeeReceiver(_addr.nftTrading).setFeeReceiver(_addr.feeReceiver);
         }
 
+        // arenaRankingManager
         if (_addr.arenaRankingManager != address(0)) {
             ISetTokenContract(_addr.arenaRankingManager).setTokenContract(_addr.token);
             ISetBattleContract(_addr.arenaRankingManager).setBattleContract(_addr.battle);
@@ -144,6 +173,8 @@ library AuthorizerLib {
                 ISetArenaBattleContract(_addr.arenaRankingManager).setArenaBattleContract(_addr.arenaBattle);
             }
         }
+        
+        // arenaRankingQuery
         if (_addr.arenaRankingQuery != address(0)) {
             if (_addr.arenaReward != address(0)) {
                 ISetArenaRewardContract(_addr.arenaRankingQuery).setArenaRewardContract(_addr.arenaReward);
@@ -152,16 +183,24 @@ library AuthorizerLib {
                 ISetArenaLeaderboardContract(_addr.arenaRankingQuery).setArenaLeaderboardContract(_addr.arenaLeaderboard);
             }
         }
+        
+        // arenaReward
         if (_addr.arenaReward != address(0)) {
             ISetArenaRankingManagerContract(_addr.arenaReward).setArenaRankingManagerContract(_addr.arenaRankingManager);
         }
+        
+        // arenaLeaderboard
         if (_addr.arenaLeaderboard != address(0)) {
             ISetArenaRankingManagerContract(_addr.arenaLeaderboard).setArenaRankingManagerContract(_addr.arenaRankingManager);
         }
+        
+        // arenaPlayer
         if (_addr.arenaPlayer != address(0)) {
             ISetArenaRankingManagerContract(_addr.arenaPlayer).setArenaRankingManagerContract(_addr.arenaRankingManager);
             ISetNFTContract(_addr.arenaPlayer).setNFTContract(_addr.nftMintCore);
         }
+        
+        // arenaBattle
         if (_addr.arenaBattle != address(0)) {
             ISetArenaRankingManagerContract(_addr.arenaBattle).setArenaRankingManagerContract(_addr.arenaRankingManager);
             ISetBattleContract(_addr.arenaBattle).setBattleContract(_addr.battle);
