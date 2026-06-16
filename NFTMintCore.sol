@@ -402,9 +402,15 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(nftDataContract != address(0), "NFTMint: nftDataContract not set");
         
         try INFTDataInterface(nftDataContract).syncNFTData(tokenId, zodiacType, level, growth, to) {
-        } catch {
+        } catch (bytes memory reason) {
             emit NFTDataSyncFailed(tokenId, zodiacType, level, growth, to);
             _queueFailedSync(tokenId, zodiacType, level, growth, to);
+            
+            if (bytes(reason).length > 0) {
+                revert(string(abi.encodePacked("NFTMint: Sync failed - ", reason)));
+            } else {
+                revert("NFTMint: Sync failed");
+            }
         }
     }
 

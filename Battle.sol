@@ -213,6 +213,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     );
 
     /**
+     * @dev 战斗调用者地址设置事件
+     * @param battleCaller 新的战斗调用者地址
+     */
+    event BattleCallerSet(address battleCaller);
+
+    /**
      * @dev 修饰器：仅所有者或授权器可调用
      */
     modifier onlyOwnerOrAuthorizer() {
@@ -269,6 +275,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     function setBattleCaller(address _battleCallerAddress) external onlyOwnerOrAuthorizer {
         require(_battleCallerAddress != address(0), "Battle: Invalid battle caller address");
         battleCaller = _battleCallerAddress;
+        emit BattleCallerSet(_battleCallerAddress);
     }
 
     /**

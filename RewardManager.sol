@@ -479,7 +479,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         if (dividendPool != address(0) && dividendAmount > 0) {
             (bool success, ) = payable(dividendPool).call{value: dividendAmount}("");
             if (success) {
-                try IDividendManager(dividendPool).syncDividendPool() {} catch {}
+                try IDividendManager(dividendPool).syncDividendPool() {} catch { emit SyncDividendPoolFailed(dividendPool, dividendAmount); }
             } else {
                 emit BNBTransferFailed(0, dividendPool, dividendAmount);
                 lockedBNBAmount += dividendAmount;
@@ -501,7 +501,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                 if (dividendPool != address(0)) {
                     (bool fbSuccess, ) = payable(dividendPool).call{value: totalSwapAmount}("");
                     if (fbSuccess) {
-                        try IDividendManager(dividendPool).syncDividendPool() {} catch {}
+                        try IDividendManager(dividendPool).syncDividendPool() {} catch { emit SyncDividendPoolFailed(dividendPool, totalSwapAmount); }
                         emit SwapFailedFallback(totalSwapAmount);
                     } else {
                         // 如果连分红池转账也失败，BNB保留在合约中，后续可通过emergencyWithdraw处理
@@ -583,7 +583,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         if (nftStakingPool != address(0) && nftStakingTokenAmount > 0) {
             token.safeTransfer(nftStakingPool, nftStakingTokenAmount);
             if (poolManager != address(0)) {
-                try IPoolManager(poolManager).addToNFTStakingPool(nftStakingTokenAmount) {} catch {}
+                try IPoolManager(poolManager).addToNFTStakingPool(nftStakingTokenAmount) {} catch { emit PoolManagerCallFailed("addToNFTStakingPool", nftStakingTokenAmount); }
             }
         }
 
@@ -591,17 +591,17 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         if (tokenStakingPool != address(0) && tokenStakingTokenAmount > 0) {
             token.safeTransfer(tokenStakingPool, tokenStakingTokenAmount);
             if (poolManager != address(0)) {
-                try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingTokenAmount) {} catch {}
+                try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingTokenAmount) {} catch { emit PoolManagerCallFailed("addToTokenStakingPool", tokenStakingTokenAmount); }
             }
             // 调用 TokenStaking 的 recordIncomingTokens 记录流入
-            try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingTokenAmount) {} catch {}
+            try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingTokenAmount) {} catch { emit TokenStakingRecordFailed(tokenStakingPool, tokenStakingTokenAmount); }
         }
 
         // 分配到竞技场奖励池
         if (arenaRewardPool != address(0) && arenaRewardTokenAmount > 0) {
             token.safeTransfer(arenaRewardPool, arenaRewardTokenAmount);
             if (poolManager != address(0)) {
-                try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardTokenAmount) {} catch {}
+                try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardTokenAmount) {} catch { emit PoolManagerCallFailed("addToArenaRewardPool", arenaRewardTokenAmount); }
             }
         }
     }
@@ -613,6 +613,10 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     event SwapFailedFallback(uint256 bnbAmount);
     event BNBDistributed(address indexed from, uint256 totalAmount, uint256 dividendAmount, uint256 nftStakingAmount, uint256 tokenStakingAmount, uint256 arenaRewardAmount, uint256 buybackAmount);
     event BNBTransferFailed(uint256 poolType, address pool, uint256 amount);
+    event SyncDividendPoolFailed(address dividendPool, uint256 amount);
+    event PoolManagerCallFailed(string funcName, uint256 amount);
+    event TokenStakingRecordFailed(address stakingPool, uint256 amount);
+    event BuybackRecordFailed(address buybackPool, uint256 amount);
 
     /**
      * @dev 添加质押池奖励
@@ -743,33 +747,33 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         // 使用 try-catch 分别处理每个分配，允许部分成功
         if (dividendPool != address(0) && dividendAmount > 0) {
             token.safeTransfer(dividendPool, dividendAmount);
-                try IDividendManager(dividendPool).syncDividendPool() {} catch {}
+                try IDividendManager(dividendPool).syncDividendPool() {} catch { emit SyncDividendPoolFailed(dividendPool, dividendAmount); }
         }
         if (nftStakingPool != address(0) && nftStakingAmount > 0) {
             token.safeTransfer(nftStakingPool, nftStakingAmount);
             if (poolManager != address(0)) {
-                try IPoolManager(poolManager).addToNFTStakingPool(nftStakingAmount) {} catch {}
+                try IPoolManager(poolManager).addToNFTStakingPool(nftStakingAmount) {} catch { emit PoolManagerCallFailed("addToNFTStakingPool", nftStakingAmount); }
             }
         }
         if (tokenStakingPool != address(0) && tokenStakingAmount > 0) {
             token.safeTransfer(tokenStakingPool, tokenStakingAmount);
             if (poolManager != address(0)) {
-                try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch {}
+                try IPoolManager(poolManager).addToTokenStakingPool(tokenStakingAmount) {} catch { emit PoolManagerCallFailed("addToTokenStakingPool", tokenStakingAmount); }
             }
             // 调用 TokenStaking 的 recordIncomingTokens 记录流入
-            try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingAmount) {} catch {}
+            try ITokenStaking(tokenStakingPool).recordIncomingTokens(tokenStakingAmount) {} catch { emit TokenStakingRecordFailed(tokenStakingPool, tokenStakingAmount); }
         }
         if (arenaRewardPool != address(0) && arenaRewardAmount > 0) {
             token.safeTransfer(arenaRewardPool, arenaRewardAmount);
             if (poolManager != address(0)) {
-                try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardAmount) {} catch {}
+                try IPoolManager(poolManager).addToArenaRewardPool(arenaRewardAmount) {} catch { emit PoolManagerCallFailed("addToArenaRewardPool", arenaRewardAmount); }
             }
         }
         // NFT回购销毁池：直接转账代币到回购合约，回购合约收到代币后可用于回购销毁NFT
         if (nftBuybackPool != address(0) && buybackAmount > 0) {
             token.safeTransfer(nftBuybackPool, buybackAmount);
             // 尝试调用回购合约的记录函数（如果实现）
-            try IBuybackReceiver(nftBuybackPool).recordIncomingTokens(buybackAmount) {} catch {}
+            try IBuybackReceiver(nftBuybackPool).recordIncomingTokens(buybackAmount) {} catch { emit BuybackRecordFailed(nftBuybackPool, buybackAmount); }
         }
 
         totalDistributed += amount;
@@ -995,7 +999,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         if (dividendPool != address(0) && dividendAmount > 0) {
             (bool success, ) = payable(dividendPool).call{value: dividendAmount}("");
             if (success) {
-                try IDividendManager(dividendPool).syncDividendPool() {} catch {}
+                try IDividendManager(dividendPool).syncDividendPool() {} catch { emit SyncDividendPoolFailed(dividendPool, dividendAmount); }
                 successfullyDistributed += dividendAmount;
             }
         }

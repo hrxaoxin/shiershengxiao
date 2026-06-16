@@ -435,7 +435,11 @@ interface ISetNFTContract {
 }
 
 interface ISetRewardTokenContract {
-    function setRewardTokenContract(address _tokenContract) external;
+    function setRewardTokenContract(address _rewardTokenContract) external;
+}
+
+interface ISetRewardManager {
+    function setRewardManager(address _rewardManager) external;
 }
 
 interface ISetDividendPool {
@@ -510,8 +514,16 @@ interface ISetNFTDataContract {
     function setNFTDataContract(address _nftDataContract) external;
 }
 
+interface ISetNFTMintCore {
+    function setNFTMintCore(address _nftMintCore) external;
+}
+
 interface ISetBattleContract {
     function setBattleContract(address _battleContract) external;
+}
+
+interface ISetBattleCaller {
+    function setBattleCaller(address _battleCaller) external;
 }
 
 interface ISetDividendManager {

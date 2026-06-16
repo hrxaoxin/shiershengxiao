@@ -41,6 +41,9 @@ library AuthorizerLib {
         // battle
         if (_addr.battle != address(0)) {
             ISetNFTContract(_addr.battle).setNFTContract(_addr.nftMintCore);
+            if (_addr.arenaBattle != address(0)) {
+                ISetBattleCaller(_addr.battle).setBattleCaller(_addr.arenaBattle);
+            }
         }
         
         // breedingCore
@@ -79,6 +82,11 @@ library AuthorizerLib {
             if (_addr.poolManager != address(0)) {
                 ISetPoolManager(_addr.rewardManager).setPoolManager(_addr.poolManager);
             }
+        }
+        
+        // poolManager + rewardManager
+        if (_addr.poolManager != address(0) && _addr.rewardManager != address(0)) {
+            ISetRewardManager(_addr.poolManager).setRewardManager(_addr.rewardManager);
         }
         
         // dividendManager
@@ -146,6 +154,11 @@ library AuthorizerLib {
         // nftData + dividendManager
         if (_addr.nftData != address(0) && _addr.dividendManager != address(0)) {
             ISetDividendManager(_addr.nftData).setDividendManager(_addr.dividendManager);
+        }
+        
+        // nftData + nftMintCore
+        if (_addr.nftData != address(0) && _addr.nftMintCore != address(0)) {
+            ISetNFTMintCore(_addr.nftData).setNFTMintCore(_addr.nftMintCore);
         }
         
         // battleHistory

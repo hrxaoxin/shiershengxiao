@@ -224,12 +224,11 @@ contract WeightManager is
     }
     
     /**
-     * @dev 修饰器：仅合约所有者可调用
+     * @dev 修饰器：仅所有者或授权器可调用
      * 用于保护权重更新和缓存管理等敏感操作
-     * 修复：统一使用 require 保持一致性
      */
     modifier onlyOperator() {
-        require(msg.sender == owner(), "WeightManager: Not operator");
+        require(msg.sender == owner() || msg.sender == authorizer, "WeightManager: Not operator");
         _;
     }
     

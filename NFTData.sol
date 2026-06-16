@@ -72,6 +72,9 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /// @dev 授权合约地址
     address public authorizer;
     
+    /// @dev NFT铸造核心合约地址（NFTMintCore），有权调用syncNFTData
+    address public nftMintCore;
+    
     /// @dev 分红管理合约地址
     address public dividendManager;
     
@@ -186,10 +189,19 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
-     * @dev 检查是否为授权调用者（owner或authorizer）
+     * @dev 设置NFT铸造核心合约地址（NFTMintCore）
+     * @param _nftMintCoreAddress NFT铸造核心合约地址
+     */
+    function setNFTMintCore(address _nftMintCoreAddress) external onlyOwnerOrAuthorizer {
+        require(_nftMintCoreAddress != address(0), "NFTData: Invalid NFT mint core address");
+        nftMintCore = _nftMintCoreAddress;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner、authorizer或nftMintCore）
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer, "NFTData: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == nftMintCore, "NFTData: Not authorized");
         _;
     }
 

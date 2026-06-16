@@ -79,6 +79,11 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 授权合约地址（Authorizer）
      */
     address public authorizer;
+    
+    /**
+     * @dev 奖励管理合约地址（RewardManager），有权调用资金分配函数
+     */
+    address public rewardManager;
 
     /**
      * @dev 池子余额映射
@@ -129,10 +134,19 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 检查是否为授权调用者（owner或authorizer）
+     * @dev 设置奖励管理合约地址
+     * @param _rewardManagerAddress 奖励管理合约地址
+     */
+    function setRewardManager(address _rewardManagerAddress) external onlyOwnerOrAuthorizer {
+        require(_rewardManagerAddress != address(0), "PoolManager: Invalid reward manager address");
+        rewardManager = _rewardManagerAddress;
+    }
+
+    /**
+     * @dev 检查是否为授权调用者（owner、authorizer或rewardManager）
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer, "PoolManager: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == rewardManager, "PoolManager: Not authorized");
         _;
     }
 
