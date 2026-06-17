@@ -217,7 +217,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * 用于战斗发起类函数（如 challenge）
      */
     modifier onlyBattleCaller() {
-        address battleCaller = IAuthorizer(authorizer).getArenaRanking();
+        address battleCaller = IAuthorizer(authorizer).getArenaPlayer();
         require(msg.sender == owner() || msg.sender == battleCaller, "Battle: Only authorized caller");
         _;
     }
@@ -944,7 +944,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     /**
      * @dev 查找攻击目标（优先选择HP最低的目标）
      * @param alive 存活状态数组
-     * @param traits 属性数组
+     * @param maxHp 最大HP数组
      * @param currentHp 当前HP数组
      * @return 目标索引（6表示无目标）
      */

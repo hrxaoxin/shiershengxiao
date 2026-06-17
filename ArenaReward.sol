@@ -224,25 +224,17 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         
         if (mockRewardTotal > 0 && mockRewardRecipient != address(0)) {
             if (rewardType == 0) {
-                try {
-                    (bool success, ) = payable(mockRewardRecipient).call{value: mockRewardTotal}("");
-                    if (success) {
-                        emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonId);
-                    } else {
-                        emit MockRewardDistributionFailed(mockRewardTotal, seasonId);
-                    }
-                } catch {
+                (bool success, ) = payable(mockRewardRecipient).call{value: mockRewardTotal}("");
+                if (success) {
+                    emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonId);
+                } else {
                     emit MockRewardDistributionFailed(mockRewardTotal, seasonId);
                 }
             } else {
-                try {
-                    address tokenContract = IAuthorizer(authorizer).getToken();
-                    require(tokenContract != address(0), "ArenaReward: Token contract not set");
-                    SafeERC20.safeTransfer(IERC20(tokenContract), mockRewardRecipient, mockRewardTotal);
-                    emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonId);
-                } catch {
-                    emit MockRewardDistributionFailed(mockRewardTotal, seasonId);
-                }
+                address tokenContract = IAuthorizer(authorizer).getToken();
+                require(tokenContract != address(0), "ArenaReward: Token contract not set");
+                SafeERC20.safeTransfer(IERC20(tokenContract), mockRewardRecipient, mockRewardTotal);
+                emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonId);
             }
         }
         
@@ -293,25 +285,31 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function _calculateRealPlayerRewards(uint256 seasonId, uint256 totalReward, uint256 mockRewardTotal) internal returns (uint256) {
         address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
         address[] memory rankings = IArenaRanking(arenaRankingManager).getSeasonRankings(seasonId);
-        uint256 totalPlayers = rankings.length;
         uint256 totalRealPlayers = IArenaRanking(arenaRankingManager).countRealPlayers(seasonId);
         
-        // 修复：添加检查防止模拟玩家奖励超过总奖励导致负数奖励池
         uint256 realPlayerRewardPool = mockRewardTotal <= totalReward ? totalReward - mockRewardTotal : 0;
-        uint256 distributed = 0;
         
-        for (uint256 i = 0; i < totalPlayers; i++) {
+        return _distributeRealPlayerRewards(seasonId, rankings, arenaRankingManager, realPlayerRewardPool, totalRealPlayers);
+    }
+
+    function _distributeRealPlayerRewards(
+        uint256 seasonId,
+        address[] memory rankings,
+        address arenaRankingManager,
+        uint256 realPlayerRewardPool,
+        uint256 totalRealPlayers
+    ) internal returns (uint256) {
+        uint256 distributed = 0;
+        for (uint256 i = 0; i < rankings.length; i++) {
             address player = rankings[i];
             if (IArenaRanking(arenaRankingManager).isMockPlayer(player)) {
                 continue;
             }
-            
             uint256 rank = IArenaRanking(arenaRankingManager).getRealPlayerRank(seasonId, i);
             uint256 rankReward = ArenaRankingLib.calculateRankReward(rank, realPlayerRewardPool, totalRealPlayers);
             playerSeasonRewards[seasonId][player] = rankReward;
             distributed += rankReward;
         }
-        
         return distributed;
     }
 

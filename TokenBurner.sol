@@ -290,12 +290,12 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
         emit TokenBurned(user, cost, block.timestamp);
 
-        INFTMintBatch nftMintBatch = INFTMintBatch(nftMintBatchAddress);
+        INFTMintBatch batchContract = INFTMintBatch(nftMintBatchAddress);
         uint256[] memory tokenIds;
         if (isRare) {
-            tokenIds = nftMintBatch.mintRareTen(user);
+            tokenIds = batchContract.mintRareTen(user);
         } else {
-            tokenIds = nftMintBatch.mintNormalTen(user);
+            tokenIds = batchContract.mintNormalTen(user);
         }
         require(tokenIds.length == 10, "TokenBurner: Batch mint failed");
 

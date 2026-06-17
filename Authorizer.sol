@@ -21,15 +21,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     string public pauseReason;
 
     mapping(bytes32 => address) private _addresses;
-    /**
-     * @dev 当前设置的 authorizer 地址（用于验证旧的 authorizer）
-     */
     address public currentAuthorizer;
-
-    /**
-     * @dev 全局合约地址结构（用于快速查询）
-     */
-    AuthorizerLib.ContractAddresses public globalAddresses;
 
     event Paused(address account, string reason);
     event Unpaused(address account);
@@ -69,200 +61,219 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         emit ContractAddressUpdated(key, value);
     }
 
-    function setAllContracts(AuthorizerLib.ContractAddresses calldata _addr) external onlyOwner whenNotPaused {
-        _addresses[keccak256("token")] = _addr.token;
-        _addresses[keccak256("usdt")] = _addr.usdt;
-        _addresses[keccak256("nftMintCore")] = _addr.nftMintCore;
-        _addresses[keccak256("nftMintBatch")] = _addr.nftMintBatch;
-        _addresses[keccak256("nftMintMetadata")] = _addr.nftMintMetadata;
-        _addresses[keccak256("nftUpdate")] = _addr.nftUpdate;
-        _addresses[keccak256("nftData")] = _addr.nftData;
-        _addresses[keccak256("tokenBurner")] = _addr.tokenBurner;
-        _addresses[keccak256("nftTrading")] = _addr.nftTrading;
-        _addresses[keccak256("nftBuyback")] = _addr.nftBuyback;
-        _addresses[keccak256("staking")] = _addr.staking;
-        _addresses[keccak256("tokenStaking")] = _addr.tokenStaking;
-        _addresses[keccak256("rewardManager")] = _addr.rewardManager;
-        _addresses[keccak256("dividendManager")] = _addr.dividendManager;
-        _addresses[keccak256("poolManager")] = _addr.poolManager;
-        _addresses[keccak256("priceOracle")] = _addr.priceOracle;
-        _addresses[keccak256("battle")] = _addr.battle;
-        _addresses[keccak256("battleSkillData")] = _addr.battleSkillData;
-        _addresses[keccak256("battleHistory")] = _addr.battleHistory;
-        _addresses[keccak256("breedingCore")] = _addr.breedingCore;
-        _addresses[keccak256("breedingMarket")] = _addr.breedingMarket;
-        _addresses[keccak256("weightManager")] = _addr.weightManager;
-        _addresses[keccak256("arenaRankingManager")] = _addr.arenaRankingManager;
-        _addresses[keccak256("arenaRankingQuery")] = _addr.arenaRankingQuery;
-        _addresses[keccak256("arenaReward")] = _addr.arenaReward;
-        _addresses[keccak256("arenaLeaderboard")] = _addr.arenaLeaderboard;
-        _addresses[keccak256("arenaPlayer")] = _addr.arenaPlayer;
-        _addresses[keccak256("arenaBattle")] = _addr.arenaBattle;
-        _addresses[keccak256("feeReceiver")] = _addr.feeReceiver;
-        _addresses[keccak256("pancakeSwapRouter")] = _addr.pancakeSwapRouter;
-        _addresses[keccak256("flapSwapRouter")] = _addr.flapSwapRouter;
-        _addresses[keccak256("uniswapRouter")] = _addr.uniswapRouter;
-        _addresses[keccak256("wbnb")] = _addr.wbnb;
-
-        // 更新全局合约地址结构（用于快速查询）
-        globalAddresses = _addr;
+    function setAllContracts(address[] calldata _addr) external onlyOwner whenNotPaused {
+        _setAddresses(_addr);
         emit GlobalAddressesUpdated();
+    }
+
+    function _setAddresses(address[] calldata _addr) internal {
+        _setCoreAddresses(_addr);
+        _setNFTAddresses(_addr);
+        _setStakingAddresses(_addr);
+        _setBattleAddresses(_addr);
+        _setBreedingAddresses(_addr);
+        _setArenaAddresses(_addr);
+        _setOtherAddresses(_addr);
+    }
+
+    function _setCoreAddresses(address[] calldata _addr) private {
+        _addresses[keccak256("token")] = _addr[0];
+        _addresses[keccak256("usdt")] = _addr[1];
+        _addresses[keccak256("rewardManager")] = _addr[12];
+        _addresses[keccak256("dividendManager")] = _addr[13];
+        _addresses[keccak256("poolManager")] = _addr[14];
+        _addresses[keccak256("priceOracle")] = _addr[15];
+    }
+
+    function _setNFTAddresses(address[] calldata _addr) private {
+        _addresses[keccak256("nftMintCore")] = _addr[2];
+        _addresses[keccak256("nftMintBatch")] = _addr[3];
+        _addresses[keccak256("nftMintMetadata")] = _addr[4];
+        _addresses[keccak256("nftUpdate")] = _addr[5];
+        _addresses[keccak256("nftData")] = _addr[6];
+        _addresses[keccak256("tokenBurner")] = _addr[7];
+        _addresses[keccak256("nftTrading")] = _addr[8];
+        _addresses[keccak256("nftBuyback")] = _addr[9];
+    }
+
+    function _setStakingAddresses(address[] calldata _addr) private {
+        _addresses[keccak256("staking")] = _addr[10];
+        _addresses[keccak256("tokenStaking")] = _addr[11];
+        _addresses[keccak256("weightManager")] = _addr[21];
+    }
+
+    function _setBattleAddresses(address[] calldata _addr) private {
+        _addresses[keccak256("battle")] = _addr[16];
+        _addresses[keccak256("battleSkillData")] = _addr[17];
+        _addresses[keccak256("battleHistory")] = _addr[18];
+    }
+
+    function _setBreedingAddresses(address[] calldata _addr) private {
+        _addresses[keccak256("breedingCore")] = _addr[19];
+        _addresses[keccak256("breedingMarket")] = _addr[20];
+    }
+
+    function _setArenaAddresses(address[] calldata _addr) private {
+        _addresses[keccak256("arenaRankingManager")] = _addr[22];
+        _addresses[keccak256("arenaRankingQuery")] = _addr[23];
+        _addresses[keccak256("arenaReward")] = _addr[24];
+        _addresses[keccak256("arenaLeaderboard")] = _addr[25];
+        _addresses[keccak256("arenaPlayer")] = _addr[26];
+        _addresses[keccak256("arenaBattle")] = _addr[27];
+    }
+
+    function _setOtherAddresses(address[] calldata _addr) private {
+        _addresses[keccak256("feeReceiver")] = _addr[28];
+        _addresses[keccak256("pancakeSwapRouter")] = _addr[29];
+        _addresses[keccak256("flapSwapRouter")] = _addr[30];
+        _addresses[keccak256("uniswapRouter")] = _addr[31];
+        _addresses[keccak256("wbnb")] = _addr[32];
     }
 
     function setAllAuthorizers(
         address _expectedOldAuthorizer,
         address _newAuthorizer,
-        AuthorizerLib.ContractAddresses calldata _contracts
+        address[] calldata _contracts
     ) external onlyOwner whenNotPaused {
         if (_expectedOldAuthorizer != currentAuthorizer) revert InvalidOldAuthorizer();
         if (_newAuthorizer == address(0)) revert InvalidAuthorizer();
         
-        // 更新全局合约地址结构
-        globalAddresses = _contracts;
+        _setAddresses(_contracts);
         emit GlobalAddressesUpdated();
         
         currentAuthorizer = _newAuthorizer;
         AuthorizerLib.setupAllAuthorizers(_newAuthorizer, _contracts);
     }
 
-    /**
-     * @dev 获取全局合约地址结构
-     */
-    function getGlobalAddresses() external view returns (AuthorizerLib.ContractAddresses memory) {
-        return globalAddresses;
-    }
-
-    // ==================== 便捷查询函数 ====================
-
     function getToken() external view returns (address) {
-        return globalAddresses.token;
+        return _addresses[keccak256("token")];
     }
 
     function getUSDT() external view returns (address) {
-        return globalAddresses.usdt;
+        return _addresses[keccak256("usdt")];
     }
 
     function getNFTMintCore() external view returns (address) {
-        return globalAddresses.nftMintCore;
+        return _addresses[keccak256("nftMintCore")];
     }
 
     function getNFTMintBatch() external view returns (address) {
-        return globalAddresses.nftMintBatch;
+        return _addresses[keccak256("nftMintBatch")];
     }
 
     function getNFTMintMetadata() external view returns (address) {
-        return globalAddresses.nftMintMetadata;
+        return _addresses[keccak256("nftMintMetadata")];
     }
 
     function getNFTUpdate() external view returns (address) {
-        return globalAddresses.nftUpdate;
+        return _addresses[keccak256("nftUpdate")];
     }
 
     function getNFTData() external view returns (address) {
-        return globalAddresses.nftData;
+        return _addresses[keccak256("nftData")];
     }
 
     function getTokenBurner() external view returns (address) {
-        return globalAddresses.tokenBurner;
+        return _addresses[keccak256("tokenBurner")];
     }
 
     function getNFTTrading() external view returns (address) {
-        return globalAddresses.nftTrading;
+        return _addresses[keccak256("nftTrading")];
     }
 
     function getNFTBuyback() external view returns (address) {
-        return globalAddresses.nftBuyback;
+        return _addresses[keccak256("nftBuyback")];
     }
 
     function getStaking() external view returns (address) {
-        return globalAddresses.staking;
+        return _addresses[keccak256("staking")];
     }
 
     function getTokenStaking() external view returns (address) {
-        return globalAddresses.tokenStaking;
+        return _addresses[keccak256("tokenStaking")];
     }
 
     function getRewardManager() external view returns (address) {
-        return globalAddresses.rewardManager;
+        return _addresses[keccak256("rewardManager")];
     }
 
     function getDividendManager() external view returns (address) {
-        return globalAddresses.dividendManager;
+        return _addresses[keccak256("dividendManager")];
     }
 
     function getPoolManager() external view returns (address) {
-        return globalAddresses.poolManager;
+        return _addresses[keccak256("poolManager")];
     }
 
     function getPriceOracle() external view returns (address) {
-        return globalAddresses.priceOracle;
+        return _addresses[keccak256("priceOracle")];
     }
 
     function getBattle() external view returns (address) {
-        return globalAddresses.battle;
+        return _addresses[keccak256("battle")];
     }
 
     function getBattleSkillData() external view returns (address) {
-        return globalAddresses.battleSkillData;
+        return _addresses[keccak256("battleSkillData")];
     }
 
     function getBattleHistory() external view returns (address) {
-        return globalAddresses.battleHistory;
+        return _addresses[keccak256("battleHistory")];
     }
 
     function getBreedingCore() external view returns (address) {
-        return globalAddresses.breedingCore;
+        return _addresses[keccak256("breedingCore")];
     }
 
     function getBreedingMarket() external view returns (address) {
-        return globalAddresses.breedingMarket;
+        return _addresses[keccak256("breedingMarket")];
     }
 
     function getWeightManager() external view returns (address) {
-        return globalAddresses.weightManager;
+        return _addresses[keccak256("weightManager")];
     }
 
     function getArenaRankingManager() external view returns (address) {
-        return globalAddresses.arenaRankingManager;
+        return _addresses[keccak256("arenaRankingManager")];
     }
 
     function getArenaRankingQuery() external view returns (address) {
-        return globalAddresses.arenaRankingQuery;
+        return _addresses[keccak256("arenaRankingQuery")];
     }
 
     function getArenaReward() external view returns (address) {
-        return globalAddresses.arenaReward;
+        return _addresses[keccak256("arenaReward")];
     }
 
     function getArenaLeaderboard() external view returns (address) {
-        return globalAddresses.arenaLeaderboard;
+        return _addresses[keccak256("arenaLeaderboard")];
     }
 
     function getArenaPlayer() external view returns (address) {
-        return globalAddresses.arenaPlayer;
+        return _addresses[keccak256("arenaPlayer")];
     }
 
     function getArenaBattle() external view returns (address) {
-        return globalAddresses.arenaBattle;
+        return _addresses[keccak256("arenaBattle")];
     }
 
     function getFeeReceiver() external view returns (address) {
-        return globalAddresses.feeReceiver;
+        return _addresses[keccak256("feeReceiver")];
     }
 
     function getPancakeSwapRouter() external view returns (address) {
-        return globalAddresses.pancakeSwapRouter;
+        return _addresses[keccak256("pancakeSwapRouter")];
     }
 
     function getFlapSwapRouter() external view returns (address) {
-        return globalAddresses.flapSwapRouter;
+        return _addresses[keccak256("flapSwapRouter")];
     }
 
     function getUniswapRouter() external view returns (address) {
-        return globalAddresses.uniswapRouter;
+        return _addresses[keccak256("uniswapRouter")];
     }
 
     function getWBNB() external view returns (address) {
-        return globalAddresses.wbnb;
+        return _addresses[keccak256("wbnb")];
     }
 }

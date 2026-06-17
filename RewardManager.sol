@@ -309,23 +309,22 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     function _distributeBNB(uint256 amount) internal {
         if (amount == 0) {
-            return; // 0 金额直接返回，不中断流程
+            return;
         }
         address tokenContract = IAuthorizer(authorizer).getToken();
-        address dividendPool = IAuthorizer(authorizer).getDividendManager();
-        address nftBuybackPool = IAuthorizer(authorizer).getNFTBuyback();
         address dexRouter = IAuthorizer(authorizer).getPancakeSwapRouter();
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         require(dexRouter != address(0), "RewardManager: DEX router not set");
 
-        // 计算各池分配金额
-        uint256 dividendAmount = amount * dividendPercent / PRECISION;
-        uint256 nftStakingAmount = amount * nftStakingPercent / PRECISION;
-        uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
-        uint256 arenaRewardAmount = amount * arenaRewardPercent / PRECISION;
-        uint256 buybackAmount = amount * nftBuybackPercent / PRECISION;
+        _distributeDividendPool(amount);
+        _distributeTokenPools(amount, tokenContract);
+        _distributeBuybackPool(amount);
+    }
 
-        // 分红池：直接转账BNB
+    function _distributeDividendPool(uint256 amount) private {
+        address dividendPool = IAuthorizer(authorizer).getDividendManager();
+        uint256 dividendAmount = amount * dividendPercent / PRECISION;
+        
         if (dividendPool != address(0) && dividendAmount > 0) {
             (bool success, ) = payable(dividendPool).call{value: dividendAmount}("");
             if (success) {
@@ -335,26 +334,28 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                 lockedBNBAmount += dividendAmount;
             }
         }
+    }
 
-        // 需要兑换为代币的总金额（NFT质押池、代币质押池、竞技场奖励池均使用代币奖励）
+    function _distributeTokenPools(uint256 amount, address tokenContract) private {
+        address dividendPool = IAuthorizer(authorizer).getDividendManager();
+        uint256 nftStakingAmount = amount * nftStakingPercent / PRECISION;
+        uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
+        uint256 arenaRewardAmount = amount * arenaRewardPercent / PRECISION;
+        
         uint256 totalSwapAmount = nftStakingAmount + tokenStakingAmount + arenaRewardAmount;
         
         if (totalSwapAmount > 0) {
-            // 兑换 BNB -> 代币
             uint256 tokenAmount = _swapBNBToToken(totalSwapAmount, tokenContract);
             
             if (tokenAmount > 0) {
-                // 分配兑换后的代币到NFT质押池、代币质押池和竞技场奖励池
                 _distributeSwappedTokens(tokenAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, totalSwapAmount, tokenContract);
             } else {
-                // 兑换失败时，将未兑换的BNB作为价值储备转入分红池（最终回退）
                 if (dividendPool != address(0)) {
                     (bool fbSuccess, ) = payable(dividendPool).call{value: totalSwapAmount}("");
                     if (fbSuccess) {
                         try IDividendManager(dividendPool).syncDividendPool() {} catch {}
                         emit SwapFailedFallback(totalSwapAmount);
                     } else {
-                        // 如果连分红池转账也失败，BNB保留在合约中，后续可通过emergencyWithdraw处理
                         lockedBNBAmount += totalSwapAmount;
                         emit SwapFailed(totalSwapAmount);
                     }
@@ -364,18 +365,19 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
                 }
             }
         }
+    }
 
-        // NFT回购销毁池：直接转账BNB
+    function _distributeBuybackPool(uint256 amount) private {
+        address nftBuybackPool = IAuthorizer(authorizer).getNFTBuyback();
+        uint256 buybackAmount = amount * nftBuybackPercent / PRECISION;
+        
         if (nftBuybackPool != address(0) && buybackAmount > 0) {
             (bool success, ) = payable(nftBuybackPool).call{value: buybackAmount}("");
             if (!success) {
-                // 回购池转账失败，保留在合约中
                 lockedBNBAmount += buybackAmount;
                 emit BNBTransferFailed(4, nftBuybackPool, buybackAmount);
             }
         }
-
-        emit BNBDistributed(msg.sender, amount, dividendAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, buybackAmount);
     }
 
     /**
@@ -813,7 +815,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @return dividendPoolBalance NFT质押池余额
      * @return tokenStakingBalance 代币质押池余额
      * @return arenaRewardBalance 竞技场奖励池余额
-     * @return totalDistributed 总分发金额
+     * @return totalDistributed_ 总分发金额
      */
     function getRewardPoolStats() external view returns (
         uint256 dividendPoolBalance,

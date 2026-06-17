@@ -118,6 +118,12 @@ interface INFTMintCore {
     function setApprovalForAll(address operator, bool approved) external;
 }
 
+interface INFTMintBatch {
+    function mintBatch(address to, uint256[] calldata zodiacTypes) external returns (uint256[] memory);
+    function mintNormalTen(address to) external returns (uint256[] memory);
+    function mintRareTen(address to) external returns (uint256[] memory);
+}
+
 /**
  * @title INFTMintMetadata
  * @dev NFT元数据合约接口，提供TokenURI生成功能
@@ -611,6 +617,9 @@ interface IAuthorizer {
         address arenaBattle;
         address feeReceiver;
         address pancakeSwapRouter;
+        address flapSwapRouter;
+        address uniswapRouter;
+        address wbnb;
     }
     
     function getGlobalAddresses() external view returns (ContractAddresses memory);
@@ -645,6 +654,9 @@ interface IAuthorizer {
     function getArenaBattle() external view returns (address);
     function getFeeReceiver() external view returns (address);
     function getPancakeSwapRouter() external view returns (address);
+    function getFlapSwapRouter() external view returns (address);
+    function getUniswapRouter() external view returns (address);
+    function getWBNB() external view returns (address);
 }
 
 /**

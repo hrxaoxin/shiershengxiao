@@ -308,44 +308,38 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint8 level = nft.tokenLevel(tokenId);
         bool isRare = nft.isRare(tokenId);
 
-        // 计算基础回购价
         uint256 totalCost = getNFTMintCost(level, isRare);
         uint256 discount = getBuybackDiscount(level);
         uint256 basePrice = (totalCost * discount) / 100;
 
-        // 从NFTData合约读取铸造时间（持有时间加成基于链上真实铸造时间，避免需要手动同步）
-        uint256 mintTime = 0;
-        address nftDataContract = IAuthorizer(authorizer).getNFTData();
-        if (nftDataContract != address(0)) {
-            try INFTData(nftDataContract).getNFTMintTime(tokenId) returns (uint256 m) {
-                mintTime = m;
-            } catch {}
-        }
-
-        // 如果没有铸造时间记录，返回基础价格
+        uint256 mintTime = _getMintTime(tokenId);
         if (mintTime == 0) {
             return basePrice;
         }
 
-        // 计算持有天数和加成
+        return _calculateGrowthWithBonus(mintTime, level, totalCost, discount, basePrice);
+    }
+
+    function _calculateGrowthWithBonus(
+        uint256 mintTime,
+        uint8 level,
+        uint256 totalCost,
+        uint256 discount,
+        uint256 basePrice
+    ) private view returns (uint256) {
         uint256 holdingDays = (block.timestamp - mintTime) / 1 days;
         uint256 daysToBreakEven = getDaysToBreakEven(level);
         uint256 maxBonusDays = ((maxBuybackMultiplier - 100) * daysToBreakEven) / (100 - discount);
-
-        // 计算实际加成天数（不超过最大加成天数）
         uint256 bonusDays = holdingDays > maxBonusDays ? maxBonusDays : holdingDays;
         
-        // 修复：添加溢出检查
         uint256 bonus = 0;
         if (bonusDays > 0 && daysToBreakEven > 0) {
             require(basePrice <= type(uint256).max / bonusDays, "NFTBuyback: Bonus calculation overflow");
             bonus = (basePrice * bonusDays) / daysToBreakEven;
         }
 
-        // 计算最终价格（不超过最高价格）
         uint256 finalPrice = basePrice + bonus;
         uint256 maxPrice = (totalCost * maxBuybackMultiplier) / 100;
-
         return finalPrice > maxPrice ? maxPrice : finalPrice;
     }
 
@@ -370,21 +364,25 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 basePrice = (totalCost * discount) / 100;
         uint256 daysToMax = getDaysToBreakEven(level);
 
-        // 从NFTData合约读取铸造时间
-        uint256 mintTime = 0;
-        address nftDataContract = IAuthorizer(authorizer).getNFTData();
-        if (nftDataContract != address(0)) {
-            try INFTData(nftDataContract).getNFTMintTime(tokenId) returns (uint256 m) {
-                mintTime = m;
-            } catch {}
-        }
+        uint256 mintTime = _getMintTime(tokenId);
 
         if (mintTime == 0) {
             return (basePrice, 0, basePrice, daysToMax);
         }
 
-        // 使用mintTime替代存储映射
         return _calculateWithBonus(mintTime, totalCost, discount, basePrice, daysToMax);
+    }
+
+    function _getMintTime(uint256 tokenId) private view returns (uint256) {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        if (nftDataContract == address(0)) {
+            return 0;
+        }
+        try INFTData(nftDataContract).getNFTMintTime(tokenId) returns (uint256 m) {
+            return m;
+        } catch {
+            return 0;
+        }
     }
 
     function _calculateWithBonus(

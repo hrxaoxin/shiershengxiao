@@ -112,6 +112,16 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /** @dev 授权合约地址 */
     address public authorizer;
 
+    /** @dev 合约地址 */
+    address public nftContract;
+    address public tokenContract;
+    address public metadataContract;
+    address public dividendManager;
+    address public pancakeSwapPair;
+
+    /** @dev 最小PancakeSwap流动性（防止价格操纵） */
+    uint256 public minPancakeSwapLiquidity;
+
     /** @dev 价格过期时间（秒），默认1小时 */
     uint256 public priceExpirySeconds = 3600;
     /** @dev 价格波动保护阈值（千分比，默认5000 = 50%） */
@@ -152,6 +162,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         transferOwnership(initialOwner);
         authorizer = _authorizerAddress;
         
+        // 从 Authorizer 初始化合约地址
+        _syncContractAddresses();
+        
         // 初始化带默认值的参数
         priceExpirySeconds = 3600;
         priceDeviationThreshold = 5000;
@@ -163,6 +176,18 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         level4UpgradeCost = 480000 * 10**18;
         usdUpgradeHidden = true;
         minPancakeSwapLiquidity = 10**15;
+    }
+
+    function _syncContractAddresses() internal {
+        IAuthorizer auth = IAuthorizer(authorizer);
+        nftContract = auth.getNFTMintCore();
+        tokenContract = auth.getToken();
+        metadataContract = auth.getNFTData();
+        dividendManager = auth.getDividendManager();
+    }
+
+    function setPancakeSwapPair(address pair) external onlyOwner {
+        pancakeSwapPair = pair;
     }
 
     /**
@@ -289,20 +314,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         ];
     }
 
-    /**
-     * @dev 从PancakeSwap获取代币价格（USD）
-     * @return uint256 代币价格（精度18位）
-     */
-    /**
-     * @dev 预言机读取时所需的最小流动性（防止 pair 中人为设置极低流动性操纵价格）
-     * 使用万分比精度：100 = 1% 偏差即失效。默认 10**15（0.001 token 单位，对 18 位小数代币）
-     */
-    uint256 public minPancakeSwapLiquidity = 10**15;
-
-    /**
-     * @dev 设置预言机读取所需的最小流动性
-     * @param minLiq 最小流动性（代币单位，按 token 的 decimals 计）
-     */
     function setMinPancakeSwapLiquidity(uint256 minLiq) external onlyOwner {
         minPancakeSwapLiquidity = minLiq;
     }
