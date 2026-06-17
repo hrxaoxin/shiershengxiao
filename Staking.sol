@@ -104,6 +104,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         uint256 lastClaimTime;
         uint256 accumulatedReward; // 记录该 NFT 上次结算时的 globalRewardPerWeight 快照
         bool isRare;
+        uint8 level; // 添加等级字段，用于计算权重
     }
 
     mapping(uint256 => StakingInfo) public stakingInfo;
@@ -115,10 +116,28 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     // 优化：tokenId 到用户在 userStakedNFTs 数组中的索引映射
     mapping(uint256 => uint256) public tokenIdToUserIndex;
 
-    uint256 public normalNFTWeight = 66;
-    uint256 public rareNFTWeight = 76;
     uint8 public minStakingLevel = 1;
     address public authorizer;
+    
+    uint256 public constant MAX_NFT_LEVEL = 5;
+    
+    function _calculateNFTWeight(bool isRare, uint8 level) internal pure returns (uint256) {
+        if (level == 0) return 0;
+        
+        if (isRare) {
+            uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
+            if (level <= MAX_NFT_LEVEL) {
+                return weights[level - 1];
+            }
+            return weights[MAX_NFT_LEVEL - 1];
+        } else {
+            uint256[5] memory weights = [uint256(1), 2, 6, 18, 66];
+            if (level <= MAX_NFT_LEVEL) {
+                return weights[level - 1];
+            }
+            return weights[MAX_NFT_LEVEL - 1];
+        }
+    }
     uint256 public globalPendingRewards;
     
     bool public paused;
@@ -211,14 +230,15 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
                 stakeTime: block.timestamp,
                 lastClaimTime: block.timestamp,
                 accumulatedReward: globalRewardPerWeight, // 初始化快照为当前全局值
-                isRare: isRareToken
+                isRare: isRareToken,
+                level: tokenLevel
             });
 
             uint256 newIndex = userStakedNFTs[msg.sender].length;
             userStakedNFTs[msg.sender].push(tokenId);
             tokenIdToUserIndex[tokenId] = newIndex;
             totalStakedNFTs++;
-            uint256 weight = isRareToken ? rareNFTWeight : normalNFTWeight;
+            uint256 weight = _calculateNFTWeight(isRareToken, tokenLevel);
             totalWeightedNFTs += weight;
             // 更新用户级别累计跟踪
             userStakedWeight[msg.sender] += weight;
@@ -227,6 +247,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             // 修复：使用 < 而不是 <= 来正确防止溢出
             require(_userSnapshotWeight[msg.sender] < USER_SNAPSHOT_OVERFLOW_THRESHOLD - snapshotIncrement, "Staking: User snapshot overflow imminent");
             _userSnapshotWeight[msg.sender] += snapshotIncrement;
+            
+            _syncWeightAfterStake(msg.sender, tokenId, tokenLevel, nftContract);
         }
         emit Staked(msg.sender, tokenIds);
     }
@@ -277,7 +299,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             require(block.timestamp >= info.stakeTime + minStakingDuration, "Staking: Lock period");
 
             bool wasRare = info.isRare;
-            uint256 weight = wasRare ? rareNFTWeight : normalNFTWeight;
+            uint256 weight = _calculateNFTWeight(wasRare, info.level);
             delete stakingInfo[tokenId];
             _removeFromUserStakedNFTs(msg.sender, tokenId);
             totalStakedNFTs--;
@@ -289,6 +311,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             _userSnapshotWeight[msg.sender] -= snapshotDecrement;
 
             nft.safeTransferFrom(address(this), msg.sender, tokenId);
+            _syncWeightAfterUnstake(msg.sender, tokenId, info.level, nftContract);
         }
 
         if (userStakedNFTs[msg.sender].length == 0) {
@@ -335,7 +358,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     // --- 内部核心逻辑 ---
 
     function _calculatePendingForNFT(StakingInfo storage info) internal view returns (uint256) {
-        uint256 weight = info.isRare ? rareNFTWeight : normalNFTWeight;
+        uint256 weight = _calculateNFTWeight(info.isRare, info.level);
         // 奖励 = (当前全局值 - 上次快照) * 权重 / 精度
         if (globalRewardPerWeight <= info.accumulatedReward) return 0;
         return (globalRewardPerWeight - info.accumulatedReward) * weight / STAKING_REWARD_PRECISION;
@@ -690,6 +713,38 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
      */
     receive() external payable {}
+
+    /**
+     * @dev 质押后同步权重到WeightManager和DividendManager
+     * @param user 用户地址
+     * @param tokenId NFT ID
+     * @param level NFT等级
+     * @param nftContract NFT合约地址
+     */
+    function _syncWeightAfterStake(address user, uint256 tokenId, uint8 level, address nftContract) internal {
+        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        if (weightManager != address(0)) {
+            try IWeightManager(weightManager).syncUserWeight(user) {
+            } catch {
+            }
+        }
+    }
+
+    /**
+     * @dev 解除质押后同步权重到WeightManager和DividendManager
+     * @param user 用户地址
+     * @param tokenId NFT ID
+     * @param level NFT等级
+     * @param nftContract NFT合约地址
+     */
+    function _syncWeightAfterUnstake(address user, uint256 tokenId, uint8 level, address nftContract) internal {
+        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        if (weightManager != address(0)) {
+            try IWeightManager(weightManager).syncUserWeight(user) {
+            } catch {
+            }
+        }
+    }
 
     /**
      * @dev Fallback 函数 - 处理未匹配的调用

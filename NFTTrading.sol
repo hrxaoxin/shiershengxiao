@@ -235,6 +235,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             revert("NFTTrading: NFT return transfer failed");
         }
 
+        _syncWeightAfterTransfer(address(this), seller, tokenId, nftContract);
         emit NFTDelisted(tokenId, seller);
     }
 
@@ -292,6 +293,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         }
 
         totalVolume += price;
+        _syncWeightAfterTransfer(seller, msg.sender, tokenId, nftContract);
         emit NFTBought(tokenId, msg.sender, seller, price, fee);
     }
 
@@ -486,4 +488,27 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
     event EmergencyNFTWithdrawn(address indexed operator, address indexed to, uint256 tokenId);
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
+
+    function _syncWeightAfterTransfer(address from, address to, uint256 tokenId, address nftContract) internal {
+        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        if (dividendManager != address(0)) {
+            INFT nft = INFT(nftContract);
+            uint8 level = nft.tokenLevel(tokenId);
+            uint256 zodiacType = nft.tokenType(tokenId);
+            uint8 element = uint8(zodiacType / 24);
+            
+            IDividendManager(dividendManager).syncUserWeight(from);
+            IDividendManager(dividendManager).syncUserWeight(to);
+        }
+        
+        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        if (weightManager != address(0)) {
+            try IWeightManager(weightManager).syncUserWeight(from) {
+            } catch {
+            }
+            try IWeightManager(weightManager).syncUserWeight(to) {
+            } catch {
+            }
+        }
+    }
 }

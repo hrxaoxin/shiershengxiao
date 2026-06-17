@@ -390,6 +390,15 @@ contract WeightManager is
     function updateUserWeight(address user) external onlyOperator whenNotPaused {
         _updateUserWeight(user);
     }
+
+    /**
+     * @dev 同步用户权重（由NFTTrading、Staking等合约调用）
+     * 此函数不需要权限检查，因为它只是根据NFT数据重新计算权重
+     * @param user 目标用户地址
+     */
+    function syncUserWeight(address user) external {
+        _updateUserWeight(user);
+    }
     
     /**
      * @dev 内部函数：管理用户资格列表

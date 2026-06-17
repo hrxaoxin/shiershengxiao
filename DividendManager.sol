@@ -552,6 +552,35 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         minWeightUpdateInterval = seconds_;
     }
 
+    /**
+     * @dev 同步用户权重（由NFTTrading、Staking等合约调用）
+     * 此函数不需要权限检查，因为它只是根据NFT数据重新计算权重
+     * @param user 用户地址
+     */
+    function syncUserWeight(address user) external {
+        require(user != address(0), "DividendManager: Zero user address");
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        if (nftDataContract == address(0)) return;
+        
+        INFTDataInterface nftData = INFTDataInterface(nftDataContract);
+        uint256 newWeight = nftData.calcUserWeight(user);
+        
+        // 先结算用户当前未领取的分红
+        if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
+            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
+            uint256 pending = userWeights[user] * cumulativeDiff / 1e18;
+            pendingDividends[user] += pending;
+        }
+        
+        // 更新权重
+        totalWeight = totalWeight - userWeights[user] + newWeight;
+        userWeights[user] = newWeight;
+        userCumulativeSnapshots[user] = cumulativePerWeightDividend;
+        lastWeightUpdateTime[user] = block.timestamp;
+        
+        emit WeightUpdated(user, newWeight);
+    }
+
     uint256 public constant MAX_NFT_LEVEL = 5;
 
     /**

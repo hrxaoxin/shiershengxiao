@@ -675,6 +675,7 @@ interface IDividendManager {
     function dividendPoolBalance() external view returns (uint256);
     function totalDistributed() external view returns (uint256);
     function updateUserWeight(address user, uint256 level, bool isAdd, uint8 element) external;
+    function syncUserWeight(address user) external;
 }
 
 /**
@@ -798,4 +799,16 @@ interface IERC20Extended {
     function safeTransfer(address to, uint256 amount) external;
     function balanceOf(address account) external view returns (uint256);
     function approve(address spender, uint256 amount) external returns (bool);
+}
+
+/**
+ * @title IWeightManager
+ * @dev 权重管理器接口
+ */
+interface IWeightManager {
+    function updateUserWeight(address user) external;
+    function syncUserWeight(address user) external;
+    function getUserWeight(address user) external view returns (uint256);
+    function getEligibleUsers() external view returns (address[] memory);
+    function getMinEligibleWeight() external view returns (uint256);
 }
