@@ -272,7 +272,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
 
-        // 先从买家转移代币
+        // 先从买家转移代币到合约
         token.safeTransferFrom(msg.sender, address(this), price);
 
         // 支付手续费给 feeReceiver
@@ -285,12 +285,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             token.safeTransfer(seller, sellerAmount);
         }
 
-        // 最后转移 NFT（从合约中转给买家）
-        try INFT(nftContract).safeTransferFrom(address(this), msg.sender, tokenId) {
-        } catch {
-            token.safeTransfer(msg.sender, price);
-            revert("NFTTrading: NFT transfer failed");
-        }
+        // 最后转移 NFT（如果前面的代币转移都成功）
+        INFT(nftContract).safeTransferFrom(address(this), msg.sender, tokenId);
 
         totalVolume += price;
         _syncWeightAfterTransfer(seller, msg.sender, tokenId, nftContract);

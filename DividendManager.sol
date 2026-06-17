@@ -183,14 +183,18 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         authorizer = _authorizerAddress;
     }
 
-    /**
-     * @dev 检查是否为授权调用者（owner、authorizer、NFTUpdate、RewardManager 或 WeightManager）
-     */
     modifier onlyOwnerOrAuthorizer() {
-        address nftUpdateContract = IAuthorizer(authorizer).getNFTUpdate();
-        address rewardManagerContract = IAuthorizer(authorizer).getRewardManager();
-        address weightManagerContract = IAuthorizer(authorizer).getWeightManager();
-        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == nftUpdateContract || msg.sender == rewardManagerContract || msg.sender == weightManagerContract, "DividendManager: Not authorized");
+        if (msg.sender == owner() || msg.sender == authorizer) {
+            _;
+            return;
+        }
+        IAuthorizer auth = IAuthorizer(authorizer);
+        require(
+            msg.sender == auth.getNFTUpdate() || 
+            msg.sender == auth.getRewardManager() || 
+            msg.sender == auth.getWeightManager(), 
+            "DividendManager: Not authorized"
+        );
         _;
     }
 
@@ -384,33 +388,32 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         _autoSyncDividendPool();
 
         uint256 userWeight = userWeights[msg.sender];
-        require(userWeight > 0, "DividendManager: No weight");
 
-        // 检查用户是否长时间未领取分红
         if (lastClaimTime[msg.sender] > 0 &&
             block.timestamp - lastClaimTime[msg.sender] > DIVIDEND_CLAIM_WARNING_THRESHOLD) {
             emit DividendClaimWarning(msg.sender, block.timestamp - lastClaimTime[msg.sender]);
         }
 
-        uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[msg.sender];
-
-        // 修复：使用安全乘法并检查溢出
-        uint256 newDividend;
-        newDividend = (userWeight * cumulativeDiff) / 1e18;
+        uint256 newDividend = 0;
+        if (userWeight > 0) {
+            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[msg.sender];
+            newDividend = (userWeight * cumulativeDiff) / 1e18;
+        }
 
         uint256 totalDividend = pendingDividends[msg.sender] + newDividend;
 
         require(totalDividend > 0, "DividendManager: No dividend");
 
         pendingDividends[msg.sender] = 0;
-        userCumulativeSnapshots[msg.sender] = cumulativePerWeightDividend;
+        if (userWeight > 0) {
+            userCumulativeSnapshots[msg.sender] = cumulativePerWeightDividend;
+        }
         lastClaimTime[msg.sender] = block.timestamp;
 
         address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "DividendManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= totalDividend, "DividendManager: Insufficient contract balance");
-        // 修复：使用 safeTransfer 替代 transfer 确保安全
         token.safeTransfer(msg.sender, totalDividend);
 
         emit DividendClaimed(msg.sender, totalDividend);
@@ -554,10 +557,10 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
     /**
      * @dev 同步用户权重（由NFTTrading、Staking等合约调用）
-     * 此函数不需要权限检查，因为它只是根据NFT数据重新计算权重
+     * 仅授权合约可调用，防止恶意调用影响分红计算
      * @param user 用户地址
      */
-    function syncUserWeight(address user) external {
+    function syncUserWeight(address user) external onlyOwnerOrAuthorizer {
         require(user != address(0), "DividendManager: Zero user address");
         address nftDataContract = IAuthorizer(authorizer).getNFTData();
         if (nftDataContract == address(0)) return;
@@ -653,32 +656,19 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         require(users.length == weights.length, "DividendManager: Length mismatch");
         
         uint256 usersLength = users.length;
-        uint256[] memory pendingDividendUpdates = new uint256[](usersLength);
-        uint256[] memory oldWeights = new uint256[](usersLength);
         uint256 totalWeightChange = 0;
         
         for (uint256 i = 0; i < usersLength; i++) {
             address user = users[i];
             uint256 newWeight = weights[i];
-            oldWeights[i] = userWeights[user];
+            uint256 oldWeight = userWeights[user];
             
-            // 计算用户应结算的分红
-            if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
+            if (oldWeight > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
                 uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-                pendingDividendUpdates[i] = userWeights[user] * cumulativeDiff / 1e18;
+                pendingDividends[user] += oldWeight * cumulativeDiff / 1e18;
             }
             
-            totalWeightChange = totalWeightChange - userWeights[user] + newWeight;
-        }
-        
-        for (uint256 i = 0; i < usersLength; i++) {
-            address user = users[i];
-            uint256 newWeight = weights[i];
-            
-            if (pendingDividendUpdates[i] > 0) {
-                pendingDividends[user] += pendingDividendUpdates[i];
-            }
-            
+            totalWeightChange = totalWeightChange - oldWeight + newWeight;
             userWeights[user] = newWeight;
             userCumulativeSnapshots[user] = cumulativePerWeightDividend;
         }

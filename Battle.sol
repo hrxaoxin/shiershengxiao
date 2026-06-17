@@ -572,7 +572,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 result.targetAlive = false;
             }
         } else {
-            uint defenderIdx = _findTarget(result.targetState.alive, result.targetState.traits, result.targetState.hp);
+            uint defenderIdx = _findTarget(result.targetState.alive, result.targetState.maxHp, result.targetState.hp);
             if (defenderIdx == 6) {
                 result.targetAlive = false;
                 return result;
@@ -685,7 +685,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         if (canUseSkill && skill.skillId > 0) {
             return _applySkillToState(attacker, target, attackerIdx, skill, seed);
         } else {
-            uint defenderIdx = _findTarget(target.alive, target.traits, target.hp);
+            uint defenderIdx = _findTarget(target.alive, target.maxHp, target.hp);
             // 修复：确保防御者索引有效
             if (defenderIdx >= 6) {
                 return target;
@@ -719,7 +719,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
 
         if (validTargetIndex < 6) {
-            targetIndex = skill.isAoe ? validTargetIndex : _findTarget(target.alive, target.traits, target.hp);
+            targetIndex = skill.isAoe ? validTargetIndex : _findTarget(target.alive, target.maxHp, target.hp);
             if (targetIndex >= 6) {
                 targetIndex = validTargetIndex;
             }
@@ -783,7 +783,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
 
         if (validTargetIndex < 6) {
-            targetIndex = skill.isAoe ? validTargetIndex : _findTarget(defenderState.alive, defenderState.traits, defenderState.hp);
+            targetIndex = skill.isAoe ? validTargetIndex : _findTarget(defenderState.alive, defenderState.maxHp, defenderState.hp);
             if (targetIndex >= 6) {
                 targetIndex = validTargetIndex;
             }
@@ -945,14 +945,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @param currentHp 当前HP数组
      * @return 目标索引（6表示无目标）
      */
-    function _findTarget(bool[6] memory alive, NFTTraits[6] memory traits, uint256[6] memory currentHp) internal pure returns (uint) {
+    function _findTarget(bool[6] memory alive, uint256[6] memory maxHp, uint256[6] memory currentHp) internal pure returns (uint) {
         uint minHpIndex = 6;
         uint256 minHpPercent = type(uint256).max;
 
         for (uint i = 0; i < 6; i++) {
             if (alive[i]) {
-                uint256 maxHp = _calculateMaxHP(traits[i]);
-                uint256 currentHpPercent = (maxHp == 0) ? 0 : (currentHp[i] * 100) / maxHp;
+                uint256 currentHpPercent = (maxHp[i] == 0) ? 0 : (currentHp[i] * 100) / maxHp[i];
                 if (currentHpPercent < minHpPercent) {
                     minHpPercent = currentHpPercent;
                     minHpIndex = i;

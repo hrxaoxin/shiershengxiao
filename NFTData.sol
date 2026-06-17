@@ -106,6 +106,12 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * value: 持有者地址数组
      */
     mapping(uint256 => address[]) internal _nftTypeOwners;
+    
+    /**
+     * @dev 类型所有者存在性映射（优化查询）
+     * key: nftType => owner => 是否存在
+     */
+    mapping(uint256 => mapping(address => bool)) internal _typeOwnerExists;
 
     /**
      * @dev 用户持有的NFT列表
@@ -325,6 +331,8 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param tokenId NFT ID
      */
     function _removeUserNFT(address user, uint256 tokenId) internal {
+        uint256 zodiacType = _nftInfo[tokenId].zodiacType;
+        
         uint256[] storage userTokens = _userNFTs[user];
         for (uint256 i = 0; i < userTokens.length; i++) {
             if (userTokens[i] == tokenId) {
@@ -335,8 +343,6 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             }
         }
         
-        // 同步更新按类型分组的用户NFT列表
-        uint256 zodiacType = _getNFTType(tokenId);
         uint256[] storage typeTokens = _userNFTsByType[user][zodiacType];
         for (uint256 i = 0; i < typeTokens.length; i++) {
             if (typeTokens[i] == tokenId) {
@@ -374,14 +380,11 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param owner 持有者地址
      */
     function _addToTypeOwners(uint256 nftType, address owner) internal {
-        // 修复：检查 owner 是否已在列表中，避免重复添加
-        address[] storage owners = _nftTypeOwners[nftType];
-        for (uint256 i = 0; i < owners.length; i++) {
-            if (owners[i] == owner) {
-                return; // 已存在，不需要重复添加
-            }
+        if (_typeOwnerExists[nftType][owner]) {
+            return;
         }
         _nftTypeOwners[nftType].push(owner);
+        _typeOwnerExists[nftType][owner] = true;
     }
 
     /**
@@ -391,21 +394,15 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param owner 持有者地址
      */
     function _removeFromTypeOwners(uint256 nftType, address owner) internal {
+        delete _typeOwnerExists[nftType][owner];
+        
         address[] storage owners = _nftTypeOwners[nftType];
-        uint256 writeIndex = 0;
-        bool found = false;
         for (uint256 i = 0; i < owners.length; i++) {
             if (owners[i] == owner) {
-                found = true;
-                continue; // 跳过要移除的元素
+                owners[i] = owners[owners.length - 1];
+                owners.pop();
+                return;
             }
-            if (!found || i != writeIndex) {
-                owners[writeIndex] = owners[i];
-            }
-            writeIndex++;
-        }
-        while (owners.length > writeIndex) {
-            owners.pop();
         }
     }
 
@@ -496,26 +493,21 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * 权重计算基于用户拥有的NFT数量、等级和稀有度
      */
     function calcUserWeight(address user) external view returns (uint256) {
-        uint256[] memory userTokens = _getUserNFTs(user);
+        uint256[] storage userTokens = _userNFTs[user];
         uint256 totalWeight = 0;
+        uint256 length = userTokens.length;
 
-        for (uint256 i = 0; i < userTokens.length; i++) {
+        for (uint256 i = 0; i < length; i++) {
             uint256 tokenId = userTokens[i];
-            struct_NFTInfo memory info = _nftInfo[tokenId];
-
-            // 稀有属性权重（闪光属性，zodiacType >= 72）
+            struct_NFTInfo storage info = _nftInfo[tokenId];
+            
             bool isRare = info.zodiacType >= RARE_TYPE_START;
-
-            // 基础权重基于等级
-            uint256 levelWeight;
-            if (info.level == 1) levelWeight = isRare ? 10 : 1;
-            else if (info.level == 2) levelWeight = isRare ? 12 : 2;
-            else if (info.level == 3) levelWeight = isRare ? 16 : 6;
-            else if (info.level == 4) levelWeight = isRare ? 28 : 18;
-            else if (info.level == 5) levelWeight = isRare ? 76 : 66;
-            else levelWeight = 0;
-
-            totalWeight += levelWeight;
+            
+            if (info.level == 1) totalWeight += isRare ? 10 : 1;
+            else if (info.level == 2) totalWeight += isRare ? 12 : 2;
+            else if (info.level == 3) totalWeight += isRare ? 16 : 6;
+            else if (info.level == 4) totalWeight += isRare ? 28 : 18;
+            else if (info.level == 5) totalWeight += isRare ? 76 : 66;
         }
 
         return totalWeight;

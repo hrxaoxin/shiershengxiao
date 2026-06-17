@@ -437,10 +437,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         address poolManager = IAuthorizer(authorizer).getPoolManager();
         
         // 计算各池应得代币数量（按BNB金额比例）
-        uint256 nftStakingTokenAmount = totalTokenAmount * nftStakingBNBAmount / totalBNBAmount;
+        uint256 nftStakingTokenAmount;
         uint256 tokenStakingTokenAmount;
         uint256 arenaRewardTokenAmount;
         if (totalBNBAmount > 0) {
+            nftStakingTokenAmount = totalTokenAmount * nftStakingBNBAmount / totalBNBAmount;
             tokenStakingTokenAmount = totalTokenAmount * tokenStakingBNBAmount / totalBNBAmount;
             arenaRewardTokenAmount = totalTokenAmount * arenaRewardBNBAmount / totalBNBAmount;
         }
@@ -818,7 +819,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 dividendPoolBalance,
         uint256 tokenStakingBalance,
         uint256 arenaRewardBalance,
-        uint256 totalDistributed
+        uint256 totalDistributed_
     ) {
         address tokenContract = IAuthorizer(authorizer).getToken();
         address dividendPool = IAuthorizer(authorizer).getDividendManager();
@@ -836,10 +837,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             arenaRewardBalance = token.balanceOf(arenaRewardPool);
         }
 
-        totalDistributed = 0;
-        for (uint256 i = 0; i < distributionHistory.length; i++) {
-            totalDistributed += distributionHistory[i].totalAmount;
-        }
+        totalDistributed_ = totalDistributed;
     }
 
     function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {

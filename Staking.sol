@@ -166,8 +166,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         maxRewardRate = 200;
         rateStep = 10;
         emergencyWithdrawTimelock = 48 hours;
-        normalNFTWeight = 66;
-        rareNFTWeight = 76;
         minStakingLevel = 1;
         
         emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
@@ -247,9 +245,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             // 修复：使用 < 而不是 <= 来正确防止溢出
             require(_userSnapshotWeight[msg.sender] < USER_SNAPSHOT_OVERFLOW_THRESHOLD - snapshotIncrement, "Staking: User snapshot overflow imminent");
             _userSnapshotWeight[msg.sender] += snapshotIncrement;
-            
-            _syncWeightAfterStake(msg.sender, tokenId, tokenLevel, nftContract);
         }
+        
+        _syncUserWeight(msg.sender);
         emit Staked(msg.sender, tokenIds);
     }
 
@@ -259,37 +257,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         INFT nft = INFT(nftContract);
 
         uint256 totalWeightBefore = userStakedWeight[msg.sender];
-
-        // 先计算并领取当前用户的所有待领取奖励
-        uint256 totalClaimable = _calcUserPending(msg.sender);
-        if (totalClaimable > 0) {
-            // 只有在有待领取奖励时才检查奖励代币合约是否设置
-            address rewardTokenContract = IAuthorizer(authorizer).getToken();
-            require(rewardTokenContract != address(0), "Staking: Reward token contract not set");
-            IERC20 rewardToken = IERC20(rewardTokenContract);
-            require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance for unstake");
-
-            // 先领取奖励
-            rewardToken.safeTransfer(msg.sender, totalClaimable);
-            emit RewardClaimed(msg.sender, totalClaimable);
-
-            // 重置用户状态
-            uint256[] storage userNFTs = userStakedNFTs[msg.sender];
-            for (uint256 j = 0; j < userNFTs.length; j++) {
-                StakingInfo storage info = stakingInfo[userNFTs[j]];
-                if (info.owner == msg.sender) {
-                    info.accumulatedReward = globalRewardPerWeight;
-                    info.lastClaimTime = block.timestamp;
-                }
-            }
-            pendingRewards[msg.sender] = 0;
-        }
-
-        // 更新snapshot以反映当前stake状态
-        uint256 currentWeight = userStakedWeight[msg.sender];
-        if (currentWeight > 0) {
-            _userSnapshotWeight[msg.sender] = globalRewardPerWeight * currentWeight;
-        }
 
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
@@ -311,12 +278,24 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             _userSnapshotWeight[msg.sender] -= snapshotDecrement;
 
             nft.safeTransferFrom(address(this), msg.sender, tokenId);
-            _syncWeightAfterUnstake(msg.sender, tokenId, info.level, nftContract);
         }
+        
+        _syncUserWeight(msg.sender);
 
         if (userStakedNFTs[msg.sender].length == 0) {
             isStakingUser[msg.sender] = false;
             _removeFromStakingUsers(msg.sender);
+            
+            uint256 totalClaimable = _calcUserPending(msg.sender);
+            if (totalClaimable > 0) {
+                address rewardTokenContract = IAuthorizer(authorizer).getToken();
+                require(rewardTokenContract != address(0), "Staking: Reward token contract not set");
+                IERC20 rewardToken = IERC20(rewardTokenContract);
+                require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance for unstake");
+                rewardToken.safeTransfer(msg.sender, totalClaimable);
+                emit RewardClaimed(msg.sender, totalClaimable);
+                pendingRewards[msg.sender] = 0;
+            }
         }
         emit Unstaked(msg.sender, tokenIds);
     }
@@ -715,29 +694,10 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     receive() external payable {}
 
     /**
-     * @dev 质押后同步权重到WeightManager和DividendManager
+     * @dev 同步用户权重到WeightManager
      * @param user 用户地址
-     * @param tokenId NFT ID
-     * @param level NFT等级
-     * @param nftContract NFT合约地址
      */
-    function _syncWeightAfterStake(address user, uint256 tokenId, uint8 level, address nftContract) internal {
-        address weightManager = IAuthorizer(authorizer).getWeightManager();
-        if (weightManager != address(0)) {
-            try IWeightManager(weightManager).syncUserWeight(user) {
-            } catch {
-            }
-        }
-    }
-
-    /**
-     * @dev 解除质押后同步权重到WeightManager和DividendManager
-     * @param user 用户地址
-     * @param tokenId NFT ID
-     * @param level NFT等级
-     * @param nftContract NFT合约地址
-     */
-    function _syncWeightAfterUnstake(address user, uint256 tokenId, uint8 level, address nftContract) internal {
+    function _syncUserWeight(address user) internal {
         address weightManager = IAuthorizer(authorizer).getWeightManager();
         if (weightManager != address(0)) {
             try IWeightManager(weightManager).syncUserWeight(user) {

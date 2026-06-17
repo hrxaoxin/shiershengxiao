@@ -132,22 +132,6 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         return globalAddresses;
     }
 
-    /**
-     * @dev 获取指定合约地址
-     * @param key 合约名称的 keccak256 hash
-     */
-    function getAddress(bytes32 key) external view returns (address) {
-        return _addresses[key];
-    }
-
-    /**
-     * @dev 设置单个合约地址
-     */
-    function setAddress(bytes32 key, address value) external onlyOwner whenNotPaused {
-        _addresses[key] = value;
-        emit ContractAddressUpdated(key, value);
-    }
-
     // ==================== 便捷查询函数 ====================
 
     function getToken() external view returns (address) {

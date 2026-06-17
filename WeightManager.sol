@@ -350,7 +350,13 @@ contract WeightManager is
      * @return bool 是否具备资格
      */
     function _hasEligibility(address user) internal view returns (bool) {
-        uint256 w = this.getUserWeight(user);
+        if (user == owner()) return ownerWeight >= minOwnerWeight;
+        
+        if (cachedWeightTimestamp[user] + weightCacheDuration >= block.timestamp) {
+            return cachedUserWeight[user] >= minOwnerWeight;
+        }
+        
+        uint256 w = _calcUserWeight(user);
         return w >= minOwnerWeight;
     }
     
@@ -370,7 +376,15 @@ contract WeightManager is
      */
     function _updateUserWeight(address user) internal {
         uint256 oldWeight = userWeight[user];
-        uint256 newWeight = _calcUserWeight(user);
+        uint256 newWeight;
+        
+        if (user == owner()) {
+            newWeight = ownerWeight;
+        } else if (cachedWeightTimestamp[user] + weightCacheDuration >= block.timestamp) {
+            newWeight = cachedUserWeight[user];
+        } else {
+            newWeight = _calcUserWeight(user);
+        }
         
         if (oldWeight != newWeight) {
             userWeight[user] = newWeight;
@@ -393,10 +407,10 @@ contract WeightManager is
 
     /**
      * @dev 同步用户权重（由NFTTrading、Staking等合约调用）
-     * 此函数不需要权限检查，因为它只是根据NFT数据重新计算权重
+     * 仅授权合约可调用，防止恶意调用
      * @param user 目标用户地址
      */
-    function syncUserWeight(address user) external {
+    function syncUserWeight(address user) external onlyOwnerOrAuthorizer {
         _updateUserWeight(user);
     }
     
@@ -482,6 +496,8 @@ contract WeightManager is
         uint256 oldWeight = userWeight[user];
         if (oldWeight > 0) {
             userWeight[user] = 0;
+            delete cachedUserWeight[user];
+            delete cachedWeightTimestamp[user];
             _manageEligibleList(user);
             emit UserWeightUpdated(user, oldWeight, 0, block.timestamp);
         }
