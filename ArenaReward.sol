@@ -295,7 +295,9 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         address[] memory rankings = IArenaRanking(arenaRankingManager).getSeasonRankings(seasonId);
         uint256 totalPlayers = rankings.length;
         uint256 totalRealPlayers = IArenaRanking(arenaRankingManager).countRealPlayers(seasonId);
-        uint256 realPlayerRewardPool = totalReward - mockRewardTotal;
+        
+        // 修复：添加检查防止模拟玩家奖励超过总奖励导致负数奖励池
+        uint256 realPlayerRewardPool = mockRewardTotal <= totalReward ? totalReward - mockRewardTotal : 0;
         uint256 distributed = 0;
         
         for (uint256 i = 0; i < totalPlayers; i++) {

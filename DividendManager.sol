@@ -576,12 +576,25 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         // 先结算用户当前未领取的分红
         if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
             uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-            uint256 pending = userWeights[user] * cumulativeDiff / 1e18;
-            pendingDividends[user] += pending;
+            // 修复：添加乘法溢出检查
+            uint256 weightedProduct = userWeights[user] * cumulativeDiff;
+            require(weightedProduct / userWeights[user] == cumulativeDiff, "DividendManager: Sync weight calculation overflow");
+            uint256 pending = weightedProduct / 1e18;
+            // 修复：添加加法溢出检查
+            uint256 newPending = pendingDividends[user] + pending;
+            require(newPending >= pendingDividends[user], "DividendManager: Pending dividends overflow");
+            pendingDividends[user] = newPending;
         }
         
         // 更新权重
-        totalWeight = totalWeight - userWeights[user] + newWeight;
+        // 修复：添加减法下溢检查
+        require(totalWeight >= userWeights[user], "DividendManager: Total weight underflow");
+        uint256 totalWeightAfterRemove = totalWeight - userWeights[user];
+        // 修复：添加加法溢出检查
+        uint256 totalWeightAfterAdd = totalWeightAfterRemove + newWeight;
+        require(totalWeightAfterAdd >= totalWeightAfterRemove, "DividendManager: Total weight overflow");
+        totalWeight = totalWeightAfterAdd;
+        
         userWeights[user] = newWeight;
         userCumulativeSnapshots[user] = cumulativePerWeightDividend;
         lastWeightUpdateTime[user] = block.timestamp;

@@ -352,17 +352,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             }
         }
         
-<<<<<<< HEAD
-        uint256[] storage typeTokens = _userNFTsByType[user][zodiacType];
-        for (uint256 i = 0; i < typeTokens.length; i++) {
-            if (typeTokens[i] == tokenId) {
-                typeTokens[i] = typeTokens[typeTokens.length - 1];
-                typeTokens.pop();
-                break;
-=======
-        // 如果在主列表中找到了，才更新类型列表
         if (found) {
-            uint256 zodiacType = _getNFTType(tokenId);
             uint256[] storage typeTokens = _userNFTsByType[user][zodiacType];
             for (uint256 i = 0; i < typeTokens.length; i++) {
                 if (typeTokens[i] == tokenId) {
@@ -370,7 +360,6 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
                     typeTokens.pop();
                     break;
                 }
->>>>>>> c8ee94389caa14348e1c0f9b1e4bc3505a30770f
             }
         }
     }

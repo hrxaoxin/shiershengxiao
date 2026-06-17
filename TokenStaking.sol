@@ -237,9 +237,8 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         
         SafeERC20Upgradeable.safeTransferFrom(token, msg.sender, address(this), amount);
         
-        if (stake.amount == 0) {
-            stake.stakedAt = block.timestamp;
-        }
+        // 修复：每次追加质押时更新 stakedAt，确保新增代币也受锁仓期约束
+        stake.stakedAt = block.timestamp;
         
         stake.amount += amount;
         totalStakedTokens += amount;

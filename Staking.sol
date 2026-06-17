@@ -245,9 +245,10 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             // 修复：使用 < 而不是 <= 来正确防止溢出
             require(_userSnapshotWeight[msg.sender] < USER_SNAPSHOT_OVERFLOW_THRESHOLD - snapshotIncrement, "Staking: User snapshot overflow imminent");
             _userSnapshotWeight[msg.sender] += snapshotIncrement;
+            
+            _syncWeightAfterStake(msg.sender, tokenId, tokenLevel, nftContract);
         }
         
-        _syncUserWeight(msg.sender);
         emit Staked(msg.sender, tokenIds);
     }
 
@@ -278,10 +279,10 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             _userSnapshotWeight[msg.sender] -= snapshotDecrement;
 
             nft.safeTransferFrom(address(this), msg.sender, tokenId);
+            
+            _syncWeightAfterUnstake(msg.sender, tokenId, info.level, nftContract);
         }
         
-        _syncUserWeight(msg.sender);
-
         if (userStakedNFTs[msg.sender].length == 0) {
             isStakingUser[msg.sender] = false;
             _removeFromStakingUsers(msg.sender);
@@ -694,12 +695,12 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     receive() external payable {}
 
     /**
-     * @dev 同步用户权重到WeightManager
+     * @dev 质押后同步权重到WeightManager和DividendManager
      * @param user 用户地址
+     * @param tokenId NFT ID
+     * @param level NFT等级
+     * @param nftContract NFT合约地址
      */
-<<<<<<< HEAD
-    function _syncUserWeight(address user) internal {
-=======
     function _syncWeightAfterStake(address user, uint256 tokenId, uint8 level, address nftContract) internal {
         address nftDataContract = IAuthorizer(authorizer).getNFTData();
         require(nftDataContract != address(0), "Staking: NFTData contract not set");
@@ -726,7 +727,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         require(nftDataContract != address(0), "Staking: NFTData contract not set");
         INFTDataInterface(nftDataContract).addUserNFT(user, tokenId);
         
->>>>>>> c8ee94389caa14348e1c0f9b1e4bc3505a30770f
         address weightManager = IAuthorizer(authorizer).getWeightManager();
         require(weightManager != address(0), "Staking: WeightManager contract not set");
         IWeightManager(weightManager).syncUserWeight(user);

@@ -274,6 +274,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             traits.growth = uint8(growth);
             traits.power = _calculatePower(traits.level, traits.growth);
         } else {
+            // 修复：在mock模式下验证tokenId有效性
+            require(tokenId > 0, "Battle: Invalid tokenId in mock mode");
+            
             uint256 mockMultiplier = 1000;
             uint256 mockOffset = 10000;
             uint256 mockIdRange = 1000;
