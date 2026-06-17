@@ -55,6 +55,16 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     using NFTLib for uint256;
     
     /**
+     * @dev NFT集合名称
+     */
+    string private _name;
+    
+    /**
+     * @dev NFT集合符号
+     */
+    string private _symbol;
+    
+    /**
      * @dev 属性概率分布（水、风、火、暗、光）
      */
     uint256[5] public elementProbabilities;
@@ -181,6 +191,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         
+        _name = "Zodiac NFT";
+        _symbol = "ZODIAC";
         elementProbabilities = [32, 32, 32, 2, 2];
         rareElementProbabilities = [50, 50];
         authorizer = _authorizerAddress;
@@ -388,11 +400,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         address nftDataContract = IAuthorizer(authorizer).getNFTData();
         require(nftDataContract != address(0), "NFTMint: nftDataContract not set");
         
-        try INFTDataInterface(nftDataContract).syncNFTData(tokenId, zodiacType, level, growth, to) {
-        } catch {
-            emit NFTDataSyncFailed(tokenId, zodiacType, level, growth, to);
-            _queueFailedSync(tokenId, zodiacType, level, growth, to);
-        }
+        INFTDataInterface(nftDataContract).syncNFTData(tokenId, zodiacType, level, growth, to);
     }
 
     function _queueFailedSync(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to) internal {
@@ -595,7 +603,42 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
     
     function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal virtual {}
-    function _afterTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal virtual {}
+
+    function _afterTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize) internal override {
+        _syncWeightOnTransfer(from, to, tokenId);
+    }
+
+    function _syncWeightOnTransfer(address from, address to, uint256 tokenId) internal {
+        address stakingContract = IAuthorizer(authorizer).getStaking();
+        address nftTradingContract = IAuthorizer(authorizer).getNFTTrading();
+        
+        if (from == stakingContract || to == stakingContract) {
+            return;
+        }
+        
+        if (from == nftTradingContract || to == nftTradingContract) {
+            return;
+        }
+        
+        if (from == address(0) || to == address(0)) {
+            return;
+        }
+        
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        require(nftDataContract != address(0), "NFTMint: NFTData contract not set");
+        INFTDataInterface(nftDataContract).removeUserNFT(from, tokenId);
+        INFTDataInterface(nftDataContract).addUserNFT(to, tokenId);
+        
+        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        require(weightManager != address(0), "NFTMint: WeightManager contract not set");
+        IWeightManager(weightManager).syncUserWeight(from);
+        IWeightManager(weightManager).syncUserWeight(to);
+        
+        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        require(dividendManager != address(0), "NFTMint: DividendManager contract not set");
+        IDividendManager(dividendManager).syncUserWeight(from);
+        IDividendManager(dividendManager).syncUserWeight(to);
+    }
     
     function safeTransferFrom(address from, address to, uint256 tokenId) external {
         transferFrom(from, to, tokenId);
@@ -628,5 +671,63 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             tokenIds[i] = _ownedTokens[owner][i];
         }
         return tokenIds;
+    }
+    
+    /**
+     * @dev 获取NFT集合名称（ERC721Metadata标准接口）
+     * @return NFT集合名称
+     */
+    function name() external view returns (string memory) {
+        return _name;
+    }
+    
+    /**
+     * @dev 获取NFT集合符号（ERC721Metadata标准接口）
+     * @return NFT集合符号
+     */
+    function symbol() external view returns (string memory) {
+        return _symbol;
+    }
+    
+    /**
+     * @dev 获取NFT的TokenURI（ERC721Metadata标准接口）
+     * 调用NFTMintMetadata合约获取元数据
+     * @param tokenId NFT ID
+     * @return TokenURI字符串（Base64编码的JSON）
+     */
+    function tokenURI(uint256 tokenId) external view returns (string memory) {
+        require(_exists(tokenId), "NFTMint: Token not exists");
+        
+        address metadataContract = IAuthorizer(authorizer).getNFTMintMetadata();
+        require(metadataContract != address(0), "NFTMint: Metadata contract not set");
+        
+        return INFTMintMetadata(metadataContract).tokenURI(tokenId);
+    }
+    
+    /**
+     * @dev 设置NFT集合名称和符号（仅所有者可调用）
+     * @param newName 新名称
+     * @param newSymbol 新符号
+     */
+    function setNameAndSymbol(string calldata newName, string calldata newSymbol) external onlyOwner {
+        require(bytes(newName).length > 0, "NFTMint: Name cannot be empty");
+        require(bytes(newSymbol).length > 0, "NFTMint: Symbol cannot be empty");
+        _name = newName;
+        _symbol = newSymbol;
+    }
+    
+    /**
+     * @dev ERC165接口检测（各大钱包识别NFT所必需）
+     * ERC721接口ID: 0x80ac58cd
+     * ERC721Metadata接口ID: 0x5b5e139f
+     * ERC721Enumerable接口ID: 0x780e9d83
+     * @param interfaceId 接口ID
+     * @return 是否支持该接口
+     */
+    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
+        return interfaceId == 0x01ffc9a7 || // ERC165
+               interfaceId == 0x80ac58cd || // ERC721
+               interfaceId == 0x5b5e139f || // ERC721Metadata
+               interfaceId == 0x780e9d83;   // ERC721Enumerable
     }
 }

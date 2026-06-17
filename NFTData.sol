@@ -320,6 +320,13 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param tokenId NFT ID
      */
     function _addUserNFT(address user, uint256 tokenId) internal {
+        // 检查是否已存在，避免重复添加
+        uint256[] storage userTokens = _userNFTs[user];
+        for (uint256 i = 0; i < userTokens.length; i++) {
+            if (userTokens[i] == tokenId) {
+                return; // 已存在，不重复添加
+            }
+        }
         _userNFTs[user].push(tokenId);
         _userNFTCount[user]++;
     }
@@ -334,21 +341,36 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         uint256 zodiacType = _nftInfo[tokenId].zodiacType;
         
         uint256[] storage userTokens = _userNFTs[user];
+        bool found = false;
         for (uint256 i = 0; i < userTokens.length; i++) {
             if (userTokens[i] == tokenId) {
                 userTokens[i] = userTokens[userTokens.length - 1];
                 userTokens.pop();
                 _userNFTCount[user]--;
+                found = true;
                 break;
             }
         }
         
+<<<<<<< HEAD
         uint256[] storage typeTokens = _userNFTsByType[user][zodiacType];
         for (uint256 i = 0; i < typeTokens.length; i++) {
             if (typeTokens[i] == tokenId) {
                 typeTokens[i] = typeTokens[typeTokens.length - 1];
                 typeTokens.pop();
                 break;
+=======
+        // 如果在主列表中找到了，才更新类型列表
+        if (found) {
+            uint256 zodiacType = _getNFTType(tokenId);
+            uint256[] storage typeTokens = _userNFTsByType[user][zodiacType];
+            for (uint256 i = 0; i < typeTokens.length; i++) {
+                if (typeTokens[i] == tokenId) {
+                    typeTokens[i] = typeTokens[typeTokens.length - 1];
+                    typeTokens.pop();
+                    break;
+                }
+>>>>>>> c8ee94389caa14348e1c0f9b1e4bc3505a30770f
             }
         }
     }

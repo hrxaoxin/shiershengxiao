@@ -697,13 +697,43 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @dev 同步用户权重到WeightManager
      * @param user 用户地址
      */
+<<<<<<< HEAD
     function _syncUserWeight(address user) internal {
+=======
+    function _syncWeightAfterStake(address user, uint256 tokenId, uint8 level, address nftContract) internal {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        require(nftDataContract != address(0), "Staking: NFTData contract not set");
+        INFTDataInterface(nftDataContract).removeUserNFT(user, tokenId);
+        
         address weightManager = IAuthorizer(authorizer).getWeightManager();
-        if (weightManager != address(0)) {
-            try IWeightManager(weightManager).syncUserWeight(user) {
-            } catch {
-            }
-        }
+        require(weightManager != address(0), "Staking: WeightManager contract not set");
+        IWeightManager(weightManager).syncUserWeight(user);
+        
+        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        require(dividendManager != address(0), "Staking: DividendManager contract not set");
+        IDividendManager(dividendManager).syncUserWeight(user);
+    }
+
+    /**
+     * @dev 解除质押后同步权重到WeightManager和DividendManager
+     * @param user 用户地址
+     * @param tokenId NFT ID
+     * @param level NFT等级
+     * @param nftContract NFT合约地址
+     */
+    function _syncWeightAfterUnstake(address user, uint256 tokenId, uint8 level, address nftContract) internal {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        require(nftDataContract != address(0), "Staking: NFTData contract not set");
+        INFTDataInterface(nftDataContract).addUserNFT(user, tokenId);
+        
+>>>>>>> c8ee94389caa14348e1c0f9b1e4bc3505a30770f
+        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        require(weightManager != address(0), "Staking: WeightManager contract not set");
+        IWeightManager(weightManager).syncUserWeight(user);
+        
+        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        require(dividendManager != address(0), "Staking: DividendManager contract not set");
+        IDividendManager(dividendManager).syncUserWeight(user);
     }
 
     /**
