@@ -130,6 +130,11 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 分红池增加事件
      */
     event DividendPoolAdded(uint256 amount, uint256 totalDividend, uint256 perWeightDividendIncrement);
+    
+    /**
+     * @dev 用户权重更新事件
+     */
+    event WeightUpdated(address indexed user, uint256 newWeight);
 
     /**
      * @dev 授权合约地址（Authorizer）

@@ -59,6 +59,8 @@ interface INFTDataInterface {
     function setTokenLevel(uint256 tokenId, uint8 level) external;
     function calcUserWeight(address user) external view returns (uint256);
     function syncNFTData(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to) external;
+    function removeUserNFT(address user, uint256 tokenId) external;
+    function addUserNFT(address user, uint256 tokenId) external;
 }
 
 /**
@@ -94,6 +96,10 @@ interface INFTMint {
     function balanceOf(address owner) external view returns (uint256);
     function isApprovedForAll(address owner, address operator) external view returns (bool);
     function setApprovalForAll(address operator, bool approved) external;
+    function name() external view returns (string memory);
+    function symbol() external view returns (string memory);
+    function tokenURI(uint256 tokenId) external view returns (string memory);
+    function supportsInterface(bytes4 interfaceId) external view returns (bool);
 }
 
 interface INFTMintCore {
@@ -110,6 +116,25 @@ interface INFTMintCore {
     function generateSecureRandom() external returns (uint256);
     function isApprovedForAll(address owner, address operator) external view returns (bool);
     function setApprovalForAll(address operator, bool approved) external;
+}
+
+/**
+ * @title INFTMintMetadata
+ * @dev NFT元数据合约接口，提供TokenURI生成功能
+ */
+interface INFTMintMetadata {
+    function tokenURI(uint256 tokenId) external view returns (string memory);
+    function getNFTData(uint256 tokenId) external view returns (
+        uint256 tokenType_,
+        uint256 attack,
+        uint256 defense,
+        uint256 health,
+        uint256 speed,
+        uint8 level,
+        uint256 rank,
+        string memory name,
+        string memory imageUrl
+    );
 }
 
 /**

@@ -211,6 +211,10 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         });
 
         listedNFTs.push(tokenId);
+        
+        // 同步权重：NFT从用户转移到NFTTrading合约
+        _syncWeightAfterTransfer(msg.sender, address(this), tokenId, nftContract);
+        
         emit NFTListed(tokenId, msg.sender, priceWei);
     }
 
@@ -490,25 +494,19 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
     function _syncWeightAfterTransfer(address from, address to, uint256 tokenId, address nftContract) internal {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        require(nftDataContract != address(0), "NFTTrading: NFTData contract not set");
+        INFTDataInterface(nftDataContract).removeUserNFT(from, tokenId);
+        INFTDataInterface(nftDataContract).addUserNFT(to, tokenId);
+        
         address dividendManager = IAuthorizer(authorizer).getDividendManager();
-        if (dividendManager != address(0)) {
-            INFT nft = INFT(nftContract);
-            uint8 level = nft.tokenLevel(tokenId);
-            uint256 zodiacType = nft.tokenType(tokenId);
-            uint8 element = uint8(zodiacType / 24);
-            
-            IDividendManager(dividendManager).syncUserWeight(from);
-            IDividendManager(dividendManager).syncUserWeight(to);
-        }
+        require(dividendManager != address(0), "NFTTrading: DividendManager contract not set");
+        IDividendManager(dividendManager).syncUserWeight(from);
+        IDividendManager(dividendManager).syncUserWeight(to);
         
         address weightManager = IAuthorizer(authorizer).getWeightManager();
-        if (weightManager != address(0)) {
-            try IWeightManager(weightManager).syncUserWeight(from) {
-            } catch {
-            }
-            try IWeightManager(weightManager).syncUserWeight(to) {
-            } catch {
-            }
-        }
+        require(weightManager != address(0), "NFTTrading: WeightManager contract not set");
+        IWeightManager(weightManager).syncUserWeight(from);
+        IWeightManager(weightManager).syncUserWeight(to);
     }
 }

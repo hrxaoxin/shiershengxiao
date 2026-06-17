@@ -166,8 +166,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         maxRewardRate = 200;
         rateStep = 10;
         emergencyWithdrawTimelock = 48 hours;
-        normalNFTWeight = 66;
-        rareNFTWeight = 76;
         minStakingLevel = 1;
         
         emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
@@ -722,12 +720,17 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @param nftContract NFT合约地址
      */
     function _syncWeightAfterStake(address user, uint256 tokenId, uint8 level, address nftContract) internal {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        require(nftDataContract != address(0), "Staking: NFTData contract not set");
+        INFTDataInterface(nftDataContract).removeUserNFT(user, tokenId);
+        
         address weightManager = IAuthorizer(authorizer).getWeightManager();
-        if (weightManager != address(0)) {
-            try IWeightManager(weightManager).syncUserWeight(user) {
-            } catch {
-            }
-        }
+        require(weightManager != address(0), "Staking: WeightManager contract not set");
+        IWeightManager(weightManager).syncUserWeight(user);
+        
+        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        require(dividendManager != address(0), "Staking: DividendManager contract not set");
+        IDividendManager(dividendManager).syncUserWeight(user);
     }
 
     /**
@@ -738,12 +741,17 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @param nftContract NFT合约地址
      */
     function _syncWeightAfterUnstake(address user, uint256 tokenId, uint8 level, address nftContract) internal {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        require(nftDataContract != address(0), "Staking: NFTData contract not set");
+        INFTDataInterface(nftDataContract).addUserNFT(user, tokenId);
+        
         address weightManager = IAuthorizer(authorizer).getWeightManager();
-        if (weightManager != address(0)) {
-            try IWeightManager(weightManager).syncUserWeight(user) {
-            } catch {
-            }
-        }
+        require(weightManager != address(0), "Staking: WeightManager contract not set");
+        IWeightManager(weightManager).syncUserWeight(user);
+        
+        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        require(dividendManager != address(0), "Staking: DividendManager contract not set");
+        IDividendManager(dividendManager).syncUserWeight(user);
     }
 
     /**
