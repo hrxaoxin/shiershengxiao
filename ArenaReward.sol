@@ -60,14 +60,6 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 竞技场排名管理合约地址
-     */
-    address public arenaRankingManagerContract;
-    /**
-     * @dev 代币合约地址
-     */
-    address public tokenContract;
-    /**
      * @dev 模拟玩家奖励接收地址
      */
     address public mockRewardRecipient;
@@ -144,19 +136,15 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 授权检查修饰器
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == arenaRankingManagerContract, "ArenaReward: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer, "ArenaReward: Not authorized");
         _;
     }
 
     /**
      * @dev 初始化函数
-     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
-     * @param _tokenContractAddress 代币合约地址
      * @param _authorizerAddress 授权合约地址
      */
     function initialize(
-        address _arenaRankingManagerContractAddress,
-        address _tokenContractAddress,
         address _authorizerAddress
     ) external initializer {
         __Ownable2Step_init();
@@ -164,8 +152,6 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         __ReentrancyGuard_init();
         __Pausable_init();
         
-        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
-        tokenContract = _tokenContractAddress;
         authorizer = _authorizerAddress;
         rewardType = 1;
     }
@@ -196,22 +182,6 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function unpause() external onlyOwner {
         _unpause();
-    }
-
-    /**
-     * @dev 设置竞技场排名管理合约地址
-     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
-     */
-    function setArenaRankingManagerContract(address _arenaRankingManagerContractAddress) external onlyOwnerOrAuthorizer {
-        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
-    }
-
-    /**
-     * @dev 设置代币合约地址
-     * @param _tokenContractAddress 代币合约地址
-     */
-    function setTokenContract(address _tokenContractAddress) external onlyOwnerOrAuthorizer {
-        tokenContract = _tokenContractAddress;
     }
 
     /**
@@ -262,7 +232,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return rewardPool BNB 奖励池, tokenRewardPool 代币奖励池, totalPlayers 总玩家数
      */
     function _getSeasonData(uint256 seasonId) internal view returns (uint256, uint256, uint256) {
-        return IArenaRanking(arenaRankingManagerContract).getSeasonRewardData(seasonId);
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        return IArenaRanking(arenaRankingManager).getSeasonRewardData(seasonId);
     }
 
     /**
@@ -272,13 +243,14 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 模拟玩家奖励总额
      */
     function _calculateMockRewards(uint256 seasonId, uint256 totalReward) internal view returns (uint256) {
-        address[] memory rankings = IArenaRanking(arenaRankingManagerContract).getSeasonRankings(seasonId);
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        address[] memory rankings = IArenaRanking(arenaRankingManager).getSeasonRankings(seasonId);
         uint256 totalPlayers = rankings.length;
         uint256 mockRewardTotal = 0;
         
         for (uint256 i = 0; i < totalPlayers; i++) {
             address player = rankings[i];
-            if (IArenaRanking(arenaRankingManagerContract).isMockPlayer(player)) {
+            if (IArenaRanking(arenaRankingManager).isMockPlayer(player)) {
                 uint256 rank = i + 1;
                 uint256 reward = ArenaRankingLib.calculateRankReward(rank, totalReward, totalPlayers);
                 mockRewardTotal += reward;
@@ -296,19 +268,20 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 已分配奖励总额
      */
     function _calculateRealPlayerRewards(uint256 seasonId, uint256 totalReward, uint256 mockRewardTotal) internal returns (uint256) {
-        address[] memory rankings = IArenaRanking(arenaRankingManagerContract).getSeasonRankings(seasonId);
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        address[] memory rankings = IArenaRanking(arenaRankingManager).getSeasonRankings(seasonId);
         uint256 totalPlayers = rankings.length;
-        uint256 totalRealPlayers = IArenaRanking(arenaRankingManagerContract).countRealPlayers(seasonId);
+        uint256 totalRealPlayers = IArenaRanking(arenaRankingManager).countRealPlayers(seasonId);
         uint256 realPlayerRewardPool = totalReward - mockRewardTotal;
         uint256 distributed = 0;
         
         for (uint256 i = 0; i < totalPlayers; i++) {
             address player = rankings[i];
-            if (IArenaRanking(arenaRankingManagerContract).isMockPlayer(player)) {
+            if (IArenaRanking(arenaRankingManager).isMockPlayer(player)) {
                 continue;
             }
             
-            uint256 rank = IArenaRanking(arenaRankingManagerContract).getRealPlayerRank(seasonId, i);
+            uint256 rank = IArenaRanking(arenaRankingManager).getRealPlayerRank(seasonId, i);
             uint256 rankReward = ArenaRankingLib.calculateRankReward(rank, realPlayerRewardPool, totalRealPlayers);
             playerSeasonRewards[seasonId][player] = rankReward;
             distributed += rankReward;
@@ -326,6 +299,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             (bool success, ) = payable(mockRewardRecipient).call{value: amount}("");
             require(success, "ArenaReward: Mock reward transfer failed");
         } else {
+            address tokenContract = IAuthorizer(authorizer).getToken();
             require(tokenContract != address(0), "ArenaReward: Token contract not set");
             SafeERC20.safeTransfer(IERC20(tokenContract), mockRewardRecipient, amount);
         }
@@ -349,10 +323,10 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             (bool success, ) = payable(msg.sender).call{value: reward}("");
             require(success, "ArenaReward: Transfer failed");
         } else {
+            address tokenContract = IAuthorizer(authorizer).getToken();
             require(tokenContract != address(0), "ArenaReward: Token contract not set");
             IERC20 token = IERC20(tokenContract);
             require(token.balanceOf(address(this)) >= reward, "ArenaReward: Insufficient token balance");
-            // 优化：使用 safeTransfer 代替直接 transfer，确保安全
             token.safeTransfer(msg.sender, reward);
         }
         
@@ -363,7 +337,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 领取当前赛季奖励（重载）
      */
     function claimSeasonReward() external nonReentrant whenNotPaused {
-        uint256 currentSeasonId = IArenaRanking(arenaRankingManagerContract).currentSeasonId();
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         _claimRewardFor(msg.sender, currentSeasonId);
     }
 
@@ -401,6 +376,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             (bool success, ) = payable(player).call{value: reward}("");
             require(success, "ArenaReward: BNB transfer failed");
         } else {
+            address tokenContract = IAuthorizer(authorizer).getToken();
             require(tokenContract != address(0), "ArenaReward: Token contract not set");
             IERC20 token = IERC20(tokenContract);
             require(token.balanceOf(address(this)) >= reward, "ArenaReward: Insufficient token balance");
@@ -440,7 +416,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 待领取奖励总额
      */
     function getTotalPendingRewards(address player) external view returns (uint256) {
-        uint256 currentSeasonId = IArenaRanking(arenaRankingManagerContract).currentSeasonId();
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         uint256 total = 0;
         
         for (uint256 i = 1; i <= currentSeasonId; i++) {
@@ -471,10 +448,10 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "ArenaReward: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "ArenaReward: Insufficient token balance");
-        // 优化：使用 safeTransfer 代替直接 transfer，确保安全
         token.safeTransfer(owner(), amount);
         emit EmergencyWithdraw(owner(), amount);
     }
@@ -485,9 +462,10 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function calculateRewardForRank(uint256 rank) external view returns (uint256) {
         require(rank > 0, "ArenaReward: Rank must be > 0");
-        uint256 currentSeasonId = IArenaRanking(arenaRankingManagerContract).currentSeasonId();
-        (uint256 rewardPool, , uint256 totalPlayers) = IArenaRanking(arenaRankingManagerContract).getSeasonRewardData(currentSeasonId);
-        uint256 totalRealPlayers = IArenaRanking(arenaRankingManagerContract).countRealPlayers(currentSeasonId);
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
+        (uint256 rewardPool, , uint256 totalPlayers) = IArenaRanking(arenaRankingManager).getSeasonRewardData(currentSeasonId);
+        uint256 totalRealPlayers = IArenaRanking(arenaRankingManager).countRealPlayers(currentSeasonId);
         return ArenaRankingLib.calculateRankReward(rank, rewardPool, totalRealPlayers);
     }
 
@@ -508,7 +486,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         rateStep = step;
     }
 
-    function setRewardType(uint8 _rewardType) external onlyOwner {
+    function setRewardType(uint8 _rewardType) external onlyOwnerOrAuthorizer {
         require(_rewardType == 0 || _rewardType == 1, "ArenaReward: Invalid reward type");
         rewardType = _rewardType;
     }

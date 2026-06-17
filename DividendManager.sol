@@ -137,21 +137,6 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     address public authorizer;
 
     /**
-     * @dev 权重管理合约地址（WeightManager）
-     */
-    address public weightManagerContract;
-
-    /**
-     * @dev NFT 升级合约地址（NFTUpdate），有权调用 updateUserWeight
-     */
-    address public nftUpdateContract;
-
-    /**
-     * @dev 奖励管理合约地址（RewardManager），有权调用 syncDividendPool
-     */
-    address public rewardManagerContract;
-
-    /**
      * @dev 用户权重映射
      * user => weight
      */
@@ -175,30 +160,13 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /**
      * @dev 初始化函数
      * @param _authorizerAddress 授权合约地址
-     * @param _tokenContractAddress 代币合约地址
-     * @param _weightManagerAddress 权重管理合约地址
-     * @param _nftUpdateAddress NFT升级合约地址
      */
-    function initialize(
-        address _authorizerAddress,
-        address _tokenContractAddress,
-        address _weightManagerAddress,
-        address _nftUpdateAddress
-    ) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "DividendManager: Invalid authorizer address");
-        require(_tokenContractAddress != address(0), "DividendManager: Invalid token contract address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
-        tokenContract = _tokenContractAddress;
-        
-        if (_weightManagerAddress != address(0)) {
-            weightManagerContract = _weightManagerAddress;
-        }
-        if (_nftUpdateAddress != address(0)) {
-            nftUpdateContract = _nftUpdateAddress;
-        }
     }
 
     /**
@@ -216,36 +184,12 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /**
-     * @dev 设置权重管理合约地址（WeightManager）
-     * @param _weightManagerAddress 权重管理合约地址
-     */
-    function setWeightManager(address _weightManagerAddress) external onlyOwnerOrAuthorizer {
-        require(_weightManagerAddress != address(0), "DividendManager: Invalid weight manager address");
-        weightManagerContract = _weightManagerAddress;
-    }
-
-    /**
-     * @dev 设置 NFT 升级合约地址（NFTUpdate）
-     * @param _nftUpdateAddress NFT 升级合约地址
-     */
-    function setNFTUpdateContract(address _nftUpdateAddress) external onlyOwnerOrAuthorizer {
-        require(_nftUpdateAddress != address(0), "DividendManager: Invalid NFT update address");
-        nftUpdateContract = _nftUpdateAddress;
-    }
-
-    /**
-     * @dev 设置奖励管理合约地址（RewardManager）
-     * @param _rewardManagerContract 奖励管理合约地址
-     */
-    function setRewardManagerContract(address _rewardManagerContract) external onlyOwnerOrAuthorizer {
-        require(_rewardManagerContract != address(0), "DividendManager: Invalid reward manager address");
-        rewardManagerContract = _rewardManagerContract;
-    }
-
-    /**
-     * @dev 检查是否为授权调用者（owner、authorizer、nftUpdateContract 或 rewardManagerContract）
+     * @dev 检查是否为授权调用者（owner、authorizer、NFTUpdate、RewardManager 或 WeightManager）
      */
     modifier onlyOwnerOrAuthorizer() {
+        address nftUpdateContract = IAuthorizer(authorizer).getNFTUpdate();
+        address rewardManagerContract = IAuthorizer(authorizer).getRewardManager();
+        address weightManagerContract = IAuthorizer(authorizer).getWeightManager();
         require(msg.sender == owner() || msg.sender == authorizer || msg.sender == nftUpdateContract || msg.sender == rewardManagerContract || msg.sender == weightManagerContract, "DividendManager: Not authorized");
         _;
     }
@@ -266,15 +210,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      */
     uint256 public dividendPoolBalance;
 
-    /**
-     * @dev 分红池地址（用于查询外部池余额）
-     */
-    address public dividendPool;
-
-    /**
-     * @dev 代币合约地址（用于领取分红转账）
-     */
-    address public tokenContract;
+    
 
     /**
      * @dev 最后更新快照时间
@@ -322,6 +258,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     function addDividendPool(uint256 amount) external onlyOwner whenNotPaused {
         require(amount > 0, "DividendManager: Invalid amount");
         _addToDividendPool(amount);
+        address tokenContract = IAuthorizer(authorizer).getToken();
         if (tokenContract != address(0)) {
             lastSyncedBalance = IERC20(tokenContract).balanceOf(address(this));
         }
@@ -331,6 +268,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 同步分红池余额（自动检测合约中新增的代币）
      */
     function syncDividendPool() external onlyOwnerOrAuthorizer {
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "DividendManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         uint256 currentBalance = token.balanceOf(address(this));
@@ -348,6 +286,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 自动同步分红池（在用户操作时调用）
      */
     function _autoSyncDividendPool() internal {
+        address tokenContract = IAuthorizer(authorizer).getToken();
         if (tokenContract == address(0)) return;
         
         if (block.timestamp >= lastAutoSyncTime + AUTO_SYNC_INTERVAL) {
@@ -467,6 +406,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         userCumulativeSnapshots[msg.sender] = cumulativePerWeightDividend;
         lastClaimTime[msg.sender] = block.timestamp;
 
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "DividendManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= totalDividend, "DividendManager: Insufficient contract balance");
@@ -492,24 +432,6 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     function calcUserDividend(address user) external view returns (uint256, uint256) {
         uint256 claimable = this.getClaimableDividend(user);
         return (claimable, userWeights[user]);
-    }
-
-    /**
-     * @dev 设置分红池地址
-     * @param _pool 分红池合约地址
-     */
-    function setDividendPool(address _pool) external onlyOwnerOrAuthorizer {
-        require(_pool != address(0), "DividendManager: Invalid pool address");
-        dividendPool = _pool;
-    }
-
-    /**
-     * @dev 设置代币合约地址
-     * @param _tokenContractAddress 代币合约地址
-     */
-    function setTokenContract(address _tokenContractAddress) external onlyOwnerOrAuthorizer {
-        require(_tokenContractAddress != address(0), "DividendManager: Invalid token contract");
-        tokenContract = _tokenContractAddress;
     }
 
     /**
@@ -827,6 +749,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256 snapshotCount,
         uint256 lastSnapshotTime
     ) {
+        address tokenContract = IAuthorizer(authorizer).getToken();
         if (tokenContract != address(0)) {
             currentPool = IERC20(tokenContract).balanceOf(address(this));
         }
@@ -872,6 +795,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         require(block.timestamp >= emergencyWithdrawRequestedAt + emergencyWithdrawTimelock, 
             "DividendManager: Timelock not expired");
         require(amount > 0, "DividendManager: Amount must be > 0");
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "DividendManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "DividendManager: Insufficient token balance");

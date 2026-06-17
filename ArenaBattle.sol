@@ -40,26 +40,6 @@ import "./NFTInterface.sol";
  */
 contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     /**
-     * @dev 竞技场排名管理合约地址
-     */
-    address public arenaRankingManagerContract;
-    /**
-     * @dev 战斗核心合约地址
-     */
-    address public battleContract;
-    /**
-     * @dev NFT 合约地址
-     */
-    address public nftContract;
-    /**
-     * @dev 竞技场玩家合约地址
-     */
-    address public arenaPlayerContract;
-    /**
-     * @dev 竞技场排行榜合约地址
-     */
-    address public arenaLeaderboardContract;
-    /**
      * @dev 授权合约地址
      */
     address public authorizer;
@@ -214,36 +194,21 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 授权检查修饰器
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == arenaRankingManagerContract, "ArenaBattle: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer, "ArenaBattle: Not authorized");
         _;
     }
 
     /**
      * @dev 初始化函数
-     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
-     * @param _battleContractAddress 战斗核心合约地址
-     * @param _nftContractAddress NFT 合约地址
-     * @param _arenaPlayerContractAddress 竞技场玩家合约地址
-     * @param _arenaLeaderboardContractAddress 竞技场排行榜合约地址
      * @param _authorizerAddress 授权合约地址
      */
     function initialize(
-        address _arenaRankingManagerContractAddress,
-        address _battleContractAddress,
-        address _nftContractAddress,
-        address _arenaPlayerContractAddress,
-        address _arenaLeaderboardContractAddress,
         address _authorizerAddress
     ) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
-        battleContract = _battleContractAddress;
-        nftContract = _nftContractAddress;
-        arenaPlayerContract = _arenaPlayerContractAddress;
-        arenaLeaderboardContract = _arenaLeaderboardContractAddress;
         authorizer = _authorizerAddress;
     }
 
@@ -273,26 +238,6 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function unpause() external onlyOwner {
         _unpause();
-    }
-
-    function setArenaRankingManagerContract(address _arenaRankingManagerContractAddress) external onlyOwnerOrAuthorizer {
-        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
-    }
-
-    function setBattleContract(address _battleContractAddress) external onlyOwnerOrAuthorizer {
-        battleContract = _battleContractAddress;
-    }
-
-    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
-        nftContract = _nftContractAddress;
-    }
-
-    function setArenaLeaderboardContract(address _arenaLeaderboardContractAddress) external onlyOwnerOrAuthorizer {
-        arenaLeaderboardContract = _arenaLeaderboardContractAddress;
-    }
-
-    function setArenaPlayerContract(address _arenaPlayerContractAddress) external onlyOwnerOrAuthorizer {
-        arenaPlayerContract = _arenaPlayerContractAddress;
     }
 
     function challengeMockPlayer(uint256 mockIndex) external nonReentrant whenNotPaused returns (bool, uint256) {
@@ -415,8 +360,9 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
         record.lastBattleTime = block.timestamp;
 
-        if (arenaLeaderboardContract != address(0)) {
-            IArenaLeaderboard(arenaLeaderboardContract).updateRanking(player, record.score, currentSeasonId);
+        address arenaLeaderboard = IAuthorizer(authorizer).getArenaLeaderboard();
+        if (arenaLeaderboard != address(0)) {
+            IArenaLeaderboard(arenaLeaderboard).updateRanking(player, record.score, currentSeasonId);
         }
         emit ScoreUpdated(player, record.score, currentSeasonId);
     }
@@ -452,8 +398,8 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256[6] calldata playerTeam,
         uint256 mockIndex
     ) external onlyOwnerOrAuthorizer nonReentrant whenNotPaused returns (bool success_, uint256 winner, uint256 battleId) {
+        address battleContract = IAuthorizer(authorizer).getBattle();
         require(battleContract != address(0), "ArenaBattle: Battle contract not set");
-        require(nftContract != address(0), "ArenaBattle: NFT contract not set");
         require(mockIndex < MAX_MOCK_RANKING, "ArenaBattle: Invalid mock player index");
         require(block.timestamp >= lastBattleTime[msg.sender] + BATTLE_COOLDOWN, "ArenaBattle: Battle cooldown");
 
@@ -484,8 +430,8 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256[6] calldata playerTeam,
         uint256[6] calldata challengedTeam
     ) external onlyOwnerOrAuthorizer nonReentrant whenNotPaused returns (bool success_, uint256 winner, uint256 battleId) {
+        address battleContract = IAuthorizer(authorizer).getBattle();
         require(battleContract != address(0), "ArenaBattle: Battle contract not set");
-        require(nftContract != address(0), "ArenaBattle: NFT contract not set");
         require(challengedPlayer != address(0), "ArenaBattle: Invalid challenged player");
         require(challengedPlayer != msg.sender, "ArenaBattle: Cannot challenge self");
         require(block.timestamp >= lastBattleTime[msg.sender] + BATTLE_COOLDOWN, "ArenaBattle: Battle cooldown");
@@ -514,7 +460,6 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function _validateTeam(uint256[6] memory team) internal view {
-        require(nftContract != address(0), "ArenaBattle: NFT contract not set");
         // 轻量校验：仅检查 tokenId > 0（ArenaRanking会做更深层的所有者验证）
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
             uint256 tokenId = team[i];
@@ -532,6 +477,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function _calculateTeamPower(uint256[6] memory team) internal view returns (uint256) {
         uint256 totalPower = 0;
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         for (uint256 i = 0; i < team.length; i++) {
             if (team[i] > 0) {
                 uint256 level = INFTMint(nftContract).tokenLevel(team[i]);

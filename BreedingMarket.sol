@@ -47,17 +47,9 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     using SafeERC20 for IERC20;
     
     /**
-     * @dev 授权合约地址
+     * @dev 授权合约地址（Authorizer）- 通过此地址获取所有关联合约地址
      */
     address public authorizer;
-    /**
-     * @dev NFT铸造合约地址
-     */
-    address public nftMintContract;
-    /**
-     * @dev 繁殖核心合约地址
-     */
-    address public breedingCoreContract;
 
     /**
      * @dev 是否暂停市场操作
@@ -137,19 +129,14 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
 
     /**
      * @dev 初始化函数
-     * @param _nftMintContractAddress NFT铸造合约地址
      * @param _authorizerAddress 授权合约地址
-     * @param _breedingCoreContractAddress 繁殖核心合约地址
      */
-    function initialize(address _nftMintContractAddress, address _authorizerAddress, address _breedingCoreContractAddress) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "BM: Invalid authorizer address");
-        require(_breedingCoreContractAddress != address(0), "BM: Invalid breeding core address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        nftMintContract = _nftMintContractAddress;
         authorizer = _authorizerAddress;
-        breedingCoreContract = _breedingCoreContractAddress;
     }
 
     /**
@@ -159,15 +146,6 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "BM: Invalid authorizer address");
         authorizer = _authorizerAddress;
-    }
-
-    /**
-     * @dev 设置繁殖核心合约地址
-     * @param _breedingCoreContractAddress 繁殖核心合约地址
-     */
-    function setBreedingCore(address _breedingCoreContractAddress) external onlyOwnerOrAuthorizer {
-        require(_breedingCoreContractAddress != address(0), "BM: Invalid breeding core address");
-        breedingCoreContract = _breedingCoreContractAddress;
     }
 
     /**
@@ -195,6 +173,8 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     }
 
     function listForMarketBreeding(uint256 tokenId) external nonReentrant whenNotPaused {
+        address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
+        address breedingCoreContract = IAuthorizer(authorizer).getBreeding();
         require(nftMintContract != address(0), "BM: NFT contract not set");
         require(breedingCoreContract != address(0), "BM: Breeding core not set");
         require(INFTMint(nftMintContract).ownerOf(tokenId) == msg.sender, "BM: Not token owner");
@@ -248,15 +228,6 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
 
     function getMarketListingCount() external view returns (uint256) { 
         return listedTokenIds.length; 
-    }
-
-    /**
-     * @dev 设置NFT铸造合约地址
-     * @param _nftMintContractAddress NFT铸造合约地址
-     */
-    function setNFTContract(address _nftMintContractAddress) external onlyOwnerOrAuthorizer { 
-        require(_nftMintContractAddress != address(0), "BM: Invalid NFT contract address"); 
-        nftMintContract = _nftMintContractAddress; 
     }
 
     receive() external payable {}

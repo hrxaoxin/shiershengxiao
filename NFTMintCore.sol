@@ -98,19 +98,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     mapping(uint256 => uint8) public tokenGrowth;
     
     /**
-     * @dev NFT数据合约地址
-     */
-    address public nftDataContract;
-    /**
-     * @dev 代币销毁合约地址
-     */
-    address public tokenBurnerContract;
-    /**
-     * @dev 繁殖合约地址
-     */
-    address public breedingContract;
-    /**
-     * @dev 授权器合约地址（Authorizer）
+     * @dev 授权器合约地址（Authorizer）- 通过此地址获取所有关联合约地址
      */
     address public authorizer;
     
@@ -148,6 +136,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 修饰器：仅TokenBurner合约可调用
      */
     modifier onlyTokenBurner() {
+        address tokenBurnerContract = IAuthorizer(authorizer).getTokenBurner();
         require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
         require(msg.sender == tokenBurnerContract, "NFTMint: Only TokenBurner");
         _;
@@ -157,6 +146,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 修饰器：仅繁殖合约可调用
      */
     modifier onlyBreeding() {
+        address breedingContract = IAuthorizer(authorizer).getBreeding();
         require(breedingContract != address(0), "NFTMint: breedingContract not set");
         require(msg.sender == breedingContract, "NFTMint: Only Breeding");
         _;
@@ -166,6 +156,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 修饰器：仅授权合约可调用（TokenBurner或Breeding）
      */
     modifier onlyAuthorized() {
+        address tokenBurnerContract = IAuthorizer(authorizer).getTokenBurner();
+        address breedingContract = IAuthorizer(authorizer).getBreeding();
         require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
         require(breedingContract != address(0), "NFTMint: breedingContract not set");
         require(msg.sender == tokenBurnerContract || msg.sender == breedingContract, "NFTMint: Unauthorized");
@@ -182,22 +174,16 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     
     /**
      * @dev 初始化函数
-     * @param _nftDataContractAddress NFT数据合约地址
-     * @param _tokenBurnerContractAddress 代币销毁合约地址
      * @param _authorizerAddress 授权合约地址
-     * @param _breedingContractAddress 繁殖合约地址
      */
-    function initialize(address _nftDataContractAddress, address _tokenBurnerContractAddress, address _authorizerAddress, address _breedingContractAddress) public initializer {
+    function initialize(address _authorizerAddress) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         
         elementProbabilities = [32, 32, 32, 2, 2];
         rareElementProbabilities = [50, 50];
-        nftDataContract = _nftDataContractAddress;
-        tokenBurnerContract = _tokenBurnerContractAddress;
         authorizer = _authorizerAddress;
-        breedingContract = _breedingContractAddress;
         _nextCardId = 1;
     }
     
@@ -399,6 +385,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     uint256 public constant SYNC_FAILURE_WARNING_THRESHOLD = 10;
 
     function _syncNFTData(address to, uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth) internal {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
         require(nftDataContract != address(0), "NFTMint: nftDataContract not set");
         
         try INFTDataInterface(nftDataContract).syncNFTData(tokenId, zodiacType, level, growth, to) {
@@ -431,6 +418,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         FailedSync storage sync = failedSyncs[syncId];
         require(sync.retryCount < MAX_RETRY_COUNT, "NFTMint: Max retry count exceeded");
         
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
         try INFTDataInterface(nftDataContract).syncNFTData(sync.tokenId, sync.zodiacType, sync.level, sync.growth, sync.to) {
             _removeFailedSync(syncId);
         } catch {
@@ -442,6 +430,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function retryAllFailedSyncs() external onlyOwner {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
         for (uint256 i = 0; i < failedSyncCount; ) {
             FailedSync storage sync = failedSyncs[i];
             if (sync.retryCount >= MAX_RETRY_COUNT) {
@@ -464,24 +453,6 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
         delete failedSyncs[failedSyncCount - 1];
         failedSyncCount--;
-    }
-    
-    function setNftDataContract(address _nftDataContractAddress) external onlyOwnerOrAuthorizer {
-        // 修复：零地址检查，防止错误配置导致所有 mint 失败
-        require(_nftDataContractAddress != address(0), "NFTMint: nftDataContract cannot be zero address");
-        nftDataContract = _nftDataContractAddress;
-    }
-    
-    function setTokenBurnerContract(address _tokenBurnerContractAddress) external onlyOwnerOrAuthorizer {
-        // 修复：零地址检查，防止错误配置导致 burner mint 失败
-        require(_tokenBurnerContractAddress != address(0), "NFTMint: tokenBurnerContract cannot be zero address");
-        tokenBurnerContract = _tokenBurnerContractAddress;
-    }
-    
-    function setBreedingContract(address _breedingContractAddress) external onlyOwnerOrAuthorizer {
-        // 修复：零地址检查，防止错误配置导致 breeding mint 失败
-        require(_breedingContractAddress != address(0), "NFTMint: breedingContract cannot be zero address");
-        breedingContract = _breedingContractAddress;
     }
     
     /**

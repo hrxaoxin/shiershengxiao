@@ -82,10 +82,6 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      */
     address public authorizer;
     /**
-     * @dev 竞技场排名管理合约地址
-     */
-    address public arenaRankingManagerContract;
-    /**
      * @dev 赛季信息映射
      */
     mapping(uint256 => SeasonInfo) public seasons;
@@ -130,17 +126,14 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     /**
      * @dev 初始化函数
      * @param _authorizerAddress 授权合约地址
-     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
      */
     function initialize(
-        address _authorizerAddress,
-        address _arenaRankingManagerContractAddress
+        address _authorizerAddress
     ) external initializer {
         require(_authorizerAddress != address(0), "ArenaLeaderboard: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         authorizer = _authorizerAddress;
-        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
         _createSeason();
     }
     
@@ -156,14 +149,6 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "ArenaLeaderboard: Invalid authorizer address");
         authorizer = _authorizerAddress;
-    }
-    
-    /**
-     * @dev 设置竞技场排名管理合约地址
-     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
-     */
-    function setArenaRankingManagerContract(address _arenaRankingManagerContractAddress) external onlyOwnerOrAuthorizer {
-        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
     }
     
     /**

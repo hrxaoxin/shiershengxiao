@@ -82,21 +82,9 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     uint256 public marketBreedingFee = 888 * 1e18;
     /**
-     * @dev NFT铸造合约地址
-     */
-    address public nftMintContract;
-    /**
-     * @dev 授权合约地址
+     * @dev 授权合约地址（Authorizer）- 通过此地址获取所有关联合约地址
      */
     address public authorizer;
-    /**
-     * @dev 代币合约地址
-     */
-    address public tokenContract;
-    /**
-     * @dev 质押合约地址
-     */
-    address public stakingContract;
     /**
      * @dev 黑洞地址（用于销毁NFT）
      */
@@ -239,19 +227,13 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     /**
      * @dev 初始化函数
-     * @param _nftMintContractAddress NFT铸造合约地址
-     * @param _tokenContractAddress 代币合约地址
-     * @param _stakingContractAddress 质押合约地址
      * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address _nftMintContractAddress, address _tokenContractAddress, address _stakingContractAddress, address _authorizerAddress) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "BC: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        nftMintContract = _nftMintContractAddress;
-        tokenContract = _tokenContractAddress;
-        stakingContract = _stakingContractAddress;
         authorizer = _authorizerAddress;
     }
 
@@ -262,15 +244,6 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "BC: Invalid authorizer address");
         authorizer = _authorizerAddress;
-    }
-
-    /**
-     * @dev 设置质押合约地址
-     * @param _stakingContractAddress 质押合约地址
-     */
-    function setStakingContract(address _stakingContractAddress) external onlyOwnerOrAuthorizer {
-        require(_stakingContractAddress != address(0), "BC: Invalid staking contract address");
-        stakingContract = _stakingContractAddress;
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -288,6 +261,8 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     function createSelfBreedingPair(uint256 fatherId, uint256 motherId, uint256 coOwnerId) external nonReentrant whenNotPaused returns (uint256) {
+        address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
+        address stakingContract = IAuthorizer(authorizer).getStaking();
         require(nftMintContract != address(0), "BC: NFT contract not set");
         require(fatherId > 0, "BC: Invalid father");
         require(motherId > 0, "BC: Invalid mother");

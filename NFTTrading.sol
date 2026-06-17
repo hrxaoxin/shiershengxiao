@@ -110,35 +110,19 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     string public pauseReason;
 
     /**
-     * @dev 授权合约地址（Authorizer）
+     * @dev 授权合约地址（Authorizer）- 通过此地址获取所有关联合约地址
      */
     address public authorizer;
 
     /**
-     * @dev NFT合约地址
-     */
-    address public nftContract;
-
-    /**
-     * @dev 代币合约地址（ERC20）
-     */
-    address public tokenContract;
-
-    /**
      * @dev 初始化函数
-     * @param _nftContractAddress NFT合约地址
-     * @param _tokenContractAddress 代币合约地址
      * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address _nftContractAddress, address _tokenContractAddress, address _authorizerAddress) external initializer {
-        require(_nftContractAddress != address(0), "NFTTrading: Invalid NFT contract address");
-        require(_tokenContractAddress != address(0), "NFTTrading: Invalid token contract address");
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "NFTTrading: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        nftContract = _nftContractAddress;
-        tokenContract = _tokenContractAddress;
         authorizer = _authorizerAddress;
         
         // 初始化带默认值的参数
@@ -213,6 +197,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     function listNFT(uint256 tokenId, uint256 priceWei) external whenNotPaused nonReentrant {
         require(priceWei > 0, "NFTTrading: Invalid price");
         require(priceWei <= 1000 ether, "NFTTrading: Price too high");
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(INFTMint(nftContract).ownerOf(tokenId) == msg.sender, "NFTTrading: Not token owner");
         require(listings[tokenId].seller == address(0), "NFTTrading: Already listed");
@@ -242,6 +227,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(listings[tokenId].seller == msg.sender, "NFTTrading: Not owner");
 
         address seller = listings[tokenId].seller;
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
 
         // 先删除挂牌信息（Checks-Effects-Interactions 模式）
         delete listings[tokenId];
@@ -264,6 +250,9 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(tokenId > 0, "NFTTrading: Invalid token ID");
         require(msg.sender != address(0), "NFTTrading: Invalid buyer address");
         require(listings[tokenId].seller != address(0), "NFTTrading: Listing not found");
+        
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(feeReceiver != address(0), "NFTTrading: Fee receiver not set");
         require(tokenContract != address(0), "NFTTrading: Token contract not set");
@@ -318,24 +307,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         feeReceiver = _feeReceiver;
     }
 
-    /**
-     * @dev 设置NFT合约地址
-     */
-    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
-        require(_nftContractAddress != address(0), "NFTTrading: Invalid NFT contract address");
-        nftContract = _nftContractAddress;
-    }
-
-    /**
-     * @dev 设置代币合约地址
-     */
-    function setTokenContract(address _tokenContractAddress) external onlyOwnerOrAuthorizer {
-        require(_tokenContractAddress != address(0), "NFTTrading: Invalid token contract address");
-        tokenContract = _tokenContractAddress;
-        emit TokenContractUpdated(_tokenContractAddress);
-    }
-
-    event TokenContractUpdated(address newTokenContract);
+    
 
     /**
      * @dev 更新价格
@@ -508,6 +480,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     function emergencyWithdrawNFT(uint256 tokenId) external onlyOwner nonReentrant {
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         INFT nft = INFT(nftContract);
         nft.safeTransferFrom(address(this), owner(), tokenId);
@@ -516,6 +489,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "NFTTrading: Amount must be > 0");
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "NFTTrading: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "NFTTrading: Insufficient token balance");

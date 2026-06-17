@@ -118,8 +118,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     uint256 public normalNFTWeight = 66;
     uint256 public rareNFTWeight = 76;
     uint8 public minStakingLevel = 1;
-    address public rewardTokenContract;
-    address public nftContract;
     address public authorizer;
     uint256 public globalPendingRewards;
     
@@ -136,22 +134,12 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
-    function initialize(
-        address _authorizerAddress,
-        address _nftContractAddress,
-        address _rewardTokenContractAddress
-    ) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "Staking: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
-        if (_nftContractAddress != address(0)) {
-            nftContract = _nftContractAddress;
-        }
-        if (_rewardTokenContractAddress != address(0)) {
-            rewardTokenContract = _rewardTokenContractAddress;
-        }
         
         // 初始化带默认值的参数
         minStakingDuration = 30 minutes;
@@ -169,11 +157,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "Staking: Invalid authorizer address");
         authorizer = _authorizerAddress;
-    }
-
-    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
-        require(_nftContractAddress != address(0), "Staking: Invalid NFT contract address");
-        nftContract = _nftContractAddress;
     }
 
     function setMinStakingLevel(uint8 _minLevel) external onlyOwnerOrAuthorizer {
@@ -195,6 +178,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
 
     function stake(uint256[] calldata tokenIds) external whenNotPaused nonReentrant {
         require(tokenIds.length > 0, "Staking: Empty tokenIds");
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "Staking: NFT contract not set");
         
         _checkNewDay();
@@ -248,6 +232,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     function unstake(uint256[] calldata tokenIds) external whenNotPaused nonReentrant {
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "Staking: NFT contract not set");
         INFT nft = INFT(nftContract);
 
@@ -257,6 +242,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         uint256 totalClaimable = _calcUserPending(msg.sender);
         if (totalClaimable > 0) {
             // 只有在有待领取奖励时才检查奖励代币合约是否设置
+            address rewardTokenContract = IAuthorizer(authorizer).getToken();
             require(rewardTokenContract != address(0), "Staking: Reward token contract not set");
             IERC20 rewardToken = IERC20(rewardTokenContract);
             require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance for unstake");
@@ -318,6 +304,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function claimReward() external whenNotPaused nonReentrant {
         uint256[] storage nfts = userStakedNFTs[msg.sender];
         require(nfts.length > 0, "Staking: No staked NFTs");
+        address rewardTokenContract = IAuthorizer(authorizer).getToken();
         require(rewardTokenContract != address(0), "Staking: Reward token not set");
 
         // O(1) 用户级别公式计算总量
@@ -368,16 +355,17 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @dev 每日奖励计算（仅增加全局增量，不遍历用户）
      */
     function calculateDailyReward() external whenNotPaused onlyOwnerOrAuthorizer {
+        address rewardTokenContract = IAuthorizer(authorizer).getToken();
         require(rewardTokenContract != address(0), "Staking: Reward token contract not set");
         _checkNewDay();
         require(todayRewardAmount == 0, "Staking: Daily reward already calculated");
-        _doCalculateDailyReward();
+        _doCalculateDailyReward(rewardTokenContract);
     }
 
     /**
      * @dev 内部检查是否需要计算每日奖励
      */
-    function _shouldCalculateDailyReward() internal view returns (bool) {
+    function _shouldCalculateDailyReward(address rewardTokenContract) internal view returns (bool) {
         return rewardTokenContract != address(0) && 
                totalWeightedNFTs > 0;
     }
@@ -385,8 +373,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     /**
      * @dev 核心每日奖励计算逻辑（消除代码重复）
      */
-    function _doCalculateDailyReward() internal {
-        if (!_shouldCalculateDailyReward()) return;
+    function _doCalculateDailyReward(address rewardTokenContract) internal {
+        if (!_shouldCalculateDailyReward(rewardTokenContract)) return;
         
         IERC20 rewardToken = IERC20(rewardTokenContract);
         uint256 contractBalance = rewardToken.balanceOf(address(this));
@@ -486,7 +474,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      */
     function _autoCalculateDailyReward() internal {
         _checkNewDay();
-        _doCalculateDailyReward();
+        address rewardTokenContract = IAuthorizer(authorizer).getToken();
+        _doCalculateDailyReward(rewardTokenContract);
     }
 
     function _removeFromUserStakedNFTs(address user, uint256 tokenId) internal {
@@ -595,11 +584,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         return earnedReward + pendingRewards[user];
     }
 
-    function setRewardTokenContract(address _rewardTokenContractAddress) external onlyOwnerOrAuthorizer {
-        require(_rewardTokenContractAddress != address(0), "Staking: Invalid token address");
-        rewardTokenContract = _rewardTokenContractAddress;
-    }
-
     function pause(string memory reason) external onlyOwner {
         paused = true;
         pauseReason = reason;
@@ -684,6 +668,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(block.timestamp >= emergencyWithdrawUnlockTime, "Staking: Timelock not expired");
         require(amount > 0, "Staking: Amount must be > 0");
+        address rewardTokenContract = IAuthorizer(authorizer).getToken();
         require(rewardTokenContract != address(0), "Staking: Token contract not set");
         IERC20 token = IERC20(rewardTokenContract);
         require(token.balanceOf(address(this)) >= amount, "Staking: Insufficient token balance");

@@ -109,16 +109,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /** @dev 黑洞地址，用于销毁NFT和代币 */
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
     
-    /** @dev NFT合约地址 */
-    address public nftContract;
-    /** @dev 元数据合约地址 */
-    address public metadataContract;
-    /** @dev 代币合约地址 */
-    address public tokenContract;
-    /** @dev 分红管理合约地址 */
-    address public dividendManager;
-    /** @dev PancakeSwap流动性池地址 */
-    address public pancakeSwapPair;
     /** @dev 授权合约地址 */
     address public authorizer;
 
@@ -151,27 +141,15 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     /** @dev 初始化函数
      * @param initialOwner 初始所有者地址
-     * @param _nftContractAddress NFT合约地址
-     * @param _metadataContractAddress 元数据合约地址
-     * @param _tokenContractAddress 代币合约地址
-     * @param _dividendManagerAddress 分红管理合约地址
      * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address initialOwner, address _nftContractAddress, address _metadataContractAddress, address _tokenContractAddress, address _dividendManagerAddress, address _authorizerAddress) external initializer {
+    function initialize(address initialOwner, address _authorizerAddress) external initializer {
         require(initialOwner != address(0), "NFTUpdate: Invalid initial owner address");
-        require(_nftContractAddress != address(0), "NFTUpdate: Invalid NFT contract address");
-        require(_metadataContractAddress != address(0), "NFTUpdate: Invalid metadata contract address");
-        require(_tokenContractAddress != address(0), "NFTUpdate: Invalid token contract address");
-        require(_dividendManagerAddress != address(0), "NFTUpdate: Invalid dividend manager address");
         require(_authorizerAddress != address(0), "NFTUpdate: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         transferOwnership(initialOwner);
-        nftContract = _nftContractAddress;
-        metadataContract = _metadataContractAddress;
-        tokenContract = _tokenContractAddress;
-        dividendManager = _dividendManagerAddress;
         authorizer = _authorizerAddress;
         
         // 初始化带默认值的参数
@@ -185,15 +163,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         level4UpgradeCost = 480000 * 10**18;
         usdUpgradeHidden = true;
         minPancakeSwapLiquidity = 10**15;
-    }
-
-    /**
-     * @dev 设置分红管理合约地址
-     * @param a 分红管理合约地址
-     */
-    function setDividendManager(address a) external onlyOwnerOrAuthorizer {
-        require(a != address(0), "NFTUpdate: Invalid dividend manager address");
-        dividendManager = a;
     }
 
     /**
@@ -216,42 +185,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "NFTUpdate: Invalid authorizer address");
         authorizer = _authorizerAddress;
-    }
-
-    /**
-     * @dev 设置NFT合约地址
-     * @param _nftContractAddress NFT合约地址
-     */
-    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
-        require(_nftContractAddress != address(0), "NFTUpdate: Invalid NFT contract address");
-        nftContract = _nftContractAddress;
-    }
-
-    /**
-     * @dev 设置元数据合约地址
-     * @param _metadataContractAddress 元数据合约地址
-     */
-    function setMetadataContract(address _metadataContractAddress) external onlyOwnerOrAuthorizer {
-        require(_metadataContractAddress != address(0), "NFTUpdate: Invalid metadata contract address");
-        metadataContract = _metadataContractAddress;
-    }
-
-    /**
-     * @dev 设置代币合约地址
-     * @param _tokenContractAddress 代币合约地址
-     */
-    function setTokenContract(address _tokenContractAddress) external onlyOwnerOrAuthorizer {
-        require(_tokenContractAddress != address(0), "NFTUpdate: Invalid token contract address");
-        tokenContract = _tokenContractAddress;
-    }
-
-    /**
-     * @dev 设置PancakeSwap流动性池地址
-     * @param pair 流动性池地址
-     */
-    function setPancakeSwapPair(address pair) external onlyOwnerOrAuthorizer {
-        require(pair != address(0), "E27: Zero address");
-        pancakeSwapPair = pair;
     }
 
     /**

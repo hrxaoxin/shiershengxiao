@@ -105,11 +105,7 @@ contract WeightManager is
     }
 
     /**
-     * @dev NFT数据合约地址，用于查询用户NFT持有情况和计算权重
-     */
-    address public nftDataContract;
-    /**
-     * @dev 授权管理合约地址，用于配置其他合约的操作权限
+     * @dev 授权管理合约地址，用于配置其他合约的操作权限和获取关联合约地址
      */
     address public authorizer;
     /**
@@ -181,18 +177,14 @@ contract WeightManager is
      * @dev 合约初始化函数（仅可调用一次）
      * 初始化OpenZeppelin升级组件和基础参数
      * @param _authorizerAddress 授权管理合约地址，不可为零地址
-     * @param _nftDataContractAddress NFT数据合约地址
      */
-    function initialize(address _authorizerAddress, address _nftDataContractAddress) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "WeightManager: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         minOwnerWeight = 0;
         ownerWeight = 100;
         authorizer = _authorizerAddress;
-        if (_nftDataContractAddress != address(0)) {
-            nftDataContract = _nftDataContractAddress;
-        }
         
         // 初始化带默认值的参数
         weightCacheDuration = 15 minutes;
@@ -234,16 +226,6 @@ contract WeightManager is
     }
     
     /**
-     * @dev 设置NFT数据合约地址
-     * 此合约用于查询用户NFT持有情况和计算权重
-     * @param _nftDataContractAddress 新的NFT数据合约地址，不可为零地址
-     */
-    function setNFTDataContract(address _nftDataContractAddress) external onlyOwnerOrAuthorizer {
-        if (_nftDataContractAddress == address(0)) revert ZeroAddress();
-        nftDataContract = _nftDataContractAddress;
-    }
-    
-    /**
      * @dev 设置最低持有权重要求
      * 用户权重必须大于等于此值才能进入合格用户列表
      * 如果当前所有者权重低于新最小值，将自动提升所有者权重
@@ -276,9 +258,11 @@ contract WeightManager is
      */
     function _calcUserWeight(address user) internal view returns (uint256) {
         if (user == owner()) return ownerWeight;
-        if (nftDataContract == address(0)) return 0;
         
-        INFTDataInterface m = INFTDataInterface(nftDataContract);
+        address nftDataAddr = IAuthorizer(authorizer).getNFTData();
+        if (nftDataAddr == address(0)) return 0;
+        
+        INFTDataInterface m = INFTDataInterface(nftDataAddr);
         return m.calcUserWeight(user);
     }
     
@@ -304,9 +288,10 @@ contract WeightManager is
      * @param user 目标用户地址
      */
     function refreshUserWeightCache(address user) external onlyOperator {
-        if (nftDataContract == address(0)) return;
+        address nftDataAddr = IAuthorizer(authorizer).getNFTData();
+        if (nftDataAddr == address(0)) return;
         
-        INFTDataInterface nftData = INFTDataInterface(nftDataContract);
+        INFTDataInterface nftData = INFTDataInterface(nftDataAddr);
         if (user == owner()) return;
         
         uint256 weight = nftData.calcUserWeight(user);

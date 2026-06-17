@@ -118,11 +118,6 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 代币合约地址
-     */
-    address public tokenContract;
-
-    /**
      * @dev 授权合约地址（Authorizer）
      */
     address public authorizer;
@@ -130,50 +125,13 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     /**
      * @dev 初始化函数
      * @param _authorizerAddress 授权合约地址
-     * @param _tokenContractAddress 代币合约地址
-     * @param _dividendManagerAddress 分红管理合约地址
-     * @param _stakingAddress NFT质押池地址
-     * @param _tokenStakingAddress 代币质押池地址
-     * @param _arenaRewardAddress 竞技场奖励池地址
-     * @param _nftBuybackAddress NFT回购池地址
-     * @param _poolManagerAddress 资金池管理合约地址
      */
-    function initialize(
-        address _authorizerAddress,
-        address _tokenContractAddress,
-        address _dividendManagerAddress,
-        address _stakingAddress,
-        address _tokenStakingAddress,
-        address _arenaRewardAddress,
-        address _nftBuybackAddress,
-        address _poolManagerAddress
-    ) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "RewardManager: Invalid authorizer address");
-        require(_tokenContractAddress != address(0), "RewardManager: Invalid token contract address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
-        tokenContract = _tokenContractAddress;
-        
-        if (_dividendManagerAddress != address(0)) {
-            dividendPool = _dividendManagerAddress;
-        }
-        if (_stakingAddress != address(0)) {
-            nftStakingPool = _stakingAddress;
-        }
-        if (_tokenStakingAddress != address(0)) {
-            tokenStakingPool = _tokenStakingAddress;
-        }
-        if (_arenaRewardAddress != address(0)) {
-            arenaRewardPool = _arenaRewardAddress;
-        }
-        if (_nftBuybackAddress != address(0)) {
-            nftBuybackPool = _nftBuybackAddress;
-        }
-        if (_poolManagerAddress != address(0)) {
-            poolManager = _poolManagerAddress;
-        }
         
         // 设置默认 DEX Router 地址（BSC - PancakeSwap）
         dexRouter = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
@@ -212,36 +170,6 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev UUPS升级授权
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    /**
-     * @dev 分红池地址
-     */
-    address public dividendPool;
-
-    /**
-     * @dev NFT质押池地址
-     */
-    address public nftStakingPool;
-
-    /**
-     * @dev 代币质押池地址
-     */
-    address public tokenStakingPool;
-
-    /**
-     * @dev 竞技场奖励池地址
-     */
-    address public arenaRewardPool;
-
-    /**
-     * @dev NFT回购销毁池地址（用于NFT回购销毁）
-     */
-    address public nftBuybackPool;
-
-    /**
-     * @dev 资金池管理合约地址（用于追踪各池余额）
-     */
-    address public poolManager;
 
     /**
      * @dev DEX Router 配置 - 支持 FlapSwap、PancakeSwap、Uniswap
@@ -337,62 +265,6 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     );
 
     /**
-     * @dev 设置分红池地址
-     */
-    function setDividendPool(address _dividendPoolAddress) external onlyOwnerOrAuthorizer {
-        require(_dividendPoolAddress != address(0), "RewardManager: Invalid dividend pool");
-        dividendPool = _dividendPoolAddress;
-    }
-
-    /**
-     * @dev 设置NFT质押池地址
-     */
-    function setNFTStakingPool(address _stakingAddress) external onlyOwnerOrAuthorizer {
-        require(_stakingAddress != address(0), "RewardManager: Invalid NFT staking pool");
-        nftStakingPool = _stakingAddress;
-    }
-
-    /**
-     * @dev 设置代币质押池地址
-     */
-    function setTokenStakingPool(address _tokenStakingAddress) external onlyOwnerOrAuthorizer {
-        require(_tokenStakingAddress != address(0), "RewardManager: Invalid token staking pool");
-        tokenStakingPool = _tokenStakingAddress;
-    }
-
-    /**
-     * @dev 设置代币合约地址
-     */
-    function setTokenContract(address _tokenContract) external onlyOwnerOrAuthorizer {
-        require(_tokenContract != address(0), "RewardManager: Invalid token contract");
-        tokenContract = _tokenContract;
-    }
-
-    /**
-     * @dev 设置竞技场奖励池地址
-     */
-    function setArenaRewardPool(address _arenaRewardAddress) external onlyOwnerOrAuthorizer {
-        require(_arenaRewardAddress != address(0), "RewardManager: Invalid arena reward pool");
-        arenaRewardPool = _arenaRewardAddress;
-    }
-
-    /**
-     * @dev 设置NFT回购销毁池地址
-     */
-    function setNFTBuybackPool(address _nftBuybackAddress) external onlyOwnerOrAuthorizer {
-        require(_nftBuybackAddress != address(0), "RewardManager: Invalid buyback pool");
-        nftBuybackPool = _nftBuybackAddress;
-    }
-
-    /**
-     * @dev 设置资金池管理合约地址
-     */
-    function setPoolManager(address _poolManager) external onlyOwnerOrAuthorizer {
-        require(_poolManager != address(0), "RewardManager: Invalid pool manager address");
-        poolManager = _poolManager;
-    }
-
-    /**
      * @dev 设置DEX Router地址（支持 FlapSwap、PancakeSwap、Uniswap）
      * @param _dexRouter DEX Router 合约地址
      * @param _dexType DEX类型：0=FlapSwap, 1=PancakeSwap, 2=Uniswap
@@ -465,6 +337,9 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         if (amount == 0) {
             return; // 0 金额直接返回，不中断流程
         }
+        address tokenContract = IAuthorizer(authorizer).getToken();
+        address dividendPool = IAuthorizer(authorizer).getDividendManager();
+        address nftBuybackPool = IAuthorizer(authorizer).getNFTBuyback();
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         require(dexRouter != address(0), "RewardManager: DEX router not set");
 
@@ -491,11 +366,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         
         if (totalSwapAmount > 0) {
             // 兑换 BNB -> 代币
-            uint256 tokenAmount = _swapBNBToToken(totalSwapAmount);
+            uint256 tokenAmount = _swapBNBToToken(totalSwapAmount, tokenContract);
             
             if (tokenAmount > 0) {
                 // 分配兑换后的代币到NFT质押池、代币质押池和竞技场奖励池
-                _distributeSwappedTokens(tokenAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, totalSwapAmount);
+                _distributeSwappedTokens(tokenAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, totalSwapAmount, tokenContract);
             } else {
                 // 兑换失败时，将未兑换的BNB作为价值储备转入分红池（最终回退）
                 if (dividendPool != address(0)) {
@@ -531,7 +406,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     /**
      * @dev 内部函数：将BNB兑换为代币
      */
-    function _swapBNBToToken(uint256 bnbAmount) internal returns (uint256) {
+    function _swapBNBToToken(uint256 bnbAmount, address tokenContract) internal returns (uint256) {
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         
         address[] memory path = new address[](2);
@@ -566,9 +441,14 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 nftStakingBNBAmount,
         uint256 tokenStakingBNBAmount,
         uint256 arenaRewardBNBAmount,
-        uint256 totalBNBAmount
+        uint256 totalBNBAmount,
+        address tokenContract
     ) internal {
         IERC20 token = IERC20(tokenContract);
+        address nftStakingPool = IAuthorizer(authorizer).getStaking();
+        address tokenStakingPool = IAuthorizer(authorizer).getTokenStaking();
+        address arenaRewardPool = IAuthorizer(authorizer).getArenaReward();
+        address poolManager = IAuthorizer(authorizer).getPoolManager();
         
         // 计算各池应得代币数量（按BNB金额比例）
         uint256 nftStakingTokenAmount = totalTokenAmount * nftStakingBNBAmount / totalBNBAmount;
@@ -619,10 +499,15 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     function addStakingReward(uint256 amount, uint256 poolType) external onlyOwnerOrAuthorizer whenNotPaused {
         require(amount > 0, "RewardManager: Invalid amount");
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "RewardManager: Token contract not set");
 
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(msg.sender) >= amount, "RewardManager: Insufficient balance");
+
+        address nftStakingPool = IAuthorizer(authorizer).getStaking();
+        address tokenStakingPool = IAuthorizer(authorizer).getTokenStaking();
+        address arenaRewardPool = IAuthorizer(authorizer).getArenaReward();
 
         if (poolType == 0 && nftStakingPool != address(0)) {
             token.safeTransferFrom(msg.sender, nftStakingPool, amount);
@@ -655,6 +540,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     function claimDividend() external whenNotPaused nonReentrant returns (uint256) {
         address user = msg.sender;
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         
         uint256 dividend = pendingDividends[user];
@@ -679,6 +565,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             msg.sender == owner() || msg.sender == authorizer,
             "RewardManager: Not authorized to claim for other users"
         );
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         require(user != address(0), "RewardManager: Invalid user address");
         
@@ -721,6 +608,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 获取分红池余额
      */
     function dividendPoolBalance() external view returns (uint256) {
+        address tokenContract = IAuthorizer(authorizer).getToken();
+        address dividendPool = IAuthorizer(authorizer).getDividendManager();
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         return IERC20(tokenContract).balanceOf(dividendPool);
     }
@@ -729,6 +618,13 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 分配奖励到各个池
      */
     function _distributeReward(uint256 amount) internal {
+        address tokenContract = IAuthorizer(authorizer).getToken();
+        address dividendPool = IAuthorizer(authorizer).getDividendManager();
+        address nftStakingPool = IAuthorizer(authorizer).getStaking();
+        address tokenStakingPool = IAuthorizer(authorizer).getTokenStaking();
+        address arenaRewardPool = IAuthorizer(authorizer).getArenaReward();
+        address nftBuybackPool = IAuthorizer(authorizer).getNFTBuyback();
+        address poolManager = IAuthorizer(authorizer).getPoolManager();
         require(tokenContract != address(0), "RewardManager: Token contract not set");
 
         IERC20 token = IERC20(tokenContract);
@@ -938,6 +834,10 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 arenaRewardBalance,
         uint256 totalDistributed
     ) {
+        address tokenContract = IAuthorizer(authorizer).getToken();
+        address dividendPool = IAuthorizer(authorizer).getDividendManager();
+        address tokenStakingPool = IAuthorizer(authorizer).getTokenStaking();
+        address arenaRewardPool = IAuthorizer(authorizer).getArenaReward();
         IERC20 token = IERC20(tokenContract);
 
         if (dividendPool != address(0)) {
@@ -966,6 +866,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "RewardManager: Amount must be > 0");
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "RewardManager: Insufficient token balance");
@@ -985,6 +886,9 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             return;
         }
         
+        address dividendPool = IAuthorizer(authorizer).getDividendManager();
+        address tokenContract = IAuthorizer(authorizer).getToken();
+        
         uint256 dividendAmount = lockedAmount * dividendPercent / PRECISION;
         uint256 nftStakingAmount = lockedAmount * nftStakingPercent / PRECISION;
         uint256 tokenStakingAmount = lockedAmount * tokenStakingPercent / PRECISION;
@@ -1002,9 +906,9 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         
         uint256 totalSwapAmount = nftStakingAmount + tokenStakingAmount + arenaRewardAmount;
         if (totalSwapAmount > 0 && dexRouter != address(0)) {
-            uint256 tokenAmount = _swapBNBToToken(totalSwapAmount);
+            uint256 tokenAmount = _swapBNBToToken(totalSwapAmount, tokenContract);
             if (tokenAmount > 0) {
-                _distributeSwappedTokens(tokenAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, totalSwapAmount);
+                _distributeSwappedTokens(tokenAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, totalSwapAmount, tokenContract);
                 successfullyDistributed += totalSwapAmount;
             }
         }

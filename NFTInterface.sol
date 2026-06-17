@@ -542,6 +542,86 @@ interface ISetNFTBuybackPool {
     function setNFTBuybackPool(address _pool) external;
 }
 
+interface ISetWeightManager {
+    function setWeightManager(address _weightManagerAddress) external;
+}
+
+interface ISetBattleCaller {
+    function setBattleCaller(address _battleCallerAddress) external;
+}
+
+/**
+ * @title IAuthorizer
+ * @dev Authorizer 合约接口 - 用于查询全局合约地址
+ */
+interface IAuthorizer {
+    struct ContractAddresses {
+        address token;
+        address usdt;
+        address nftMintCore;
+        address nftMintBatch;
+        address nftMintMetadata;
+        address nftUpdate;
+        address nftData;
+        address tokenBurner;
+        address nftTrading;
+        address nftBuyback;
+        address staking;
+        address tokenStaking;
+        address rewardManager;
+        address dividendManager;
+        address poolManager;
+        address priceOracle;
+        address battle;
+        address battleSkillData;
+        address battleHistory;
+        address breedingCore;
+        address breedingMarket;
+        address weightManager;
+        address arenaRankingManager;
+        address arenaRankingQuery;
+        address arenaReward;
+        address arenaLeaderboard;
+        address arenaPlayer;
+        address arenaBattle;
+        address feeReceiver;
+        address pancakeSwapRouter;
+    }
+    
+    function getGlobalAddresses() external view returns (ContractAddresses memory);
+    
+    function getToken() external view returns (address);
+    function getUSDT() external view returns (address);
+    function getNFTMintCore() external view returns (address);
+    function getNFTMintBatch() external view returns (address);
+    function getNFTMintMetadata() external view returns (address);
+    function getNFTUpdate() external view returns (address);
+    function getNFTData() external view returns (address);
+    function getTokenBurner() external view returns (address);
+    function getNFTTrading() external view returns (address);
+    function getNFTBuyback() external view returns (address);
+    function getStaking() external view returns (address);
+    function getTokenStaking() external view returns (address);
+    function getRewardManager() external view returns (address);
+    function getDividendManager() external view returns (address);
+    function getPoolManager() external view returns (address);
+    function getPriceOracle() external view returns (address);
+    function getBattle() external view returns (address);
+    function getBattleSkillData() external view returns (address);
+    function getBattleHistory() external view returns (address);
+    function getBreedingCore() external view returns (address);
+    function getBreedingMarket() external view returns (address);
+    function getWeightManager() external view returns (address);
+    function getArenaRankingManager() external view returns (address);
+    function getArenaRankingQuery() external view returns (address);
+    function getArenaReward() external view returns (address);
+    function getArenaLeaderboard() external view returns (address);
+    function getArenaPlayer() external view returns (address);
+    function getArenaBattle() external view returns (address);
+    function getFeeReceiver() external view returns (address);
+    function getPancakeSwapRouter() external view returns (address);
+}
+
 /**
  * @title INFTBuyback
  * @dev NFT回购销毁合约接口

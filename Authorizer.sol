@@ -14,15 +14,27 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
     error InvalidAuthorizer();
     error ContractPaused();
+    error InvalidOldAuthorizer();
+    error ContractNotSet(bytes32 key);
 
     bool public paused;
     string public pauseReason;
 
     mapping(bytes32 => address) private _addresses;
+    /**
+     * @dev 当前设置的 authorizer 地址（用于验证旧的 authorizer）
+     */
+    address public currentAuthorizer;
+
+    /**
+     * @dev 全局合约地址结构（用于快速查询）
+     */
+    AuthorizerLib.ContractAddresses public globalAddresses;
 
     event Paused(address account, string reason);
     event Unpaused(address account);
     event ContractAddressUpdated(bytes32 key, address value);
+    event GlobalAddressesUpdated();
 
     modifier whenNotPaused() {
         if (paused) revert ContractPaused();
@@ -89,14 +101,169 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _addresses[keccak256("feeReceiver")] = _addr.feeReceiver;
         _addresses[keccak256("pancakeSwapRouter")] = _addr.pancakeSwapRouter;
 
-        AuthorizerLib.setupAllContracts(_addr);
+        // 更新全局合约地址结构（用于快速查询）
+        globalAddresses = _addr;
+        emit GlobalAddressesUpdated();
     }
 
     function setAllAuthorizers(
+        address _expectedOldAuthorizer,
         address _newAuthorizer,
         AuthorizerLib.ContractAddresses calldata _contracts
     ) external onlyOwner whenNotPaused {
+        if (_expectedOldAuthorizer != currentAuthorizer) revert InvalidOldAuthorizer();
         if (_newAuthorizer == address(0)) revert InvalidAuthorizer();
+        
+        // 更新全局合约地址结构
+        globalAddresses = _contracts;
+        emit GlobalAddressesUpdated();
+        
+        currentAuthorizer = _newAuthorizer;
         AuthorizerLib.setupAllAuthorizers(_newAuthorizer, _contracts);
+    }
+
+    /**
+     * @dev 获取全局合约地址结构
+     */
+    function getGlobalAddresses() external view returns (AuthorizerLib.ContractAddresses memory) {
+        return globalAddresses;
+    }
+
+    /**
+     * @dev 获取指定合约地址
+     * @param key 合约名称的 keccak256 hash
+     */
+    function getAddress(bytes32 key) external view returns (address) {
+        return _addresses[key];
+    }
+
+    /**
+     * @dev 设置单个合约地址
+     */
+    function setAddress(bytes32 key, address value) external onlyOwner whenNotPaused {
+        _addresses[key] = value;
+        emit ContractAddressUpdated(key, value);
+    }
+
+    // ==================== 便捷查询函数 ====================
+
+    function getToken() external view returns (address) {
+        return globalAddresses.token;
+    }
+
+    function getUSDT() external view returns (address) {
+        return globalAddresses.usdt;
+    }
+
+    function getNFTMintCore() external view returns (address) {
+        return globalAddresses.nftMintCore;
+    }
+
+    function getNFTMintBatch() external view returns (address) {
+        return globalAddresses.nftMintBatch;
+    }
+
+    function getNFTMintMetadata() external view returns (address) {
+        return globalAddresses.nftMintMetadata;
+    }
+
+    function getNFTUpdate() external view returns (address) {
+        return globalAddresses.nftUpdate;
+    }
+
+    function getNFTData() external view returns (address) {
+        return globalAddresses.nftData;
+    }
+
+    function getTokenBurner() external view returns (address) {
+        return globalAddresses.tokenBurner;
+    }
+
+    function getNFTTrading() external view returns (address) {
+        return globalAddresses.nftTrading;
+    }
+
+    function getNFTBuyback() external view returns (address) {
+        return globalAddresses.nftBuyback;
+    }
+
+    function getStaking() external view returns (address) {
+        return globalAddresses.staking;
+    }
+
+    function getTokenStaking() external view returns (address) {
+        return globalAddresses.tokenStaking;
+    }
+
+    function getRewardManager() external view returns (address) {
+        return globalAddresses.rewardManager;
+    }
+
+    function getDividendManager() external view returns (address) {
+        return globalAddresses.dividendManager;
+    }
+
+    function getPoolManager() external view returns (address) {
+        return globalAddresses.poolManager;
+    }
+
+    function getPriceOracle() external view returns (address) {
+        return globalAddresses.priceOracle;
+    }
+
+    function getBattle() external view returns (address) {
+        return globalAddresses.battle;
+    }
+
+    function getBattleSkillData() external view returns (address) {
+        return globalAddresses.battleSkillData;
+    }
+
+    function getBattleHistory() external view returns (address) {
+        return globalAddresses.battleHistory;
+    }
+
+    function getBreedingCore() external view returns (address) {
+        return globalAddresses.breedingCore;
+    }
+
+    function getBreedingMarket() external view returns (address) {
+        return globalAddresses.breedingMarket;
+    }
+
+    function getWeightManager() external view returns (address) {
+        return globalAddresses.weightManager;
+    }
+
+    function getArenaRankingManager() external view returns (address) {
+        return globalAddresses.arenaRankingManager;
+    }
+
+    function getArenaRankingQuery() external view returns (address) {
+        return globalAddresses.arenaRankingQuery;
+    }
+
+    function getArenaReward() external view returns (address) {
+        return globalAddresses.arenaReward;
+    }
+
+    function getArenaLeaderboard() external view returns (address) {
+        return globalAddresses.arenaLeaderboard;
+    }
+
+    function getArenaPlayer() external view returns (address) {
+        return globalAddresses.arenaPlayer;
+    }
+
+    function getArenaBattle() external view returns (address) {
+        return globalAddresses.arenaBattle;
+    }
+
+    function getFeeReceiver() external view returns (address) {
+        return globalAddresses.feeReceiver;
+    }
+
+    function getPancakeSwapRouter() external view returns (address) {
+        return globalAddresses.pancakeSwapRouter;
     }
 }

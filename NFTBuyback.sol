@@ -93,32 +93,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev NFT合约地址
-     */
-    address public nftContract;
-    
-    /**
-     * @dev 代币合约地址
-     */
-    address public tokenContract;
-    
-    /**
-     * @dev TokenBurner合约地址（用于获取铸造成本）
-     */
-    address public tokenBurnerContract;
-    
-    /**
-     * @dev NFTUpdate合约地址（用于获取升级成本）
-     */
-    address public nftUpdateContract;
-    
-    /**
-     * @dev NFTData合约地址（用于读取NFT铸造时间，计算持有天数加成）
-     */
-    address public nftDataContract;
-    
-    /**
-     * @dev 授权者地址（可与所有者共同管理合约）
+     * @dev 授权者地址（可与所有者共同管理合约）- 通过此地址获取所有关联合约地址
      */
     address public authorizer;
 
@@ -187,28 +162,13 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
     /**
      * @dev 初始化合约
-     * @param _nftContractAddress NFT合约地址
-     * @param _tokenContractAddress 代币合约地址
-     * @param _tokenBurnerContractAddress 代币销毁合约地址
-     * @param _nftUpdateContractAddress NFT升级合约地址
-     * @param _nftDataContractAddress NFT数据合约地址
      * @param _authorizerAddress 授权者地址
      */
-    function initialize(address _nftContractAddress, address _tokenContractAddress, address _tokenBurnerContractAddress, address _nftUpdateContractAddress, address _nftDataContractAddress, address _authorizerAddress) external initializer {
-        require(_nftContractAddress != address(0), "NFTBuyback: Invalid NFT contract address");
-        require(_tokenContractAddress != address(0), "NFTBuyback: Invalid token contract address");
-        require(_tokenBurnerContractAddress != address(0), "NFTBuyback: Invalid token burner address");
-        require(_nftUpdateContractAddress != address(0), "NFTBuyback: Invalid NFT update address");
-        require(_nftDataContractAddress != address(0), "NFTBuyback: Invalid NFT data address");
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "NFTBuyback: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        nftContract = _nftContractAddress;
-        tokenContract = _tokenContractAddress;
-        tokenBurnerContract = _tokenBurnerContractAddress;
-        nftUpdateContract = _nftUpdateContractAddress;
-        nftDataContract = _nftDataContractAddress;
         authorizer = _authorizerAddress;
     }
 
@@ -224,42 +184,6 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "NFTBuyback: Invalid authorizer address");
         authorizer = _authorizerAddress;
-    }
-
-    /**
-     * @dev 设置NFT合约地址
-     * @param _nftContractAddress NFT合约地址
-     */
-    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
-        require(_nftContractAddress != address(0), "NFTBuyback: Invalid NFT contract address");
-        nftContract = _nftContractAddress;
-    }
-
-    /**
-     * @dev 设置代币合约地址
-     * @param _tokenContractAddress 代币合约地址
-     */
-    function setTokenContract(address _tokenContractAddress) external onlyOwnerOrAuthorizer {
-        require(_tokenContractAddress != address(0), "NFTBuyback: Invalid token contract address");
-        tokenContract = _tokenContractAddress;
-    }
-
-    /**
-     * @dev 设置TokenBurner合约地址
-     * @param _tokenBurnerContractAddress TokenBurner合约地址
-     */
-    function setTokenBurnerContract(address _tokenBurnerContractAddress) external onlyOwnerOrAuthorizer {
-        require(_tokenBurnerContractAddress != address(0), "NFTBuyback: Invalid token burner address");
-        tokenBurnerContract = _tokenBurnerContractAddress;
-    }
-
-    /**
-     * @dev 设置NFTUpdate合约地址
-     * @param _nftUpdateContractAddress NFTUpdate合约地址
-     */
-    function setNFTUpdateContract(address _nftUpdateContractAddress) external onlyOwnerOrAuthorizer {
-        require(_nftUpdateContractAddress != address(0), "NFTBuyback: Invalid NFT update address");
-        nftUpdateContract = _nftUpdateContractAddress;
     }
 
     /**
@@ -378,6 +302,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return 最终回购价格
      */
     function calculateGrowthPrice(uint256 tokenId) public view returns (uint256) {
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         
         INFTMint nft = INFTMint(nftContract);
@@ -391,6 +316,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
         // 从NFTData合约读取铸造时间（持有时间加成基于链上真实铸造时间，避免需要手动同步）
         uint256 mintTime = 0;
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
         if (nftDataContract != address(0)) {
             try INFTData(nftDataContract).getNFTMintTime(tokenId) returns (uint256 m) {
                 mintTime = m;
@@ -427,6 +353,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return daysToMax 达到最高回购价所需天数
      */
     function calculateBuybackPrice(uint256 tokenId) public view returns (uint256, uint256, uint256, uint256) {
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         
         INFTMint nft = INFTMint(nftContract);
@@ -440,6 +367,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
         // 从NFTData合约读取铸造时间
         uint256 mintTime = 0;
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
         if (nftDataContract != address(0)) {
             try INFTData(nftDataContract).getNFTMintTime(tokenId) returns (uint256 m) {
                 mintTime = m;
@@ -492,6 +420,8 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function sellWithGrowthPrice(uint256 tokenId) external whenNotPaused nonReentrant {
         require(growthBuybackOpen, "NFTBuyback: Growth buyback not open");
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
 

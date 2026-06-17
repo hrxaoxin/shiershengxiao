@@ -8,6 +8,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "./NFTInterface.sol";
 
 /**
  * @title TokenStaking
@@ -78,8 +79,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /** @dev dailyRewardPerToken 最大阈值，超过时触发重置 */
     uint256 public constant MAX_DAILY_REWARD_PER_TOKEN = 1e36;
 
-    /** @dev 代币合约地址 */
-    address public tokenContract;
     /** @dev 授权合约地址 */
     address public authorizer;
 
@@ -159,11 +158,9 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     /**
      * @dev 初始化合约
-     * @param _tokenContractAddress 代币合约地址
      * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address _tokenContractAddress, address _authorizerAddress) external initializer {
-        require(_tokenContractAddress != address(0), "TokenStaking: Invalid token contract address");
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "TokenStaking: Invalid authorizer address");
         
         __Ownable2Step_init();
@@ -171,7 +168,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         __ReentrancyGuard_init();
         __Pausable_init();
 
-        tokenContract = _tokenContractAddress;
         authorizer = _authorizerAddress;
         lastRewardUpdate = block.timestamp;
         dailyRewardDistributed = 0;
@@ -236,7 +232,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(stake.amount + amount <= maxUserStaked, "TokenStaking: User stake limit exceeded");
         require(totalStakedTokens + amount <= maxTotalStaked, "TokenStaking: Total stake limit exceeded");
         
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getToken());
         require(token.balanceOf(msg.sender) >= amount, "TokenStaking: Insufficient balance");
         require(token.allowance(msg.sender, address(this)) >= amount, "TokenStaking: Insufficient allowance");
         
@@ -292,7 +288,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             stake.stakedAt = 0;
         }
         
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getToken());
         token.safeTransfer(msg.sender, amount);
         
         emit TokensUnstaked(msg.sender, amount);
@@ -391,7 +387,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         
         require(todayRewardAmount == 0, "TokenStaking: Daily reward already calculated");
 
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getToken());
         uint256 contractTokenBalance = token.balanceOf(address(this));
         // 可用奖励余额 = 总代币余额 - 已质押的代币（质押的代币需要归还用户）
         // 由于质押和奖励都在合约中，我们区分：totalStakedTokens 是用户质押的本金
@@ -439,7 +435,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 userReward = stake.accumulatedRewards;
         require(userReward > 0, "TokenStaking: No rewards to claim");
         
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
+        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getToken());
         require(token.balanceOf(address(this)) >= userReward + totalStakedTokens, 
                 "TokenStaking: Insufficient token balance in contract");
 
@@ -500,27 +496,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _;
     }
 
-    /**
-     * @dev 设置代币合约地址
-     * @param _tokenContractAddress 代币合约地址
-     */
-    function setTokenContract(address _tokenContractAddress) external onlyOwnerOrAuthorizer {
-        require(_tokenContractAddress != address(0), "TokenStaking: Invalid token contract address");
-        tokenContract = _tokenContractAddress;
-        emit TokenContractUpdated(_tokenContractAddress);
-    }
-    
-    event TokenContractUpdated(address newTokenContract);
-
-    /**
-     * @dev 设置代币合约地址（Authorizer 调用接口，与 ISetTokenAddress 匹配）
-     * @param _tokenContractAddress 代币合约地址
-     */
-    function setTokenAddress(address _tokenContractAddress) external onlyOwnerOrAuthorizer {
-        require(_tokenContractAddress != address(0), "TokenStaking: Invalid token address");
-        tokenContract = _tokenContractAddress;
-    }
-
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "TokenStaking: Invalid authorizer address");
         authorizer = _authorizerAddress;
@@ -539,7 +514,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @return uint256 代币余额
      */
     function getContractTokenBalance() external view returns (uint256) {
-        return IERC20Upgradeable(tokenContract).balanceOf(address(this));
+        return IERC20Upgradeable(IAuthorizer(authorizer).getToken()).balanceOf(address(this));
     }
 
     /**
@@ -547,7 +522,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @return uint256 奖励代币余额
      */
     function getRewardTokenBalance() external view returns (uint256) {
-        uint256 balance = IERC20Upgradeable(tokenContract).balanceOf(address(this));
+        uint256 balance = IERC20Upgradeable(IAuthorizer(authorizer).getToken()).balanceOf(address(this));
         return balance > totalStakedTokens ? balance - totalStakedTokens : 0;
     }
 
@@ -565,8 +540,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "TokenStaking: Amount must be > 0");
-        IERC20Upgradeable token = IERC20Upgradeable(tokenContract);
-        require(tokenContract != address(0), "TokenStaking: Token contract not set");
+        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getToken());
         require(amount <= token.balanceOf(address(this)), "TokenStaking: insufficient token balance");
         SafeERC20Upgradeable.safeTransfer(token, owner(), amount);
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);

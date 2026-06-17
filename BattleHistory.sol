@@ -66,13 +66,7 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 战斗合约地址
-     * 只有战斗合约可以添加战斗记录
-     */
-    address public battleContract;
-
-    /**
-     * @dev 授权合约地址（Authorizer）
+     * @dev 授权合约地址（Authorizer）- 通过此地址获取所有关联合约地址
      */
     address public authorizer;
 
@@ -111,20 +105,19 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 仅允许战斗合约调用的修饰器
      */
     modifier onlyBattleContract() {
+        address battleContract = IAuthorizer(authorizer).getBattle();
         require(msg.sender == battleContract, "BattleHistory: Only battle contract");
         _;
     }
 
     /**
      * @dev 初始化函数
-     * @param _battleContractAddress 战斗合约地址
      * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address _battleContractAddress, address _authorizerAddress) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "BattleHistory: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
-        battleContract = _battleContractAddress;
         authorizer = _authorizerAddress;
     }
 
@@ -149,15 +142,6 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     modifier onlyOwnerOrAuthorizer() {
         require(msg.sender == owner() || msg.sender == authorizer, "BattleHistory: Not authorized");
         _;
-    }
-
-    /**
-     * @dev 设置战斗合约地址
-     * @param _battleContractAddress 战斗合约地址
-     */
-    function setBattleContract(address _battleContractAddress) external onlyOwnerOrAuthorizer {
-        require(_battleContractAddress != address(0), "BattleHistory: Invalid battle contract address");
-        battleContract = _battleContractAddress;
     }
 
     /**

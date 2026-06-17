@@ -158,17 +158,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     uint256 public constant SKILL_USE_CHANCE_DENOMINATOR = 5; // 1/5概率触发技能
 
     /**
-     * @dev NFT合约地址（用于查询NFT属性和所有权）
-     */
-    address public nftContract;
-    /**
      * @dev 授权器地址（Authorizer 合约）
      */
     address public authorizer;
-    /**
-     * @dev 战斗调用者地址（通常为 ArenaRanking 合约）
-     */
-    address public battleCaller;
 
     /**
      * @dev 属性类型常量
@@ -225,24 +217,21 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * 用于战斗发起类函数（如 challenge）
      */
     modifier onlyBattleCaller() {
+        address battleCaller = IAuthorizer(authorizer).getArenaRanking();
         require(msg.sender == owner() || msg.sender == battleCaller, "Battle: Only authorized caller");
         _;
     }
 
     /**
      * @dev 初始化合约
-     * @param _nftContractAddress NFT合约地址
      * @param _authorizerAddress 授权器合约地址
-     * @param _battleCallerAddress 战斗调用者地址（通常是ArenaRanking合约）
      */
-    function initialize(address _nftContractAddress, address _authorizerAddress, address _battleCallerAddress) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "Battle: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        nftContract = _nftContractAddress;
         authorizer = _authorizerAddress;
-        battleCaller = _battleCallerAddress;
         _initSkills();
     }
 
@@ -263,28 +252,10 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     }
 
     /**
-     * @dev 设置战斗调用者地址
-     * @param _battleCallerAddress 战斗调用者地址
-     */
-    function setBattleCaller(address _battleCallerAddress) external onlyOwnerOrAuthorizer {
-        require(_battleCallerAddress != address(0), "Battle: Invalid battle caller address");
-        battleCaller = _battleCallerAddress;
-    }
-
-    /**
      * @dev 授权升级
      * @param newImplementation 新实现合约地址
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
-
-    /**
-     * @dev 设置NFT合约地址
-     * @param _nftContractAddress NFT合约地址
-     */
-    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
-        require(_nftContractAddress != address(0), "Battle: Invalid NFT contract address");
-        nftContract = _nftContractAddress;
-    }
 
     /**
      * @dev 获取NFT属性
@@ -294,6 +265,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     function _getNFTTraits(uint256 tokenId) internal view returns (NFTTraits memory) {
         NFTTraits memory traits;
         traits.tokenId = tokenId;
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         if (nftContract != address(0)) {
             (uint256 zodiacType, uint256 level, uint256 growth) = _getNFTData(tokenId);
             traits.level = uint8(level);
@@ -349,6 +321,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @return growth 成长值
      */
     function _getNFTData(uint256 tokenId) internal view returns (uint256 tokenType, uint256 level, uint256 growth) {
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         if (nftContract == address(0)) {
             return (0, 1, 50);
         }
@@ -405,6 +378,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @param team 队伍NFT数组（6个）
      */
     function _requireNFTOwnership(uint256[6] memory team) internal view {
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "Battle: NFT contract not set");
         for (uint256 i = 0; i < 6; i++) {
             uint256 tokenId = team[i];
@@ -435,6 +409,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         address challengedAddress
     ) external nonReentrant onlyBattleCaller whenNotPaused returns (bool, uint256) {
         bool isMockBattle = (challengedAddress == address(0));
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
 
         // 修复：统一验证NFT合约设置
         if (!isMockBattle) {
@@ -541,6 +516,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @param owner 所有权地址
      */
     function _requireNFTOwnershipForAddress(uint256[6] memory team, address owner) internal view {
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "Battle: NFT contract not set");
         for (uint256 i = 0; i < 6; i++) {
             uint256 tokenId = team[i];
@@ -563,6 +539,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         if (isMockBattle) {
             return true;
         }
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         if (nftContract == address(0)) return false;
         (bool success, bytes memory data) = nftContract.staticcall(
             abi.encodeWithSignature("ownerOf(uint256)", tokenId)

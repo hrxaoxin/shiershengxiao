@@ -38,14 +38,6 @@ import "./NFTInterface.sol";
  */
 contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     /**
-     * @dev 竞技场排名管理合约地址
-     */
-    address public arenaRankingManagerContract;
-    /**
-     * @dev NFT 合约地址
-     */
-    address public nftContract;
-    /**
      * @dev 授权合约地址
      */
     address public authorizer;
@@ -139,27 +131,21 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 授权检查修饰器
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == arenaRankingManagerContract, "ArenaPlayer: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer, "ArenaPlayer: Not authorized");
         _;
     }
 
     /**
      * @dev 初始化函数
-     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
-     * @param _nftContractAddress NFT 合约地址
      * @param _authorizerAddress 授权合约地址
      */
     function initialize(
-        address _arenaRankingManagerContractAddress,
-        address _nftContractAddress,
         address _authorizerAddress
     ) external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
-        nftContract = _nftContractAddress;
         authorizer = _authorizerAddress;
     }
     
@@ -192,22 +178,6 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 设置竞技场排名管理合约地址
-     * @param _arenaRankingManagerContractAddress 竞技场排名管理合约地址
-     */
-    function setArenaRankingManagerContract(address _arenaRankingManagerContractAddress) external onlyOwnerOrAuthorizer {
-        arenaRankingManagerContract = _arenaRankingManagerContractAddress;
-    }
-
-    /**
-     * @dev 设置 NFT 合约地址
-     * @param _nftContractAddress NFT 合约地址
-     */
-    function setNFTContract(address _nftContractAddress) external onlyOwnerOrAuthorizer {
-        nftContract = _nftContractAddress;
-    }
-
-    /**
      * @dev 内部函数：重置玩家的挑战次数
      * @param player 玩家地址
      */
@@ -225,6 +195,8 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function stakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
         require(tokenIds.length > 0 && tokenIds.length <= 6, "ArenaPlayer: Invalid tokenIds count");
+        
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "ArenaPlayer: NFT contract not set");
         INFT nft = INFT(nftContract);
         
@@ -246,6 +218,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function unstakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "ArenaPlayer: NFT contract not set");
         INFT nft = INFT(nftContract);
         
@@ -286,8 +259,6 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function setBattleTeam(uint256[6] calldata tokenIds) external nonReentrant whenNotPaused {
-        require(nftContract != address(0), "ArenaPlayer: NFT contract not set");
-        
         for (uint256 i = 0; i < 6; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId > 0, "ArenaPlayer: Invalid token ID");
@@ -322,7 +293,8 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function rechargeChallengeAttempts() external payable nonReentrant whenNotPaused {
-        require(IArenaRanking(arenaRankingManagerContract).currentSeasonId() > 0, "ArenaPlayer: No active season");
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        require(IArenaRanking(arenaRankingManager).currentSeasonId() > 0, "ArenaPlayer: No active season");
         
         _checkAndResetAttempts(msg.sender);
         require(rechargeCount[msg.sender] < maxRechargeAttempts, "ArenaPlayer: Max recharge attempts reached");
