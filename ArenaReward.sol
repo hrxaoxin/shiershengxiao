@@ -124,6 +124,10 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     event MockRewardDistributed(address recipient, uint256 amount, uint256 seasonId);
     /**
+     * @dev 模拟玩家奖励分配失败事件
+     */
+    event MockRewardDistributionFailed(uint256 amount, uint256 seasonId);
+    /**
      * @dev 奖励添加事件
      */
     event RewardAdded(uint256 amount);
@@ -214,14 +218,33 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 mockRewardTotal = _calculateMockRewards(seasonId, totalReward);
         uint256 distributed = _calculateRealPlayerRewards(seasonId, totalReward, mockRewardTotal);
         
-        if (mockRewardTotal > 0 && mockRewardRecipient != address(0)) {
-            _distributeMockReward(mockRewardTotal);
-            emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonId);
-        }
-        
         seasonReward.pendingRewards += distributed;
         seasonReward.rewardCalculated = true;
         seasonReward.totalDistributed = distributed;
+        
+        if (mockRewardTotal > 0 && mockRewardRecipient != address(0)) {
+            if (rewardType == 0) {
+                try {
+                    (bool success, ) = payable(mockRewardRecipient).call{value: mockRewardTotal}("");
+                    if (success) {
+                        emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonId);
+                    } else {
+                        emit MockRewardDistributionFailed(mockRewardTotal, seasonId);
+                    }
+                } catch {
+                    emit MockRewardDistributionFailed(mockRewardTotal, seasonId);
+                }
+            } else {
+                try {
+                    address tokenContract = IAuthorizer(authorizer).getToken();
+                    require(tokenContract != address(0), "ArenaReward: Token contract not set");
+                    SafeERC20.safeTransfer(IERC20(tokenContract), mockRewardRecipient, mockRewardTotal);
+                    emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonId);
+                } catch {
+                    emit MockRewardDistributionFailed(mockRewardTotal, seasonId);
+                }
+            }
+        }
         
         emit SeasonRewardsCalculated(seasonId, totalReward, distributed);
     }

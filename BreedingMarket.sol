@@ -174,7 +174,7 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
 
     function listForMarketBreeding(uint256 tokenId) external nonReentrant whenNotPaused {
         address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
-        address breedingCoreContract = IAuthorizer(authorizer).getBreeding();
+        address breedingCoreContract = IAuthorizer(authorizer).getBreedingCore();
         require(nftMintContract != address(0), "BM: NFT contract not set");
         require(breedingCoreContract != address(0), "BM: Breeding core not set");
         require(INFTMint(nftMintContract).ownerOf(tokenId) == msg.sender, "BM: Not token owner");

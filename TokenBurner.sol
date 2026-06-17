@@ -277,33 +277,32 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
         address tokenAddress = IAuthorizer(authorizer).getToken();
         address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
+        address nftMintBatchAddress = IAuthorizer(authorizer).getNFTMintBatch();
         require(tokenAddress != address(0), "TokenBurner: tokenContract not set");
         require(nftMintAddress != address(0), "TokenBurner: nftMintContract not set");
+        require(nftMintBatchAddress != address(0), "TokenBurner: nftMintBatchContract not set");
 
         IERC20 token = IERC20(tokenAddress);
         uint256 cost = isRare ? rareMintCost * 10 : normalMintCost * 10;
         require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
-        // 修复：使用 SafeERC20.safeTransferFrom 确保安全
         token.safeTransferFrom(user, BLACK_HOLE, cost);
 
         emit TokenBurned(user, cost, block.timestamp);
 
-        INFTMint nftMint = INFTMint(nftMintAddress);
+        INFTMintBatch nftMintBatch = INFTMintBatch(nftMintBatchAddress);
+        uint256[] memory tokenIds;
         if (isRare) {
-            for (uint256 i = 0; i < 10; i++) {
-                uint256 tokenId = nftMint.mintRare(user);
-                require(tokenId > 0, "TokenBurner: NFT mint failed");
-                uint256 zodiacType = nftMint.tokenType(tokenId);
-                emit NFTMinted(user, tokenId, zodiacType, true);
-            }
+            tokenIds = nftMintBatch.mintRareTen(user);
         } else {
-            for (uint256 i = 0; i < 10; i++) {
-                uint256 tokenId = nftMint.mintNormal(user);
-                require(tokenId > 0, "TokenBurner: NFT mint failed");
-                uint256 zodiacType = nftMint.tokenType(tokenId);
-                emit NFTMinted(user, tokenId, zodiacType, false);
-            }
+            tokenIds = nftMintBatch.mintNormalTen(user);
+        }
+        require(tokenIds.length == 10, "TokenBurner: Batch mint failed");
+
+        INFTMint nftMint = INFTMint(nftMintAddress);
+        for (uint256 i = 0; i < 10; i++) {
+            uint256 zodiacType = nftMint.tokenType(tokenIds[i]);
+            emit NFTMinted(user, tokenIds[i], zodiacType, isRare);
         }
 
         return true;

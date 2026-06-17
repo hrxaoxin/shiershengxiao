@@ -72,9 +72,6 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /// @dev 授权合约地址
     address public authorizer;
     
-    /// @dev 分红管理合约地址
-    address public dividendManager;
-    
     event LevelUpdated(uint256 indexed tokenId, uint8 oldLevel, uint8 newLevel, uint64 timestamp);
 
     /**
@@ -150,16 +147,12 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 初始化函数
      * @param _authorizerAddress 授权合约地址
-     * @param _dividendManagerAddress 分红管理合约地址
      */
-    function initialize(address _authorizerAddress, address _dividendManagerAddress) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "NFTData: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         authorizer = _authorizerAddress;
-        if (_dividendManagerAddress != address(0)) {
-            dividendManager = _dividendManagerAddress;
-        }
     }
 
     /**
@@ -174,15 +167,6 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "NFTData: Invalid authorizer address");
         authorizer = _authorizerAddress;
-    }
-
-    /**
-     * @dev 设置分红管理合约地址
-     * @param _dividendManagerAddress 分红管理合约地址
-     */
-    function setDividendManager(address _dividendManagerAddress) external onlyOwnerOrAuthorizer {
-        require(_dividendManagerAddress != address(0), "NFTData: Invalid dividend manager address");
-        dividendManager = _dividendManagerAddress;
     }
 
     /**
@@ -561,6 +545,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _addUserNFT(to, tokenId);
         _addToTypeOwners(zodiacType, to);
         
+        address dividendManager = IAuthorizer(authorizer).getDividendManager();
         if (dividendManager != address(0)) {
             uint8 element = uint8(zodiacType / 24);
             IDividendManager(dividendManager).updateUserWeight(to, uint256(level), true, element);

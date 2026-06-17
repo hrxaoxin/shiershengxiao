@@ -240,18 +240,17 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return 总铸造成本
      */
     function getNFTMintCost(uint8 level, bool isRare) public view returns (uint256) {
+        address tokenBurnerContract = IAuthorizer(authorizer).getTokenBurner();
         require(tokenBurnerContract != address(0), "NFTBuyback: Token burner not set");
         
-        // 获取铸造成本
         (uint256 normalCost, uint256 rareCost) = ITokenBurner(tokenBurnerContract).getAllCosts();
         uint256 baseCost = isRare ? rareCost : normalCost;
 
-        // 1阶只需铸造成本
         if (level == 1) {
             return baseCost;
         }
 
-        // 获取升级成本
+        address nftUpdateContract = IAuthorizer(authorizer).getNFTUpdate();
         uint256[4] memory upgradeCosts = INFTUpdate(nftUpdateContract).getAllLevelUpgradeCosts();
         uint256 level1Cost = upgradeCosts[0];
         uint256 level2Cost = upgradeCosts[1];
@@ -335,7 +334,13 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
         // 计算实际加成天数（不超过最大加成天数）
         uint256 bonusDays = holdingDays > maxBonusDays ? maxBonusDays : holdingDays;
-        uint256 bonus = (basePrice * bonusDays) / daysToBreakEven;
+        
+        // 修复：添加溢出检查
+        uint256 bonus = 0;
+        if (bonusDays > 0 && daysToBreakEven > 0) {
+            require(basePrice <= type(uint256).max / bonusDays, "NFTBuyback: Bonus calculation overflow");
+            bonus = (basePrice * bonusDays) / daysToBreakEven;
+        }
 
         // 计算最终价格（不超过最高价格）
         uint256 finalPrice = basePrice + bonus;
@@ -450,6 +455,8 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function sellWithFixedPrice(uint256 tokenId) external whenNotPaused nonReentrant {
         require(fixedBuybackOpen, "NFTBuyback: Fixed buyback not open");
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
 
@@ -457,14 +464,11 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(nft.ownerOf(tokenId) == msg.sender, "NFTBuyback: Not owner");
         require(fixedBuybackPrice > 0, "NFTBuyback: Fixed price not set");
 
-        // 检查合约余额
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= fixedBuybackPrice, "NFTBuyback: Insufficient contract balance");
 
-        // 转移NFT到黑洞（销毁）
         nft.safeTransferFrom(msg.sender, BLACK_HOLE, tokenId);
         
-        // 转移代币给卖家
         token.safeTransfer(msg.sender, fixedBuybackPrice);
 
         emit NFTBurnedForBuyback(tokenId, msg.sender, fixedBuybackPrice, "fixed");
@@ -477,6 +481,8 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return NFT总供应量
      */
     function calculateBalanceRatioPrice() public view returns (uint256, uint256, uint256) {
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
         
@@ -499,36 +505,25 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function sellWithBalanceRatioPrice(uint256 tokenId) external whenNotPaused nonReentrant {
         require(balanceRatioBuybackOpen, "NFTBuyback: Balance ratio buyback not open");
+        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
         
         INFTMint nft = INFTMint(nftContract);
         require(nft.ownerOf(tokenId) == msg.sender, "NFTBuyback: Not owner");
         
-        // 计算回购价格
         (uint256 buybackPrice, , ) = calculateBalanceRatioPrice();
         require(buybackPrice > 0, "NFTBuyback: Buyback price is zero");
         
-        // 检查合约余额
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= buybackPrice, "NFTBuyback: Insufficient contract balance");
         
-        // 转移NFT到黑洞（销毁）
         nft.safeTransferFrom(msg.sender, BLACK_HOLE, tokenId);
         
-        // 转移代币给卖家
         token.safeTransfer(msg.sender, buybackPrice);
         
         emit NFTBurnedForBuyback(tokenId, msg.sender, buybackPrice, "balanceRatio");
-    }
-
-    /**
-     * @dev 设置NFTData合约地址（仅授权者可调用）
-     * @param _nftDataContractAddress NFTData合约地址
-     */
-    function setNFTDataContract(address _nftDataContractAddress) external onlyOwnerOrAuthorizer {
-        require(_nftDataContractAddress != address(0), "NFTBuyback: Invalid NFT data address");
-        nftDataContract = _nftDataContractAddress;
     }
 
     /**
@@ -537,6 +532,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "NFTBuyback: Amount must be > 0");
+        address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "NFTBuyback: Insufficient balance");

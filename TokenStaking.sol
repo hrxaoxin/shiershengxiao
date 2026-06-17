@@ -196,13 +196,12 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /**
      * @dev 接收代币奖励（通过 token.transfer 进入合约）
      * 提供一个记录函数供外部调用以更新流入统计
-     * 
-     * 说明：该函数不设访问控制是因为 RewardManager 合约会调用它来记录流入，
-     * 但调用时 msg.sender 是 RewardManager 本身（而非 Authorizer）。
-     * 该函数仅更新统计数据，不涉及资金转移，风险较低。
+     * 仅允许 RewardManager 合约或授权地址调用
      */
     function recordIncomingTokens(uint256 amount) external {
         require(amount > 0, "TokenStaking: Amount must be > 0");
+        require(msg.sender == owner() || msg.sender == authorizer || msg.sender == IAuthorizer(authorizer).getRewardManager(), 
+                "TokenStaking: Not authorized");
         _checkNewDay();
         todayIncomingTokens += amount;
         emit IncomingTokensRecorded(amount, todayIncomingTokens);

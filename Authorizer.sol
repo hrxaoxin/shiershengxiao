@@ -100,6 +100,9 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _addresses[keccak256("arenaBattle")] = _addr.arenaBattle;
         _addresses[keccak256("feeReceiver")] = _addr.feeReceiver;
         _addresses[keccak256("pancakeSwapRouter")] = _addr.pancakeSwapRouter;
+        _addresses[keccak256("flapSwapRouter")] = _addr.flapSwapRouter;
+        _addresses[keccak256("uniswapRouter")] = _addr.uniswapRouter;
+        _addresses[keccak256("wbnb")] = _addr.wbnb;
 
         // 更新全局合约地址结构（用于快速查询）
         globalAddresses = _addr;
@@ -265,5 +268,17 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
 
     function getPancakeSwapRouter() external view returns (address) {
         return globalAddresses.pancakeSwapRouter;
+    }
+
+    function getFlapSwapRouter() external view returns (address) {
+        return globalAddresses.flapSwapRouter;
+    }
+
+    function getUniswapRouter() external view returns (address) {
+        return globalAddresses.uniswapRouter;
+    }
+
+    function getWBNB() external view returns (address) {
+        return globalAddresses.wbnb;
     }
 }

@@ -35,6 +35,9 @@ library AuthorizerLib {
         address arenaBattle;
         address feeReceiver;
         address pancakeSwapRouter;
+        address flapSwapRouter;
+        address uniswapRouter;
+        address wbnb;
     }
 
     /**

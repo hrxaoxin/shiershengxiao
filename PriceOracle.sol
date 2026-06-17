@@ -106,16 +106,6 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     uint256 public constant MAX_PRICE_CHANGE_PERCENT = 5000;
 
     /**
-     * @dev 代币地址
-     */
-    address public tokenAddress;
-
-    /**
-     * @dev USDT代币地址
-     */
-    address public usdtAddress;
-
-    /**
      * @dev 授权合约地址（Authorizer）
      */
     address public authorizer;
@@ -126,35 +116,12 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     event Paused(address account, string reason);
     event Unpaused(address account);
     
-    function initialize(
-        address _authorizerAddress,
-        address _tokenContractAddress,
-        address _usdtContractAddress,
-        address _pancakeSwapRouterAddress
-    ) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "PriceOracle: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
-        
-        if (_tokenContractAddress != address(0)) {
-            tokenAddress = _tokenContractAddress;
-        }
-        if (_usdtContractAddress != address(0)) {
-            usdtAddress = _usdtContractAddress;
-        }
-        if (_pancakeSwapRouterAddress != address(0)) {
-            pancakeSwapRouter = _pancakeSwapRouterAddress;
-            wbnb = IDexRouter(_pancakeSwapRouterAddress).WETH();
-            activeDEX = 1;
-        } else {
-            // 设置默认 DEX Router 地址（BSC 链）
-            pancakeSwapRouter = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
-            uniswapRouter = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-            wbnb = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
-            activeDEX = 1;
-        }
         
         // 初始化带默认值的参数
         priceValidityPeriod = 86400;
@@ -241,13 +208,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     uint256 public constant USDT_PRECISION = 10**6;
 
-    /**
-     * @dev DEX Router 配置 - 支持 FlapSwap、PancakeSwap、Uniswap
-     */
-    address public flapSwapRouter;
-    address public pancakeSwapRouter;
-    address public uniswapRouter;
-    address public wbnb;
+    
     
     /**
      * @dev 当前活跃的DEX类型
@@ -386,88 +347,6 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 设置代币地址
-     *
-     * @param _tokenContractAddress 代币合约地址
-     */
-    function setTokenAddress(address _tokenContractAddress) external onlyOwnerOrAuthorizer {
-        require(_tokenContractAddress != address(0), "PriceOracle: Invalid token address");
-        tokenAddress = _tokenContractAddress;
-    }
-
-    /**
-     * @dev 设置USDT地址
-     *
-     * @param _usdtContractAddress USDT代币合约地址
-     */
-    function setUSDTAddress(address _usdtContractAddress) external onlyOwnerOrAuthorizer {
-        require(_usdtContractAddress != address(0), "PriceOracle: Invalid USDT address");
-        usdtAddress = _usdtContractAddress;
-    }
-
-    /**
-     * @dev 设置PancakeSwap Router地址
-     * @param _pancakeSwapRouterAddress PancakeSwap Router 地址
-     */
-    function setPancakeSwapRouter(address _pancakeSwapRouterAddress) external onlyOwnerOrAuthorizer {
-        require(_pancakeSwapRouterAddress != address(0), "PriceOracle: Invalid PancakeSwap router address");
-        pancakeSwapRouter = _pancakeSwapRouterAddress;
-        activeDEX = 1;
-        wbnb = IDexRouter(_pancakeSwapRouterAddress).WETH();
-    }
-
-    /**
-     * @dev 设置DEX Router地址（支持 FlapSwap、PancakeSwap、Uniswap）
-     * @param _flapSwapRouter FlapSwap Router 地址
-     * @param _pancakeSwapRouter PancakeSwap Router 地址
-     * @param _uniswapRouter Uniswap Router 地址
-     */
-    function setDEXRouters(address _flapSwapRouter, address _pancakeSwapRouter, address _uniswapRouter) external onlyOwner {
-        require(
-            _flapSwapRouter != address(0) || _pancakeSwapRouter != address(0) || _uniswapRouter != address(0),
-            "PriceOracle: At least one DEX router must be valid"
-        );
-        flapSwapRouter = _flapSwapRouter;
-        pancakeSwapRouter = _pancakeSwapRouter;
-        uniswapRouter = _uniswapRouter;
-        
-        // 设置默认活跃DEX（优先使用PancakeSwap，如果可用）
-        if (_pancakeSwapRouter != address(0)) {
-            activeDEX = 1;
-            wbnb = IDexRouter(_pancakeSwapRouter).WETH();
-        } else if (_flapSwapRouter != address(0)) {
-            activeDEX = 0;
-            wbnb = IDexRouter(_flapSwapRouter).WETH();
-        } else if (_uniswapRouter != address(0)) {
-            activeDEX = 2;
-            wbnb = IDexRouter(_uniswapRouter).WETH();
-        }
-    }
-
-    /**
-     * @dev 设置活跃DEX
-     * @param _dexType DEX类型（0=FlapSwap, 1=PancakeSwap, 2=Uniswap）
-     */
-    function setActiveDEX(uint8 _dexType) external onlyOwner {
-        require(_dexType <= 2, "PriceOracle: Invalid DEX type");
-        
-        address router;
-        if (_dexType == 0) {
-            require(flapSwapRouter != address(0), "PriceOracle: FlapSwap not configured");
-            router = flapSwapRouter;
-        } else if (_dexType == 1) {
-            require(pancakeSwapRouter != address(0), "PriceOracle: PancakeSwap not configured");
-            router = pancakeSwapRouter;
-        } else {
-            require(uniswapRouter != address(0), "PriceOracle: Uniswap not configured");
-            router = uniswapRouter;
-        }
-        
-        activeDEX = _dexType;
-        wbnb = IDexRouter(router).WETH();
-    }
-
-    /**
      * @dev 设置自动价格获取开关
      */
     function setAutoPriceEnabled(bool enabled) external onlyOwner {
@@ -519,15 +398,19 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 获取当前活跃的DEX Router
      */
     function _getActiveRouter() internal view returns (address) {
-        if (activeDEX == 0) return flapSwapRouter;
-        if (activeDEX == 1) return pancakeSwapRouter;
-        return uniswapRouter;
+        if (activeDEX == 0) return IAuthorizer(authorizer).getFlapSwapRouter();
+        if (activeDEX == 1) return IAuthorizer(authorizer).getPancakeSwapRouter();
+        return IAuthorizer(authorizer).getUniswapRouter();
     }
 
     /**
      * @dev 从DEX获取代币价格
      */
     function _fetchTokenPrice(address router) internal view returns (uint256) {
+        address tokenAddress = IAuthorizer(authorizer).getToken();
+        address usdtAddress = IAuthorizer(authorizer).getUSDT();
+        address wbnb = IAuthorizer(authorizer).getWBNB();
+        
         if (tokenAddress == address(0) || usdtAddress == address(0) || wbnb == address(0)) {
             return 0;
         }
@@ -553,6 +436,9 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 从DEX获取ETH价格
      */
     function _fetchETHPrice(address router) internal view returns (uint256) {
+        address usdtAddress = IAuthorizer(authorizer).getUSDT();
+        address wbnb = IAuthorizer(authorizer).getWBNB();
+        
         if (usdtAddress == address(0) || wbnb == address(0)) {
             return 0;
         }
@@ -580,6 +466,10 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 tokenPriceSum = 0;
         uint256 ethPriceSum = 0;
         uint256 count = 0;
+        
+        address flapSwapRouter = IAuthorizer(authorizer).getFlapSwapRouter();
+        address pancakeSwapRouter = IAuthorizer(authorizer).getPancakeSwapRouter();
+        address uniswapRouter = IAuthorizer(authorizer).getUniswapRouter();
         
         // 从FlapSwap获取
         if (flapSwapRouter != address(0)) {

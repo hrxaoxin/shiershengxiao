@@ -40,11 +40,6 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     using NFTLib for uint256;
     
     /**
-     * @dev NFT铸造核心合约地址
-     */
-    address public nftMintCore;
-    
-    /**
      * @dev 授权合约地址（Authorizer）
      */
     address public authorizer;
@@ -71,7 +66,7 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @dev 修饰器：仅TokenBurner合约可调用
      */
     modifier onlyTokenBurner() {
-        require(msg.sender == INFTMintCore(nftMintCore).tokenBurnerContract(), "NFTMintBatch: Only TokenBurner");
+        require(msg.sender == IAuthorizer(authorizer).getTokenBurner(), "NFTMintBatch: Only TokenBurner");
         _;
     }
     
@@ -85,16 +80,13 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     
     /**
      * @dev 初始化函数
-     * @param _nftMintCoreAddress NFT铸造核心合约地址
      * @param _authorizerAddress 授权合约地址
      */
-    function initialize(address _nftMintCoreAddress, address _authorizerAddress) public initializer {
+    function initialize(address _authorizerAddress) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
-        require(_nftMintCoreAddress != address(0), "NFTMintBatch: Invalid NFTMintCore address");
         require(_authorizerAddress != address(0), "NFTMintBatch: Invalid authorizer address");
-        nftMintCore = _nftMintCoreAddress;
         authorizer = _authorizerAddress;
     }
     
@@ -112,6 +104,7 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function mintBatch(address to, uint256[] calldata zodiacTypes) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Zero address");
         uint256[] memory tokenIds = new uint256[](zodiacTypes.length);
+        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
         
         for (uint256 i = 0; i < zodiacTypes.length; i++) {
             require(zodiacTypes[i] < 120, "NFTMint: Invalid type");
@@ -131,6 +124,7 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function mintNormalTen(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Zero address");
         uint256[] memory tokenIds = new uint256[](10);
+        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
         uint256 baseSeed = INFTMintCore(nftMintCore).generateSecureRandom();
         
         for (uint256 i = 0; i < 10; i++) {
@@ -154,6 +148,7 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function mintRareTen(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
         require(to != address(0), "NFTMint: Zero address");
         uint256[] memory tokenIds = new uint256[](10);
+        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
         uint256 baseSeed = INFTMintCore(nftMintCore).generateSecureRandom();
         
         for (uint256 i = 0; i < 10; i++) {
@@ -174,6 +169,7 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(baseZodiac < 12, "NFTMint: Invalid base zodiac");
         
         uint256[] memory tokenIds = new uint256[](10);
+        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
         uint256 baseSeed = INFTMintCore(nftMintCore).generateSecureRandom();
         
         for (uint256 element = 0; element < 5; element++) {
@@ -192,6 +188,7 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
     
     function _mintNormalType(uint256 randomSeed) internal view returns (uint256) {
+        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
         uint256[5] memory probabilities = INFTMintCore(nftMintCore).elementProbabilities();
         uint256[5] memory cumulative;
         cumulative[0] = probabilities[0];
@@ -214,6 +211,7 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
     
     function _mintRareType(uint256 randomSeed) internal view returns (uint256) {
+        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
         uint256[2] memory probabilities = INFTMintCore(nftMintCore).rareElementProbabilities();
         uint256 roll = randomSeed % 100;
         uint256 element = roll < probabilities[0] ? 3 : 4;
@@ -221,11 +219,6 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 zodiac = (randomSeed / 100) % 12;
         uint256 gender = (randomSeed / 100 / 12) % 2;
         return NFTLib.calculateZodiacType(element, zodiac, gender);
-    }
-    
-    function setNftMintCore(address _nftMintCoreAddress) external onlyOwnerOrAuthorizer {
-        require(_nftMintCoreAddress != address(0), "NFTMintBatch: Invalid address");
-        nftMintCore = _nftMintCoreAddress;
     }
     
     /**

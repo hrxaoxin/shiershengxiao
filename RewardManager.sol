@@ -133,11 +133,6 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
         
-        // 设置默认 DEX Router 地址（BSC - PancakeSwap）
-        dexRouter = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
-        activeDEX = 1; // 1 = PancakeSwap
-        wbnb = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
-        
         // 初始化带默认值的参数
         autoSwapEnabled = true;
         minSwapAmount = 1000000000000000;
@@ -171,11 +166,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    /**
-     * @dev DEX Router 配置 - 支持 FlapSwap、PancakeSwap、Uniswap
-     */
-    address public dexRouter;
-    address public wbnb;
+    
     
     /**
      * @dev 自动兑换设置
@@ -265,23 +256,6 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     );
 
     /**
-     * @dev 设置DEX Router地址（支持 FlapSwap、PancakeSwap、Uniswap）
-     * @param _dexRouter DEX Router 合约地址
-     * @param _dexType DEX类型：0=FlapSwap, 1=PancakeSwap, 2=Uniswap
-     */
-    function setDEXRouter(address _dexRouter, uint8 _dexType) external onlyOwner {
-        require(_dexRouter != address(0), "RewardManager: Invalid DEX router");
-        require(_dexType <= 2, "RewardManager: Invalid DEX type");
-        
-        dexRouter = _dexRouter;
-        activeDEX = _dexType;
-        // 自动获取 WBNB 地址
-        wbnb = IDexRouter(_dexRouter).WETH();
-        
-        emit DEXRouterUpdated(_dexRouter, _dexType);
-    }
-
-    /**
      * @dev 设置自动兑换开关
      */
     function setAutoSwapEnabled(bool enabled) external onlyOwner {
@@ -309,12 +283,12 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 接收BNB并自动处理
      */
     receive() external payable {
-        if (msg.value > 0 && autoSwapEnabled && dexRouter != address(0)) {
-            if (msg.value >= minSwapAmount) {
-                _distributeBNB(msg.value);
-            }
+        if (msg.value > 0) {
+            emit BNBReceived(msg.sender, msg.value);
         }
     }
+    
+    event BNBReceived(address indexed sender, uint256 amount);
 
     /**
      * @dev 手动触发BNB分配（用于处理小额BNB或调试）
@@ -340,6 +314,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         address tokenContract = IAuthorizer(authorizer).getToken();
         address dividendPool = IAuthorizer(authorizer).getDividendManager();
         address nftBuybackPool = IAuthorizer(authorizer).getNFTBuyback();
+        address dexRouter = IAuthorizer(authorizer).getPancakeSwapRouter();
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         require(dexRouter != address(0), "RewardManager: DEX router not set");
 
@@ -408,6 +383,17 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     function _swapBNBToToken(uint256 bnbAmount, address tokenContract) internal returns (uint256) {
         require(tokenContract != address(0), "RewardManager: Token contract not set");
+        
+        // 根据 activeDEX 选择正确的 DEX 路由
+        address dexRouter;
+        if (activeDEX == 1) {
+            dexRouter = IAuthorizer(authorizer).getPancakeSwapRouter();
+        } else if (activeDEX == 2) {
+            dexRouter = IAuthorizer(authorizer).getUniswapRouter();
+        } else {
+            dexRouter = IAuthorizer(authorizer).getFlapSwapRouter();
+        }
+        address wbnb = IAuthorizer(authorizer).getWBNB();
         
         address[] memory path = new address[](2);
         path[0] = wbnb;
@@ -888,6 +874,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         
         address dividendPool = IAuthorizer(authorizer).getDividendManager();
         address tokenContract = IAuthorizer(authorizer).getToken();
+        address dexRouter = IAuthorizer(authorizer).getPancakeSwapRouter();
         
         uint256 dividendAmount = lockedAmount * dividendPercent / PRECISION;
         uint256 nftStakingAmount = lockedAmount * nftStakingPercent / PRECISION;

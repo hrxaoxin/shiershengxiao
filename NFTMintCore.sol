@@ -146,7 +146,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 修饰器：仅繁殖合约可调用
      */
     modifier onlyBreeding() {
-        address breedingContract = IAuthorizer(authorizer).getBreeding();
+        address breedingContract = IAuthorizer(authorizer).getBreedingCore();
         require(breedingContract != address(0), "NFTMint: breedingContract not set");
         require(msg.sender == breedingContract, "NFTMint: Only Breeding");
         _;
@@ -157,7 +157,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     modifier onlyAuthorized() {
         address tokenBurnerContract = IAuthorizer(authorizer).getTokenBurner();
-        address breedingContract = IAuthorizer(authorizer).getBreeding();
+        address breedingContract = IAuthorizer(authorizer).getBreedingCore();
         require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
         require(breedingContract != address(0), "NFTMint: breedingContract not set");
         require(msg.sender == tokenBurnerContract || msg.sender == breedingContract, "NFTMint: Unauthorized");

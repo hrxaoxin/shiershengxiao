@@ -51,11 +51,6 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     using Base64 for bytes;
     
     /**
-     * @dev NFT铸造核心合约地址
-     */
-    address public nftMintCore;
-    
-    /**
      * @dev 授权合约地址（Authorizer）
      */
     address public authorizer;
@@ -98,7 +93,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 修饰器：仅NFTMintCore合约可调用
      */
     modifier onlyMintCore() {
-        require(msg.sender == nftMintCore, "NFTMintMetadata: Only NFTMintCore");
+        require(msg.sender == IAuthorizer(authorizer).getNFTMintCore(), "NFTMintMetadata: Only NFTMintCore");
         _;
     }
     
@@ -112,22 +107,18 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     
     /**
      * @dev 初始化函数
-     * @param _nftMintCoreAddress NFT铸造核心合约地址
      * @param _authorizerAddress 授权合约地址
      * @param _ipfsBaseNormal 普通NFT的IPFS基础URL（可选，有默认值）
      * @param _ipfsBaseRare 稀有NFT的IPFS基础URL（可选，有默认值）
      */
     function initialize(
-        address _nftMintCoreAddress, 
         address _authorizerAddress,
         string calldata _ipfsBaseNormal,
         string calldata _ipfsBaseRare
     ) public initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
-        require(_nftMintCoreAddress != address(0), "NFTMintMetadata: Invalid NFTMintCore address");
         require(_authorizerAddress != address(0), "NFTMintMetadata: Invalid authorizer address");
-        nftMintCore = _nftMintCoreAddress;
         authorizer = _authorizerAddress;
         
         if (bytes(_ipfsBaseNormal).length > 0) {
@@ -154,6 +145,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @return TokenURI字符串
      */
     function tokenURI(uint256 tokenId) public view returns (string memory) {
+        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
         require(INFTMintCore(nftMintCore)._exists(tokenId), "NFTMint: Token not exists");
         
         uint256 tokenType_ = INFTMintCore(nftMintCore).tokenType(tokenId);
@@ -169,6 +161,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @return NFTDataResult 包含NFT的所有属性信息
      */
     function getNFTData(uint256 tokenId) external view returns (NFTDataResult memory) {
+        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
         require(INFTMintCore(nftMintCore)._exists(tokenId), "NFTMint: Token not exists");
         
         uint256 t = INFTMintCore(nftMintCore).tokenType(tokenId);
@@ -206,11 +199,6 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         return NFTLib.buildTokenURIJson(tokenId, tokenType_, level, element, zodiac, isMale, isRare, imagePath);
     }
     
-    function setNftMintCore(address _nftMintCoreAddress) external onlyOwnerOrAuthorizer {
-        require(_nftMintCoreAddress != address(0), "NFTMintMetadata: Invalid address");
-        nftMintCore = _nftMintCoreAddress;
-    }
-
     function setIPFSBases(string calldata _ipfsBaseNormal, string calldata _ipfsBaseRare) external onlyOwnerOrAuthorizer {
         ipfsBaseNormal = _ipfsBaseNormal;
         ipfsBaseRare = _ipfsBaseRare;

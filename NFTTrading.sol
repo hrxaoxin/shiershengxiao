@@ -99,11 +99,6 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     uint256 public totalVolume;
 
     /**
-     * @dev 手续费接收地址
-     */
-    address public feeReceiver;
-
-    /**
      * @dev 紧急暂停
      */
     bool public paused;
@@ -253,6 +248,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         
         address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         address tokenContract = IAuthorizer(authorizer).getToken();
+        address feeReceiver = IAuthorizer(authorizer).getFeeReceiver();
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(feeReceiver != address(0), "NFTTrading: Fee receiver not set");
         require(tokenContract != address(0), "NFTTrading: Token contract not set");
@@ -275,14 +271,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
 
-        // 先转移 NFT（从合约中转给买家）
-        try INFT(nftContract).safeTransferFrom(address(this), msg.sender, tokenId) {
-            // NFT 转移成功
-        } catch {
-            revert("NFTTrading: NFT transfer failed");
-        }
-
-        // 从买家转移代币
+        // 先从买家转移代币
         token.safeTransferFrom(msg.sender, address(this), price);
 
         // 支付手续费给 feeReceiver
@@ -295,20 +284,18 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             token.safeTransfer(seller, sellerAmount);
         }
 
+        // 最后转移 NFT（从合约中转给买家）
+        try INFT(nftContract).safeTransferFrom(address(this), msg.sender, tokenId) {
+        } catch {
+            token.safeTransfer(msg.sender, price);
+            revert("NFTTrading: NFT transfer failed");
+        }
+
         totalVolume += price;
         emit NFTBought(tokenId, msg.sender, seller, price, fee);
     }
 
-    /**
-     * @dev 设置手续费接收地址
-     */
-    function setFeeReceiver(address _feeReceiver) external onlyOwnerOrAuthorizer {
-        require(_feeReceiver != address(0), "NFTTrading: Invalid fee receiver address");
-        feeReceiver = _feeReceiver;
-    }
-
     
-
     /**
      * @dev 更新价格
      */

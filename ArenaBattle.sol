@@ -247,6 +247,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         PlayerRecord storage record = players[msg.sender];
         _checkAndResetAttempts(msg.sender);
         require(record.remainingAttempts > 0, "ArenaBattle: No remaining attempts");
+        require(record.hasTeam, "ArenaBattle: No battle team set");
         
         record.remainingAttempts--;
         record.lastBattleTime = block.timestamp;
@@ -274,6 +275,8 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         
         _checkAndResetAttempts(msg.sender);
         require(challengerRecord.remainingAttempts > 0, "ArenaBattle: No remaining attempts");
+        require(challengerRecord.hasTeam, "ArenaBattle: Challenger has no battle team");
+        require(challengedRecord.hasTeam, "ArenaBattle: Challenged has no battle team");
         
         challengerRecord.remainingAttempts--;
         challengerRecord.lastBattleTime = block.timestamp;
