@@ -341,25 +341,25 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         uint256 zodiacType = _nftInfo[tokenId].zodiacType;
         
         uint256[] storage userTokens = _userNFTs[user];
-        bool found = false;
         for (uint256 i = 0; i < userTokens.length; i++) {
             if (userTokens[i] == tokenId) {
-                userTokens[i] = userTokens[userTokens.length - 1];
+                for (uint256 j = i; j < userTokens.length - 1; j++) {
+                    userTokens[j] = userTokens[j + 1];
+                }
                 userTokens.pop();
                 _userNFTCount[user]--;
-                found = true;
                 break;
             }
         }
         
-        if (found) {
-            uint256[] storage typeTokens = _userNFTsByType[user][zodiacType];
-            for (uint256 i = 0; i < typeTokens.length; i++) {
-                if (typeTokens[i] == tokenId) {
-                    typeTokens[i] = typeTokens[typeTokens.length - 1];
-                    typeTokens.pop();
-                    break;
+        uint256[] storage typeTokens = _userNFTsByType[user][zodiacType];
+        for (uint256 i = 0; i < typeTokens.length; i++) {
+            if (typeTokens[i] == tokenId) {
+                for (uint256 j = i; j < typeTokens.length - 1; j++) {
+                    typeTokens[j] = typeTokens[j + 1];
                 }
+                typeTokens.pop();
+                break;
             }
         }
     }

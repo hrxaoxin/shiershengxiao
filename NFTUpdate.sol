@@ -468,10 +468,31 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param nft NFT合约实例
      */
     function _burnNFTs(uint256[] memory burnCandidates, NFTDataTypes.ZodiacType t, INFTMint nft) internal {
+        INFTDataInterface m = INFTDataInterface(metadataContract);
+        NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
+        uint8 burnLevel = m.tokenLevel(burnCandidates[0]); // 同类型同级NFT
+        
         for (uint i = 0; i < burnCandidates.length; i++) {
             uint burnId = burnCandidates[i];
+            // 同步权重：移除被销毁NFT的权重
+            _updateUserWeight(msg.sender, burnLevel, false, element);
+            // 从NFTData用户NFT列表中移除
+            _removeUserNFT(msg.sender, burnId);
             nft.safeTransferFrom(msg.sender, BLACK_HOLE, burnId);
             emit CardBurned(burnId, t, msg.sender);
+        }
+    }
+
+    /**
+     * @dev 从NFTData用户NFT列表中移除
+     * @param user 用户地址
+     * @param tokenId NFT ID
+     */
+    function _removeUserNFT(address user, uint256 tokenId) internal {
+        try INFTDataInterface(metadataContract).removeUserNFT(user, tokenId) {
+            // 成功
+        } catch {
+            // 忽略错误，继续执行
         }
     }
 

@@ -275,8 +275,13 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             // 更新用户级别累计跟踪
             userStakedWeight[msg.sender] -= weight;
             uint256 snapshotDecrement = globalRewardPerWeight * weight;
-            require(_userSnapshotWeight[msg.sender] >= snapshotDecrement, "Staking: Snapshot underflow");
-            _userSnapshotWeight[msg.sender] -= snapshotDecrement;
+            // 当 globalRewardPerWeight 重置为 0 时，确保 _userSnapshotWeight 也正确重置
+            if (globalRewardPerWeight == 0) {
+                _userSnapshotWeight[msg.sender] = 0;
+            } else {
+                require(_userSnapshotWeight[msg.sender] >= snapshotDecrement, "Staking: Snapshot underflow");
+                _userSnapshotWeight[msg.sender] -= snapshotDecrement;
+            }
 
             nft.safeTransferFrom(address(this), msg.sender, tokenId);
             
@@ -564,6 +569,44 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      */
     function getPendingReward(address user) external view returns (uint256) {
         return _calcUserPending(user);
+    }
+
+    /**
+     * @dev 获取普通NFT所有等级权重（用于前端显示）
+     * @return weights 等级1-5的权重数组
+     */
+    function normalNFTWeight() external pure returns (uint256[5] memory weights) {
+        weights = [uint256(1), 2, 6, 18, 66];
+    }
+
+    /**
+     * @dev 获取稀有NFT所有等级权重（用于前端显示）
+     * @return weights 等级1-5的权重数组
+     */
+    function rareNFTWeight() external pure returns (uint256[5] memory weights) {
+        weights = [uint256(10), 12, 16, 28, 76];
+    }
+
+    /**
+     * @dev 获取普通NFT权重（按等级）
+     * @param level NFT等级（1-5）
+     * @return weight 该等级的权重
+     */
+    function normalNFTWeight(uint8 level) external pure returns (uint256 weight) {
+        require(level >= 1 && level <= MAX_NFT_LEVEL, "Staking: Invalid level");
+        uint256[5] memory weights = [uint256(1), 2, 6, 18, 66];
+        return weights[level - 1];
+    }
+
+    /**
+     * @dev 获取稀有NFT权重（按等级）
+     * @param level NFT等级（1-5）
+     * @return weight 该等级的权重
+     */
+    function rareNFTWeight(uint8 level) external pure returns (uint256 weight) {
+        require(level >= 1 && level <= MAX_NFT_LEVEL, "Staking: Invalid level");
+        uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
+        return weights[level - 1];
     }
 
     /**

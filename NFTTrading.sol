@@ -272,6 +272,9 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 fee = (price * feePercent) / 100;
         uint256 sellerAmount = price - fee;
         
+        // 先验证合约拥有该 NFT，确保可以安全转移
+        require(INFT(nftContract).ownerOf(tokenId) == address(this), "NFTTrading: Contract does not own NFT");
+        
         // Checks-Effects-Interactions 模式：先清除挂牌状态
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
@@ -289,7 +292,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             token.safeTransfer(seller, sellerAmount);
         }
 
-        // 最后转移 NFT（如果前面的代币转移都成功）
+        // 最后转移 NFT
         INFT(nftContract).safeTransferFrom(address(this), msg.sender, tokenId);
 
         totalVolume += price;
@@ -345,6 +348,44 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
+     * @dev 分页获取在售NFT列表
+     * @param offset 起始偏移
+     * @param limit 每页数量限制
+     * @return listings 分页的挂牌列表
+     */
+    function getListingsPaginated(uint256 offset, uint256 limit) external view returns (uint256[] memory listings) {
+        uint256 totalCount = 0;
+        for (uint256 i = 0; i < listedNFTs.length; i++) {
+            uint256 tokenId = listedNFTs[i];
+            if (listings[tokenId].seller != address(0)) {
+                totalCount++;
+            }
+        }
+        
+        if (offset >= totalCount) {
+            return new uint256[](0);
+        }
+        
+        uint256 size = limit;
+        if (offset + limit > totalCount) {
+            size = totalCount - offset;
+        }
+        
+        listings = new uint256[](size);
+        uint256 resultIndex = 0;
+        uint256 count = 0;
+        for (uint256 i = 0; i < listedNFTs.length; i++) {
+            uint256 tokenId = listedNFTs[i];
+            if (listings[tokenId].seller != address(0)) {
+                if (count >= offset && resultIndex < size) {
+                    listings[resultIndex++] = tokenId;
+                }
+                count++;
+            }
+        }
+    }
+
+    /**
      * @dev 设置手续费率（仅所有者）
      */
     function setFeePercent(uint256 percent) external onlyOwner {
@@ -362,7 +403,9 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     function _removeFromListedNFTs(uint256 tokenId) internal {
         for (uint256 i = 0; i < listedNFTs.length; i++) {
             if (listedNFTs[i] == tokenId) {
-                listedNFTs[i] = listedNFTs[listedNFTs.length - 1];
+                for (uint256 j = i; j < listedNFTs.length - 1; j++) {
+                    listedNFTs[j] = listedNFTs[j + 1];
+                }
                 listedNFTs.pop();
                 break;
             }
@@ -472,7 +515,10 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         INFT nft = INFT(nftContract);
-        nft.safeTransferFrom(address(this), owner(), tokenId);
+        address from = address(this);
+        address to = owner();
+        nft.safeTransferFrom(from, to, tokenId);
+        _syncWeightAfterTransfer(from, to, tokenId, nftContract);
         emit EmergencyNFTWithdrawn(msg.sender, owner(), tokenId);
     }
 

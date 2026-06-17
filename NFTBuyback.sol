@@ -385,6 +385,34 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         }
     }
 
+    /**
+     * @dev 销毁NFT后同步权重
+     * @param user 用户地址
+     * @param tokenId NFT ID
+     */
+    function _syncWeightAfterBurn(address user, uint256 tokenId) internal {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        
+        // 移除用户NFT记录
+        if (nftDataContract != address(0)) {
+            try INFTData(nftDataContract).removeUserNFT(user, tokenId) {
+                // 成功
+            } catch {
+                // 忽略错误
+            }
+        }
+        
+        // 同步用户权重
+        if (dividendManager != address(0)) {
+            try IDividendManager(dividendManager).syncUserWeight(user) {
+                // 成功
+            } catch {
+                // 忽略错误
+            }
+        }
+    }
+
     function _calculateWithBonus(
         uint256 mintTime,
         uint256 totalCost,
@@ -438,6 +466,9 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= buybackPrice, "NFTBuyback: Insufficient contract balance");
 
+        // 同步权重（NFT销毁前）
+        _syncWeightAfterBurn(msg.sender, tokenId);
+        
         // 转移NFT到黑洞（销毁）
         nft.safeTransferFrom(msg.sender, BLACK_HOLE, tokenId);
         
@@ -465,6 +496,9 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= fixedBuybackPrice, "NFTBuyback: Insufficient contract balance");
 
+        // 同步权重（NFT销毁前）
+        _syncWeightAfterBurn(msg.sender, tokenId);
+        
         nft.safeTransferFrom(msg.sender, BLACK_HOLE, tokenId);
         
         token.safeTransfer(msg.sender, fixedBuybackPrice);
@@ -516,6 +550,9 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= buybackPrice, "NFTBuyback: Insufficient contract balance");
+        
+        // 同步权重（NFT销毁前）
+        _syncWeightAfterBurn(msg.sender, tokenId);
         
         nft.safeTransferFrom(msg.sender, BLACK_HOLE, tokenId);
         

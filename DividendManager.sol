@@ -687,7 +687,17 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
                 pendingDividends[user] += oldWeight * cumulativeDiff / 1e18;
             }
             
-            totalWeightChange = totalWeightChange - oldWeight + newWeight;
+            // 安全计算 weight change，防止溢出和下溢
+            if (newWeight > oldWeight) {
+                uint256 increase = newWeight - oldWeight;
+                totalWeightChange = totalWeightChange + increase;
+            } else if (oldWeight > newWeight) {
+                uint256 decrease = oldWeight - newWeight;
+                require(totalWeightChange >= decrease, "DividendManager: Weight change underflow");
+                totalWeightChange = totalWeightChange - decrease;
+            }
+            // 如果 oldWeight == newWeight，totalWeightChange 不变
+            
             userWeights[user] = newWeight;
             userCumulativeSnapshots[user] = cumulativePerWeightDividend;
         }

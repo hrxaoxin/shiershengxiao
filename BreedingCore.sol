@@ -351,6 +351,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _validateBreedingPair(nft, fatherId, motherId);
 
         _breedingPairExists[fatherId][motherId] = true;
+        _breedingPairExists[motherId][fatherId] = true;
         breedingPairCount++;
         pairId = breedingPairCount;
         
@@ -371,7 +372,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(breedingCooldowns[motherId] <= block.timestamp, "BC: Mother cooldown");
         require(!isNFTInActiveBreeding[fatherId], "BC: Father breeding");
         require(!isNFTInActiveBreeding[motherId], "BC: Mother breeding");
-        require(!_breedingPairExists[fatherId][motherId], "BC: Pair already exists");
+        require(!_breedingPairExists[fatherId][motherId] && !_breedingPairExists[motherId][fatherId], "BC: Pair already exists");
     }
 
     function _createBreedingPair(
@@ -421,6 +422,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 fee, address tokenContract
     ) internal {
         bool fatherTransferred = false;
+        address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
 
         try nft.safeTransferFrom(maleOwner, address(this), fatherId) {
             fatherTransferred = true;
@@ -430,12 +432,15 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             }
             revert("BC: Father transfer failed");
         }
+        // 权重同步：用户 -> 合约
+        _syncWeightAfterTransfer(maleOwner, address(this), fatherId, nftMintContract);
 
         try nft.safeTransferFrom(femaleOwner, address(this), motherId) {
         } catch {
             if (fatherTransferred) {
                 bool revertOnFailure = false;
                 try nft.safeTransferFrom(address(this), maleOwner, fatherId) {
+                    _syncWeightAfterTransfer(address(this), maleOwner, fatherId, nftMintContract);
                 } catch {
                     emit EmergencyNFTLocked(fatherId, maleOwner);
                     revertOnFailure = true;
@@ -449,6 +454,8 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             }
             revert("BC: Mother transfer failed");
         }
+        // 权重同步：用户 -> 合约
+        _syncWeightAfterTransfer(femaleOwner, address(this), motherId, nftMintContract);
     }
 
     function setMaxDailyPublicBreedings(uint256 limit) external onlyOwner {
@@ -472,6 +479,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         
         pair.status = BREEDING_STATUS_CANCELLED;
         _breedingPairExists[pair.fatherId][pair.motherId] = false;
+        _breedingPairExists[pair.motherId][pair.fatherId] = false;
         pair.cancelledAt = block.timestamp;
         
         isNFTInActiveBreeding[pair.fatherId] = false;
@@ -483,15 +491,21 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         BreedingLib.removeActiveOrder(pair.maleOwner, pairId, _userActiveOrderIds);
         BreedingLib.removeActiveOrder(pair.femaleOwner, pairId, _userActiveOrderIds);
         
+        // 记录原持有者用于权重同步
+        address fatherOwner = pair.maleOwner;
+        address motherOwner = pair.femaleOwner;
+        
         try nft721.safeTransferFrom(address(this), pair.maleOwner, pair.fatherId) {
         } catch {
             emit EmergencyNFTLocked(pair.fatherId, pair.maleOwner);
         }
+        _syncWeightAfterTransfer(address(this), fatherOwner, pair.fatherId, nftMintContract);
         
         try nft721.safeTransferFrom(address(this), pair.femaleOwner, pair.motherId) {
         } catch {
             emit EmergencyNFTLocked(pair.motherId, pair.femaleOwner);
         }
+        _syncWeightAfterTransfer(address(this), motherOwner, pair.motherId, nftMintContract);
         
         emit BreedingCancelled(pairId, pair.fatherId, pair.motherId, msg.sender);
     }
@@ -589,6 +603,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         IERC721Upgradeable nft721
     ) private {
         _breedingPairExists[pair.fatherId][pair.motherId] = false;
+        _breedingPairExists[pair.motherId][pair.fatherId] = false;
         isNFTInActiveBreeding[pair.fatherId] = false;
         isNFTInActiveBreeding[pair.motherId] = false;
         BreedingLib.removeActiveOrder(pair.maleOwner, pairId, _userActiveOrderIds);
@@ -596,8 +611,15 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         _burnFee(pair.breedingType);
 
+        // 记录原持有者用于权重同步
+        address fatherOwner = pair.maleOwner;
+        address motherOwner = pair.femaleOwner;
+        address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
+
         try nft721.safeTransferFrom(address(this), pair.maleOwner, pair.fatherId) {} catch { emit EmergencyNFTLocked(pair.fatherId, pair.maleOwner); }
+        _syncWeightAfterTransfer(address(this), fatherOwner, pair.fatherId, nftMintContract);
         try nft721.safeTransferFrom(address(this), pair.femaleOwner, pair.motherId) {} catch { emit EmergencyNFTLocked(pair.motherId, pair.femaleOwner); }
+        _syncWeightAfterTransfer(address(this), motherOwner, pair.motherId, nftMintContract);
     }
 
     function getBreedingInfo(uint256 pairId) external view returns (
@@ -822,8 +844,32 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(nftMintContract != address(0), "BC: NFT contract not set");
         require(!isNFTInActiveBreeding[tokenId], "BC: NFT in active breeding");
         IERC721Upgradeable nft = IERC721Upgradeable(nftMintContract);
-        nft.safeTransferFrom(address(this), owner(), tokenId);
+        address from = address(this);
+        address to = owner();
+        nft.safeTransferFrom(from, to, tokenId);
+        _syncWeightAfterTransfer(from, to, tokenId, nftMintContract);
         emit EmergencyNFTWithdrawn(msg.sender, owner(), tokenId);
+    }
+
+    /**
+     * @dev 同步权重（NFT转移后调用）
+     * @param from 原持有者
+     * @param to 新持有者
+     * @param tokenId NFT ID
+     * @param nftContract NFT合约地址
+     */
+    function _syncWeightAfterTransfer(address from, address to, uint256 tokenId, address nftContract) internal {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        if (nftDataContract != address(0)) {
+            INFTDataInterface(nftDataContract).removeUserNFT(from, tokenId);
+            INFTDataInterface(nftDataContract).addUserNFT(to, tokenId);
+        }
+        
+        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        if (dividendManager != address(0)) {
+            IDividendManager(dividendManager).syncUserWeight(from);
+            IDividendManager(dividendManager).syncUserWeight(to);
+        }
     }
 
     receive() external payable {}

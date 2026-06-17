@@ -708,6 +708,10 @@
         let accounts = [];
         let battleContract;
         let arenaContract;
+        let arenaPlayerContract;
+        let arenaBattleContract;
+        let arenaRankingQueryContract;
+        let arenaRewardContract;
         
         let matchRound = 1;
         let attackerMatchWins = 0;
@@ -1011,6 +1015,10 @@
             const config = ZODIAC_CONFIG;
             battleContract = new web3.eth.Contract(config.ABIS.battleABI, config.CONTRACT_ADDRESSES.battle);
             arenaContract = new web3.eth.Contract(config.ABIS.arenaABI, config.CONTRACT_ADDRESSES.arena);
+            arenaPlayerContract = new web3.eth.Contract(config.ABIS.arenaPlayerABI, config.CONTRACT_ADDRESSES.arenaPlayer);
+            arenaBattleContract = new web3.eth.Contract(config.ABIS.arenaBattleABI, config.CONTRACT_ADDRESSES.arenaBattle);
+            arenaRankingQueryContract = new web3.eth.Contract(config.ABIS.arenaRankingQueryABI, config.CONTRACT_ADDRESSES.arenaRankingQuery);
+            arenaRewardContract = new web3.eth.Contract(config.ABIS.arenaRewardABI, config.CONTRACT_ADDRESSES.arenaReward);
             nftContract = new web3.eth.Contract(config.ABIS.nftMintABI, config.CONTRACT_ADDRESSES.nftMint);
             await loadArenaConfig();
         }
@@ -1021,7 +1029,7 @@
                 
                 // 从合约读取充值费用
                 try {
-                    const rechargeCost = await arenaContract.methods.rechargeCost().call();
+                    const rechargeCost = await arenaPlayerContract.methods.rechargeCost().call();
                     const cost = (parseInt(rechargeCost) / 10**18).toFixed(0);
                     document.getElementById('rechargeCostDisplay').textContent = cost;
                 } catch (e) {
@@ -1080,7 +1088,7 @@
                         isAoe: skillData.isAoe || skillData[5]
                     };
                     
-                    const stakedOwner = await arenaContract.methods.nftStakedOwner(tokenId).call();
+                    const stakedOwner = await arenaPlayerContract.methods.nftStakedOwner(tokenId).call();
                     const isStaked = stakedOwner !== '0x0000000000000000000000000000000000000000';
                     
                     myNfts.push({
@@ -1322,7 +1330,7 @@
         async function clearBattleTeam() {
             try {
                 ZODIAC_UI.showLoading('正在获取当前战队...');
-                const playerRecord = await arenaContract.methods.players(accounts[0]).call();
+                const playerRecord = await arenaBattleContract.methods.players(accounts[0]).call();
                 
                 if (!playerRecord.hasTeam) {
                     ZODIAC_UI.hideLoading();
@@ -1330,7 +1338,7 @@
                     return;
                 }
                 
-                const currentTeam = await arenaContract.methods.getPlayerBattleTeam(accounts[0]).call();
+                const currentTeam = await arenaPlayerContract.methods.getPlayerBattleTeam(accounts[0]).call();
                 const tokenIds = currentTeam.filter(id => id !== '0' && id !== 0);
                 
                 if (tokenIds.length === 0) {
@@ -1365,7 +1373,7 @@
                     return;
                 }
                 
-                const playerRecord = await arenaContract.methods.players(accounts[0]).call();
+                const playerRecord = await arenaBattleContract.methods.players(accounts[0]).call();
                 if (playerRecord.hasTeam) {
                     ZODIAC_UI.showToast('您已经设置了战队，请先清除后再重新设置', 'warning');
                     return;
@@ -1387,19 +1395,19 @@
                 
                 ZODIAC_UI.showLoading('正在检查NFT授权状态...');
                 
-                const isApproved = await nftContract.methods.isApprovedForAll(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena).call();
+                const isApproved = await nftContract.methods.isApprovedForAll(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer).call();
                 
                 if (!isApproved) {
                     ZODIAC_UI.showLoading('正在授权NFT...');
-                    await nftContract.methods.setApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena, true).send({ from: accounts[0] });
+                    await nftContract.methods.setApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer, true).send({ from: accounts[0] });
                 }
                 
                 ZODIAC_UI.showLoading('正在质押NFT...');
                 await ZODIAC_WEB3.stakeArenaNFTs(tokenIds);
                 
                 ZODIAC_UI.showLoading('正在设置战队...');
-                const gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'setBattleTeam', [tokenIds], accounts[0]);
-                await arenaContract.methods.setBattleTeam(tokenIds).send({ from: accounts[0], gas: gas });
+                const gas = await ZODIAC_WEB3.estimateGas(arenaPlayerContract, 'setBattleTeam', [tokenIds], accounts[0]);
+                await arenaPlayerContract.methods.setBattleTeam(tokenIds).send({ from: accounts[0], gas: gas });
                 
                 ZODIAC_UI.hideLoading();
                 ZODIAC_UI.showToast('战队设置成功！NFT已质押进合约', 'success');
@@ -1461,7 +1469,7 @@
                 }
                 
                 await ZODIAC_UI.handleTransaction(
-                    arenaContract.methods.rechargeChallengeAttempts().send({ from: accounts[0], gas: gas }),
+                    arenaPlayerContract.methods.rechargeChallengeAttempts().send({ from: accounts[0], gas: gas }),
                     {
                         actionName: '充值挑战次数',
                         loadingMessage: '正在销毁代币获取挑战次数...',
@@ -1521,7 +1529,7 @@
 
         async function loadMyTeam() {
             try {
-                const battleTeamTokens = await arenaContract.methods.getPlayerBattleTeam(accounts[0]).call();
+                const battleTeamTokens = await arenaPlayerContract.methods.getPlayerBattleTeam(accounts[0]).call();
                 
                 battleTeam = [];
                 
@@ -1546,7 +1554,7 @@
 
         async function loadRemainingAttempts() {
             try {
-                const attempts = await arenaContract.methods.getRemainingAttempts(accounts[0]).call();
+                const attempts = await arenaPlayerContract.methods.getRemainingAttempts(accounts[0]).call();
                 document.getElementById('remainingAttempts').textContent = attempts;
             } catch (error) {
                 console.error('加载挑战次数失败:', error);
@@ -1565,7 +1573,7 @@
 
         async function loadMyStats() {
             try {
-                const playerRecord = await arenaContract.methods.players(accounts[0]).call();
+                const playerRecord = await arenaBattleContract.methods.players(accounts[0]).call();
                 const points = playerRecord.score || '0';
                 const wins = playerRecord.wins || '0';
                 const losses = playerRecord.losses || '0';
@@ -1592,7 +1600,7 @@
 
         async function getPlayerPoints() {
             try {
-                const playerRecord = await arenaContract.methods.players(accounts[0]).call();
+                const playerRecord = await arenaBattleContract.methods.players(accounts[0]).call();
                 return parseInt(playerRecord.score || '0', 10);
             } catch (error) {
                 console.error('获取玩家积分失败:', error);
@@ -1605,7 +1613,7 @@
                 // 获取当前奖励池
                 let rewardPoolWei = '0';
                 try {
-                    rewardPoolWei = await arenaContract.methods.getCurrentRewardPool().call();
+                    rewardPoolWei = await arenaRewardContract.methods.getCurrentRewardPool().call();
                 } catch (e) {
                     // 回退方案：读取奖励率和合约代币余额
                     try {
@@ -1642,7 +1650,7 @@
                 // 检查当前赛季状态
                 let seasonIsActive = true;
                 try {
-                    const seasonInfo = await arenaContract.methods.currentSeason().call();
+                    const seasonInfo = await arenaRankingQueryContract.methods.currentSeason().call();
                     seasonIsActive = seasonInfo.isActive;
                 } catch (e) {
                     // 如果无法获取赛季信息，使用默认值
@@ -1651,11 +1659,11 @@
                 if (seasonIsActive) {
                     // 赛季进行中：显示当前积分对应的潜在奖励
                     try {
-                        const playerRecord = await arenaContract.methods.players(accounts[0]).call();
+                        const playerRecord = await arenaBattleContract.methods.players(accounts[0]).call();
                         const playerScore = playerRecord.score || '0';
                         let estimatedReward = '0';
                         try {
-                            const rewardWei = await arenaContract.methods.getSeasonReward(accounts[0]).call();
+                            const rewardWei = await arenaRankingQueryContract.methods.getSeasonReward(accounts[0]).call();
                             estimatedReward = web3.utils.fromWei(rewardWei, 'ether');
                         } catch (e) { /* ignore */ }
 
@@ -1674,7 +1682,7 @@
                     }
                 } else {
                     // 赛季已结束：检查是否已领取奖励
-                    const claimed = await arenaContract.methods.seasonRewardsClaimed(currentSeasonId, accounts[0]).call();
+                    const claimed = await arenaRankingQueryContract.methods.seasonRewardsClaimed(currentSeasonId, accounts[0]).call();
 
                     if (claimed) {
                         // 已领取
@@ -1688,7 +1696,7 @@
                     } else {
                         // 未领取：显示可领取的奖励
                         try {
-                            const rewardWei = await arenaContract.methods.getSeasonReward(accounts[0]).call();
+                            const rewardWei = await arenaRankingQueryContract.methods.getSeasonReward(accounts[0]).call();
                             const rewardAmount = web3.utils.fromWei(rewardWei, 'ether');
 
                             if (parseFloat(rewardAmount) > 0) {
@@ -1751,7 +1759,7 @@
                 // 获取当前赛季ID
                 let currentSeasonId;
                 try {
-                    currentSeasonId = await arenaContract.methods.currentSeasonId().call();
+                    currentSeasonId = await arenaRankingQueryContract.methods.currentSeasonId().call();
                 } catch (e) {
                     console.log('获取赛季ID失败:', e);
                     currentSeasonId = 1;
@@ -1761,7 +1769,7 @@
                 let paginationResult = null;
                 
                 try {
-                    paginationResult = await arenaContract.methods.getLeaderboardByPage(currentSeasonId, page, size).call();
+                    paginationResult = await arenaRankingQueryContract.methods.getLeaderboardByPage(currentSeasonId, page, size).call();
                     totalPages = parseInt(paginationResult.totalPages) || 1;
                     totalPlayers = parseInt(paginationResult.totalPlayers) || 0;
                 } catch (e) {
@@ -1795,7 +1803,7 @@
                         
                         if (!isMock) {
                             try {
-                                const teamTokens = await arenaContract.methods.getPlayerBattleTeam(address).call();
+                                const teamTokens = await arenaPlayerContract.methods.getPlayerBattleTeam(address).call();
                                 for (const tokenId of teamTokens) {
                                     if (tokenId && tokenId !== '0' && tokenId !== 0) {
                                         try {
@@ -1863,11 +1871,11 @@
                 // 获取当前用户的排名
                 if (account) {
                     try {
-                        const userRank = await arenaContract.methods.getPlayerRank(account).call();
+                        const userRank = await arenaRankingQueryContract.methods.getPlayerRank(account).call();
                         const userRankNum = parseInt(userRank) || 0;
                         
                         if (userRankNum > 0) {
-                            const myStats = await arenaContract.methods.getPlayerRecord(account).call();
+                            const myStats = await arenaBattleContract.methods.getPlayerRecord(account).call();
                             const userPoints = parseInt(myStats[0] || '0');
                             
                             const myRankDiv = document.getElementById('myRankDisplay');
@@ -1883,7 +1891,7 @@
                 const rewards = [];
                 for (let i = 0; i < topPlayers.length; i++) {
                     try {
-                        const rewardWei = await arenaContract.methods.getRewardForRank(topPlayers[i].rank).call();
+                        const rewardWei = await arenaRewardContract.methods.getRewardForRank(topPlayers[i].rank).call();
                         rewards.push(web3.utils.fromWei(rewardWei, 'ether'));
                     } catch (e) {
                         rewards.push('0');
@@ -2137,7 +2145,7 @@
                 }
 
                 for (const tokenId of playerTeam) {
-                    const stakedOwner = await arenaContract.methods.nftStakedOwner(tokenId).call();
+                    const stakedOwner = await arenaPlayerContract.methods.nftStakedOwner(tokenId).call();
                     if (stakedOwner.toLowerCase() !== accounts[0].toLowerCase()) {
                         ZODIAC_UI.showToast(`NFT ${tokenId} 未质押或不属于您`, 'warning');
                         ZODIAC_UI.hideLoading();

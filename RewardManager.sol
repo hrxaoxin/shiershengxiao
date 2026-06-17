@@ -900,9 +900,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             }
         }
         
-        // 修复：添加下溢检查，确保 successfullyDistributed <= lockedBNBAmount
-        require(successfullyDistributed <= lockedBNBAmount, "RewardManager: Invalid distribution amount");
-        lockedBNBAmount -= successfullyDistributed;
+        // 修复：确保 only subtract successfully distributed amount
+        // 如果 successfullyDistributed = 0，lockedBNBAmount 保持不变，允许重试
+        if (successfullyDistributed > 0 && successfullyDistributed <= lockedBNBAmount) {
+            lockedBNBAmount -= successfullyDistributed;
+        }
         emit LockedBNBRedistributed(lockedAmount, successfullyDistributed, lockedBNBAmount);
     }
     

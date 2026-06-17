@@ -559,11 +559,14 @@
         async function loadStakingConstants() {
             try {
                 const minDuration = await stakingContract.methods.minStakingDuration().call();
-                const normalWeight = await stakingContract.methods.normalNFTWeight().call();
-                const rareWeight = await stakingContract.methods.rareNFTWeight().call();
+                const normalWeightArr = await stakingContract.methods.normalNFTWeight().call();
+                const rareWeightArr = await stakingContract.methods.rareNFTWeight().call();
                 document.getElementById('minStakingDuration').textContent = formatDuration(minDuration);
-                document.getElementById('normalWeight').textContent = normalWeight;
-                document.getElementById('rareWeight').textContent = rareWeight;
+                // 显示所有等级的权重，格式为 "等级1:weight1, 等级2:weight2, ..."
+                const normalWeightStr = normalWeightArr.map((w, i) => `${i+1}:${w}`).join(', ');
+                const rareWeightStr = rareWeightArr.map((w, i) => `${i+1}:${w}`).join(', ');
+                document.getElementById('normalWeight').textContent = normalWeightStr;
+                document.getElementById('rareWeight').textContent = rareWeightStr;
             } catch (error) {
                 console.error('加载质押常量失败:', error);
             }

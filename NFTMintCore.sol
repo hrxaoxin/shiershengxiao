@@ -530,6 +530,19 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function isRare(uint256 tokenId) external view returns (bool) {
         return tokenType[tokenId] >= 72;
     }
+
+    /**
+     * @dev 获取NFT完整数据（兼容前端接口）
+     * @param tokenId NFT ID
+     * @return tokenType_ NFT类型
+     * @return level NFT等级
+     */
+    function getNFTData(uint256 tokenId) external view returns (
+        uint256 tokenType_,
+        uint8 level
+    ) {
+        return (tokenType[tokenId], tokenLevel[tokenId]);
+    }
     
     function transferFrom(address from, address to, uint256 tokenId) public {
         // 修复：添加 msg.sender 授权检查，确保只有所有者或授权方可以转移

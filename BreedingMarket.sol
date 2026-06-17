@@ -201,7 +201,9 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         
         for (uint256 i = 0; i < listedTokenIds.length; i++) {
             if (listedTokenIds[i] == tokenId) {
-                listedTokenIds[i] = listedTokenIds[listedTokenIds.length - 1];
+                for (uint256 j = i; j < listedTokenIds.length - 1; j++) {
+                    listedTokenIds[j] = listedTokenIds[j + 1];
+                }
                 listedTokenIds.pop();
                 break;
             }
@@ -209,7 +211,9 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         
         for (uint256 i = 0; i < activeListedTokenIds.length; i++) {
             if (activeListedTokenIds[i] == tokenId) {
-                activeListedTokenIds[i] = activeListedTokenIds[activeListedTokenIds.length - 1];
+                for (uint256 j = i; j < activeListedTokenIds.length - 1; j++) {
+                    activeListedTokenIds[j] = activeListedTokenIds[j + 1];
+                }
                 activeListedTokenIds.pop();
                 break;
             }

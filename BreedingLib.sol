@@ -135,7 +135,9 @@ library BreedingLib {
         uint256[] storage list = activeOrders[user];
         for (uint256 i = 0; i < list.length; i++) {
             if (list[i] == pairId) {
-                list[i] = list[list.length - 1];
+                for (uint256 j = i; j < list.length - 1; j++) {
+                    list[j] = list[j + 1];
+                }
                 list.pop();
                 break;
             }
