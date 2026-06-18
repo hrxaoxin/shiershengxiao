@@ -697,19 +697,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "breedingContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -806,6 +793,30 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "getNFTData",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenType_",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint8",
+				"name": "level",
+				"type": "uint8"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "owner",
 				"type": "address"
@@ -826,22 +837,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_nftDataContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenBurnerContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_breedingContractAddress",
 				"type": "address"
 			}
 		],
@@ -1083,12 +1079,12 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "nextCardId",
+		"name": "name",
 		"outputs": [
 			{
-				"internalType": "uint256",
+				"internalType": "string",
 				"name": "",
-				"type": "uint256"
+				"type": "string"
 			}
 		],
 		"stateMutability": "view",
@@ -1096,12 +1092,12 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "nftDataContract",
+		"name": "nextCardId",
 		"outputs": [
 			{
-				"internalType": "address",
+				"internalType": "uint256",
 				"name": "",
-				"type": "address"
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -1308,12 +1304,17 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_breedingContractAddress",
-				"type": "address"
+				"internalType": "string",
+				"name": "newName",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "newSymbol",
+				"type": "string"
 			}
 		],
-		"name": "setBreedingContract",
+		"name": "setNameAndSymbol",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -1321,27 +1322,33 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_nftDataContractAddress",
-				"type": "address"
+				"internalType": "bytes4",
+				"name": "interfaceId",
+				"type": "bytes4"
 			}
 		],
-		"name": "setNftDataContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"name": "supportsInterface",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "pure",
 		"type": "function"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "symbol",
+		"outputs": [
 			{
-				"internalType": "address",
-				"name": "_tokenBurnerContractAddress",
-				"type": "address"
+				"internalType": "string",
+				"name": "",
+				"type": "string"
 			}
 		],
-		"name": "setTokenBurnerContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -1352,19 +1359,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenBurnerContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -1446,6 +1440,25 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "tokenURI",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
 			}
 		],
 		"stateMutability": "view",
@@ -1757,19 +1770,6 @@ window.ZODIAC_CONFIG = (function() {
 			{
 				"indexed": false,
 				"internalType": "address",
-				"name": "newTokenContract",
-				"type": "address"
-			}
-		],
-		"name": "TokenContractUpdated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "address",
 				"name": "account",
 				"type": "address"
 			}
@@ -1812,19 +1812,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "authorizedNFTContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -1981,41 +1968,13 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftMintContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_authorizedNFTContractAddress",
 				"type": "address"
 			}
 		],
 		"name": "initialize",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftMintContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -2159,37 +2118,11 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_authorizedNFTContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setAuthorizedNFTContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
 		],
 		"name": "setAuthorizer",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftMintContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -2221,19 +2154,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"name": "targetedMintCost",
 		"outputs": [
@@ -2241,19 +2161,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -2418,6 +2325,25 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BNBDistributed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "sender",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "BNBReceived",
 		"type": "event"
 	},
 	{
@@ -2883,19 +2809,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "arenaRewardPool",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "authorizer",
 		"outputs": [
 			{
@@ -2974,19 +2887,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "dexRouter",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -3071,19 +2971,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "dividendPool",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -3341,7 +3228,7 @@ window.ZODIAC_CONFIG = (function() {
 			},
 			{
 				"internalType": "uint256",
-				"name": "totalDistributed",
+				"name": "totalDistributed_",
 				"type": "uint256"
 			}
 		],
@@ -3385,41 +3272,6 @@ window.ZODIAC_CONFIG = (function() {
 			{
 				"internalType": "address",
 				"name": "_authorizerAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_dividendManagerAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_stakingAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenStakingAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaRewardAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftBuybackAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_poolManagerAddress",
 				"type": "address"
 			}
 		],
@@ -3469,38 +3321,12 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "nftBuybackPool",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "nftStakingPercent",
 		"outputs": [
 			{
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftStakingPool",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -3592,19 +3418,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "poolManager",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "proxiableUUID",
 		"outputs": [
 			{
@@ -3634,19 +3447,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_arenaRewardAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaRewardPool",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
@@ -3665,24 +3465,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setAutoSwapEnabled",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_dexRouter",
-				"type": "address"
-			},
-			{
-				"internalType": "uint8",
-				"name": "_dexType",
-				"type": "uint8"
-			}
-		],
-		"name": "setDEXRouter",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -3723,19 +3505,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_dividendPoolAddress",
-				"type": "address"
-			}
-		],
-		"name": "setDividendPool",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
@@ -3749,77 +3518,12 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_nftBuybackAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTBuybackPool",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_stakingAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTStakingPool",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_poolManager",
-				"type": "address"
-			}
-		],
-		"name": "setPoolManager",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "_slippage",
 				"type": "uint256"
 			}
 		],
 		"name": "setSlippage",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenContract",
-				"type": "address"
-			}
-		],
-		"name": "setTokenContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenStakingAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenStakingPool",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -3839,38 +3543,12 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "tokenContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "tokenStakingPercent",
 		"outputs": [
 			{
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenStakingPool",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -3954,19 +3632,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "wbnb",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -4530,26 +4195,6 @@ window.ZODIAC_CONFIG = (function() {
 			},
 			{
 				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_metadataContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_dividendManagerAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
@@ -4875,19 +4520,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "a",
-				"type": "address"
-			}
-		],
-		"name": "setDividendManager",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "cost",
 				"type": "uint256"
@@ -4940,38 +4572,12 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_metadataContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setMetadataContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "minLiq",
 				"type": "uint256"
 			}
 		],
 		"name": "setMinPancakeSwapLiquidity",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -5011,19 +4617,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setPriceExpirySeconds",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -5447,19 +5040,6 @@ window.ZODIAC_CONFIG = (function() {
 		"anonymous": false,
 		"inputs": [
 			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "newTokenContract",
-				"type": "address"
-			}
-		],
-		"name": "TokenContractUpdated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
 				"indexed": true,
 				"internalType": "address",
 				"name": "account",
@@ -5569,19 +5149,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "feeReceiver",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "getListedNFTs",
 		"outputs": [
 			{
@@ -5636,6 +5203,30 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "getListingsByPriceRange",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "tokenIds",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "offset",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "limit",
+				"type": "uint256"
+			}
+		],
+		"name": "getListingsPaginated",
 		"outputs": [
 			{
 				"internalType": "uint256[]",
@@ -5716,14 +5307,33 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_nftContractAddress",
+				"name": "user",
 				"type": "address"
 			},
 			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
+				"internalType": "uint256",
+				"name": "offset",
+				"type": "uint256"
 			},
+			{
+				"internalType": "uint256",
+				"name": "limit",
+				"type": "uint256"
+			}
+		],
+		"name": "getUserListingsPaginated",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "tokenIds",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
 			{
 				"internalType": "address",
 				"name": "_authorizerAddress",
@@ -5751,6 +5361,25 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "listNFT",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "listedNFTIndex",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -5796,19 +5425,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "listTime",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -5926,58 +5542,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_feeReceiver",
-				"type": "address"
-			}
-		],
-		"name": "setFeeReceiver",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"name": "totalVolume",
 		"outputs": [
@@ -6057,6 +5621,30 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "upgradeToAndCall",
 		"outputs": [],
 		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "userListings",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	}
 ],
@@ -6379,19 +5967,6 @@ window.ZODIAC_CONFIG = (function() {
 			{
 				"indexed": true,
 				"internalType": "address",
-				"name": "nftContract",
-				"type": "address"
-			}
-		],
-		"name": "NFTContractSet",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
 				"name": "previousOwner",
 				"type": "address"
 			},
@@ -6441,19 +6016,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "Paused",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "tokenContract",
-				"type": "address"
-			}
-		],
-		"name": "TokenContractSet",
 		"type": "event"
 	},
 	{
@@ -6821,37 +6383,21 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "amount",
+				"name": "tokenType",
 				"type": "uint256"
-			}
-		],
-		"name": "emergencyWithdrawBNB",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
+			},
 			{
 				"internalType": "uint256",
-				"name": "tokenId",
+				"name": "tokenIdOrAmount",
 				"type": "uint256"
-			}
-		],
-		"name": "emergencyWithdrawNFT",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
+			},
 			{
 				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
 			}
 		],
-		"name": "emergencyWithdrawTokens",
+		"name": "emergencyWithdraw",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -6996,25 +6542,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "getNFTBreedingCooldown",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "remainingCooldown",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "address",
 				"name": "user",
 				"type": "address"
@@ -7067,21 +6594,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftMintContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_stakingContractAddress",
-				"type": "address"
-			},
 			{
 				"internalType": "address",
 				"name": "_authorizerAddress",
@@ -7184,19 +6696,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftMintContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -7368,19 +6867,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_nftMintContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "cooldown",
 				"type": "uint256"
@@ -7402,58 +6888,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "setSelfBreedingFee",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_stakingContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setStakingContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "stakingContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -7831,19 +7265,6 @@ window.ZODIAC_CONFIG = (function() {
 			{
 				"indexed": true,
 				"internalType": "address",
-				"name": "nftContract",
-				"type": "address"
-			}
-		],
-		"name": "NFTContractSet",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
 				"name": "previousOwner",
 				"type": "address"
 			},
@@ -7893,19 +7314,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "Paused",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "tokenContract",
-				"type": "address"
-			}
-		],
-		"name": "TokenContractSet",
 		"type": "event"
 	},
 	{
@@ -8273,37 +7681,21 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "amount",
+				"name": "tokenType",
 				"type": "uint256"
-			}
-		],
-		"name": "emergencyWithdrawBNB",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
+			},
 			{
 				"internalType": "uint256",
-				"name": "tokenId",
+				"name": "tokenIdOrAmount",
 				"type": "uint256"
-			}
-		],
-		"name": "emergencyWithdrawNFT",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
+			},
 			{
 				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
 			}
 		],
-		"name": "emergencyWithdrawTokens",
+		"name": "emergencyWithdraw",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -8448,25 +7840,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "getNFTBreedingCooldown",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "remainingCooldown",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "address",
 				"name": "user",
 				"type": "address"
@@ -8519,21 +7892,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftMintContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_stakingContractAddress",
-				"type": "address"
-			},
 			{
 				"internalType": "address",
 				"name": "_authorizerAddress",
@@ -8636,19 +7994,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftMintContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -8820,19 +8165,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_nftMintContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "cooldown",
 				"type": "uint256"
@@ -8854,58 +8186,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "setSelfBreedingFee",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_stakingContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setStakingContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "stakingContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -9180,19 +8460,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "breedingCoreContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -9276,17 +8543,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_nftMintContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_breedingCoreContractAddress",
 				"type": "address"
 			}
 		],
@@ -9356,19 +8613,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "bool",
 				"name": "isActive",
 				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftMintContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -9468,32 +8712,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setAuthorizer",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_breedingCoreContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setBreedingCore",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftMintContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -10077,31 +9295,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenBurnerContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftUpdateContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftDataContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
@@ -10132,45 +9325,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftDataContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftUpdateContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -10389,97 +9543,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "setMaxBuybackMultiplier",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftDataContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTDataContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftUpdateContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTUpdateContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenBurnerContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenBurnerContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenBurnerContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -10785,19 +9848,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "dividendManager",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -10874,11 +9924,6 @@ window.ZODIAC_CONFIG = (function() {
 			{
 				"internalType": "address",
 				"name": "_authorizerAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_dividendManagerAddress",
 				"type": "address"
 			}
 		],
@@ -10960,19 +10005,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setAuthorizer",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_dividendManagerAddress",
-				"type": "address"
-			}
-		],
-		"name": "setDividendManager",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -11493,6 +10525,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_NFT_LEVEL",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "REWARD_OVERFLOW_THRESHOLD",
 		"outputs": [
 			{
@@ -11819,16 +10864,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_rewardTokenContractAddress",
-				"type": "address"
 			}
 		],
 		"name": "initialize",
@@ -11896,28 +10931,34 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "nftContract",
+		"name": "normalNFTWeight",
 		"outputs": [
 			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
+				"internalType": "uint256[5]",
+				"name": "weights",
+				"type": "uint256[5]"
 			}
 		],
-		"stateMutability": "view",
+		"stateMutability": "pure",
 		"type": "function"
 	},
 	{
-		"inputs": [],
+		"inputs": [
+			{
+				"internalType": "uint8",
+				"name": "level",
+				"type": "uint8"
+			}
+		],
 		"name": "normalNFTWeight",
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "weight",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
+		"stateMutability": "pure",
 		"type": "function"
 	},
 	{
@@ -12018,16 +11059,35 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
+		"inputs": [
+			{
+				"internalType": "uint8",
+				"name": "level",
+				"type": "uint8"
+			}
+		],
 		"name": "rareNFTWeight",
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "weight",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
+		"stateMutability": "pure",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "rareNFTWeight",
+		"outputs": [
+			{
+				"internalType": "uint256[5]",
+				"name": "weights",
+				"type": "uint256[5]"
+			}
+		],
+		"stateMutability": "pure",
 		"type": "function"
 	},
 	{
@@ -12084,19 +11144,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rewardTokenContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -12164,19 +11211,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "_rateStep",
 				"type": "uint256"
@@ -12196,19 +11230,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setRewardRate",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_rewardTokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setRewardTokenContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -12260,6 +11281,11 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "bool",
 				"name": "isRare",
 				"type": "bool"
+			},
+			{
+				"internalType": "uint8",
+				"name": "level",
+				"type": "uint8"
 			}
 		],
 		"stateMutability": "view",
@@ -13130,64 +12156,12 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "arenaBattleContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "arenaLeaderboardContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "arenaMode",
 		"outputs": [
 			{
 				"internalType": "uint8",
 				"name": "",
 				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "arenaPlayerContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "arenaRewardContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -13214,19 +12188,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "battleContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -13414,42 +12375,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_battleContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaRewardContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaLeaderboardContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaPlayerContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaBattleContractAddress",
 				"type": "address"
 			}
 		],
@@ -13524,19 +12450,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint8",
 				"name": "",
 				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -13656,11 +12569,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "remainingAttempts",
 				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "hasTeam",
-				"type": "bool"
 			},
 			{
 				"internalType": "uint256",
@@ -13834,64 +12742,12 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_arenaBattleContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaBattleContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_arenaLeaderboardContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaLeaderboardContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint8",
 				"name": "mode",
 				"type": "uint8"
 			}
 		],
 		"name": "setArenaMode",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_arenaPlayerContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaPlayerContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_arenaRewardContract",
-				"type": "address"
-			}
-		],
-		"name": "setArenaRewardContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -13918,45 +12774,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setBaseRewardPerWin",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_battleContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setBattleContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256[]",
-				"name": "tokenIds",
-				"type": "uint256[]"
-			}
-		],
-		"name": "setBattleTeam",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256[6]",
-				"name": "tokenIds",
-				"type": "uint256[6]"
-			}
-		],
-		"name": "setBattleTeam",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -14003,19 +12820,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint8",
 				"name": "_rewardType",
 				"type": "uint8"
@@ -14055,19 +12859,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "seasonId",
 				"type": "uint256"
@@ -14096,19 +12887,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "startNewSeason",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -14811,64 +13589,12 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "arenaBattleContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "arenaLeaderboardContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "arenaMode",
 		"outputs": [
 			{
 				"internalType": "uint8",
 				"name": "",
 				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "arenaPlayerContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "arenaRewardContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -14895,19 +13621,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "battleContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -15095,42 +13808,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_battleContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaRewardContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaLeaderboardContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaPlayerContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaBattleContractAddress",
 				"type": "address"
 			}
 		],
@@ -15205,19 +13883,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint8",
 				"name": "",
 				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -15337,11 +14002,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "remainingAttempts",
 				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "hasTeam",
-				"type": "bool"
 			},
 			{
 				"internalType": "uint256",
@@ -15515,64 +14175,12 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_arenaBattleContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaBattleContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_arenaLeaderboardContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaLeaderboardContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint8",
 				"name": "mode",
 				"type": "uint8"
 			}
 		],
 		"name": "setArenaMode",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_arenaPlayerContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaPlayerContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_arenaRewardContract",
-				"type": "address"
-			}
-		],
-		"name": "setArenaRewardContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -15599,45 +14207,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setBaseRewardPerWin",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_battleContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setBattleContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256[]",
-				"name": "tokenIds",
-				"type": "uint256[]"
-			}
-		],
-		"name": "setBattleTeam",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256[6]",
-				"name": "tokenIds",
-				"type": "uint256[6]"
-			}
-		],
-		"name": "setBattleTeam",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -15684,19 +14253,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint8",
 				"name": "_rewardType",
 				"type": "uint8"
@@ -15736,19 +14292,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "seasonId",
 				"type": "uint256"
@@ -15777,19 +14320,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "startNewSeason",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -16058,32 +14588,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "arenaLeaderboardContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "arenaRewardContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -16882,16 +15386,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaRewardContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaLeaderboardContractAddress",
-				"type": "address"
 			}
 		],
 		"name": "initialize",
@@ -17177,32 +15671,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_arenaLeaderboardContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaLeaderboardContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_arenaRewardContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaRewardContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
@@ -17467,19 +15935,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "arenaRankingManagerContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -18082,11 +16537,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaRankingManagerContractAddress",
-				"type": "address"
 			}
 		],
 		"name": "initialize",
@@ -18317,19 +16767,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_arenaRankingManagerContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaRankingManagerContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
@@ -18408,6 +16845,17 @@ window.ZODIAC_CONFIG = (function() {
 	}
 ],
 		arenaPlayerABI: [
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			}
+		],
+		"name": "SafeERC20FailedOperation",
+		"type": "error"
+	},
 	{
 		"anonymous": false,
 		"inputs": [
@@ -18712,19 +17160,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "arenaRankingManagerContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "authorizer",
 		"outputs": [
 			{
@@ -18871,16 +17306,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_arenaRankingManagerContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
@@ -18917,19 +17342,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -19098,7 +17510,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [],
 		"name": "rechargeChallengeAttempts",
 		"outputs": [],
-		"stateMutability": "payable",
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -19144,19 +17556,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_arenaRankingManagerContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaRankingManagerContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
@@ -19188,19 +17587,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setMaxRechargeAttempts",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -19710,45 +18096,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "arenaLeaderboardContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "arenaPlayerContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "arenaRankingManagerContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "authorizer",
 		"outputs": [
 			{
@@ -19768,19 +18115,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "battleContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -20034,31 +18368,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_arenaRankingManagerContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_battleContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaPlayerContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_arenaLeaderboardContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
@@ -20138,19 +18447,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -20251,11 +18547,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "remainingAttempts",
 				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "hasTeam",
-				"type": "bool"
 			}
 		],
 		"stateMutability": "view",
@@ -20329,76 +18620,11 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_arenaLeaderboardContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaLeaderboardContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_arenaPlayerContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaPlayerContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_arenaRankingManagerContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setArenaRankingManagerContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
 		],
 		"name": "setAuthorizer",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_battleContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setBattleContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -20751,19 +18977,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"indexed": false,
-				"internalType": "address",
-				"name": "newTokenContract",
-				"type": "address"
-			}
-		],
-		"name": "TokenContractUpdated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
 				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
@@ -21030,11 +19243,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			},
 			{
 				"internalType": "address",
 				"name": "_authorizerAddress",
@@ -21304,32 +19512,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenAddress",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
@@ -21374,19 +19556,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -21799,6 +19968,25 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newWeight",
+				"type": "uint256"
+			}
+		],
+		"name": "WeightUpdated",
+		"type": "event"
+	},
+	{
 		"inputs": [],
 		"name": "AUTO_SYNC_INTERVAL",
 		"outputs": [
@@ -21967,19 +20155,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "dividendPool",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -22360,21 +20535,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_weightManagerAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftUpdateAddress",
-				"type": "address"
 			}
 		],
 		"name": "initialize",
@@ -22467,19 +20627,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftUpdateContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -22597,19 +20744,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "rewardManagerContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -22618,19 +20752,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setAuthorizer",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_pool",
-				"type": "address"
-			}
-		],
-		"name": "setDividendPool",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -22652,45 +20773,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_nftUpdateAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTUpdateContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_rewardManagerContract",
-				"type": "address"
-			}
-		],
-		"name": "setRewardManagerContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenContract",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
 				"name": "user",
 				"type": "address"
 			},
@@ -22701,19 +20783,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setUserWeight",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_weightManagerAddress",
-				"type": "address"
-			}
-		],
-		"name": "setWeightManager",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -22773,16 +20842,16 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "tokenContract",
-		"outputs": [
+		"inputs": [
 			{
 				"internalType": "address",
-				"name": "",
+				"name": "user",
 				"type": "address"
 			}
 		],
-		"stateMutability": "view",
+		"name": "syncUserWeight",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -22928,19 +20997,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "weightManagerContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -23474,19 +21530,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "flapSwapRouter",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "getETHPrice",
 		"outputs": [
 			{
@@ -23696,21 +21739,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_usdtContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_pancakeSwapRouterAddress",
-				"type": "address"
 			}
 		],
 		"name": "initialize",
@@ -23799,19 +21827,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "owner",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "pancakeSwapRouter",
 		"outputs": [
 			{
 				"internalType": "address",
@@ -24035,19 +22050,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "uint8",
-				"name": "_dexType",
-				"type": "uint8"
-			}
-		],
-		"name": "setActiveDEX",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
@@ -24067,42 +22069,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setAutoPriceEnabled",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_flapSwapRouter",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_pancakeSwapRouter",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_uniswapRouter",
-				"type": "address"
-			}
-		],
-		"name": "setDEXRouters",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_pancakeSwapRouterAddress",
-				"type": "address"
-			}
-		],
-		"name": "setPancakeSwapRouter",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -24147,45 +22113,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_tokenContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setTokenAddress",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_usdtContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setUSDTAddress",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenAddress",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"name": "tokenPriceUSD",
 		"outputs": [
@@ -24222,19 +22149,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "transferOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "uniswapRouter",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -24317,32 +22231,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "upgradeToAndCall",
 		"outputs": [],
 		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "usdtAddress",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "wbnb",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -24809,19 +22697,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "battleCaller",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -25072,36 +22947,13 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_battleCallerAddress",
 				"type": "address"
 			}
 		],
 		"name": "initialize",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftContract",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -25192,32 +23044,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setAuthorizer",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_battleCallerAddress",
-				"type": "address"
-			}
-		],
-		"name": "setBattleCaller",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_nftContractAddress",
-				"type": "address"
-			}
-		],
-		"name": "setNFTContract",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"

@@ -12,148 +12,35 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "./BreedingLib.sol";
 
 /**
- * @title BreedingCore
- * @dev NFT繁殖核心合约，负责处理NFT繁殖逻辑
- * 
- * 核心职责�?
- * 1. 繁殖配对创建：创建繁殖配对，锁定父母NFT
- * 2. 繁殖执行：生成子代NFT，继承父母属�?
- * 3. 冷却期管理：管理繁殖后的冷却时间
- * 4. 繁殖类型：支持自繁殖和市场繁殖两种模�?
- * 
- * 繁殖类型�?
- * - 自繁殖（BREEDING_TYPE_SELF = 0）：用户使用自己的两个NFT繁殖
- * - 市场繁殖（BREEDING_TYPE_MARKET = 1）：用户与市场上的NFT配对繁殖
- * 
- * 冷却期设置：
- * - 自繁殖冷却：12小时
- * - 市场繁殖冷却�?4小时
- * 
- * 费用设置�?
- * - 自繁殖费用：888代币
- * - 市场繁殖费用�?88代币
- * 
- * 繁殖流程�?
- * 1. 用户调用 breed() �?breedMarket() 创建繁殖配对
- * 2. 检查父母NFT是否满足条件（等�?=5、不在冷却期、未被锁定）
- * 3. 锁定父母NFT，扣除繁殖费�?
- * 4. 生成子代NFT，继承父母属性（生肖、属性、等级等�?
- * 5. 解锁父母NFT（进入冷却期�?
- * 6. 用户领取子代NFT
- * 
- * 属性遗传规则：
- * - 生肖：从父母中随机继�?
- * - 属性：从父母中随机继承，有概率变异
- * - 等级：子代等级为父母等级的平均值向下取�?
- * - 稀有度：根据父母稀有度计算，有概率提升
- * 
- * 与其他合约的交互�?
- * - NFTMint：铸造新的子代NFT
- * - Staking：检查NFT是否处于质押状�?
- * - TokenBurner：销毁繁殖费用代�?
- * 
- * 安全机制�?
- * - ReentrancyGuard：防止重入攻�?
- * - Pausable：可暂停所有繁殖操�?
- * - NFT锁定：繁殖期间锁定NFT防止转移
- * 
- * 权限控制�?
- * - onlyOwner：暂停合约、设置参数、紧急操�?
- * - onlyAuthorized：授权合约调�?
+ * @title BreedingCore - NFT繁殖核心合约
+ * @dev 支持自繁殖和市场繁殖两种模式
  */
 contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
     using BreedingLib for *;
 
-    /**
-     * @dev 自繁殖冷却时�?
-     */
     uint256 public selfBreedingCooldown = 12 hours;
-    /**
-     * @dev 市场繁殖冷却时间
-     */
     uint256 public marketBreedingCooldown = 24 hours;
-    /**
-     * @dev 自繁殖费用（代币�?
-     */
     uint256 public selfBreedingFee = 888 * 1e18;
-    /**
-     * @dev 市场繁殖费用（代币）
-     */
     uint256 public marketBreedingFee = 888 * 1e18;
-    /**
-     * @dev 授权合约地址（Authorizer�? 通过此地址获取所有关联合约地址
-     */
     address public authorizer;
-    /**
-     * @dev 黑洞地址（用于销毁NFT�?
-     */
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
 
-    /**
-     * @dev 自繁殖类�?
-     */
     uint256 public constant BREEDING_TYPE_SELF = 0;
-    /**
-     * @dev 市场繁殖类型
-     */
     uint256 public constant BREEDING_TYPE_MARKET = 1;
-    /**
-     * @dev 最大繁殖配对数�?
-     */
     uint256 public constant MAX_BREEDING_PAIRS = 10000;
 
-    /**
-     * @dev 每日最大公共繁殖次�?
-     */
     uint256 public maxDailyPublicBreedings = 5;
-    /**
-     * @dev 用户每日公共繁殖次数映射
-     */
     mapping(address => uint256) public dailyPublicBreedings;
-    /**
-     * @dev 用户上次繁殖日期映射
-     */
     mapping(address => uint256) public lastBreedingDay;
 
-    /**
-     * @dev 是否暂停繁殖
-     */
     bool public paused;
-    /**
-     * @dev 暂停原因
-     */
     string public pauseReason;
 
-    /**
-     * @dev 繁殖状态：进行�?
-     */
     uint256 public constant BREEDING_STATUS_ACTIVE = 0;
-    /**
-     * @dev 繁殖状态：已完�?
-     */
     uint256 public constant BREEDING_STATUS_COMPLETED = 1;
-    /**
-     * @dev 繁殖状态：已取�?
-     */
     uint256 public constant BREEDING_STATUS_CANCELLED = 2;
 
-    /**
-     * @dev 繁殖配对结构�?
-     * @param fatherId 父NFT ID
-     * @param motherId 母NFT ID
-     * @param maleOwner 父NFT所有�?
-     * @param femaleOwner 母NFT所有�?
-     * @param maleCoOwnerId 父NFT共同所有者ID
-     * @param femaleCoOwnerId 母NFT共同所有者ID
-     * @param startTime 繁殖开始时�?
-     * @param breedingType 繁殖类型�?=自繁殖，1=市场繁殖�?
-     * @param status 繁殖状�?
-     * @param childId 子代NFT ID（雌性）
-     * @param maleChildId 子代NFT ID（雄性）
-     * @param rewardsClaimed 奖励是否已领�?
-     * @param cancelledAt 取消时间（如果被取消�?
-     */
     struct BreedingPair {
         uint256 fatherId;
         uint256 motherId;
@@ -170,34 +57,12 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 cancelledAt;
     }
 
-    /**
-     * @dev 繁殖配对映射
-     */
     mapping(uint256 => BreedingPair) public breedingPairs;
-    /**
-     * @dev 繁殖配对计数�?
-     */
     uint256 public breedingPairCount;
-    /**
-     * @dev NFT冷却时间映射
-     */
     mapping(uint256 => uint256) public breedingCooldowns;
-    /**
-     * @dev NFT是否正在繁殖�?
-     */
     mapping(uint256 => bool) public isNFTInActiveBreeding;
-    /**
-     * @dev 用户活跃繁殖订单ID列表
-     */
     mapping(address => uint256[]) private _userActiveOrderIds;
-    
-    /**
-     * @dev 用户所有繁殖订单ID列表（用于统计查询优化）
-     */
     mapping(address => uint256[]) private _userAllOrderIds;
-    /**
-     * @dev 繁殖配对是否存在（防止重复）
-     */
     mapping(uint256 => mapping(uint256 => bool)) private _breedingPairExists;
 
     event BreedingPairCreated(uint256 indexed pairId, uint256 indexed fatherId, uint256 indexed motherId, uint256 breedingType);
@@ -215,12 +80,12 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     event BreedingCancelled(uint256 indexed pairId, uint256 fatherId, uint256 motherId, address indexed canceller);
 
     modifier whenNotPaused() {
-        require(!paused, "BC: Paused");
+        require(!paused, "BC: P");
         _;
     }
 
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer, "BC: Not authorized");
+        require(msg.sender == owner() || msg.sender == authorizer, "BC: NA");
         _;
     }
 
@@ -228,24 +93,16 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _disableInitializers();
     }
 
-    /**
-     * @dev 初始化函�?
-     * @param _authorizerAddress 授权合约地址
-     */
     function initialize(address _authorizerAddress) external initializer {
-        require(_authorizerAddress != address(0), "BC: Invalid authorizer address");
+        require(_authorizerAddress != address(0), "BC: IA");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
     }
 
-    /**
-     * @dev 设置授权合约地址
-     * @param _authorizerAddress 授权合约地址
-     */
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
-        require(_authorizerAddress != address(0), "BC: Invalid authorizer address");
+        require(_authorizerAddress != address(0), "BC: IA");
         authorizer = _authorizerAddress;
     }
 
@@ -266,33 +123,33 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function createSelfBreedingPair(uint256 fatherId, uint256 motherId, uint256 coOwnerId) external nonReentrant whenNotPaused returns (uint256) {
         address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
         address stakingContract = IAuthorizer(authorizer).getStaking();
-        require(nftMintContract != address(0), "BC: NFT contract not set");
-        require(fatherId > 0, "BC: Invalid father");
-        require(motherId > 0, "BC: Invalid mother");
-        require(fatherId != motherId, "BC: Cannot self-breed");
-        require(breedingPairCount < MAX_BREEDING_PAIRS, "BC: Max pairs");
+        require(nftMintContract != address(0), "BC: NCS");
+        require(fatherId > 0, "BC: IF");
+        require(motherId > 0, "BC: IM");
+        require(fatherId != motherId, "BC: CSB");
+        require(breedingPairCount < MAX_BREEDING_PAIRS, "BC: MP");
         
         if (stakingContract != address(0)) {
             (address fatherStaker, , , , ) = IStaking(stakingContract).stakingInfo(fatherId);
-            require(fatherStaker == address(0), "BC: Father staked");
+            require(fatherStaker == address(0), "BC: FS");
             (address motherStaker, , , , ) = IStaking(stakingContract).stakingInfo(motherId);
-            require(motherStaker == address(0), "BC: Mother staked");
+            require(motherStaker == address(0), "BC: MS");
         }
 
         INFTMint nft = INFTMint(nftMintContract);
-        require(nft.ownerOf(fatherId) == msg.sender, "BC: Not father owner");
-        require(nft.ownerOf(motherId) == msg.sender, "BC: Not mother owner");
+        require(nft.ownerOf(fatherId) == msg.sender, "BC: NFO");
+        require(nft.ownerOf(motherId) == msg.sender, "BC: NMO");
 
         uint256 fatherType = nft.tokenType(fatherId);
         uint256 motherType = nft.tokenType(motherId);
 
         if (coOwnerId > 0) {
-            require(nft.ownerOf(coOwnerId) == msg.sender, "BC: Not co-owner");
-            require(!isNFTInActiveBreeding[coOwnerId], "BC: Co-owner breeding");
-            require(breedingCooldowns[coOwnerId] <= block.timestamp, "BC: Co-owner cooldown");
+            require(nft.ownerOf(coOwnerId) == msg.sender, "BC: NCO");
+            require(!isNFTInActiveBreeding[coOwnerId], "BC: COB");
+            require(breedingCooldowns[coOwnerId] <= block.timestamp, "BC: COC");
             uint256 coOwnerType = nft.tokenType(coOwnerId);
             uint256 coOwnerZodiac = (coOwnerType / 2) % 12;
-            require(coOwnerZodiac == (fatherType / 2) % 12, "BC: Co-owner zodiac");
+            require(coOwnerZodiac == (fatherType / 2) % 12, "BC: COZ");
         }
 
         return _breedCommon(
@@ -306,26 +163,26 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 fatherId, uint256 motherId
     ) external nonReentrant whenNotPaused returns (uint256) {
         address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
-        require(nftMintContract != address(0), "BC: NFT contract not set");
-        require(fatherId > 0, "BC: Invalid father ID");
-        require(motherId > 0, "BC: Invalid mother ID");
-        require(fatherId != motherId, "BC: Cannot breed with self");
+        require(nftMintContract != address(0), "BC: NCS");
+        require(fatherId > 0, "BC: IFID");
+        require(motherId > 0, "BC: IMID");
+        require(fatherId != motherId, "BC: CBS");
         
         INFTMint nft = INFTMint(nftMintContract);
         IERC721Upgradeable nft721 = IERC721Upgradeable(nftMintContract);
         address maleOwner = nft.ownerOf(fatherId);
         address femaleOwner = nft.ownerOf(motherId);
         
-        require(maleOwner != femaleOwner, "BC: Diff owners");
-        require(msg.sender == maleOwner || msg.sender == femaleOwner, "BC: Must be owner");
+        require(maleOwner != femaleOwner, "BC: DO");
+        require(msg.sender == maleOwner || msg.sender == femaleOwner, "BC: MO");
         
         BreedingLib.checkDailyBreedingLimit(msg.sender, dailyPublicBreedings, lastBreedingDay, maxDailyPublicBreedings);
 
         uint256 fatherType = nft.tokenType(fatherId);
         uint256 motherType = nft.tokenType(motherId);
 
-        require(nft721.isApprovedForAll(maleOwner, address(this)), "BC: Father not approved");
-        require(nft721.isApprovedForAll(femaleOwner, address(this)), "BC: Mother not approved");
+        require(nft721.isApprovedForAll(maleOwner, address(this)), "BC: FNA");
+        require(nft721.isApprovedForAll(femaleOwner, address(this)), "BC: MNA");
 
         uint256 pairId = _breedCommon(
             fatherId, motherId, maleOwner, femaleOwner,
@@ -345,7 +202,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 breedingType
     ) internal returns (uint256 pairId) {
         address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
-        require(nftMintContract != address(0), "BC: NFT contract not set");
+        require(nftMintContract != address(0), "BC: NCS");
         
         INFTMint nft = INFTMint(nftMintContract);
         _validateBreedingPair(nft, fatherId, motherId);
@@ -365,14 +222,14 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 fatherType = nft.tokenType(fatherId);
         uint256 motherType = nft.tokenType(motherId);
         
-        require(nft.tokenLevel(fatherId) >= 5 && nft.tokenLevel(motherId) >= 5, "BC: Level < 5");
-        require((fatherType / 2) % 12 == (motherType / 2) % 12, "BC: Diff zodiac");
-        require((fatherType % 2) != (motherType % 2), "BC: Same gender");
-        require(breedingCooldowns[fatherId] <= block.timestamp, "BC: Father cooldown");
-        require(breedingCooldowns[motherId] <= block.timestamp, "BC: Mother cooldown");
-        require(!isNFTInActiveBreeding[fatherId], "BC: Father breeding");
-        require(!isNFTInActiveBreeding[motherId], "BC: Mother breeding");
-        require(!_breedingPairExists[fatherId][motherId] && !_breedingPairExists[motherId][fatherId], "BC: Pair already exists");
+        require(nft.tokenLevel(fatherId) >= 5 && nft.tokenLevel(motherId) >= 5, "BC: L5");
+        require((fatherType / 2) % 12 == (motherType / 2) % 12, "BC: DZ");
+        require((fatherType % 2) != (motherType % 2), "BC: SG");
+        require(breedingCooldowns[fatherId] <= block.timestamp, "BC: FC");
+        require(breedingCooldowns[motherId] <= block.timestamp, "BC: MC");
+        require(!isNFTInActiveBreeding[fatherId], "BC: FB");
+        require(!isNFTInActiveBreeding[motherId], "BC: MB");
+        require(!_breedingPairExists[fatherId][motherId] && !_breedingPairExists[motherId][fatherId], "BC: PAE");
     }
 
     function _createBreedingPair(
@@ -400,7 +257,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _transferBreedingNFTs(nft721, fatherId, motherId, maleOwner, femaleOwner, fee, tokenContract);
 
         if (fee > 0) {
-            require(tokenContract != address(0), "BC: Token contract not set");
+            require(tokenContract != address(0), "BC: TNS");
             IERC20(tokenContract).safeTransferFrom(msg.sender, address(this), fee);
         }
 
@@ -430,9 +287,8 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             if (fee > 0 && tokenContract != address(0)) {
                 IERC20(tokenContract).safeTransfer(msg.sender, fee);
             }
-            revert("BC: Father transfer failed");
+            revert("BC: FTF");
         }
-        // 权重同步：用户 -> 合约
         _syncWeightAfterTransfer(maleOwner, address(this), fatherId, nftMintContract);
 
         try nft.safeTransferFrom(femaleOwner, address(this), motherId) {
@@ -446,15 +302,14 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
                     revertOnFailure = true;
                 }
                 if (revertOnFailure) {
-                    revert("BC: Mother transfer failed and father recovery failed");
+                    revert("BC: MTF2");
                 }
             }
             if (fee > 0 && tokenContract != address(0)) {
                 IERC20(tokenContract).safeTransfer(msg.sender, fee);
             }
-            revert("BC: Mother transfer failed");
+            revert("BC: MTF");
         }
-        // 权重同步：用户 -> 合约
         _syncWeightAfterTransfer(femaleOwner, address(this), motherId, nftMintContract);
     }
 
@@ -464,15 +319,15 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function cancelBreeding(uint256 pairId) external nonReentrant whenNotPaused {
         BreedingPair storage pair = breedingPairs[pairId];
-        require(pair.status == BREEDING_STATUS_ACTIVE, "BC: Pair not active");
-        require(pair.childId == 0, "BC: Already completed");
-        require(msg.sender == pair.maleOwner || msg.sender == pair.femaleOwner, "BC: Not pair owner");
+        require(pair.status == BREEDING_STATUS_ACTIVE, "BC: PNA");
+        require(pair.childId == 0, "BC: AC");
+        require(msg.sender == pair.maleOwner || msg.sender == pair.femaleOwner, "BC: NPO");
         
         address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
-        require(nftMintContract != address(0), "BC: NFT contract not set");
+        require(nftMintContract != address(0), "BC: NCS");
 
         uint256 cooldown = pair.breedingType == BREEDING_TYPE_SELF ? selfBreedingCooldown : marketBreedingCooldown;
-        require(block.timestamp < pair.startTime + cooldown, "BC: Cannot cancel after cooldown ended");
+        require(block.timestamp < pair.startTime + cooldown, "BC: CCC");
 
         INFTMint nft = INFTMint(nftMintContract);
         IERC721Upgradeable nft721 = IERC721Upgradeable(nftMintContract);
@@ -491,7 +346,6 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         BreedingLib.removeActiveOrder(pair.maleOwner, pairId, _userActiveOrderIds);
         BreedingLib.removeActiveOrder(pair.femaleOwner, pairId, _userActiveOrderIds);
         
-        // 记录原持有者用于权重同步
         address fatherOwner = pair.maleOwner;
         address motherOwner = pair.femaleOwner;
         
@@ -512,19 +366,19 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     function completeBreeding(uint256 pairId) external nonReentrant whenNotPaused returns (uint256, uint256) {
         BreedingPair storage pair = breedingPairs[pairId];
-        require(pair.status == BREEDING_STATUS_ACTIVE, "BC: Pair not active");
-        require(pair.childId == 0, "BC: Already completed");
-        require(msg.sender == pair.maleOwner || msg.sender == pair.femaleOwner, "BC: Not pair owner");
+        require(pair.status == BREEDING_STATUS_ACTIVE, "BC: PNA");
+        require(pair.childId == 0, "BC: AC");
+        require(msg.sender == pair.maleOwner || msg.sender == pair.femaleOwner, "BC: NPO");
         
         address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
-        require(nftMintContract != address(0), "BC: NFT contract not set");
+        require(nftMintContract != address(0), "BC: NCS");
 
         IERC721Upgradeable nft721 = IERC721Upgradeable(nftMintContract);
-        require(nft721.ownerOf(pair.fatherId) == address(this), "BC: Father NFT not held by contract");
-        require(nft721.ownerOf(pair.motherId) == address(this), "BC: Mother NFT not held by contract");
+        require(nft721.ownerOf(pair.fatherId) == address(this), "BC: FNH");
+        require(nft721.ownerOf(pair.motherId) == address(this), "BC: MNH");
 
         uint256 cooldown = pair.breedingType == BREEDING_TYPE_SELF ? selfBreedingCooldown : marketBreedingCooldown;
-        require(block.timestamp >= pair.startTime + cooldown, "BC: Cooldown not ended");
+        require(block.timestamp >= pair.startTime + cooldown, "BC: CNE");
 
         INFTMint nft = INFTMint(nftMintContract);
 
@@ -538,7 +392,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         )));
         
         uint256 zodiacType = _getChildZodiacType(nft, pair.fatherId, pair.motherId, seed);
-        require(zodiacType > 0, "BC: Invalid child zodiac type");
+        require(zodiacType > 0, "BC: ICT");
 
         if (pair.breedingType == BREEDING_TYPE_SELF) {
             return _completeSelfBreeding(pairId, nft, nft721, pair, zodiacType, seed);
@@ -557,7 +411,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     ) private returns (uint256, uint256) {
         uint8 childGrowth = uint8((seed % 91) + 10);
         uint256 childId = nft.mintForBreeding(pair.femaleOwner, zodiacType, childGrowth);
-        require(childId > 0, "BC: NFT mint failed");
+        require(childId > 0, "BC: NMF");
 
         pair.childId = childId;
         pair.status = 1;
@@ -580,10 +434,10 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint8 maleChildGrowth = uint8(((seed >> 32) % 91) + 10);
 
         uint256 childIdForFemale = nft.mintForBreeding(pair.femaleOwner, zodiacType, femaleChildGrowth);
-        require(childIdForFemale > 0, "BC: Female child mint failed");
+        require(childIdForFemale > 0, "BC: FCMF");
 
         uint256 childIdForMale = nft.mintForBreeding(pair.maleOwner, zodiacType, maleChildGrowth);
-        require(childIdForMale > 0, "BC: Male child mint failed");
+        require(childIdForMale > 0, "BC: MCMF");
 
         pair.childId = childIdForFemale;
         pair.maleChildId = childIdForMale;
@@ -611,7 +465,6 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
         _burnFee(pair.breedingType);
 
-        // 记录原持有者用于权重同步
         address fatherOwner = pair.maleOwner;
         address motherOwner = pair.femaleOwner;
         address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
@@ -666,7 +519,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 motherType = nftMint.tokenType(motherId);
         uint256 fatherZodiac = (fatherType / 2) % 12;
         uint256 motherZodiac = (motherType / 2) % 12;
-        require(fatherZodiac == motherZodiac, "BC: Parent zodiac mismatch");
+        require(fatherZodiac == motherZodiac, "BC: PZM");
 
         uint256 seed = uint256(keccak256(abi.encodePacked(
             fatherId, 
@@ -693,7 +546,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         IERC20 token = IERC20(tokenContract);
         
         uint256 contractBalance = token.balanceOf(address(this));
-        require(contractBalance >= fee, "BC: Insufficient balance for fee burn");
+        require(contractBalance >= fee, "BC: IBFB");
         
         token.safeTransfer(BLACK_HOLE, fee);
         emit BreedingFeeBurned(fee);
@@ -708,13 +561,13 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     function setSelfBreedingCooldown(uint256 cooldown) external onlyOwner { 
-        require(cooldown > 0, "BC: Cooldown must be > 0"); 
+        require(cooldown > 0, "BC: CM0"); 
         selfBreedingCooldown = cooldown; 
         emit CooldownUpdated(selfBreedingCooldown, marketBreedingCooldown); 
     }
 
     function setMarketBreedingCooldown(uint256 cooldown) external onlyOwner { 
-        require(cooldown > 0, "BC: Cooldown must be > 0"); 
+        require(cooldown > 0, "BC: CM0"); 
         marketBreedingCooldown = cooldown; 
         emit CooldownUpdated(selfBreedingCooldown, marketBreedingCooldown); 
     }
@@ -736,147 +589,79 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return result;
     }
 
-    function getNFTBreedingCooldown(uint256 tokenId) public view returns (uint256 remainingCooldown) {
-        if (breedingCooldowns[tokenId] == 0) {
-            return 0;
-        }
-        if (block.timestamp >= breedingCooldowns[tokenId]) {
-            return 0;
-        }
-        return breedingCooldowns[tokenId] - block.timestamp;
-    }
-
     function getUserBreedingStats(address user) external view returns (
         uint256 totalPairs,
         uint256 activePairs,
         uint256 completedPairs,
         uint256 claimablePairs
     ) {
-        address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
-        INFTMint nftMint;
-        if (nftMintContract != address(0)) {
-            nftMint = INFTMint(nftMintContract);
-        }
-        
         uint256[] storage orderIds = _userAllOrderIds[user];
-        totalPairs = 0;
-        activePairs = 0;
-        completedPairs = 0;
-        claimablePairs = 0;
-
+        address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
+        
         for (uint256 i = 0; i < orderIds.length; i++) {
             BreedingPair memory pair = breedingPairs[orderIds[i]];
             bool isRelated = (pair.maleOwner == user || pair.femaleOwner == user);
             if (!isRelated && nftMintContract != address(0)) {
-                if (pair.maleCoOwnerId != 0 && nftMint.ownerOf(pair.maleCoOwnerId) == user) {
-                    isRelated = true;
-                }
-                if (!isRelated && pair.femaleCoOwnerId != 0 && nftMint.ownerOf(pair.femaleCoOwnerId) == user) {
-                    isRelated = true;
-                }
+                INFTMint nftMint = INFTMint(nftMintContract);
+                if (pair.maleCoOwnerId != 0 && nftMint.ownerOf(pair.maleCoOwnerId) == user) isRelated = true;
+                if (!isRelated && pair.femaleCoOwnerId != 0 && nftMint.ownerOf(pair.femaleCoOwnerId) == user) isRelated = true;
             }
 
             if (isRelated) {
                 totalPairs++;
-                if (pair.status == 0) {
-                    activePairs++;
-                } else if (pair.status == 1) {
+                if (pair.status == 0) activePairs++;
+                else if (pair.status == 1) {
                     completedPairs++;
-                    if (!pair.rewardsClaimed) {
-                        claimablePairs++;
-                    }
+                    if (!pair.rewardsClaimed) claimablePairs++;
                 }
             }
         }
     }
 
     function getBreedingPairWithCooldown(uint256 pairId) external view returns (
-        uint256 fatherId,
-        uint256 motherId,
-        uint256 fatherCooldown,
-        uint256 motherCooldown,
-        uint256 remainingTime,
-        uint256 status
+        uint256 fatherId, uint256 motherId, uint256 fatherCooldown,
+        uint256 motherCooldown, uint256 remainingTime, uint256 status
     ) {
         BreedingPair memory pair = breedingPairs[pairId];
         fatherId = pair.fatherId;
         motherId = pair.motherId;
-        fatherCooldown = getNFTBreedingCooldown(pair.fatherId);
-        motherCooldown = getNFTBreedingCooldown(pair.motherId);
+        fatherCooldown = breedingCooldowns[pair.fatherId];
+        motherCooldown = breedingCooldowns[pair.motherId];
         status = pair.status;
+        remainingTime = 0;
+        if (pair.status == 0 && pair.startTime > 0) {
+            uint256 endTime = pair.startTime + (pair.breedingType == BREEDING_TYPE_SELF ? selfBreedingCooldown : marketBreedingCooldown);
+            if (block.timestamp < endTime) remainingTime = endTime - block.timestamp;
+        }
+    }
 
-        if (pair.status == 0) {
-            if (pair.startTime > 0) {
-                uint256 breedingDuration = pair.breedingType == BREEDING_TYPE_SELF ? selfBreedingCooldown : marketBreedingCooldown;
-                if (block.timestamp >= pair.startTime + breedingDuration) {
-                    remainingTime = 0;
-                } else {
-                    remainingTime = pair.startTime + breedingDuration - block.timestamp;
-                }
-            } else {
-                remainingTime = 0;
-            }
+    function emergencyWithdraw(uint256 tokenType, uint256 tokenIdOrAmount, uint256 amount) external onlyOwner nonReentrant {
+        if (tokenType == 0) {
+            require(tokenIdOrAmount > 0, "BC: A0");
+            require(tokenIdOrAmount <= address(this).balance, "BC: IS");
+            (bool success, ) = payable(owner()).call{value: tokenIdOrAmount}("");
+            require(success, "BC: BF");
+            emit EmergencyBNBWithdrawn(msg.sender, owner(), tokenIdOrAmount);
+        } else if (tokenType == 1) {
+            require(amount > 0, "BC: A0");
+            address tokenContract = IAuthorizer(authorizer).getToken();
+            require(tokenContract != address(0), "BC: TNS");
+            IERC20 token = IERC20(tokenContract);
+            require(token.balanceOf(address(this)) >= amount, "BC: IS");
+            token.safeTransfer(owner(), amount);
+            emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
         } else {
-            remainingTime = 0;
+            address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
+            require(nftMintContract != address(0), "BC: NCS");
+            require(!isNFTInActiveBreeding[tokenIdOrAmount], "BC: NB");
+            IERC721Upgradeable(nftMintContract).safeTransferFrom(address(this), owner(), tokenIdOrAmount);
+            BreedingLib.syncWeightAfterTransfer(authorizer, address(this), owner(), tokenIdOrAmount);
+            emit EmergencyNFTWithdrawn(msg.sender, owner(), tokenIdOrAmount);
         }
     }
 
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
-        require(amount > 0, "BC: Amount must be > 0");
-        require(amount <= address(this).balance, "BC: Insufficient balance");
-        (bool success, ) = payable(owner()).call{value: amount}("");
-        require(success, "BC: BNB transfer failed");
-        emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
-    }
-
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
-        require(amount > 0, "BC: Amount must be > 0");
-        address tokenContract = IAuthorizer(authorizer).getToken();
-        require(tokenContract != address(0), "BC: Token contract not set");
-        IERC20 token = IERC20(tokenContract);
-        require(token.balanceOf(address(this)) >= amount, "BC: Insufficient token balance");
-        token.safeTransfer(owner(), amount);
-        emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
-    }
-
-    function emergencyWithdrawNFT(uint256 tokenId) external onlyOwner nonReentrant {
-        address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
-        require(nftMintContract != address(0), "BC: NFT contract not set");
-        require(!isNFTInActiveBreeding[tokenId], "BC: NFT in active breeding");
-        IERC721Upgradeable nft = IERC721Upgradeable(nftMintContract);
-        address from = address(this);
-        address to = owner();
-        nft.safeTransferFrom(from, to, tokenId);
-        _syncWeightAfterTransfer(from, to, tokenId, nftMintContract);
-        emit EmergencyNFTWithdrawn(msg.sender, owner(), tokenId);
-    }
-
-    /**
-     * @dev 同步权重（NFT转移后调用）
-     * @param from 原持有者
-     * @param to 新持有者
-     * @param tokenId NFT ID
-     * @param nftContract NFT合约地址
-     */
     function _syncWeightAfterTransfer(address from, address to, uint256 tokenId, address nftContract) internal {
-        address nftDataContract = IAuthorizer(authorizer).getNFTData();
-        if (nftDataContract != address(0)) {
-            INFTDataInterface(nftDataContract).removeUserNFT(from, tokenId);
-            INFTDataInterface(nftDataContract).addUserNFT(to, tokenId);
-        }
-        
-        address dividendManager = IAuthorizer(authorizer).getDividendManager();
-        if (dividendManager != address(0)) {
-            IDividendManager(dividendManager).syncUserWeight(from);
-            IDividendManager(dividendManager).syncUserWeight(to);
-        }
-        
-        // 修复：添加 WeightManager 同步，确保权重数据一致性
-        address weightManager = IAuthorizer(authorizer).getWeightManager();
-        if (weightManager != address(0)) {
-            IWeightManager(weightManager).syncUserWeight(from);
-            IWeightManager(weightManager).syncUserWeight(to);
-        }
+        BreedingLib.syncWeightAfterTransfer(authorizer, from, to, tokenId);
     }
 
     receive() external payable {}
