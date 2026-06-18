@@ -218,6 +218,9 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             userStakedNFTs[msg.sender].push(tokenId);
         }
         
+        // 修复：质押后同步权重数据
+        _syncWeightAfterStake(msg.sender, tokenIds);
+        
         emit NFTsStaked(msg.sender, tokenIds);
     }
 
@@ -258,6 +261,9 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         if (shouldClearTeam || userStakedNFTs[msg.sender].length == 0) {
             delete playerBattleTeams[msg.sender];
         }
+        
+        // 修复：解除质押后同步权重数据
+        _syncWeightAfterUnstake(msg.sender, tokenIds);
         
         emit NFTsUnstaked(msg.sender, tokenIds);
     }
@@ -372,5 +378,85 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function getNFTStakedOwner(uint256 tokenId) external view returns (address) {
         return nftStakedOwner[tokenId];
+    }
+
+    /**
+     * @dev 质押后同步权重数据
+     * @param user 用户地址
+     * @param tokenIds 质押的NFT ID列表
+     */
+    function _syncWeightAfterStake(address user, uint256[] calldata tokenIds) internal {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        
+        // 从用户NFT列表中移除质押的NFT
+        if (nftDataContract != address(0)) {
+            for (uint256 i = 0; i < tokenIds.length; i++) {
+                try INFTDataInterface(nftDataContract).removeUserNFT(user, tokenIds[i]) {
+                    // 成功
+                } catch {
+                    // 忽略错误，不影响主流程
+                }
+            }
+        }
+        
+        // 同步用户权重 - WeightManager
+        if (weightManager != address(0)) {
+            try IWeightManager(weightManager).syncUserWeight(user) {
+                // 成功
+            } catch {
+                // 忽略错误，不影响主流程
+            }
+        }
+        
+        // 同步用户权重 - DividendManager
+        if (dividendManager != address(0)) {
+            try IDividendManager(dividendManager).syncUserWeight(user) {
+                // 成功
+            } catch {
+                // 忽略错误，不影响主流程
+            }
+        }
+    }
+
+    /**
+     * @dev 解除质押后同步权重数据
+     * @param user 用户地址
+     * @param tokenIds 解除质押的NFT ID列表
+     */
+    function _syncWeightAfterUnstake(address user, uint256[] calldata tokenIds) internal {
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        
+        // 将解除质押的NFT添加回用户列表
+        if (nftDataContract != address(0)) {
+            for (uint256 i = 0; i < tokenIds.length; i++) {
+                try INFTDataInterface(nftDataContract).addUserNFT(user, tokenIds[i]) {
+                    // 成功
+                } catch {
+                    // 忽略错误，不影响主流程
+                }
+            }
+        }
+        
+        // 同步用户权重 - WeightManager
+        if (weightManager != address(0)) {
+            try IWeightManager(weightManager).syncUserWeight(user) {
+                // 成功
+            } catch {
+                // 忽略错误，不影响主流程
+            }
+        }
+        
+        // 同步用户权重 - DividendManager
+        if (dividendManager != address(0)) {
+            try IDividendManager(dividendManager).syncUserWeight(user) {
+                // 成功
+            } catch {
+                // 忽略错误，不影响主流程
+            }
+        }
     }
 }

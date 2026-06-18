@@ -536,6 +536,16 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         } catch {
             revert("NFTUpdate: Update weight failed with unknown error");
         }
+        
+        // 修复：添加 WeightManager 同步，确保权重数据一致性
+        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        if (weightManager != address(0)) {
+            try IWeightManager(weightManager).syncUserWeight(user) {
+                // 成功
+            } catch {
+                // 忽略 WeightManager 同步失败，不影响主流程
+            }
+        }
     }
 
     /**

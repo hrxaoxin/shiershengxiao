@@ -211,7 +211,23 @@ contract WeightManager is
      * 用于保护合约配置更新函数
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer, "WeightManager: Not authorized");
+        if (msg.sender == owner() || msg.sender == authorizer) {
+            _;
+            return;
+        }
+        IAuthorizer auth = IAuthorizer(authorizer);
+        require(
+            msg.sender == auth.getNFTUpdate() || 
+            msg.sender == auth.getRewardManager() || 
+            msg.sender == auth.getStaking() || 
+            msg.sender == auth.getNFTTrading() || 
+            msg.sender == auth.getBreedingCore() || 
+            msg.sender == auth.getNFTMintCore() || 
+            msg.sender == auth.getArenaPlayer() || 
+            msg.sender == auth.getNFTBuyback() ||
+            msg.sender == auth.getNFTData(),
+            "WeightManager: Not authorized"
+        );
         _;
     }
     

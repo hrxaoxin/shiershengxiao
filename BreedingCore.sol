@@ -870,6 +870,13 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             IDividendManager(dividendManager).syncUserWeight(from);
             IDividendManager(dividendManager).syncUserWeight(to);
         }
+        
+        // 修复：添加 WeightManager 同步，确保权重数据一致性
+        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        if (weightManager != address(0)) {
+            IWeightManager(weightManager).syncUserWeight(from);
+            IWeightManager(weightManager).syncUserWeight(to);
+        }
     }
 
     receive() external payable {}

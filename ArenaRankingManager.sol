@@ -832,10 +832,4 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 }
 
-interface IArenaPlayer {
-    function getPlayerBattleTeam(address player) external view returns (uint256[] memory);
-    function getNFTStakedOwner(uint256 tokenId) external view returns (address);
-    function stakeNFTs(uint256[] calldata tokenIds) external;
-    function unstakeNFTs(uint256[] calldata tokenIds) external;
-    function clearBattleTeam() external;
-}
+// IArenaPlayer interface 已从 NFTInterface.sol 导入，无需重复定义

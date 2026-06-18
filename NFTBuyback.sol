@@ -393,6 +393,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     function _syncWeightAfterBurn(address user, uint256 tokenId) internal {
         address nftDataContract = IAuthorizer(authorizer).getNFTData();
         address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        address weightManager = IAuthorizer(authorizer).getWeightManager();
         
         // 移除用户NFT记录
         if (nftDataContract != address(0)) {
@@ -403,12 +404,21 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             }
         }
         
-        // 同步用户权重
+        // 同步用户权重 - DividendManager
         if (dividendManager != address(0)) {
             try IDividendManager(dividendManager).syncUserWeight(user) {
                 // 成功
             } catch {
                 // 忽略错误
+            }
+        }
+        
+        // 修复：同步用户权重 - WeightManager，确保权重数据一致性
+        if (weightManager != address(0)) {
+            try IWeightManager(weightManager).syncUserWeight(user) {
+                // 成功
+            } catch {
+                // 忽略错误，不影响主流程
             }
         }
     }

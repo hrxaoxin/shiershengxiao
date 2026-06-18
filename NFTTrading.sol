@@ -91,6 +91,18 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 在售NFT列表
      */
     uint256[] public listedNFTs;
+    
+    /**
+     * @dev 在售NFT索引映射（优化删除）
+     * tokenId => 在数组中的索引
+     */
+    mapping(uint256 => uint256) public listedNFTIndex;
+
+    /**
+     * @dev 用户挂单映射 - 修复：避免getUserListings遍历所有挂单导致的性能问题
+     * user => tokenId[]
+     */
+    mapping(address => uint256[]) public userListings;
 
     /**
      * @dev 手续费率（百分比）
@@ -210,7 +222,12 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             listTime: block.timestamp
         });
 
+        // 记录索引用于O(1)删除
+        listedNFTIndex[tokenId] = listedNFTs.length;
         listedNFTs.push(tokenId);
+        
+        // 维护用户挂单列表，避免getUserListings遍历所有挂单
+        userListings[msg.sender].push(tokenId);
         
         // 同步权重：NFT从用户转移到NFTTrading合约
         _syncWeightAfterTransfer(msg.sender, address(this), tokenId, nftContract);
@@ -231,6 +248,9 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         // 先删除挂牌信息（Checks-Effects-Interactions 模式）
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
+        
+        // 修复：从用户挂单列表中移除
+        _removeFromUserListings(seller, tokenId);
 
         // 将 NFT 从合约转回卖家
         try INFT(nftContract).safeTransferFrom(address(this), seller, tokenId) {
@@ -278,6 +298,9 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         // Checks-Effects-Interactions 模式：先清除挂牌状态
         delete listings[tokenId];
         _removeFromListedNFTs(tokenId);
+        
+        // 修复：从卖家挂单列表中移除
+        _removeFromUserListings(seller, tokenId);
 
         // 先从买家转移代币到合约
         token.safeTransferFrom(msg.sender, address(this), price);
@@ -352,12 +375,13 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 分页获取在售NFT列表
      * @param offset 起始偏移
      * @param limit 每页数量限制
-     * @return listings 分页的挂牌列表
+     * @return tokenIds 分页的挂牌NFT ID列表
      */
-    function getListingsPaginated(uint256 offset, uint256 limit) external view returns (uint256[] memory listings) {
+    function getListingsPaginated(uint256 offset, uint256 limit) external view returns (uint256[] memory tokenIds) {
         uint256 totalCount = 0;
         for (uint256 i = 0; i < listedNFTs.length; i++) {
             uint256 tokenId = listedNFTs[i];
+            // 检查挂牌是否存在（seller != address(0) 表示有效挂牌）
             if (listings[tokenId].seller != address(0)) {
                 totalCount++;
             }
@@ -372,14 +396,15 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             size = totalCount - offset;
         }
         
-        listings = new uint256[](size);
+        tokenIds = new uint256[](size);
         uint256 resultIndex = 0;
         uint256 count = 0;
         for (uint256 i = 0; i < listedNFTs.length; i++) {
             uint256 tokenId = listedNFTs[i];
+            // 检查挂牌是否存在（seller != address(0) 表示有效挂牌）
             if (listings[tokenId].seller != address(0)) {
                 if (count >= offset && resultIndex < size) {
-                    listings[resultIndex++] = tokenId;
+                    tokenIds[resultIndex++] = tokenId;
                 }
                 count++;
             }
@@ -399,15 +424,32 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     event FeePercentUpdated(uint256 newFeePercent);
 
     /**
-     * @dev 从列表移除
+     * @dev 从列表移除（O(1)时间复杂度）
      */
     function _removeFromListedNFTs(uint256 tokenId) internal {
-        for (uint256 i = 0; i < listedNFTs.length; i++) {
-            if (listedNFTs[i] == tokenId) {
-                for (uint256 j = i; j < listedNFTs.length - 1; j++) {
-                    listedNFTs[j] = listedNFTs[j + 1];
-                }
-                listedNFTs.pop();
+        uint256 index = listedNFTIndex[tokenId];
+        uint256 lastIndex = listedNFTs.length - 1;
+        
+        if (index != lastIndex) {
+            uint256 lastTokenId = listedNFTs[lastIndex];
+            listedNFTs[index] = lastTokenId;
+            listedNFTIndex[lastTokenId] = index;
+        }
+        listedNFTs.pop();
+        delete listedNFTIndex[tokenId];
+    }
+    
+    /**
+     * @dev 从用户挂单列表中移除tokenId
+     * @param user 用户地址
+     * @param tokenId NFT ID
+     */
+    function _removeFromUserListings(address user, uint256 tokenId) internal {
+        uint256[] storage userList = userListings[user];
+        for (uint256 i = 0; i < userList.length; i++) {
+            if (userList[i] == tokenId) {
+                userList[i] = userList[userList.length - 1];
+                userList.pop();
                 break;
             }
         }
@@ -419,12 +461,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return count 挂牌数量
      */
     function getUserListedCount(address user) external view returns (uint256 count) {
-        for (uint256 i = 0; i < listedNFTs.length; i++) {
-            uint256 tokenId = listedNFTs[i];
-            if (listings[tokenId].seller == user) {
-                count++;
-            }
-        }
+        // 修复：直接返回mapping中的数量，避免遍历所有挂单
+        return userListings[user].length;
     }
 
     /**
@@ -433,21 +471,33 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return tokenIds 用户挂牌的NFT ID列表
      */
     function getUserListings(address user) external view returns (uint256[] memory tokenIds) {
-        uint256 count = 0;
-        for (uint256 i = 0; i < listedNFTs.length; i++) {
-            uint256 tokenId = listedNFTs[i];
-            if (listings[tokenId].seller == user) {
-                count++;
-            }
+        // 修复：直接返回mapping中的列表，避免遍历所有挂单
+        return userListings[user];
+    }
+    
+    /**
+     * @dev 获取用户的挂牌列表（分页）
+     * @param user 用户地址
+     * @param offset 起始索引
+     * @param limit 最大返回数量
+     * @return tokenIds 用户挂牌的NFT ID列表
+     */
+    function getUserListingsPaginated(address user, uint256 offset, uint256 limit) external view returns (uint256[] memory tokenIds) {
+        uint256[] storage allListings = userListings[user];
+        uint256 total = allListings.length;
+        
+        if (offset >= total) {
+            return new uint256[](0);
         }
-
-        tokenIds = new uint256[](count);
-        uint256 index = 0;
-        for (uint256 i = 0; i < listedNFTs.length; i++) {
-            uint256 tokenId = listedNFTs[i];
-            if (listings[tokenId].seller == user) {
-                tokenIds[index++] = tokenId;
-            }
+        
+        uint256 size = total - offset;
+        if (size > limit) {
+            size = limit;
+        }
+        
+        tokenIds = new uint256[](size);
+        for (uint256 i = 0; i < size; i++) {
+            tokenIds[i] = allListings[offset + i];
         }
     }
 

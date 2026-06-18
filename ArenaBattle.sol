@@ -543,6 +543,4 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 }
 
-interface IArenaPlayer {
-    function getPlayerBattleTeam(address player) external view returns (uint256[] memory);
-}
+// IArenaPlayer interface 已从 NFTInterface.sol 导入，无需重复定义

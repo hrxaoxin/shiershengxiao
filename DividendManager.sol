@@ -671,8 +671,11 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     function updateUserWeightsBatch(
         address[] calldata users,
         uint256[] calldata weights
-    ) external onlyOwner {
+    ) external onlyOwnerOrAuthorizer {
         require(users.length == weights.length, "DividendManager: Length mismatch");
+        
+        // 修复：添加批量大小限制，防止超出区块gas限制
+        require(users.length <= 100, "DividendManager: Batch size exceeds limit");
         
         uint256 usersLength = users.length;
         uint256 totalWeightChange = 0;

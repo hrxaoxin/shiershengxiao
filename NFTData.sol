@@ -114,6 +114,12 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     mapping(uint256 => mapping(address => bool)) internal _typeOwnerExists;
 
     /**
+     * @dev 类型所有者索引映射（优化删除）
+     * key: nftType => owner => 在数组中的索引
+     */
+    mapping(uint256 => mapping(address => uint256)) internal _typeOwnerIndex;
+
+    /**
      * @dev 用户持有的NFT列表
      *
      * 用于快速查询用户NFT持仓
@@ -130,6 +136,18 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * value: NFT数量
      */
     mapping(address => uint256) internal _userNFTCount;
+
+    /**
+     * @dev 用户NFT存在性映射（优化查询）
+     * key: user => tokenId => 是否存在
+     */
+    mapping(address => mapping(uint256 => bool)) internal _userNFTExists;
+
+    /**
+     * @dev 用户NFT索引映射（优化删除）
+     * key: user => tokenId => 在数组中的索引
+     */
+    mapping(address => mapping(uint256 => uint256)) internal _userNFTIndex;
 
     /**
      * @dev NFT信息结构体
@@ -179,7 +197,21 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @dev 检查是否为授权调用者（owner或authorizer）
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer, "NFTData: Not authorized");
+        if (msg.sender == owner() || msg.sender == authorizer) {
+            _;
+            return;
+        }
+        IAuthorizer auth = IAuthorizer(authorizer);
+        require(
+            msg.sender == auth.getNFTUpdate() || 
+            msg.sender == auth.getStaking() || 
+            msg.sender == auth.getNFTTrading() || 
+            msg.sender == auth.getBreedingCore() || 
+            msg.sender == auth.getNFTMintCore() || 
+            msg.sender == auth.getArenaPlayer() || 
+            msg.sender == auth.getNFTBuyback(),
+            "NFTData: Not authorized"
+        );
         _;
     }
 
@@ -320,17 +352,18 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param tokenId NFT ID
      */
     function _addUserNFT(address user, uint256 tokenId) internal {
-        // 检查是否已存在，避免重复添加
-        uint256[] storage userTokens = _userNFTs[user];
-        for (uint256 i = 0; i < userTokens.length; i++) {
-            if (userTokens[i] == tokenId) {
-                return; // 已存在，不重复添加
-            }
+        // 修复：使用O(1)查找替代O(n)循环检查重复
+        if (_userNFTExists[user][tokenId]) {
+            return; // 已存在，不重复添加
         }
+        
+        // 记录索引
+        _userNFTIndex[user][tokenId] = _userNFTs[user].length;
         _userNFTs[user].push(tokenId);
         _userNFTCount[user]++;
+        _userNFTExists[user][tokenId] = true;
         
-        // 修复：添加到按类型分组的用户NFT映射，保持与_removeUserNFT的对称性
+        // 添加到按类型分组的用户NFT映射
         uint256 zodiacType = _nftInfo[tokenId].zodiacType;
         _userNFTsByType[user][zodiacType].push(tokenId);
     }
@@ -342,25 +375,35 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param tokenId NFT ID
      */
     function _removeUserNFT(address user, uint256 tokenId) internal {
-        uint256 zodiacType = _nftInfo[tokenId].zodiacType;
-        
-        uint256[] storage userTokens = _userNFTs[user];
-        for (uint256 i = 0; i < userTokens.length; i++) {
-            if (userTokens[i] == tokenId) {
-                for (uint256 j = i; j < userTokens.length - 1; j++) {
-                    userTokens[j] = userTokens[j + 1];
-                }
-                userTokens.pop();
-                _userNFTCount[user]--;
-                break;
-            }
+        // 修复：使用O(1)索引查找替代O(n)循环
+        if (!_userNFTExists[user][tokenId]) {
+            return; // 不存在，无需删除
         }
         
+        uint256 zodiacType = _nftInfo[tokenId].zodiacType;
+        uint256[] storage userTokens = _userNFTs[user];
+        uint256 index = _userNFTIndex[user][tokenId];
+        
+        // 使用交换删除法实现O(1)删除
+        uint256 lastIndex = userTokens.length - 1;
+        if (index != lastIndex) {
+            uint256 lastTokenId = userTokens[lastIndex];
+            userTokens[index] = lastTokenId;
+            _userNFTIndex[user][lastTokenId] = index;
+        }
+        userTokens.pop();
+        _userNFTCount[user]--;
+        delete _userNFTIndex[user][tokenId];
+        _userNFTExists[user][tokenId] = false;
+        
+        // 从按类型分组的用户NFT映射中移除
         uint256[] storage typeTokens = _userNFTsByType[user][zodiacType];
         for (uint256 i = 0; i < typeTokens.length; i++) {
             if (typeTokens[i] == tokenId) {
-                for (uint256 j = i; j < typeTokens.length - 1; j++) {
-                    typeTokens[j] = typeTokens[j + 1];
+                // 使用交换删除法
+                uint256 lastIdx = typeTokens.length - 1;
+                if (i != lastIdx) {
+                    typeTokens[i] = typeTokens[lastIdx];
                 }
                 typeTokens.pop();
                 break;
@@ -398,6 +441,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         if (_typeOwnerExists[nftType][owner]) {
             return;
         }
+        _typeOwnerIndex[nftType][owner] = _nftTypeOwners[nftType].length;
         _nftTypeOwners[nftType].push(owner);
         _typeOwnerExists[nftType][owner] = true;
     }
@@ -409,16 +453,24 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param owner 持有者地址
      */
     function _removeFromTypeOwners(uint256 nftType, address owner) internal {
+        if (!_typeOwnerExists[nftType][owner]) {
+            return;
+        }
+        
         delete _typeOwnerExists[nftType][owner];
         
         address[] storage owners = _nftTypeOwners[nftType];
-        for (uint256 i = 0; i < owners.length; i++) {
-            if (owners[i] == owner) {
-                owners[i] = owners[owners.length - 1];
-                owners.pop();
-                return;
-            }
+        uint256 index = _typeOwnerIndex[nftType][owner];
+        uint256 lastIndex = owners.length - 1;
+        
+        // 使用交换删除法实现O(1)删除
+        if (index != lastIndex) {
+            address lastOwner = owners[lastIndex];
+            owners[index] = lastOwner;
+            _typeOwnerIndex[nftType][lastOwner] = index;
         }
+        owners.pop();
+        delete _typeOwnerIndex[nftType][owner];
     }
 
     /**
@@ -556,6 +608,12 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         if (dividendManager != address(0)) {
             uint8 element = uint8(zodiacType / 24);
             IDividendManager(dividendManager).updateUserWeight(to, uint256(level), true, element);
+        }
+        
+        // 修复：添加 WeightManager 同步，确保权重数据一致性
+        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        if (weightManager != address(0)) {
+            IWeightManager(weightManager).syncUserWeight(to);
         }
     }
     
