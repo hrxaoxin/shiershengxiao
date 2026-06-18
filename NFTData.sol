@@ -329,6 +329,10 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
         _userNFTs[user].push(tokenId);
         _userNFTCount[user]++;
+        
+        // 修复：添加到按类型分组的用户NFT映射，保持与_removeUserNFT的对称性
+        uint256 zodiacType = _nftInfo[tokenId].zodiacType;
+        _userNFTsByType[user][zodiacType].push(tokenId);
     }
 
     /**

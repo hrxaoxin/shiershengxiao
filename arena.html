@@ -1467,14 +1467,17 @@
                     gas = 200000;
                 }
                 
+                // 从合约获取每次充值获得的挑战次数
+                const rechargeAttempts = await arenaPlayerContract.methods.RECHARGE_ATTEMPTS().call();
+                
                 await ZODIAC_UI.handleTransaction(
                     arenaPlayerContract.methods.rechargeChallengeAttempts().send({ from: accounts[0], gas: gas }),
                     {
                         actionName: '充值挑战次数',
                         loadingMessage: '正在销毁代币获取挑战次数...',
-                        successMessage: `充值成功！销毁 ${rechargeCost} 代币，获得 ${config.rechargeAttempts} 次挑战机会`,
+                        successMessage: `充值成功！销毁 ${rechargeCost} 代币，获得 ${rechargeAttempts} 次挑战机会`,
                         showConfirmation: true,
-                        confirmationMessage: `确定要销毁 ${rechargeCost} 代币来获取 ${config.rechargeAttempts} 次挑战机会吗？`,
+                        confirmationMessage: `确定要销毁 ${rechargeCost} 代币来获取 ${rechargeAttempts} 次挑战机会吗？`,
                         onConfirmation: () => {
                             loadRemainingAttempts();
                         },

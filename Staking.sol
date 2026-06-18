@@ -346,7 +346,12 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         uint256 weight = _calculateNFTWeight(info.isRare, info.level);
         // 奖励 = (当前全局值 - 上次快照) * 权重 / 精度
         if (globalRewardPerWeight <= info.accumulatedReward) return 0;
-        return (globalRewardPerWeight - info.accumulatedReward) * weight / STAKING_REWARD_PRECISION;
+        
+        uint256 rewardDiff = globalRewardPerWeight - info.accumulatedReward;
+        // 修复：添加乘法溢出检查
+        require(rewardDiff == 0 || weight <= type(uint256).max / rewardDiff, "Staking: Reward calculation overflow");
+        
+        return rewardDiff * weight / STAKING_REWARD_PRECISION;
     }
 
     function _settleNFTReward(StakingInfo storage info) internal {

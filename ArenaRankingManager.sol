@@ -778,6 +778,15 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
+     * @dev 清除战斗队伍（代理调用 ArenaPlayer）
+     */
+    function clearBattleTeam() external nonReentrant whenNotPaused {
+        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer not set");
+        IArenaPlayer(arenaPlayer).clearBattleTeam();
+    }
+
+    /**
      * @dev 内部函数：检查玩家是否设置了战斗队伍
      * 从 ArenaPlayer 合约获取玩家的战斗队伍信息
      * @param player 玩家地址
@@ -826,5 +835,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 interface IArenaPlayer {
     function getPlayerBattleTeam(address player) external view returns (uint256[] memory);
     function getNFTStakedOwner(uint256 tokenId) external view returns (address);
+    function stakeNFTs(uint256[] calldata tokenIds) external;
     function unstakeNFTs(uint256[] calldata tokenIds) external;
+    function clearBattleTeam() external;
 }
