@@ -296,7 +296,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         INFT(nftContract).safeTransferFrom(address(this), msg.sender, tokenId);
 
         totalVolume += price;
-        _syncWeightAfterTransfer(seller, msg.sender, tokenId, nftContract);
+        // 权重同步：NFT从合约转移到买家（不是从seller，因为seller的权重在挂牌时已移除）
+        _syncWeightAfterTransfer(address(this), msg.sender, tokenId, nftContract);
         emit NFTBought(tokenId, msg.sender, seller, price, fee);
     }
 

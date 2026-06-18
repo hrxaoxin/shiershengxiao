@@ -396,7 +396,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         
         // 移除用户NFT记录
         if (nftDataContract != address(0)) {
-            try INFTData(nftDataContract).removeUserNFT(user, tokenId) {
+            try INFTDataInterface(nftDataContract).removeUserNFT(user, tokenId) {
                 // 成功
             } catch {
                 // 忽略错误

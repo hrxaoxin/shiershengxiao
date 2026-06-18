@@ -1610,17 +1610,15 @@
 
         async function loadRewardPool() {
             try {
-                // 获取当前奖励池
+                // 获取当前奖励池（使用 arenaRankingQueryContract）
                 let rewardPoolWei = '0';
                 try {
-                    rewardPoolWei = await arenaRewardContract.methods.getCurrentRewardPool().call();
+                    const seasonInfo = await arenaRankingQueryContract.methods.getCurrentSeasonInfo().call();
+                    rewardPoolWei = seasonInfo.rewardPool || '0';
                 } catch (e) {
-                    // 回退方案：读取奖励率和合约代币余额
+                    // 回退方案：读取合约 BNB 余额作为奖励池
                     try {
-                        const rewardRate = await arenaContract.methods.seasonRewardRate().call();
-                        const tokenContractObj = await window.ZODIAC_WEB3.getContract('tokenContract');
-                        const balance = await tokenContractObj.methods.balanceOf(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena).call();
-                        rewardPoolWei = (BigInt(balance) * BigInt(rewardRate)) / BigInt(100);
+                        rewardPoolWei = await window.ZODIAC_WEB3.getWeb3().eth.getBalance(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaReward);
                     } catch (e2) {
                         rewardPoolWei = '0';
                     }
@@ -1650,7 +1648,7 @@
                 // 检查当前赛季状态
                 let seasonIsActive = true;
                 try {
-                    const seasonInfo = await arenaRankingQueryContract.methods.currentSeason().call();
+                    const seasonInfo = await arenaRankingQueryContract.methods.getCurrentSeasonInfo().call();
                     seasonIsActive = seasonInfo.isActive;
                 } catch (e) {
                     // 如果无法获取赛季信息，使用默认值
