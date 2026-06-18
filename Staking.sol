@@ -620,13 +620,16 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
 
         uint256 snapshotBase = _userSnapshotWeight[user];
         
-        // 修复：移除 unchecked 块，使用安全计算方式
+        // 修复：添加乘法溢出检查
+        require(globalRewardPerWeight == 0 || totalWeight <= type(uint256).max / globalRewardPerWeight, "Staking: Reward calculation overflow");
         uint256 rewardBase = globalRewardPerWeight * totalWeight;
 
         if (rewardBase <= snapshotBase) return pendingRewards[user];
         
-        // 修复：添加安全检查防止溢出
         uint256 earnedReward = (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
+        
+        // 修复：添加加法溢出检查
+        require(earnedReward <= type(uint256).max - pendingRewards[user], "Staking: Pending rewards overflow");
         return earnedReward + pendingRewards[user];
     }
 

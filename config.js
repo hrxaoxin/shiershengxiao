@@ -329,7 +329,7 @@ window.ZODIAC_CONFIG = (function() {
         rechargeCost: 888,       // 销毁代币数量
         rechargeAttempts: 3,     // 充值获得的挑战次数
         battleCooldown: 60,      // 战斗冷却时间（秒）
-        maxRechargeAttempts: 10  // 每日最大充值次数
+        maxRechargeAttempts: 5  // 每日最大充值次数（与合约保持一致）
     };
 
     const IPFS_BASES = {

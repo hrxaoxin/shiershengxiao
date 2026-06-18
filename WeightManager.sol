@@ -268,18 +268,22 @@ contract WeightManager is
     
     /**
      * @dev 查询用户权重（外部接口）
-     * 优先使用缓存（如果未过期），否则实时计算
+     * 优先使用缓存（如果未过期），否则实时计算并更新缓存
      * @param user 目标用户地址
      * @return 用户当前权重值
      */
-    function getUserWeight(address user) external view returns (uint256) {
+    function getUserWeight(address user) external returns (uint256) {
         if (user == owner()) return ownerWeight;
         
         if (cachedWeightTimestamp[user] + weightCacheDuration >= block.timestamp) {
             return cachedUserWeight[user];
         }
         
-        return _calcUserWeight(user);
+        // 缓存过期，重新计算并更新缓存
+        uint256 weight = _calcUserWeight(user);
+        cachedUserWeight[user] = weight;
+        cachedWeightTimestamp[user] = block.timestamp;
+        return weight;
     }
     
     /**

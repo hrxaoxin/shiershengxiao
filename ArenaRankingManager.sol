@@ -74,8 +74,6 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @param lastBattleTime 上次战斗时间
      * @param lastResetTime 上次重置时间
      * @param remainingAttempts 剩余挑战次数
-     * @param battleTeam 战斗队伍（NFT ID 数组，最多6个）
-     * @param hasTeam 是否已设置战斗队伍
      * @param seasonId 当前所在赛季ID
      */
     struct PlayerRecord {
@@ -86,8 +84,6 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         uint256 lastBattleTime;
         uint256 lastResetTime;
         uint256 remainingAttempts;
-        uint256[6] battleTeam;
-        bool hasTeam;
         uint256 seasonId;
     }
 
@@ -474,7 +470,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         require(mockIndex > 0, "ArenaRankingManager: Invalid mock index");
         _checkAndResetAttempts(msg.sender);
         PlayerRecord storage record = players[msg.sender];
-        require(record.hasTeam, "ArenaRankingManager: Must set battle team first");
+        require(_hasBattleTeam(msg.sender), "ArenaRankingManager: Must set battle team first");
         require(record.remainingAttempts > 0, "ArenaRankingManager: No remaining attempts");
         _validateTeamOwnership(msg.sender, playerTeam);
         record.remainingAttempts--;
@@ -497,14 +493,14 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         require(challengedPlayer != msg.sender, "ArenaRankingManager: Cannot challenge self");
         _checkAndResetAttempts(msg.sender);
         PlayerRecord storage challengerRecord = players[msg.sender];
-        require(challengerRecord.hasTeam, "ArenaRankingManager: Must set battle team first");
+        require(_hasBattleTeam(msg.sender), "ArenaRankingManager: Must set battle team first");
         require(challengerRecord.remainingAttempts > 0, "ArenaRankingManager: No remaining attempts");
         _validateTeamOwnership(msg.sender, playerTeam);
         challengerRecord.remainingAttempts--;
-        PlayerRecord storage defenderRecord = players[challengedPlayer];
-        require(defenderRecord.hasTeam, "ArenaRankingManager: Challenged player has no team");
+        require(_hasBattleTeam(challengedPlayer), "ArenaRankingManager: Challenged player has no team");
+        uint256[6] memory defenderTeam = _getBattleTeam(challengedPlayer);
         (bool ok, uint256 winner, ) = IArenaBattle(arenaBattle).executeRealBattle(
-            challengedPlayer, playerTeam, defenderRecord.battleTeam
+            challengedPlayer, playerTeam, defenderTeam
         );
         require(ok, "ArenaRankingManager: Challenge real player failed");
         emit ChallengeResult(msg.sender, challengedPlayer, winner == 1, currentSeasonId);
@@ -782,58 +778,35 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev 设置战斗队伍（动态数组版本）
-     * @param tokenIds 战斗队伍的 NFT ID 数组（必须恰好 6 个）
+     * @dev 内部函数：检查玩家是否设置了战斗队伍
+     * 从 ArenaPlayer 合约获取玩家的战斗队伍信息
+     * @param player 玩家地址
+     * @return 是否有战斗队伍
      */
-    function setBattleTeam(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
-        require(tokenIds.length == 6, "ArenaRankingManager: Team must have exactly 6 NFTs");
+    function _hasBattleTeam(address player) internal view returns (bool) {
+        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        if (arenaPlayerContract == address(0)) {
+            return false;
+        }
+        uint256[] memory team = IArenaPlayer(arenaPlayerContract).getPlayerBattleTeam(player);
+        return team.length > 0 && team[0] > 0;
+    }
+
+    /**
+     * @dev 内部函数：获取玩家的战斗队伍
+     * 从 ArenaPlayer 合约获取玩家的战斗队伍信息
+     * @param player 玩家地址
+     * @return 战斗队伍（6个NFT ID）
+     */
+    function _getBattleTeam(address player) internal view returns (uint256[6] memory) {
+        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        require(arenaPlayerContract != address(0), "ArenaRankingManager: ArenaPlayer contract not set");
+        uint256[] memory team = IArenaPlayer(arenaPlayerContract).getPlayerBattleTeam(player);
         uint256[6] memory fixedTeam;
-        for (uint256 i = 0; i < 6; i++) {
-            fixedTeam[i] = tokenIds[i];
+        for (uint256 i = 0; i < team.length && i < 6; i++) {
+            fixedTeam[i] = team[i];
         }
-        _setBattleTeamInternal(fixedTeam);
-    }
-
-    /**
-     * @dev 设置战斗队伍（固定数组版本）
-     * @param tokenIds 战斗队伍的 NFT ID 数组（6 个）
-     */
-    function setBattleTeam(uint256[6] calldata tokenIds) external nonReentrant whenNotPaused {
-        _setBattleTeamInternal(tokenIds);
-    }
-
-    /**
-     * @dev 内部函数：设置战斗队伍
-     * @param tokenIds 战斗队伍的 NFT ID 数组（6 个）
-     */
-    function _setBattleTeamInternal(uint256[6] memory tokenIds) internal {
-        address nftContract = IAuthorizer(authorizer).getNFTMintCore();
-        require(nftContract != address(0), "ArenaRankingManager: NFT contract not set");
-        for (uint256 i = 0; i < 6; i++) {
-            if (tokenIds[i] == 0) continue;
-            require(INFTMint(nftContract).ownerOf(tokenIds[i]) == msg.sender, "ArenaRankingManager: Not owner");
-            for (uint256 j = i + 1; j < 6; j++) {
-                if (tokenIds[j] != 0) {
-                    require(tokenIds[j] != tokenIds[i], "ArenaRankingManager: Duplicate token");
-                }
-            }
-        }
-        PlayerRecord storage record = players[msg.sender];
-        for (uint256 i = 0; i < 6; i++) {
-            record.battleTeam[i] = tokenIds[i];
-        }
-        record.hasTeam = true;
-    }
-
-    /**
-     * @dev 清除战斗队伍
-     */
-    function clearBattleTeam() external nonReentrant whenNotPaused {
-        PlayerRecord storage record = players[msg.sender];
-        for (uint256 i = 0; i < 6; i++) {
-            record.battleTeam[i] = 0;
-        }
-        record.hasTeam = false;
+        return fixedTeam;
     }
 
     /**
@@ -848,4 +821,10 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     function setBaseRewardPerWin(uint256 _reward) external onlyOwner {
         baseRewardPerWin = _reward;
     }
+}
+
+interface IArenaPlayer {
+    function getPlayerBattleTeam(address player) external view returns (uint256[] memory);
+    function getNFTStakedOwner(uint256 tokenId) external view returns (address);
+    function unstakeNFTs(uint256[] calldata tokenIds) external;
 }

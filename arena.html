@@ -482,7 +482,7 @@
                         <div>• <span class="text-blue-400">积分模式</span>：挑战成功/失败根据排名动态增减积分</div>
                         <div>• <span class="text-purple-400">挑战模式</span>：挑战成功直接替换排名，失败排名不变</div>
                         <div>• <span class="text-green-400">每天免费<span id="freeChallenges">3</span>次挑战机会</span></div>
-                        <div>• <span class="text-orange-400">销毁<span id="rechargeCostDisplay">888</span>代币可充值<span id="rechargeAttempts">3</span>次挑战机会</span></div>
+                        <div>• <span class="text-orange-400">销毁<span id="rechargeCostDisplay">-</span>代币可充值<span id="rechargeAttempts">-</span>次挑战机会</span></div>
                         <div>• <span class="text-yellow-400">战队NFT需质押，战斗期间不可转移</span></div>
                         <div>• 清空战队后NFT自动解除质押</div>
                     </div>
@@ -1330,20 +1330,13 @@
         async function clearBattleTeam() {
             try {
                 ZODIAC_UI.showLoading('正在获取当前战队...');
-                const playerRecord = await arenaBattleContract.methods.players(accounts[0]).call();
-                
-                if (!playerRecord.hasTeam) {
-                    ZODIAC_UI.hideLoading();
-                    ZODIAC_UI.showToast('您还没有设置战队', 'warning');
-                    return;
-                }
-                
+                // 从 ArenaPlayer 获取战斗队伍信息（而不是从 ArenaBattle）
                 const currentTeam = await arenaPlayerContract.methods.getPlayerBattleTeam(accounts[0]).call();
                 const tokenIds = currentTeam.filter(id => id !== '0' && id !== 0);
                 
                 if (tokenIds.length === 0) {
                     ZODIAC_UI.hideLoading();
-                    ZODIAC_UI.showToast('战队为空', 'warning');
+                    ZODIAC_UI.showToast('您还没有设置战队', 'warning');
                     return;
                 }
                 
@@ -1373,8 +1366,10 @@
                     return;
                 }
                 
-                const playerRecord = await arenaBattleContract.methods.players(accounts[0]).call();
-                if (playerRecord.hasTeam) {
+                // 从 ArenaPlayer 检查是否已有战队（而不是从 ArenaBattle）
+                const currentTeam = await arenaPlayerContract.methods.getPlayerBattleTeam(accounts[0]).call();
+                const existingTokens = currentTeam.filter(id => id !== '0' && id !== 0);
+                if (existingTokens.length > 0) {
                     ZODIAC_UI.showToast('您已经设置了战队，请先清除后再重新设置', 'warning');
                     return;
                 }
@@ -1423,7 +1418,10 @@
         async function rechargeAttempts() {
             try {
                 const config = ZODIAC_CONFIG.ARENA_CONFIG;
-                const rechargeCost = config.rechargeCost;
+                
+                // 从合约动态获取充值费用，而不是从配置
+                const rechargeCostWei = await arenaPlayerContract.methods.rechargeCost().call();
+                const rechargeCost = (parseInt(rechargeCostWei) / 10**18).toFixed(0);
                 
                 if (!ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract || ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract === '0x0000000000000000000000000000000000000000') {
                     ZODIAC_UI.showToast('代币合约地址未配置', 'error');
@@ -1434,19 +1432,20 @@
                 
                 let allowance;
                 try {
-                    allowance = await tokenContract.methods.allowance(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena).call();
+                    allowance = await tokenContract.methods.allowance(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer).call();
                 } catch (allowanceError) {
                     console.error('查询授权失败:', allowanceError);
                     ZODIAC_UI.showToast('查询代币授权失败，请稍后重试', 'error');
                     return;
                 }
                 
-                const requiredAmount = web3.utils.toWei(String(rechargeCost), 'ether');
+                // 直接使用合约返回的 wei 值
+                const requiredAmount = rechargeCostWei;
                 
                 if (allowance < requiredAmount) {
                     try {
                         ZODIAC_UI.showLoading('正在授权代币...');
-                        const approveTx = await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arena, requiredAmount).send({ from: accounts[0] });
+                        const approveTx = await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer, requiredAmount).send({ from: accounts[0] });
                         if (!approveTx.status) {
                             throw new Error('代币授权失败');
                         }
@@ -1462,7 +1461,7 @@
                 
                 let gas;
                 try {
-                    gas = await ZODIAC_WEB3.estimateGas(arenaContract, 'rechargeChallengeAttempts', [], accounts[0]);
+                    gas = await ZODIAC_WEB3.estimateGas(arenaPlayerContract, 'rechargeChallengeAttempts', [], accounts[0]);
                 } catch (gasError) {
                     console.error('估算Gas失败:', gasError);
                     gas = 200000;

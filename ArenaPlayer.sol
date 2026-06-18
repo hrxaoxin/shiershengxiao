@@ -7,6 +7,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title ArenaPlayer
@@ -37,6 +39,8 @@ import "./NFTInterface.sol";
  * - onlyAuthorized：质押、解除质押、设置队伍
  */
 contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    using SafeERC20 for IERC20;
+    
     /**
      * @dev 授权合约地址
      */
@@ -56,9 +60,9 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     uint256 public maxRechargeAttempts = 5;
     /**
-     * @dev 充值成本（BNB）
+     * @dev 充值成本（代币，wei单位）
      */
-    uint256 public rechargeCost = 1000000000000000000; // 1 BNB
+    uint256 public rechargeCost = 888 * 10**18; // 888 代币
     
     /**
      * @dev 玩家战斗队伍映射
@@ -292,20 +296,19 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return playerBattleTeams[player];
     }
 
-    function rechargeChallengeAttempts() external payable nonReentrant whenNotPaused {
+    function rechargeChallengeAttempts() external nonReentrant whenNotPaused {
         address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
         require(IArenaRanking(arenaRankingManager).currentSeasonId() > 0, "ArenaPlayer: No active season");
         
         _checkAndResetAttempts(msg.sender);
         require(rechargeCount[msg.sender] < maxRechargeAttempts, "ArenaPlayer: Max recharge attempts reached");
-        // 修复：校验 msg.value >= rechargeCost，恢复付费充值机制
-        require(msg.value >= rechargeCost, "ArenaPlayer: Insufficient BNB for recharge");
         
-        // 退还多余 BNB
-        if (msg.value > rechargeCost) {
-            (bool refundOk, ) = payable(msg.sender).call{value: msg.value - rechargeCost}("");
-            require(refundOk, "ArenaPlayer: Refund failed");
-        }
+        // 获取代币合约地址
+        address tokenContract = IAuthorizer(authorizer).getToken();
+        require(tokenContract != address(0), "ArenaPlayer: Token contract not set");
+        
+        // 从用户账户转移代币到合约
+        IERC20(tokenContract).safeTransferFrom(msg.sender, address(this), rechargeCost);
 
         uint256 newAttempts = RECHARGE_ATTEMPTS;
         playerRemainingAttempts[msg.sender] += newAttempts;

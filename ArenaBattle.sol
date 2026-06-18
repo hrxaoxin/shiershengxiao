@@ -72,7 +72,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     /**
      * @dev 每日挑战次数
      */
-    uint256 public constant DAILY_ATTEMPTS = 5;
+    uint256 public constant DAILY_ATTEMPTS = 3;
     /**
      * @dev 最大模拟玩家数量
      */
@@ -106,8 +106,6 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param lastBattleTime 上次战斗时间
      * @param lastResetTime 上次重置时间
      * @param remainingAttempts 剩余挑战次数
-     * @param battleTeam 战斗队伍（NFT ID 数组）
-     * @param hasTeam 是否已设置战斗队伍
      */
     struct PlayerRecord {
         uint256 score;
@@ -118,8 +116,6 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 lastBattleTime;
         uint256 lastResetTime;
         uint256 remainingAttempts;
-        uint256[6] battleTeam;
-        bool hasTeam;
     }
     
     /**
@@ -247,7 +243,9 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         PlayerRecord storage record = players[msg.sender];
         _checkAndResetAttempts(msg.sender);
         require(record.remainingAttempts > 0, "ArenaBattle: No remaining attempts");
-        require(record.hasTeam, "ArenaBattle: No battle team set");
+        
+        // 从 ArenaPlayer 检查是否有战斗队伍
+        require(_hasBattleTeam(msg.sender), "ArenaBattle: No battle team set");
         
         record.remainingAttempts--;
         record.lastBattleTime = block.timestamp;
@@ -275,8 +273,10 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         
         _checkAndResetAttempts(msg.sender);
         require(challengerRecord.remainingAttempts > 0, "ArenaBattle: No remaining attempts");
-        require(challengerRecord.hasTeam, "ArenaBattle: Challenger has no battle team");
-        require(challengedRecord.hasTeam, "ArenaBattle: Challenged has no battle team");
+        
+        // 从 ArenaPlayer 检查双方是否有战斗队伍
+        require(_hasBattleTeam(msg.sender), "ArenaBattle: Challenger has no battle team");
+        require(_hasBattleTeam(challengedPlayer), "ArenaBattle: Challenged has no battle team");
         
         challengerRecord.remainingAttempts--;
         challengerRecord.lastBattleTime = block.timestamp;
@@ -524,4 +524,25 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 mockPower = (mockIndex % 1000) + 500;
         return playerPower > mockPower;
     }
+
+    /**
+     * @dev 内部函数：检查玩家是否设置了战斗队伍
+     * 从 ArenaPlayer 合约获取玩家的战斗队伍信息
+     * @param player 玩家地址
+     * @return 是否有战斗队伍
+     */
+    function _hasBattleTeam(address player) internal view returns (bool) {
+        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        if (arenaPlayerContract == address(0)) {
+            return false;
+        }
+        
+        // 调用 ArenaPlayer 的 getPlayerBattleTeam 方法
+        uint256[] memory team = IArenaPlayer(arenaPlayerContract).getPlayerBattleTeam(player);
+        return team.length > 0 && team[0] > 0;
+    }
+}
+
+interface IArenaPlayer {
+    function getPlayerBattleTeam(address player) external view returns (uint256[] memory);
 }
