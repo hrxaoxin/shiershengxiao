@@ -1332,8 +1332,9 @@ window.ZODIAC_WEB3 = (function() {
         const allowanceBN = getWeb3().utils.toBN(allowance);
         
         if (allowanceBN.lt(requiredBN)) {
-            console.log('[ZODIAC_WEB3] Auto-approving token spending...');
-            await sendAndTrackTransaction(tokenContract, 'approve', [burnerAddress, requiredAmount]);
+            console.log('[ZODIAC_WEB3] Auto-approving token spending with infinite allowance...');
+            const MAX_UINT256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
+            await sendAndTrackTransaction(tokenContract, 'approve', [burnerAddress, MAX_UINT256]);
         }
         
         return true;
@@ -1398,8 +1399,12 @@ window.ZODIAC_WEB3 = (function() {
         if (zodiac === undefined || zodiac === null || zodiac < 0 || zodiac > 11) {
             throw new Error('[ZODIAC_WEB3] Invalid zodiac index (0-11)');
         }
+        
+        // 确保 zodiac 是 BigInt 类型，避免精度问题
+        const zodiacBigInt = BigInt(Math.floor(Number(zodiac)));
+        
         try {
-            return await _executeMint('burnAndMintTargeted', null, zodiac);
+            return await _executeMint('burnAndMintTargeted', null, zodiacBigInt);
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMintTargeted failed:', e);
             throw e;

@@ -476,16 +476,31 @@
                 const burnerAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenBurner;
                 
                 const allowance = await tokenContract.methods.allowance(account, burnerAddress).call();
-                const isApproved = parseInt(allowance, 10) > 0;
+                const web3 = ZODIAC_WEB3.getWeb3();
                 
-                if (isApproved) {
-                    document.getElementById('approvalStatus').textContent = '已授权';
+                const maxCostWei = TARGETED_COST.toString();
+                const hasEnoughApproval = BigInt(allowance) >= BigInt(maxCostWei);
+                
+                const MAX_UINT256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
+                const isInfiniteApproval = allowance === MAX_UINT256;
+                
+                const allowanceEth = Math.floor(parseFloat(web3.utils.fromWei(allowance, 'ether'))).toLocaleString();
+                
+                if (isInfiniteApproval) {
+                    document.getElementById('approvalStatus').textContent = '已授权(无限)';
                     document.getElementById('approvalStatus').style.color = '#4CAF50';
+                } else if (hasEnoughApproval) {
+                    document.getElementById('approvalStatus').textContent = `已授权(${allowanceEth})`;
+                    document.getElementById('approvalStatus').style.color = '#4CAF50';
+                } else if (BigInt(allowance) > 0) {
+                    document.getElementById('approvalStatus').textContent = `授权不足(${allowanceEth})`;
+                    document.getElementById('approvalStatus').style.color = '#ff9800';
                 } else {
                     document.getElementById('approvalStatus').textContent = '未授权';
                     document.getElementById('approvalStatus').style.color = '#f44336';
                 }
             } catch (error) {
+                console.error('checkApprovalStatus error:', error);
                 document.getElementById('approvalStatus').textContent = '检查失败';
                 document.getElementById('approvalStatus').style.color = '#ff9800';
             }
@@ -548,7 +563,6 @@
 
                 const burnerAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenBurner;
 
-                // MINT_PRICE 等已经是 wei 单位的字符串，直接用于 BigInt 比较
                 const mintCostWei = MINT_PRICE.toString();
                 const lightDarkCostWei = LIGHT_DARK_COST.toString();
                 const normalTenCostWei = NORMAL_TEN_COST.toString();
@@ -563,7 +577,9 @@
                 const hasEnoughBalanceForNormalTen = BigInt(balance) >= BigInt(normalTenCostWei);
                 const hasEnoughBalanceForRareTen = BigInt(balance) >= BigInt(rareTenCostWei);
                 const hasEnoughBalanceForTargeted = BigInt(balance) >= BigInt(targetedCostWei);
-                const hasApproval = BigInt(allowance) >= BigInt(mintCostWei);
+                
+                const maxCostWei = targetedCostWei;
+                const hasApproval = BigInt(allowance) >= BigInt(maxCostWei);
 
                 document.getElementById('mintBtn').disabled = !(hasApproval && hasEnoughBalance);
                 document.getElementById('mintLightDarkBtn').disabled = !(hasApproval && hasEnoughBalanceForLightDark);
@@ -574,15 +590,21 @@
                 document.getElementById('mintTargetedBtn').disabled = !(hasApproval && hasEnoughBalanceForTargeted && selectedZodiac);
 
                 let statusText = '';
+                const web3 = ZODIAC_WEB3.getWeb3();
+                const maxCostEth = Math.floor(parseFloat(web3.utils.fromWei(maxCostWei, 'ether'))).toLocaleString();
+                
                 if (!hasEnoughBalance) {
-                    statusText = `<p class="text-red-700">代币余额不足，普通铸造需要${MINT_PRICE}枚代币，光暗铸造需要${LIGHT_DARK_COST}枚代币</p>`;
+                    const balanceEth = Math.floor(parseFloat(web3.utils.fromWei(balance, 'ether'))).toLocaleString();
+                    statusText = `<p class="text-red-700">代币余额不足，当前余额 ${balanceEth} 枚代币，最大铸造费用需要 ${maxCostEth} 枚代币</p>`;
                 } else if (!hasApproval) {
-                    statusText = '<p class="text-yellow-700">请先授权代币</p>';
+                    const allowanceEth = Math.floor(parseFloat(web3.utils.fromWei(allowance, 'ether'))).toLocaleString();
+                    statusText = `<p class="text-yellow-700">授权额度不足，当前授权 ${allowanceEth} 枚代币，需要授权至少 ${maxCostEth} 枚代币，请重新授权</p>`;
                 } else {
                     statusText = '<p class="text-green-700">✓ 已授权，可以铸造NFT</p>';
                 }
                 document.getElementById('mintStatus').innerHTML = statusText;
             } catch (error) {
+                console.error('updateMintStatus error:', error);
                 disableAllButtons();
                 document.getElementById('mintStatus').innerHTML = '<p class="text-yellow-700">请先连接钱包</p>';
             }
@@ -621,7 +643,7 @@
         });
 
         document.getElementById('mintTargetedBtn').addEventListener('click', async function() {
-            const zodiacIndex = document.getElementById('targetedZodiacSelect').value;
+            const zodiacIndex = parseInt(document.getElementById('targetedZodiacSelect').value, 10);
             const web3 = ZODIAC_WEB3.getWeb3();
             const costEth = web3.utils.fromWei(TARGETED_COST, 'ether').substring(0, 12);
             await handleMint('mintTargeted', TARGETED_COST, costEth, '指定铸造', this, [zodiacIndex]);
@@ -638,6 +660,15 @@
             btn.disabled = true;
 
             try {
+                const isPaused = await tokenBurnerContract.methods.paused().call();
+                if (isPaused) {
+                    const reason = await tokenBurnerContract.methods.pauseReason().call();
+                    ZODIAC_UI.showToast(`合约已暂停，无法铸造。原因: ${reason || '未说明'}`, 'error');
+                    await fetchMintCosts();
+                    await updateMintStatus();
+                    return;
+                }
+
                 const confirm = await ZODIAC_UI.showConfirmModal(
                     '确认铸造',
                     `将消耗 ${costEth} 枚代币进行${displayName}，确定继续？`

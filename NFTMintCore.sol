@@ -398,9 +398,18 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function _syncNFTData(address to, uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth) internal {
         address nftDataContract = IAuthorizer(authorizer).getNFTData();
-        require(nftDataContract != address(0), "NFTMint: nftDataContract not set");
+        if (nftDataContract == address(0)) {
+            // NFTData合约未设置，队列化失败同步以便后续重试
+            _queueFailedSync(tokenId, zodiacType, level, growth, to);
+            return;
+        }
         
-        INFTDataInterface(nftDataContract).syncNFTData(tokenId, zodiacType, level, growth, to);
+        try INFTDataInterface(nftDataContract).syncNFTData(tokenId, zodiacType, level, growth, to) {
+            // 同步成功，无需额外操作
+        } catch {
+            // 同步失败，队列化以便后续重试
+            _queueFailedSync(tokenId, zodiacType, level, growth, to);
+        }
     }
 
     function _queueFailedSync(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to) internal {

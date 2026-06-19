@@ -74,6 +74,20 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
+     * @dev 验证合约地址是否为有效地址
+     * @param addr 要验证的地址
+     * @param name 地址名称（用于错误消息）
+     */
+    function _validateContractAddress(address addr, string memory name) internal view {
+        require(addr != address(0), string(abi.encodePacked("TokenBurner: ", name, " is zero address")));
+        uint256 codeSize;
+        assembly {
+            codeSize := extcodesize(addr)
+        }
+        require(codeSize > 0, string(abi.encodePacked("TokenBurner: ", name, " is not a contract")));
+    }
+
+    /**
      * @dev 暂停合约，停止所有铸造和销毁操作
      * 仅合约所有者可以调用，用于紧急情况下暂停服务
      * @param reason 暂停原因，将被记录在事件日志中
@@ -237,8 +251,12 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
         address tokenAddress = IAuthorizer(authorizer).getToken();
         address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
-        require(tokenAddress != address(0), "TokenBurner: tokenContract not set");
-        require(nftMintAddress != address(0), "TokenBurner: nftMintContract not set");
+        _validateContractAddress(tokenAddress, "tokenContract");
+        _validateContractAddress(nftMintAddress, "nftMintContract");
+
+        // 检查 NFTMintCore 是否暂停
+        INFTMintCore nftMintCore = INFTMintCore(nftMintAddress);
+        require(!nftMintCore.paused(), "TokenBurner: NFT Mint paused");
 
         IERC20 token = IERC20(tokenAddress);
         uint256 cost = isRare ? rareMintCost : normalMintCost;
@@ -278,9 +296,17 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         address tokenAddress = IAuthorizer(authorizer).getToken();
         address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
         address nftMintBatchAddress = IAuthorizer(authorizer).getNFTMintBatch();
-        require(tokenAddress != address(0), "TokenBurner: tokenContract not set");
-        require(nftMintAddress != address(0), "TokenBurner: nftMintContract not set");
-        require(nftMintBatchAddress != address(0), "TokenBurner: nftMintBatchContract not set");
+        _validateContractAddress(tokenAddress, "tokenContract");
+        _validateContractAddress(nftMintAddress, "nftMintContract");
+        _validateContractAddress(nftMintBatchAddress, "nftMintBatchContract");
+
+        // 检查 NFTMintCore 是否暂停
+        INFTMintCore nftMintCore = INFTMintCore(nftMintAddress);
+        require(!nftMintCore.paused(), "TokenBurner: NFT Mint paused");
+
+        // 检查 NFTMintBatch 是否暂停
+        INFTMintBatch nftMintBatch = INFTMintBatch(nftMintBatchAddress);
+        require(!nftMintBatch.paused(), "TokenBurner: NFT Mint Batch paused");
 
         IERC20 token = IERC20(tokenAddress);
         uint256 cost = isRare ? rareMintCost * 10 : normalMintCost * 10;
@@ -290,12 +316,11 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
         emit TokenBurned(user, cost, block.timestamp);
 
-        INFTMintBatch batchContract = INFTMintBatch(nftMintBatchAddress);
         uint256[] memory tokenIds;
         if (isRare) {
-            tokenIds = batchContract.mintRareTen(user);
+            tokenIds = nftMintBatch.mintRareTen(user);
         } else {
-            tokenIds = batchContract.mintNormalTen(user);
+            tokenIds = nftMintBatch.mintNormalTen(user);
         }
         require(tokenIds.length == 10, "TokenBurner: Batch mint failed");
 
@@ -309,45 +334,65 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 定向代币销毁并铸造指定生肖NFT
-     * 按指定生肖类型铸造，费用 = (普通费用 * 6 + 稀有费用 * 4) * 10
-     * @param user 目标用户地址（将获得NFT的用户）
-     * @param zodiac 目标生肖类型（0-11，对应十二生肖）
-     * @return 操作是否成功，成功返回true
-     */
-    function burnAndMintTargeted(address user, uint8 zodiac) external nonReentrant whenNotPaused returns (bool) {
-        require(authorizer != address(0), "TokenBurner: authorizer not set");
-        require(user != address(0), "TokenBurner: Zero user address");
-        require(zodiac < 12, "TokenBurner: Invalid zodiac type");
+ * @dev 定向代币销毁并铸造指定生肖NFT
+ * 按指定生肖类型铸造，费用 = (普通费用 * 6 + 稀有费用 * 4) * 10
+ * 生成10个NFT：6个普通属性（水/风/火）+ 4个稀有属性（暗/光）
+ * @param user 目标用户地址（将获得NFT的用户）
+ * @param zodiac 目标生肖索引（0-11，对应十二生肖：0=鼠, 1=牛, ..., 11=猪）
+ * @return 操作是否成功，成功返回true
+ */
+function burnAndMintTargeted(address user, uint8 zodiac) external nonReentrant whenNotPaused returns (bool) {
+    require(authorizer != address(0), "TokenBurner: authorizer not set");
+    require(user != address(0), "TokenBurner: Zero user address");
+    require(zodiac < 12, "TokenBurner: Invalid zodiac type");
 
-        address tokenAddress = IAuthorizer(authorizer).getToken();
-        address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
-        require(tokenAddress != address(0), "TokenBurner: tokenContract not set");
-        require(nftMintAddress != address(0), "TokenBurner: nftMintContract not set");
+    address tokenAddress = IAuthorizer(authorizer).getToken();
+    address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
+    _validateContractAddress(tokenAddress, "tokenContract");
+    _validateContractAddress(nftMintAddress, "nftMintContract");
 
-        IERC20 token = IERC20(tokenAddress);
-        uint256 totalCost = (normalMintCost * 6 + rareMintCost * 4) * 10;
-        require(token.balanceOf(user) >= totalCost, "TokenBurner: Insufficient balance");
-        require(token.allowance(user, address(this)) >= totalCost, "TokenBurner: Insufficient allowance");
-        // 修复：使用 SafeERC20.safeTransferFrom 确保安全
-        token.safeTransferFrom(user, BLACK_HOLE, totalCost);
+    // 检查 NFTMintCore 是否暂停
+    INFTMintCore nftMintCore = INFTMintCore(nftMintAddress);
+    require(!nftMintCore.paused(), "TokenBurner: NFT Mint paused");
 
-        emit TokenBurned(user, totalCost, block.timestamp);
+    IERC20 token = IERC20(tokenAddress);
+    uint256 totalCost = (normalMintCost * 6 + rareMintCost * 4) * 10;
+    require(token.balanceOf(user) >= totalCost, "TokenBurner: Insufficient balance");
+    require(token.allowance(user, address(this)) >= totalCost, "TokenBurner: Insufficient allowance");
+    // 修复：使用 SafeERC20.safeTransferFrom 确保安全
+    token.safeTransferFrom(user, BLACK_HOLE, totalCost);
 
-        INFTMint nftMint = INFTMint(nftMintAddress);
-        for (uint256 i = 0; i < 6; i++) {
-            uint256 tokenId = nftMint.mint(user, zodiac);
+    emit TokenBurned(user, totalCost, block.timestamp);
+
+    INFTMint nftMint = INFTMint(nftMintAddress);
+    
+    // 普通铸造：6个（水/风/火属性 × 公/母）
+    // element: 0=水, 1=风, 2=火
+    // gender: 0=母, 1=公
+    // zodiacType = element * 24 + zodiac * 2 + gender
+    uint256 tokenId;
+    for (uint256 element = 0; element < 3; element++) {
+        for (uint256 gender = 0; gender < 2; gender++) {
+            uint256 zodiacType = element * 24 + zodiac * 2 + gender;
+            tokenId = nftMint.mint(user, zodiacType);
             require(tokenId > 0, "TokenBurner: NFT mint failed");
-            emit NFTMinted(user, tokenId, zodiac, false);
+            emit NFTMinted(user, tokenId, zodiacType, false);
         }
-        for (uint256 i = 0; i < 4; i++) {
-            uint256 tokenId = nftMint.mint(user, zodiac);
-            require(tokenId > 0, "TokenBurner: NFT mint failed");
-            emit NFTMinted(user, tokenId, zodiac, true);
-        }
-
-        return true;
     }
+    
+    // 稀有铸造：4个（暗/光属性 × 公/母）
+    // element: 3=暗, 4=光
+    for (uint256 element = 3; element < 5; element++) {
+        for (uint256 gender = 0; gender < 2; gender++) {
+            uint256 zodiacType = element * 24 + zodiac * 2 + gender;
+            tokenId = nftMint.mint(user, zodiacType);
+            require(tokenId > 0, "TokenBurner: NFT mint failed");
+            emit NFTMinted(user, tokenId, zodiacType, true);
+        }
+    }
+
+    return true;
+}
 
     /**
      * @dev 获取铸造费用

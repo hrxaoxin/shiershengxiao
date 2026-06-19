@@ -116,12 +116,15 @@ interface INFTMintCore {
     function generateSecureRandom() external returns (uint256);
     function isApprovedForAll(address owner, address operator) external view returns (bool);
     function setApprovalForAll(address operator, bool approved) external;
+    function paused() external view returns (bool);
 }
 
 interface INFTMintBatch {
     function mintBatch(address to, uint256[] calldata zodiacTypes) external returns (uint256[] memory);
     function mintNormalTen(address to) external returns (uint256[] memory);
     function mintRareTen(address to) external returns (uint256[] memory);
+    function mintTargeted(address to, uint8 baseZodiac) external returns (uint256[] memory);
+    function paused() external view returns (bool);
 }
 
 /**
