@@ -250,19 +250,18 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(user != address(0), "TokenBurner: Zero user address");
 
         address tokenAddress = IAuthorizer(authorizer).getToken();
-        address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
         _validateContractAddress(tokenAddress, "tokenContract");
+
+        address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
         _validateContractAddress(nftMintAddress, "nftMintContract");
 
         // 检查 NFTMintCore 是否暂停
-        INFTMintCore nftMintCore = INFTMintCore(nftMintAddress);
-        require(!nftMintCore.paused(), "TokenBurner: NFT Mint paused");
+        require(!INFTMintCore(nftMintAddress).paused(), "TokenBurner: NFT Mint paused");
 
-        IERC20 token = IERC20(tokenAddress);
         uint256 cost = isRare ? rareMintCost : normalMintCost;
+        IERC20 token = IERC20(tokenAddress);
         require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
-        // 修复：使用 SafeERC20.safeTransferFrom 确保安全
         token.safeTransferFrom(user, BLACK_HOLE, cost);
 
         emit TokenBurned(user, cost, block.timestamp);
@@ -276,8 +275,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
         require(tokenId > 0, "TokenBurner: NFT mint failed");
 
-        uint256 zodiacType = nftMint.tokenType(tokenId);
-        emit NFTMinted(user, tokenId, zodiacType, isRare);
+        emit NFTMinted(user, tokenId, nftMint.tokenType(tokenId), isRare);
 
         return true;
     }
@@ -294,40 +292,37 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(user != address(0), "TokenBurner: Zero user address");
 
         address tokenAddress = IAuthorizer(authorizer).getToken();
-        address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
-        address nftMintBatchAddress = IAuthorizer(authorizer).getNFTMintBatch();
         _validateContractAddress(tokenAddress, "tokenContract");
-        _validateContractAddress(nftMintAddress, "nftMintContract");
+
+        address nftMintBatchAddress = IAuthorizer(authorizer).getNFTMintBatch();
         _validateContractAddress(nftMintBatchAddress, "nftMintBatchContract");
 
+        address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
+        _validateContractAddress(nftMintAddress, "nftMintContract");
+
         // 检查 NFTMintCore 是否暂停
-        INFTMintCore nftMintCore = INFTMintCore(nftMintAddress);
-        require(!nftMintCore.paused(), "TokenBurner: NFT Mint paused");
+        require(!INFTMintCore(nftMintAddress).paused(), "TokenBurner: NFT Mint paused");
 
         // 检查 NFTMintBatch 是否暂停
-        INFTMintBatch nftMintBatch = INFTMintBatch(nftMintBatchAddress);
-        require(!nftMintBatch.paused(), "TokenBurner: NFT Mint Batch paused");
+        require(!INFTMintBatch(nftMintBatchAddress).paused(), "TokenBurner: NFT Mint Batch paused");
 
-        IERC20 token = IERC20(tokenAddress);
         uint256 cost = isRare ? rareMintCost * 10 : normalMintCost * 10;
+        IERC20 token = IERC20(tokenAddress);
         require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
         require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
         token.safeTransferFrom(user, BLACK_HOLE, cost);
 
         emit TokenBurned(user, cost, block.timestamp);
 
-        uint256[] memory tokenIds;
-        if (isRare) {
-            tokenIds = nftMintBatch.mintRareTen(user);
-        } else {
-            tokenIds = nftMintBatch.mintNormalTen(user);
+        uint256[] memory tokenIds = INFTMintBatch(nftMintBatchAddress).mintRareTen(user);
+        if (!isRare) {
+            tokenIds = INFTMintBatch(nftMintBatchAddress).mintNormalTen(user);
         }
         require(tokenIds.length == 10, "TokenBurner: Batch mint failed");
 
         INFTMint nftMint = INFTMint(nftMintAddress);
         for (uint256 i = 0; i < 10; i++) {
-            uint256 zodiacType = nftMint.tokenType(tokenIds[i]);
-            emit NFTMinted(user, tokenIds[i], zodiacType, isRare);
+            emit NFTMinted(user, tokenIds[i], nftMint.tokenType(tokenIds[i]), isRare);
         }
 
         return true;
@@ -347,48 +342,39 @@ function burnAndMintTargeted(address user, uint8 zodiac) external nonReentrant w
     require(zodiac < 12, "TokenBurner: Invalid zodiac type");
 
     address tokenAddress = IAuthorizer(authorizer).getToken();
-    address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
     _validateContractAddress(tokenAddress, "tokenContract");
+
+    address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
     _validateContractAddress(nftMintAddress, "nftMintContract");
 
     // 检查 NFTMintCore 是否暂停
-    INFTMintCore nftMintCore = INFTMintCore(nftMintAddress);
-    require(!nftMintCore.paused(), "TokenBurner: NFT Mint paused");
+    require(!INFTMintCore(nftMintAddress).paused(), "TokenBurner: NFT Mint paused");
 
-    IERC20 token = IERC20(tokenAddress);
     uint256 totalCost = (normalMintCost * 6 + rareMintCost * 4) * 10;
+    IERC20 token = IERC20(tokenAddress);
     require(token.balanceOf(user) >= totalCost, "TokenBurner: Insufficient balance");
     require(token.allowance(user, address(this)) >= totalCost, "TokenBurner: Insufficient allowance");
-    // 修复：使用 SafeERC20.safeTransferFrom 确保安全
     token.safeTransferFrom(user, BLACK_HOLE, totalCost);
 
     emit TokenBurned(user, totalCost, block.timestamp);
 
     INFTMint nftMint = INFTMint(nftMintAddress);
+    uint256 zodiacType;
     
     // 普通铸造：6个（水/风/火属性 × 公/母）
-    // element: 0=水, 1=风, 2=火
-    // gender: 0=母, 1=公
-    // zodiacType = element * 24 + zodiac * 2 + gender
-    uint256 tokenId;
-    for (uint256 element = 0; element < 3; element++) {
-        for (uint256 gender = 0; gender < 2; gender++) {
-            uint256 zodiacType = element * 24 + zodiac * 2 + gender;
-            tokenId = nftMint.mint(user, zodiacType);
-            require(tokenId > 0, "TokenBurner: NFT mint failed");
-            emit NFTMinted(user, tokenId, zodiacType, false);
-        }
+    for (uint256 i = 0; i < 6; i++) {
+        zodiacType = (i / 2) * 24 + zodiac * 2 + (i % 2);
+        uint256 tokenId = nftMint.mint(user, zodiacType);
+        require(tokenId > 0, "TokenBurner: NFT mint failed");
+        emit NFTMinted(user, tokenId, zodiacType, false);
     }
     
     // 稀有铸造：4个（暗/光属性 × 公/母）
-    // element: 3=暗, 4=光
-    for (uint256 element = 3; element < 5; element++) {
-        for (uint256 gender = 0; gender < 2; gender++) {
-            uint256 zodiacType = element * 24 + zodiac * 2 + gender;
-            tokenId = nftMint.mint(user, zodiacType);
-            require(tokenId > 0, "TokenBurner: NFT mint failed");
-            emit NFTMinted(user, tokenId, zodiacType, true);
-        }
+    for (uint256 i = 0; i < 4; i++) {
+        zodiacType = (3 + i / 2) * 24 + zodiac * 2 + (i % 2);
+        uint256 tokenId = nftMint.mint(user, zodiacType);
+        require(tokenId > 0, "TokenBurner: NFT mint failed");
+        emit NFTMinted(user, tokenId, zodiacType, true);
     }
 
     return true;
