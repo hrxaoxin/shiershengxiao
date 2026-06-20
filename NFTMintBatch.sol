@@ -66,7 +66,10 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @dev 修饰器：仅TokenBurner合约可调用
      */
     modifier onlyTokenBurner() {
-        require(msg.sender == IAuthorizer(authorizer).getTokenBurner(), "NFTMintBatch: Only TokenBurner");
+        require(authorizer != address(0), "NFTMintBatch: authorizer not set");
+        address tokenBurnerContract = IAuthorizer(authorizer).getTokenBurner();
+        require(tokenBurnerContract != address(0), "NFTMintBatch: tokenBurnerContract not set");
+        require(msg.sender == tokenBurnerContract, "NFTMintBatch: Only TokenBurner");
         _;
     }
     

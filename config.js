@@ -150,7 +150,7 @@ window.ZODIAC_CONFIG = (function() {
         tokenBurner: getEnvContractAddress('tokenBurner', '0xD0d735F01f76b3eA05086ceE799CCC2d4eC69035'),
         nftMint: getEnvContractAddress('nftMint', '0xd66fbb692f7CC8d841C6B2cD5FCCC367AB260269'),
         nftMintCore: getEnvContractAddress('nftMintCore', '0xd66fbb692f7CC8d841C6B2cD5FCCC367AB260269'),
-        nftMintBatch: getEnvContractAddress('nftMintBatch', '0xeE079B941dDcBc29a76dCF371F76d0a1B665b8b2'),
+        nftMintBatch: getEnvContractAddress('nftMintBatch', '0xb4Cf90a67CCE1bf1f574C6Be8cc73Ad82cB959C6'),
         nftMintMetadata: getEnvContractAddress('nftMintMetadata', '0x139d638aFda63FaF3c96E44C9B9E51FC48c437d4'),
         nftData: getEnvContractAddress('nftData', '0x4c8b25b63bdd8FC5b12BDc7AC7ee769A65f31D27'),
         nftUpdate: getEnvContractAddress('nftUpdate', '0x2CfaA553Bb1073D9910a5A4b5961b0AaA1D3aCd5'),

@@ -321,7 +321,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return tokenId;
     }
     
-    function mintWithGrowth(address to, uint256 zodiacType, uint8 growth) external onlyTokenBurner nonReentrant returns (uint256) {
+    function mintWithGrowth(address to, uint256 zodiacType, uint8 growth) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256) {
         require(to != address(0), "NFTMint: Zero address");
         require(zodiacType < 120, "NFTMint: Invalid type");
         require(growth >= 10 && growth <= 100, "NFTMint: Invalid growth");
