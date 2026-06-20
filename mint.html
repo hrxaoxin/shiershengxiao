@@ -699,21 +699,37 @@
                 }
 
                 if (methodName.includes('Ten')) {
-                    const mintedTokenIds = [];
-                    const currentNextCardId = parseInt(await nftMintContract.methods.nextCardId().call(), 10);
-                    for (let i = 0; i < 10; i++) {
-                        const tokenId = (currentNextCardId - 10 + i).toString();
-                        const cardType = await nftMintContract.methods.tokenType(tokenId).call();
-                        mintedTokenIds.push({ cardId: tokenId, cardType: cardType });
+                    try {
+                        const mintedTokenIds = [];
+                        const currentNextCardId = parseInt(await nftMintContract.methods.nextCardId().call(), 10);
+                        if (isNaN(currentNextCardId) || currentNextCardId < 10) {
+                            throw new Error('Invalid card ID');
+                        }
+                        for (let i = 0; i < 10; i++) {
+                            const tokenId = (currentNextCardId - 10 + i).toString();
+                            const cardType = await nftMintContract.methods.tokenType(tokenId).call();
+                            mintedTokenIds.push({ cardId: tokenId, cardType: cardType });
+                        }
+                        displayMultiCardInfo(mintedTokenIds);
+                    } catch (e) {
+                        console.warn('[MINT] Failed to fetch minted card info:', e.message);
+                        ZODIAC_UI.showToast('铸造成功，但无法获取卡片信息', 'success');
                     }
-                    displayMultiCardInfo(mintedTokenIds);
                 } else {
-                    const currentNextCardId = await nftMintContract.methods.nextCardId().call();
-                    const actualCardId = (parseInt(currentNextCardId, 10) - 1).toString();
-                    const cardType = await nftMintContract.methods.tokenType(actualCardId).call();
+                    try {
+                        const currentNextCardId = parseInt(await nftMintContract.methods.nextCardId().call(), 10);
+                        if (isNaN(currentNextCardId) || currentNextCardId < 1) {
+                            throw new Error('Invalid card ID');
+                        }
+                        const actualCardId = (currentNextCardId - 1).toString();
+                        const cardType = await nftMintContract.methods.tokenType(actualCardId).call();
 
-                    const cardInfo = { cardId: actualCardId, cardType: cardType };
-                    displayCardInfo(cardInfo);
+                        const cardInfo = { cardId: actualCardId, cardType: cardType };
+                        displayCardInfo(cardInfo);
+                    } catch (e) {
+                        console.warn('[MINT] Failed to fetch minted card info:', e.message);
+                        ZODIAC_UI.showToast('铸造成功，但无法获取卡片信息', 'success');
+                    }
                 }
 
                 // 获取交易哈希
