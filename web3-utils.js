@@ -1379,8 +1379,12 @@ window.ZODIAC_WEB3 = (function() {
         if (isRare !== true && isRare !== false) {
             throw new Error('[ZODIAC_WEB3] isRare must be a boolean value');
         }
+        
+        const currentAccount = await _getCurrentAccount();
+        console.log('[ZODIAC_WEB3] burnAndMint called with account:', currentAccount);
+        
         try {
-            return await _executeMint('burnAndMint', isRare, null, account);
+            return await _executeMint('burnAndMint', isRare, null, currentAccount);
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMint failed:', e);
             throw e;
@@ -1391,8 +1395,12 @@ window.ZODIAC_WEB3 = (function() {
         if (isRare !== true && isRare !== false) {
             throw new Error('[ZODIAC_WEB3] isRare must be a boolean value');
         }
+        
+        const currentAccount = await _getCurrentAccount();
+        console.log('[ZODIAC_WEB3] burnAndMintTen called with account:', currentAccount);
+        
         try {
-            return await _executeMint('burnAndMintTen', isRare, null, account);
+            return await _executeMint('burnAndMintTen', isRare, null, currentAccount);
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMintTen failed:', e);
             throw e;
@@ -1407,10 +1415,30 @@ window.ZODIAC_WEB3 = (function() {
         // 确保 zodiac 是 BigInt 类型，避免精度问题
         const zodiacBigInt = BigInt(Math.floor(Number(zodiac)));
         
+        const currentAccount = await _getCurrentAccount();
+        console.log('[ZODIAC_WEB3] burnAndMintTargeted called with account:', currentAccount);
+        
         try {
-            return await _executeMint('burnAndMintTargeted', null, zodiacBigInt, account);
+            return await _executeMint('burnAndMintTargeted', null, zodiacBigInt, currentAccount);
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMintTargeted failed:', e);
+            throw e;
+        }
+    }
+    
+    async function _getCurrentAccount() {
+        if (!web3) {
+            throw new Error('[ZODIAC_WEB3] Web3 not initialized');
+        }
+        
+        try {
+            const accounts = await web3.eth.getAccounts();
+            if (!accounts || accounts.length === 0) {
+                throw new Error('[ZODIAC_WEB3] No accounts found');
+            }
+            return accounts[0];
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] Failed to get current account:', e);
             throw e;
         }
     }
