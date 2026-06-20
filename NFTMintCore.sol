@@ -337,7 +337,10 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return tokenId;
     }
     
-    function generateSecureRandom() external onlyTokenBurner returns (uint256) {
+    function generateSecureRandom() external returns (uint256) {
+        require(msg.sender == IAuthorizer(authorizer).getTokenBurner() || 
+                msg.sender == IAuthorizer(authorizer).getNFTMintBatch(), 
+                "NFTMint: Unauthorized");
         return _generateSecureRandom();
     }
     
