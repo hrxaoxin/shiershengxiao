@@ -147,7 +147,7 @@ window.ZODIAC_CONFIG = (function() {
         dividendManager: getEnvContractAddress('dividendManager', '0xc7d1ab1f2478a09643e16fd30796bd8dcf8fe485'),
         weightManager: getEnvContractAddress('weightManager', '0x8d0c6db308dAFE42260595e2496c23Aa6C7A213C'),
         poolManager: getEnvContractAddress('poolManager', '0x28FE2521716f433dA4126171728f3013283aDd5d'),
-        tokenBurner: getEnvContractAddress('tokenBurner', '0xeE356Bf64Ac9480ACA9D2E12f69231260Ba785bC'),
+        tokenBurner: getEnvContractAddress('tokenBurner', '0xF7DacFB34574Ece7763a232fa157758B0fa0CB4d'),
         nftMint: getEnvContractAddress('nftMint', '0x5aFF998334b2D8d1a83FE52ac3764373672b40b1'),
         nftMintCore: getEnvContractAddress('nftMintCore', '0x5aFF998334b2D8d1a83FE52ac3764373672b40b1'),
         nftMintBatch: getEnvContractAddress('nftMintBatch', '0xeE079B941dDcBc29a76dCF371F76d0a1B665b8b2'),
