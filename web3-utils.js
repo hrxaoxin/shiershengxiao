@@ -1371,7 +1371,7 @@ window.ZODIAC_WEB3 = (function() {
             args.push(zodiac);
         }
         
-        const receipt = await sendAndTrackTransaction(burnerContract, methodName, args);
+        const receipt = await sendAndTrackTransaction(burnerContract, methodName, args, { from: userAccount });
         return receipt;
     }
 
