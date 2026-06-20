@@ -144,7 +144,7 @@ window.ZODIAC_CONFIG = (function() {
         tokenContract: getEnvContractAddress('token', '0xd06994d9ff24dc4a579f53c91f65d95b6be97777'),
         authorizer: getEnvContractAddress('authorizer', '0x14965363F6773F02321eB4701368B66fC6a8813a'),
         rewardManager: getEnvContractAddress('rewardManager', '0x1Cd7Ef9A3BF5494235922fE4fF788622218375e7'),
-        dividendManager: getEnvContractAddress('dividendManager', '0xc7d1ab1f2478a09643e16fd30796bd8dcf8fe485'),
+        dividendManager: getEnvContractAddress('dividendManager', '0x584D39D6FC2B44CEBb6eB975baCc8d168CE05357'),
         weightManager: getEnvContractAddress('weightManager', '0x8d0c6db308dAFE42260595e2496c23Aa6C7A213C'),
         poolManager: getEnvContractAddress('poolManager', '0x28FE2521716f433dA4126171728f3013283aDd5d'),
         tokenBurner: getEnvContractAddress('tokenBurner', '0xF7DacFB34574Ece7763a232fa157758B0fa0CB4d'),

@@ -83,7 +83,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         require(
             msg.sender == auth.getNFTUpdate() || 
             msg.sender == auth.getRewardManager() || 
-            msg.sender == auth.getWeightManager(), 
+            msg.sender == auth.getWeightManager() ||
+            msg.sender == auth.getNFTData(),
             "DM: Not authorized"
         );
         _;
