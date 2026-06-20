@@ -1427,16 +1427,28 @@ window.ZODIAC_WEB3 = (function() {
     }
     
     async function _getCurrentAccount() {
-        if (!web3) {
+        if (!web3 && !window.ethereum) {
             throw new Error('[ZODIAC_WEB3] Web3 not initialized');
         }
         
         try {
-            const accounts = await web3.eth.getAccounts();
-            if (!accounts || accounts.length === 0) {
-                throw new Error('[ZODIAC_WEB3] No accounts found');
+            // 先尝试使用 web3.eth.getAccounts()
+            if (web3) {
+                const accounts = await web3.eth.getAccounts();
+                if (accounts && accounts.length > 0) {
+                    return accounts[0];
+                }
             }
-            return accounts[0];
+            
+            // 如果 web3 没有返回账户，尝试使用 ethereum.request
+            if (window.ethereum) {
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                if (accounts && accounts.length > 0) {
+                    return accounts[0];
+                }
+            }
+            
+            throw new Error('[ZODIAC_WEB3] No accounts found');
         } catch (e) {
             console.error('[ZODIAC_WEB3] Failed to get current account:', e);
             throw e;
