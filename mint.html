@@ -729,6 +729,10 @@
 
                 await updateTokenBalance();
                 await updateMintStatus();
+                
+                // 通知其他页面铸造成功，刷新数据
+                broadcastMintSuccess();
+                
                 ZODIAC_UI.showToast('铸造成功！', 'success');
             } catch (error) {
                 let errorMsg = '铸造失败';
@@ -794,6 +798,18 @@
             document.getElementById('mintSuccessModal').classList.add('hidden');
             window.location.href = 'collection.html';
         });
+
+        function broadcastMintSuccess() {
+            try {
+                localStorage.setItem('zodiac_mint_success', JSON.stringify({
+                    timestamp: Date.now(),
+                    event: 'mint_success'
+                }));
+                localStorage.removeItem('zodiac_mint_success');
+            } catch (e) {
+                console.warn('[MINT] Failed to broadcast mint success:', e.message);
+            }
+        }
     </script>
 </body>
 </html>

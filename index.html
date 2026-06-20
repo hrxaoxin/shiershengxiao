@@ -850,6 +850,15 @@
             startDataRefresh();
 
             document.getElementById('menuBtn').addEventListener('click', openMobileMenu);
+
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'zodiac_mint_success') {
+                    console.log('[HOME] Detected mint success, refreshing data...');
+                    setTimeout(() => {
+                        loadFenHongData();
+                    }, 1000);
+                }
+            });
         });
 
         window.addEventListener('beforeunload', () => {

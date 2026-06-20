@@ -719,6 +719,17 @@
         function getStars(level) {
             return window.ZODIAC_UTILS.getStars(parseInt(level, 10));
         }
+
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'zodiac_mint_success') {
+                console.log('[COLLECTION] Detected mint success, refreshing data...');
+                setTimeout(async () => {
+                    await loadUserTokens();
+                    await updateDividends();
+                    await loadProgress();
+                }, 1000);
+            }
+        });
     </script>
 </body>
 </html>
