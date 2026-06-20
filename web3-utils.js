@@ -1340,7 +1340,11 @@ window.ZODIAC_WEB3 = (function() {
         return true;
     }
 
-    async function _executeMint(methodName, isRare, zodiac) {
+    async function _executeMint(methodName, isRare, zodiac, userAccount) {
+        if (!userAccount) {
+            throw new Error('[ZODIAC_WEB3] Invalid account address');
+        }
+        
         const burnerContract = await getContract('tokenBurner');
         
         let mintCost;
@@ -1360,7 +1364,7 @@ window.ZODIAC_WEB3 = (function() {
         
         await checkTokenBalanceAndAllowance(mintCost);
         
-        let args = [account];
+        let args = [userAccount];
         if (methodName !== 'burnAndMintTargeted') {
             args.push(isRare);
         } else {
@@ -1376,7 +1380,7 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error('[ZODIAC_WEB3] isRare must be a boolean value');
         }
         try {
-            return await _executeMint('burnAndMint', isRare);
+            return await _executeMint('burnAndMint', isRare, null, account);
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMint failed:', e);
             throw e;
@@ -1388,7 +1392,7 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error('[ZODIAC_WEB3] isRare must be a boolean value');
         }
         try {
-            return await _executeMint('burnAndMintTen', isRare);
+            return await _executeMint('burnAndMintTen', isRare, null, account);
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMintTen failed:', e);
             throw e;
@@ -1404,7 +1408,7 @@ window.ZODIAC_WEB3 = (function() {
         const zodiacBigInt = BigInt(Math.floor(Number(zodiac)));
         
         try {
-            return await _executeMint('burnAndMintTargeted', null, zodiacBigInt);
+            return await _executeMint('burnAndMintTargeted', null, zodiacBigInt, account);
         } catch (e) {
             console.error('[ZODIAC_WEB3] burnAndMintTargeted failed:', e);
             throw e;
