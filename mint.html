@@ -651,6 +651,12 @@
 
         async function handleMint(methodName, cost, costEth, displayName, btn, extraArgs = []) {
             const account = ZODIAC_WEB3.getAccount();
+            
+            if (!account) {
+                ZODIAC_UI.showToast('请先连接钱包', 'error');
+                return;
+            }
+            
             if (!tokenBurnerContract || !nftMintContract) {
                 ZODIAC_UI.showToast('合约未初始化', 'error');
                 return;
