@@ -168,12 +168,12 @@
         </div>
 
         <div id="nftStakePanel">
-            <p class="text-lg text-gray-600 mb-8">质押5阶及以上的NFT来挖矿，每分钟获得代币奖励</p>
+            <p class="text-lg text-gray-600 mb-8">质押NFT来挖矿，每分钟获得代币奖励</p>
 
             <div class="info-box mb-8">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">🌟 挖矿规则</h3>
                 <ul class="text-gray-600 space-y-2">
-                    <li>• 质押5阶及以上的NFT来挖矿</li>
+                    <li>• 质押NFT来挖矿</li>
                     <li>• 稀有NFT权重更高，获得更多奖励</li>
                     <li>• 最低质押时间 <span id="minStakingDuration" class="font-bold text-blue-600">30分钟</span></li>
                     <li>• 随时可以领取已挖矿的代币</li>
@@ -182,7 +182,7 @@
             </div>
 
             <div class="mb-8">
-                <h3 class="text-xl font-bold text-gray-800 mb-4">我的可质押NFT（5阶及以上）</h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-4">我的可质押NFT</h3>
                 <div id="eligibleNFTs" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     <div class="col-span-full text-center text-gray-500 py-8">加载中...</div>
                 </div>
@@ -641,7 +641,7 @@
                 }
 
                 if (eligible.length === 0) {
-                    eligibleNFTs.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">没有可质押的NFT（需要5阶及以上）</div>';
+                    eligibleNFTs.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">没有可质押的NFT</div>';
                     ZODIAC_UI.hideLoading();
                     return;
                 }

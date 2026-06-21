@@ -1118,27 +1118,29 @@
 
             try {
                 const nfts = [];
-                const pageSize = 20;
                 
                 const balance = parseInt(await nftMintContract.methods.balanceOf(account).call(), 10);
-                const startIdx = 0;
-                const endIdx = Math.min(balance, pageSize);
                 
-                for (let i = startIdx; i < endIdx; i++) {
+                for (let i = 0; i < balance; i++) {
                     try {
                         const tokenId = parseInt(await nftMintContract.methods.tokenOfOwnerByIndex(account, i).call(), 10);
+                        const nftType = await nftMintContract.methods.tokenType(tokenId).call();
+                        const nftLevel = await nftMintContract.methods.tokenLevel(tokenId).call();
                         
-                        const [seller, priceWei, listTime] = await nftTradingContract.methods.getListingInfo(tokenId).call();
-                        const isActive = seller !== '0x0000000000000000000000000000000000000000';
-                        if (!isActive) {
-                            const nftType = await nftMintContract.methods.tokenType(tokenId).call();
-                            const nftLevel = await nftMintContract.methods.tokenLevel(tokenId).call();
-                            nfts.push({
-                                tokenId: tokenId,
-                                type: parseInt(nftType, 10),
-                                level: parseInt(nftLevel, 10)
-                            });
+                        let isListed = false;
+                        try {
+                            const [seller, priceWei, listTime] = await nftTradingContract.methods.getListingInfo(tokenId).call();
+                            isListed = seller !== '0x0000000000000000000000000000000000000000';
+                        } catch (e) {
+                            console.warn(`获取上架信息失败 tokenId=${tokenId}:`, e);
                         }
+                        
+                        nfts.push({
+                            tokenId: tokenId,
+                            type: parseInt(nftType, 10),
+                            level: parseInt(nftLevel, 10),
+                            isListed: isListed
+                        });
                     } catch (e) {
                         console.warn(`获取NFT详情失败:`, e);
                     }
