@@ -346,19 +346,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return tokenId;
     }
     
-    function generateSecureRandom() external returns (uint256) {
-        // Step 1: 检查authorizer设置
-        require(authorizer != address(0), "NFTMintCore[Step1]: authorizer not set");
-        
-        // Step 2: 检查调用者权限
-        address tokenBurner = IAuthorizer(authorizer).getTokenBurner();
-        address nftMintBatch = IAuthorizer(authorizer).getNFTMintBatch();
-        require(tokenBurner != address(0), "NFTMintCore[Step2]: tokenBurner address is zero");
-        require(nftMintBatch != address(0), "NFTMintCore[Step2]: nftMintBatch address is zero");
-        require(msg.sender == tokenBurner || msg.sender == nftMintBatch, 
-                string(abi.encodePacked("NFTMintCore[Step2]: unauthorized caller ", _address2str(msg.sender))));
-        
-        // Step 3: 生成随机数
+    function generateSecureRandom() external whenNotPaused onlyTokenBurner returns (uint256) {
         return _generateSecureRandom();
     }
     
