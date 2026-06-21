@@ -288,42 +288,50 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 操作是否成功，成功返回true
      */
     function burnAndMintTen(address user, bool isRare) external nonReentrant whenNotPaused returns (bool) {
-        require(authorizer != address(0), "TokenBurner: authorizer not set");
-        require(user != address(0), "TokenBurner: Zero user address");
+        // Step 1: 检查基础参数
+        require(authorizer != address(0), "TokenBurner[Step1]: authorizer not set");
+        require(user != address(0), "TokenBurner[Step1]: user is zero address");
 
+        // Step 2: 获取并验证合约地址
         address tokenAddress = IAuthorizer(authorizer).getToken();
-        _validateContractAddress(tokenAddress, "tokenContract");
-
+        require(tokenAddress != address(0), "TokenBurner[Step2]: token address is zero");
+        
         address nftMintBatchAddress = IAuthorizer(authorizer).getNFTMintBatch();
-        _validateContractAddress(nftMintBatchAddress, "nftMintBatchContract");
-
+        require(nftMintBatchAddress != address(0), "TokenBurner[Step2]: nftMintBatch address is zero");
+        
         address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
-        _validateContractAddress(nftMintAddress, "nftMintContract");
+        require(nftMintAddress != address(0), "TokenBurner[Step2]: nftMintCore address is zero");
 
-        // 检查 NFTMintCore 是否暂停
-        require(!INFTMintCore(nftMintAddress).paused(), "TokenBurner: NFT Mint paused");
+        // Step 3: 检查合约暂停状态
+        require(!INFTMintCore(nftMintAddress).paused(), "TokenBurner[Step3]: NFTMintCore is paused");
+        require(!INFTMintBatch(nftMintBatchAddress).paused(), "TokenBurner[Step3]: NFTMintBatch is paused");
 
-        // 检查 NFTMintBatch 是否暂停
-        require(!INFTMintBatch(nftMintBatchAddress).paused(), "TokenBurner: NFT Mint Batch paused");
-
+        // Step 4: 检查用户余额和授权
         uint256 cost = isRare ? rareMintCost * 10 : normalMintCost * 10;
         IERC20 token = IERC20(tokenAddress);
-        require(token.balanceOf(user) >= cost, "TokenBurner: Insufficient balance");
-        require(token.allowance(user, address(this)) >= cost, "TokenBurner: Insufficient allowance");
-        token.safeTransferFrom(user, BLACK_HOLE, cost);
+        uint256 balance = token.balanceOf(user);
+        require(balance >= cost, "TokenBurner[Step4]: insufficient balance");
+        
+        uint256 allowance = token.allowance(user, address(this));
+        require(allowance >= cost, "TokenBurner[Step4]: insufficient allowance");
 
+        // Step 5: 销毁代币
+        token.safeTransferFrom(user, BLACK_HOLE, cost);
         emit TokenBurned(user, cost, block.timestamp);
 
+        // Step 6: 调用NFTMintBatch进行批量铸造
         uint256[] memory tokenIds;
         if (isRare) {
             tokenIds = INFTMintBatch(nftMintBatchAddress).mintRareTen(user);
         } else {
             tokenIds = INFTMintBatch(nftMintBatchAddress).mintNormalTen(user);
         }
-        require(tokenIds.length == 10, "TokenBurner: Batch mint failed");
+        require(tokenIds.length == 10, "TokenBurner[Step6]: batch mint returned wrong count");
 
+        // Step 7: 发出铸造事件
         INFTMint nftMint = INFTMint(nftMintAddress);
         for (uint256 i = 0; i < 10; i++) {
+            require(tokenIds[i] > 0, "TokenBurner[Step7]: invalid tokenId in batch");
             emit NFTMinted(user, tokenIds[i], nftMint.tokenType(tokenIds[i]), isRare);
         }
 

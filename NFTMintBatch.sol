@@ -125,17 +125,30 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @return tokenIds 铸造的NFT ID数组
      */
     function mintNormalTen(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
-        require(to != address(0), "NFTMint: Zero address");
-        uint256[] memory tokenIds = new uint256[](10);
-        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
-        uint256 baseSeed = INFTMintCore(nftMintCore).generateSecureRandom();
+        // Step 1: 检查接收地址
+        require(to != address(0), "NFTMintBatch[Step1]: to address is zero");
         
+        // Step 2: 获取NFTMintCore地址
+        require(authorizer != address(0), "NFTMintBatch[Step2]: authorizer not set");
+        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
+        require(nftMintCore != address(0), "NFTMintBatch[Step2]: nftMintCore address is zero");
+        
+        // Step 3: 生成随机种子
+        uint256 baseSeed = INFTMintCore(nftMintCore).generateSecureRandom();
+        require(baseSeed > 0, "NFTMintBatch[Step3]: generateSecureRandom returned zero");
+        
+        // Step 4: 循环铸造10个NFT
+        uint256[] memory tokenIds = new uint256[](10);
         for (uint256 i = 0; i < 10; i++) {
             uint256 seed = baseSeed + i * 7919;
             uint256 zodiacType = _mintNormalType(seed);
+            require(zodiacType < 120, "NFTMintBatch[Step4]: invalid zodiacType generated");
+            
             uint8 growth = NFTLib.generateGrowthValue(seed);
+            require(growth >= 10 && growth <= 100, "NFTMintBatch[Step4]: invalid growth generated");
             
             uint256 tokenId = INFTMintCore(nftMintCore).mintWithGrowth(to, zodiacType, growth);
+            require(tokenId > 0, string(abi.encodePacked("NFTMintBatch[Step4]: mintWithGrowth failed at index ", _toString(i))));
             tokenIds[i] = tokenId;
         }
         
@@ -149,22 +162,55 @@ contract NFTMintBatch is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @return tokenIds 铸造的NFT ID数组
      */
     function mintRareTen(address to) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {
-        require(to != address(0), "NFTMint: Zero address");
-        uint256[] memory tokenIds = new uint256[](10);
-        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
-        uint256 baseSeed = INFTMintCore(nftMintCore).generateSecureRandom();
+        // Step 1: 检查接收地址
+        require(to != address(0), "NFTMintBatch[Step1]: to address is zero");
         
+        // Step 2: 获取NFTMintCore地址
+        require(authorizer != address(0), "NFTMintBatch[Step2]: authorizer not set");
+        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
+        require(nftMintCore != address(0), "NFTMintBatch[Step2]: nftMintCore address is zero");
+        
+        // Step 3: 生成随机种子
+        uint256 baseSeed = INFTMintCore(nftMintCore).generateSecureRandom();
+        require(baseSeed > 0, "NFTMintBatch[Step3]: generateSecureRandom returned zero");
+        
+        // Step 4: 循环铸造10个NFT
+        uint256[] memory tokenIds = new uint256[](10);
         for (uint256 i = 0; i < 10; i++) {
             uint256 seed = baseSeed + i * 7919;
             uint256 zodiacType = _mintRareType(seed);
+            require(zodiacType < 120, "NFTMintBatch[Step4]: invalid zodiacType generated");
+            
             uint8 growth = NFTLib.generateGrowthValue(seed);
+            require(growth >= 10 && growth <= 100, "NFTMintBatch[Step4]: invalid growth generated");
             
             uint256 tokenId = INFTMintCore(nftMintCore).mintWithGrowth(to, zodiacType, growth);
+            require(tokenId > 0, string(abi.encodePacked("NFTMintBatch[Step4]: mintWithGrowth failed at index ", _toString(i))));
             tokenIds[i] = tokenId;
         }
         
         emit BatchMint(to, tokenIds);
         return tokenIds;
+    }
+    
+    /**
+     * @dev 将uint256转换为字符串（用于错误消息）
+     */
+    function _toString(uint256 value) internal pure returns (string memory) {
+        if (value == 0) return "0";
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
     }
     
     function mintTargeted(address to, uint8 baseZodiac) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256[] memory) {

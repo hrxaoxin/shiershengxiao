@@ -146,6 +146,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 修饰器：仅TokenBurner合约可调用
      */
     modifier onlyTokenBurner() {
+        require(authorizer != address(0), "NFTMint: authorizer not set");
         address tokenBurnerContract = IAuthorizer(authorizer).getTokenBurner();
         address nftMintBatchContract = IAuthorizer(authorizer).getNFTMintBatch();
         require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
@@ -322,26 +323,83 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
     
     function mintWithGrowth(address to, uint256 zodiacType, uint8 growth) external whenNotPaused onlyTokenBurner nonReentrant returns (uint256) {
-        require(to != address(0), "NFTMint: Zero address");
-        require(zodiacType < 120, "NFTMint: Invalid type");
-        require(growth >= 10 && growth <= 100, "NFTMint: Invalid growth");
+        // Step 1: 检查参数有效性
+        require(to != address(0), "NFTMintCore[Step1]: to address is zero");
+        require(zodiacType < 120, string(abi.encodePacked("NFTMintCore[Step1]: invalid zodiacType ", _uint2str(zodiacType))));
+        require(growth >= 10 && growth <= 100, string(abi.encodePacked("NFTMintCore[Step1]: invalid growth ", _uint2str(growth))));
         
+        // Step 2: 生成tokenId
         uint256 tokenId = _nextCardId++;
+        
+        // Step 3: 执行ERC721铸造
         _mint(to, tokenId);
+        
+        // Step 4: 存储NFT数据
         tokenType[tokenId] = zodiacType;
         tokenLevel[tokenId] = 1;
         tokenGrowth[tokenId] = growth;
         
+        // Step 5: 同步到NFTData合约
         _syncNFTData(to, tokenId, zodiacType, 1, growth);
+        
         emit Mint(to, tokenId, zodiacType, growth);
         return tokenId;
     }
     
     function generateSecureRandom() external returns (uint256) {
-        require(msg.sender == IAuthorizer(authorizer).getTokenBurner() || 
-                msg.sender == IAuthorizer(authorizer).getNFTMintBatch(), 
-                "NFTMint: Unauthorized");
+        // Step 1: 检查authorizer设置
+        require(authorizer != address(0), "NFTMintCore[Step1]: authorizer not set");
+        
+        // Step 2: 检查调用者权限
+        address tokenBurner = IAuthorizer(authorizer).getTokenBurner();
+        address nftMintBatch = IAuthorizer(authorizer).getNFTMintBatch();
+        require(tokenBurner != address(0), "NFTMintCore[Step2]: tokenBurner address is zero");
+        require(nftMintBatch != address(0), "NFTMintCore[Step2]: nftMintBatch address is zero");
+        require(msg.sender == tokenBurner || msg.sender == nftMintBatch, 
+                string(abi.encodePacked("NFTMintCore[Step2]: unauthorized caller ", _address2str(msg.sender))));
+        
+        // Step 3: 生成随机数
         return _generateSecureRandom();
+    }
+    
+    /**
+     * @dev 将uint256转换为字符串（用于错误消息）
+     */
+    function _uint2str(uint256 value) internal pure returns (string memory) {
+        if (value == 0) return "0";
+        uint256 temp = value;
+        uint256 digits;
+        while (temp != 0) {
+            digits++;
+            temp /= 10;
+        }
+        bytes memory buffer = new bytes(digits);
+        while (value != 0) {
+            digits -= 1;
+            buffer[digits] = bytes1(uint8(48 + uint256(value % 10)));
+            value /= 10;
+        }
+        return string(buffer);
+    }
+    
+    /**
+     * @dev 将address转换为字符串（用于错误消息）
+     */
+    function _address2str(address addr) internal pure returns (string memory) {
+        bytes memory buffer = new bytes(42);
+        buffer[0] = '0';
+        buffer[1] = 'x';
+        for (uint256 i = 0; i < 20; i++) {
+            uint8 byteValue = uint8(uint160(addr) >> (8 * (19 - i)));
+            buffer[2 + i * 2] = _hexChar(byteValue >> 4);
+            buffer[2 + i * 2 + 1] = _hexChar(byteValue & 0x0f);
+        }
+        return string(buffer);
+    }
+    
+    function _hexChar(uint8 value) internal pure returns (bytes1) {
+        if (value < 10) return bytes1(uint8(48 + value));
+        return bytes1(uint8(87 + value)); // a-f
     }
     
     function _mintNormalType(uint256 randomSeed) internal view returns (uint256) {
