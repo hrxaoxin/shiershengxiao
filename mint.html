@@ -620,32 +620,32 @@
 
         document.getElementById('mintBtn').addEventListener('click', async function() {
             const web3 = ZODIAC_WEB3.getWeb3();
-            const costEth = web3.utils.fromWei(MINT_PRICE, 'ether').substring(0, 10);
+            const costEth = Math.floor(web3.utils.toBN(MINT_PRICE).div(web3.utils.toBN('1000000000000000000')).toNumber()).toString();
             await handleMint('mintNormal', MINT_PRICE, costEth, '普通铸造', this);
         });
 
         document.getElementById('mintLightDarkBtn').addEventListener('click', async function() {
             const web3 = ZODIAC_WEB3.getWeb3();
-            const costEth = web3.utils.fromWei(LIGHT_DARK_COST, 'ether').substring(0, 10);
+            const costEth = Math.floor(web3.utils.toBN(LIGHT_DARK_COST).div(web3.utils.toBN('1000000000000000000')).toNumber()).toString();
             await handleMint('mintRare', LIGHT_DARK_COST, costEth, '光暗铸造', this);
         });
 
         document.getElementById('mintNormalTenBtn').addEventListener('click', async function() {
             const web3 = ZODIAC_WEB3.getWeb3();
-            const costEth = web3.utils.fromWei(NORMAL_TEN_COST, 'ether').substring(0, 10);
+            const costEth = Math.floor(web3.utils.toBN(NORMAL_TEN_COST).div(web3.utils.toBN('1000000000000000000')).toNumber()).toString();
             await handleMint('mintNormalTen', NORMAL_TEN_COST, costEth, '普通十连', this);
         });
 
         document.getElementById('mintRareTenBtn').addEventListener('click', async function() {
             const web3 = ZODIAC_WEB3.getWeb3();
-            const costEth = web3.utils.fromWei(RARE_TEN_COST, 'ether').substring(0, 10);
+            const costEth = Math.floor(web3.utils.toBN(RARE_TEN_COST).div(web3.utils.toBN('1000000000000000000')).toNumber()).toString();
             await handleMint('mintRareTen', RARE_TEN_COST, costEth, '光暗十连', this);
         });
 
         document.getElementById('mintTargetedBtn').addEventListener('click', async function() {
             const zodiacIndex = parseInt(document.getElementById('targetedZodiacSelect').value, 10);
             const web3 = ZODIAC_WEB3.getWeb3();
-            const costEth = web3.utils.fromWei(TARGETED_COST, 'ether').substring(0, 12);
+            const costEth = Math.floor(web3.utils.toBN(TARGETED_COST).div(web3.utils.toBN('1000000000000000000')).toNumber()).toString();
             await handleMint('mintTargeted', TARGETED_COST, costEth, '指定铸造', this, [zodiacIndex]);
         });
 
