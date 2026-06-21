@@ -119,14 +119,6 @@ interface INFTMintCore {
     function paused() external view returns (bool);
 }
 
-interface INFTMintBatch {
-    function mintBatch(address to, uint256[] calldata zodiacTypes) external returns (uint256[] memory);
-    function mintNormalTen(address to) external returns (uint256[] memory);
-    function mintRareTen(address to) external returns (uint256[] memory);
-    function mintTargeted(address to, uint8 baseZodiac) external returns (uint256[] memory);
-    function paused() external view returns (bool);
-}
-
 /**
  * @title INFTMintMetadata
  * @dev NFT元数据合约接口，提供TokenURI生成功能
@@ -593,7 +585,6 @@ interface IAuthorizer {
         address token;
         address usdt;
         address nftMintCore;
-        address nftMintBatch;
         address nftMintMetadata;
         address nftUpdate;
         address nftData;
@@ -630,7 +621,6 @@ interface IAuthorizer {
     function getToken() external view returns (address);
     function getUSDT() external view returns (address);
     function getNFTMintCore() external view returns (address);
-    function getNFTMintBatch() external view returns (address);
     function getNFTMintMetadata() external view returns (address);
     function getNFTUpdate() external view returns (address);
     function getNFTData() external view returns (address);

@@ -148,10 +148,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     modifier onlyTokenBurner() {
         require(authorizer != address(0), "NFTMint: authorizer not set");
         address tokenBurnerContract = IAuthorizer(authorizer).getTokenBurner();
-        address nftMintBatchContract = IAuthorizer(authorizer).getNFTMintBatch();
         require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
-        require(nftMintBatchContract != address(0), "NFTMint: nftMintBatchContract not set");
-        require(msg.sender == tokenBurnerContract || msg.sender == nftMintBatchContract, "NFTMint: Unauthorized");
+        require(msg.sender == tokenBurnerContract, "NFTMint: Unauthorized");
         _;
     }
     
