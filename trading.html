@@ -509,6 +509,7 @@
             try {
                 nftTradingContract = await window.ZODIAC_WEB3.getContract('nftTrading');
                 nftMintContract = await window.ZODIAC_WEB3.getContract('nftMint');
+                tokenContract = await window.ZODIAC_WEB3.getContract('token');
                 
                 // 从合约获取手续费率
                 try {
@@ -525,6 +526,8 @@
                 } catch (e) {
                     console.warn('获取手续费率失败，使用默认值:', e);
                 }
+                
+                await updateApproveButtonState();
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
                 ZODIAC_UI.showToast('合约初始化失败: ' + error.message, 'warning');
@@ -535,7 +538,6 @@
             if (!account) return;
             
             try {
-                const balance = await web3.eth.getBalance(account);
                 const networkId = await web3.eth.getChainId();
                 
                 const walletAddressDisplay = document.getElementById('walletAddressDisplay');
@@ -543,9 +545,12 @@
                     walletAddressDisplay.textContent = account.substring(0, 6) + '...' + account.substring(account.length - 4);
                 }
                 
-                const balanceEl = document.getElementById('balance');
-                if (balanceEl) {
-                    balanceEl.textContent = web3.utils.fromWei(balance, 'ether') + ' 代币';
+                if (tokenContract) {
+                    const balance = await tokenContract.methods.balanceOf(account).call();
+                    const balanceEl = document.getElementById('balance');
+                    if (balanceEl) {
+                        balanceEl.textContent = web3.utils.fromWei(balance, 'ether') + ' 代币';
+                    }
                 }
                 
                 let networkName = '未知网络';
@@ -1254,12 +1259,42 @@
         
         function updateListButtonState() {
             const listBtn = document.getElementById('listNftBtn');
+            const approveBtn = document.getElementById('approveBtn');
             const priceInput = document.getElementById('listingPrice');
             
             if (!listBtn || !priceInput) return;
             
             const price = priceInput.value;
             listBtn.disabled = !selectedTokenId || !price;
+            
+            if (approveBtn) {
+                approveBtn.disabled = false;
+            }
+        }
+        
+        async function updateApproveButtonState() {
+            if (!account) return;
+            
+            const approveBtn = document.getElementById('approveBtn');
+            
+            if (!approveBtn) return;
+            
+            try {
+                const isApproved = await checkApprovalForAll();
+                approveBtn.disabled = isApproved;
+                
+                if (isApproved) {
+                    approveBtn.innerHTML = '<i class="fas fa-check mr-1"></i> 已授权';
+                    approveBtn.classList.remove('btn-secondary');
+                    approveBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                } else {
+                    approveBtn.innerHTML = '<i class="fas fa-key mr-1"></i> 授权NFT系列';
+                    approveBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                    approveBtn.classList.add('btn-secondary');
+                }
+            } catch (error) {
+                console.error('updateApproveButtonState error:', error);
+            }
         }
         
         function debouncedUpdateListButtonState() {

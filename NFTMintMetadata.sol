@@ -174,6 +174,10 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256 finalSpeed = zodiacBonus >= 0 ? speed + uint256(zodiacBonus) : 
                              (speed > uint256(-zodiacBonus) ? speed - uint256(-zodiacBonus) : 0);
         
+        bool isRare = t >= 72;
+        string memory imageBase = isRare ? ipfsBaseRare : ipfsBaseNormal;
+        string memory imageUrl = NFTLib.buildImagePath(imageBase, t);
+        
         return NFTDataResult({
             tokenType_: t,
             attack: attack,
@@ -183,14 +187,14 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
             level: l,
             rank: 0,
             name: tokenName,
-            imageUrl: string(abi.encodePacked("https://api.example.com/nft/", tokenId.toString()))
+            imageUrl: imageUrl
         });
     }
     
     function _buildTokenURIJson(uint256 tokenId, uint256 tokenType_, uint8 level) internal view returns (string memory) {
         uint256 element = tokenType_ / 24;
         uint256 zodiac = (tokenType_ % 24 / 2) % 12;
-        bool isMale = tokenType_ % 2 == 0;
+        bool isMale = tokenType_ % 2 == 1;
         bool isRare = tokenType_ >= 72;
         
         string memory imageBase = isRare ? ipfsBaseRare : ipfsBaseNormal;
