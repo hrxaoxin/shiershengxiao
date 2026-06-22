@@ -741,13 +741,15 @@
                         if (parseInt(listTime, 10) > 0 && seller !== '0x0000000000000000000000000000000000000000') {
                             const type = await nftMintContract.methods.tokenType(tokenId).call();
                             const level = await nftMintContract.methods.tokenLevel(tokenId).call();
+                            const growth = await nftMintContract.methods.tokenGrowth(tokenId).call();
                             listings.push({
                                 tokenId: tokenId,
                                 price: web3.utils.fromWei(priceWei, 'ether'),
                                 priceWei: priceWei,
                                 seller: seller,
                                 type: type,
-                                level: parseInt(level, 10)
+                                level: parseInt(level, 10),
+                                growth: parseInt(growth, 10)
                             });
                         }
                     } catch (e) {
@@ -806,28 +808,35 @@
             for (const listing of listings) {
                 const nftInfo = window.ZODIAC_UTILS.getNFTInfo(parseInt(listing.type, 10));
                 const isOwnListing = account && listing.seller.toLowerCase() === account.toLowerCase();
+                const stars = window.ZODIAC_UTILS.getStars(listing.level);
+                const growth = listing.growth !== undefined ? listing.growth : 0;
                 
                 html += `
                     <div class="bg-white rounded-lg shadow-md overflow-hidden card-hover">
-                        <div class="p-6">
-                            <div class="flex justify-between items-start mb-4">
-                                <div>
-                                    <h3 class="text-xl font-bold text-gray-800">${nftInfo.name}</h3>
-                                    <p class="text-gray-600">NFT #${listing.tokenId}</p>
-                                    <p class="text-gray-500 text-sm">等级: ${listing.level}</p>
-                                </div>
+                        <div class="relative">
+                            <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" class="w-full h-48 object-contain bg-gray-100" onerror="this.src='images/default-nft.png'">
+                            <div class="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+                                #${listing.tokenId}
                             </div>
-                            <div class="mb-4">
-                                <p class="text-gray-600">卖家: ${listing.seller.substring(0, 6)}...${listing.seller.substring(listing.seller.length - 4)}</p>
+                            ${nftInfo.isRare ? '<div class="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-1 rounded text-xs font-bold">光暗</div>' : ''}
+                        </div>
+                        <div class="p-4">
+                            <h3 class="text-lg font-bold text-gray-800 mb-1">${nftInfo.name}</h3>
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-yellow-500">${stars}</span>
+                                <span class="text-gray-500 text-sm">成长值: ${growth}</span>
                             </div>
-                            <div class="flex justify-between items-center mb-4">
-                                <p class="text-gray-600">价格</p>
-                                <p class="text-2xl font-bold text-red-500">${listing.price} 代币</p>
+                            <div class="mb-3">
+                                <p class="text-gray-500 text-xs">卖家: ${listing.seller.substring(0, 6)}...${listing.seller.substring(listing.seller.length - 4)}</p>
                             </div>
-                            <button class="buyBtn btn-primary w-full" ${isOwnListing ? 'disabled' : ''} 
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="text-gray-600 text-sm">价格</span>
+                                <span class="text-xl font-bold text-red-500">${listing.price}</span>
+                            </div>
+                            <button class="buyBtn btn-primary w-full text-sm py-2" ${isOwnListing ? 'disabled' : ''} 
                                     data-tokenid="${listing.tokenId}" data-price="${listing.price}" 
                                     data-seller="${listing.seller}" data-type="${listing.type}">
-                                ${isOwnListing ? '自己的NFT' : '<i class="fa fa-shopping-bag mr-2"></i>立即购买'}
+                                ${isOwnListing ? '自己的NFT' : '<i class="fa fa-shopping-bag mr-1"></i>购买'}
                             </button>
                         </div>
                     </div>
@@ -1214,11 +1223,13 @@
                         if (seller.toLowerCase() === account.toLowerCase()) {
                             const type = await nftMintContract.methods.tokenType(tokenId).call();
                             const level = await nftMintContract.methods.tokenLevel(tokenId).call();
+                            const growth = await nftMintContract.methods.tokenGrowth(tokenId).call();
                             listings.push({
                                 tokenId: parseInt(tokenId, 10),
                                 price: web3.utils.fromWei(priceWei, 'ether'),
                                 type: type,
-                                level: parseInt(level, 10)
+                                level: parseInt(level, 10),
+                                growth: parseInt(growth, 10)
                             });
                         }
                     } catch (e) {
@@ -1234,15 +1245,26 @@
                 let html = '';
                 for (const listing of listings) {
                     const nftInfo = window.ZODIAC_UTILS.getNFTInfo(parseInt(listing.type, 10));
+                    const stars = window.ZODIAC_UTILS.getStars(listing.level);
+                    const growth = listing.growth !== undefined ? listing.growth : 0;
                     html += `
-                        <div class="bg-white rounded-lg shadow-md overflow-hidden">
-                            <div class="p-6">
-                                <h3 class="text-xl font-bold text-gray-800">${nftInfo.name}</h3>
-                                <p class="text-gray-600">NFT #${listing.tokenId}</p>
-                                <p class="text-gray-500 text-sm">等级: ${listing.level}</p>
-                                <div class="flex justify-between items-center mt-4">
-                                    <span class="text-xl font-bold text-red-500">${listing.price} 代币</span>
-                                    <button class="btn-danger" onclick="cancelListing(${listing.tokenId})">取消上架</button>
+                        <div class="bg-white rounded-lg shadow-md overflow-hidden card-hover">
+                            <div class="relative">
+                                <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" class="w-full h-48 object-contain bg-gray-100" onerror="this.src='images/default-nft.png'">
+                                <div class="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+                                    #${listing.tokenId}
+                                </div>
+                                ${nftInfo.isRare ? '<div class="absolute top-2 left-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-1 rounded text-xs font-bold">光暗</div>' : ''}
+                            </div>
+                            <div class="p-4">
+                                <h3 class="text-lg font-bold text-gray-800 mb-1">${nftInfo.name}</h3>
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-yellow-500">${stars}</span>
+                                    <span class="text-gray-500 text-sm">成长值: ${growth}</span>
+                                </div>
+                                <div class="flex justify-between items-center mb-3">
+                                    <span class="text-xl font-bold text-red-500">${listing.price}</span>
+                                    <button class="btn-danger text-sm py-2 px-4" onclick="cancelListing(${listing.tokenId})">取消上架</button>
                                 </div>
                             </div>
                         </div>
