@@ -964,29 +964,46 @@
         }
 
         async function checkNFT(tokenId) {
+            console.log('[TRADING] checkNFT called, tokenId:', tokenId);
             try {
+                console.log('[TRADING] checkNFT: checking contracts...');
                 if (!nftMintContract || !nftTradingContract || !account) {
+                    console.log('[TRADING] checkNFT: missing account or contracts');
                     ZODIAC_UI.showToast('请先连接钱包', 'warning');
                     return false;
                 }
+                console.log('[TRADING] checkNFT: contracts OK');
                 
+                console.log('[TRADING] checkNFT: checking ownerOf...');
                 const owner = await nftMintContract.methods.ownerOf(tokenId).call();
+                console.log('[TRADING] checkNFT: owner:', owner, 'account:', account);
                 if (owner.toLowerCase() !== account.toLowerCase()) {
+                    console.log('[TRADING] checkNFT: not owner');
                     ZODIAC_UI.showToast('您不是此NFT的所有者', 'warning');
                     return false;
                 }
+                console.log('[TRADING] checkNFT: is owner');
                 
+                console.log('[TRADING] checkNFT: checking listing info...');
                 const [seller, priceWei, listTime] = await nftTradingContract.methods.getListingInfo(tokenId).call();
+                console.log('[TRADING] checkNFT: seller:', seller, 'priceWei:', priceWei, 'listTime:', listTime);
                 const active = seller !== '0x0000000000000000000000000000000000000000';
                 if (active) {
+                    console.log('[TRADING] checkNFT: already listed');
                     ZODIAC_UI.showToast('此NFT已上架', 'warning');
                     return false;
                 }
+                console.log('[TRADING] checkNFT: not listed');
                 
-                const nftInfo = window.ZODIAC_UTILS.getNFTInfo(await nftMintContract.methods.tokenType(tokenId).call());
+                console.log('[TRADING] checkNFT: getting tokenType...');
+                const tokenType = await nftMintContract.methods.tokenType(tokenId).call();
+                console.log('[TRADING] checkNFT: tokenType:', tokenType);
+                const nftInfo = window.ZODIAC_UTILS.getNFTInfo(tokenType);
+                console.log('[TRADING] checkNFT: nftInfo:', nftInfo);
                 ZODIAC_UI.showToast(`NFT信息: ${nftInfo.name}，可上架`, 'success');
                 return true;
             } catch (error) {
+                console.error('[TRADING] checkNFT error:', error);
                 ZODIAC_UI.showToast('检查失败: ' + error.message, 'error');
                 return false;
             }
