@@ -142,7 +142,7 @@ window.ZODIAC_CONFIG = (function() {
     // 示例合约地址配置 - 部署后请替换为真实地址
     const CONTRACT_ADDRESSES = {
         tokenContract: getEnvContractAddress('token', '0xd06994d9ff24dc4a579f53c91f65d95b6be97777'),
-        authorizer: getEnvContractAddress('authorizer', '0xB18b351fa06482128a4a49116d5A31B38C873FB3'),
+        authorizer: getEnvContractAddress('authorizer', '0x409A59c107E8670963cb628e4E09ae4186b4BebF'),
         rewardManager: getEnvContractAddress('rewardManager', '0x1Cd7Ef9A3BF5494235922fE4fF788622218375e7'),
         dividendManager: getEnvContractAddress('dividendManager', '0x584D39D6FC2B44CEBb6eB975baCc8d168CE05357'),
         weightManager: getEnvContractAddress('weightManager', '0x8d0c6db308dAFE42260595e2496c23Aa6C7A213C'),
@@ -153,7 +153,7 @@ window.ZODIAC_CONFIG = (function() {
         nftMintMetadata: getEnvContractAddress('nftMintMetadata', '0x139d638aFda63FaF3c96E44C9B9E51FC48c437d4'),
         nftData: getEnvContractAddress('nftData', '0x4c8b25b63bdd8FC5b12BDc7AC7ee769A65f31D27'),
         nftUpdate: getEnvContractAddress('nftUpdate', '0x2CfaA553Bb1073D9910a5A4b5961b0AaA1D3aCd5'),
-        nftTrading: getEnvContractAddress('nftTrading', '0x4EA83f5Ee9a077950A66FdE07aebDB619B19ca8a'),
+        nftTrading: getEnvContractAddress('nftTrading', '0xDb062FB71B57b07887ceCea883336fe422c103F4'),
         nftBuyback: getEnvContractAddress('nftBuyback', '0xB8A61a527603d1Ee8dA2CBe97c73de4e3AE9c15d'),
         breedingCore: getEnvContractAddress('breedingCore', '0xAB95feeFE5a2E10FD8d5d6dCB07e368E13eAdfD0'),
         breedingMarket: getEnvContractAddress('breedingMarket', '0xF7186c75843F1256B71e5146B8c87783080e534F'),
@@ -5427,6 +5427,40 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "",
+				"type": "bytes"
+			}
+		],
+		"name": "onERC721Received",
+		"outputs": [
+			{
+				"internalType": "bytes4",
+				"name": "",
+				"type": "bytes4"
+			}
+		],
+		"stateMutability": "pure",
 		"type": "function"
 	},
 	{

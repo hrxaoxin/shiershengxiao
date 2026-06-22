@@ -73,6 +73,13 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
+     * @dev ERC721Receiver 接口实现 - 允许合约接收 NFT
+     */
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+
+    /**
      * @dev 挂牌信息结构体
      */
     struct Listing {

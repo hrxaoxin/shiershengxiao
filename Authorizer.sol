@@ -61,6 +61,31 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         emit ContractAddressUpdated(key, value);
     }
 
+    /**
+     * @dev 简单版设置单个合约地址（使用字符串名称）
+     * @param name 合约名称，如 "nftTrading", "nftMintCore", "token" 等
+     * @param value 合约地址
+     */
+    function setContractAddress(string calldata name, address value) external onlyOwner whenNotPaused {
+        bytes32 key = keccak256(abi.encodePacked(name));
+        _addresses[key] = value;
+        emit ContractAddressUpdated(key, value);
+    }
+
+    /**
+     * @dev 批量设置多个合约地址（使用字符串名称）
+     * @param names 合约名称数组
+     * @param values 合约地址数组
+     */
+    function setMultipleAddresses(string[] calldata names, address[] calldata values) external onlyOwner whenNotPaused {
+        require(names.length == values.length, "Authorizer: arrays length mismatch");
+        for (uint256 i = 0; i < names.length; i++) {
+            bytes32 key = keccak256(abi.encodePacked(names[i]));
+            _addresses[key] = values[i];
+            emit ContractAddressUpdated(key, values[i]);
+        }
+    }
+
     function setAllContracts(address[] calldata _addr) external onlyOwner whenNotPaused {
         _setAddresses(_addr);
         emit GlobalAddressesUpdated();

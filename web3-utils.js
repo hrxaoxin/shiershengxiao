@@ -207,10 +207,51 @@ window.ZODIAC_WEB3 = (function() {
         'authorizer': ABIS.authorizerABI
     };
 
-    function initContracts() {
+    // 动态获取 authorizer 中的 token 地址
+    async function getTokenAddressFromAuthorizer() {
+        try {
+            const authorizerAddr = CONTRACT_ADDRESSES.authorizer;
+            if (!authorizerAddr || authorizerAddr === '0x0000000000000000000000000000000000000000') {
+                console.warn('[ZODIAC_WEB3] authorizer address not configured');
+                return CONTRACT_ADDRESSES.tokenContract; // 回退到配置地址
+            }
+            const authorizerContract = new web3.eth.Contract(ABIS.authorizerABI, authorizerAddr);
+            const tokenAddress = await authorizerContract.methods.getToken().call();
+            console.log('[ZODIAC_WEB3] Token address from authorizer:', tokenAddress);
+            return tokenAddress;
+        } catch (e) {
+            console.warn('[ZODIAC_WEB3] Failed to get token from authorizer, using configured address:', e.message);
+            return CONTRACT_ADDRESSES.tokenContract;
+        }
+    }
+
+    async function initContracts() {
         if (!web3 || !account) return;
         contracts = {};
+        
+        // 先初始化 authorizer 合约
+        const authorizerAddr = CONTRACT_ADDRESSES.authorizer;
+        if (authorizerAddr && authorizerAddr !== '0x0000000000000000000000000000000000000000') {
+            try {
+                contracts.authorizer = new web3.eth.Contract(ABIS.authorizerABI, authorizerAddr);
+            } catch (e) {
+                console.warn('[ZODIAC_WEB3] Failed to init authorizer:', e);
+            }
+        }
+        
+        // 动态获取 token 地址
+        const tokenAddr = await getTokenAddressFromAuthorizer();
+        if (tokenAddr && tokenAddr !== '0x0000000000000000000000000000000000000000') {
+            try {
+                contracts.tokenContract = new web3.eth.Contract(ABIS.tokenABI, tokenAddr);
+            } catch (e) {
+                console.warn('[ZODIAC_WEB3] Failed to init tokenContract:', e);
+            }
+        }
+        
+        // 初始化其他合约
         for (const [name, abi] of Object.entries(ABI_MAP)) {
+            if (name === 'tokenContract' || name === 'authorizer') continue; // 已单独处理
             const addr = CONTRACT_ADDRESSES[name];
             if (addr && addr !== '0x0000000000000000000000000000000000000000' && abi) {
                 try {
@@ -243,8 +284,19 @@ window.ZODIAC_WEB3 = (function() {
         if (contracts[name]) return contracts[name];
 
         const abi = ABI_MAP[name];
-        const addr = CONTRACT_ADDRESSES[name];
         if (!abi) throw new Error(`[ZODIAC_WEB3] No ABI for contract: ${name}`);
+        
+        // tokenContract 从 authorizer 动态获取
+        if (name === 'tokenContract') {
+            const tokenAddr = await getTokenAddressFromAuthorizer();
+            if (!tokenAddr || tokenAddr === '0x0000000000000000000000000000000000000000') {
+                throw new Error(`[ZODIAC_WEB3] Token address not found in authorizer`);
+            }
+            contracts[name] = new web3.eth.Contract(abi, tokenAddr);
+            return contracts[name];
+        }
+        
+        const addr = CONTRACT_ADDRESSES[name];
         if (!addr || addr === '0x0000000000000000000000000000000000000000') {
             throw new Error(`[ZODIAC_WEB3] Contract address not configured: ${name}`);
         }
