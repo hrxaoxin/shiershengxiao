@@ -1064,6 +1064,22 @@
                 console.log('[TRADING] nftMintContract address:', nftMintContract.options.address);
                 console.log('[TRADING] nftTrading address from config:', ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftTrading);
                 
+                // 检查 authorizer 中配置的 nftMintCore 地址
+                if (authorizerContract) {
+                    const authorizerNftMintCore = await authorizerContract.methods.getNFTMintCore().call();
+                    console.log('[TRADING] authorizer.getNFTMintCore():', authorizerNftMintCore);
+                    console.log('[TRADING] nftMintContract address (lowercase):', nftMintContract.options.address.toLowerCase());
+                    console.log('[TRADING] authorizer.getNFTMintCore() (lowercase):', authorizerNftMintCore.toLowerCase());
+                    
+                    if (nftMintContract.options.address.toLowerCase() !== authorizerNftMintCore.toLowerCase()) {
+                        console.error('[TRADING] ERROR: nftMintContract address mismatch!');
+                        console.error('[TRADING] Frontend config:', nftMintContract.options.address);
+                        console.error('[TRADING] Authorizer config:', authorizerNftMintCore);
+                        ZODIAC_UI.showToast('配置错误: 合约地址不匹配', 'error');
+                        throw new Error('合约地址配置不匹配');
+                    }
+                }
+                
                 if (!isApproved) {
                     console.log('[TRADING] approving...');
                     await approveForAll();
