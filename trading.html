@@ -704,10 +704,18 @@
                     pageCacheTimestamp = {};
                 }
                 
-                const listedTokenIds = await nftTradingContract.methods.getListedNFTs().call();
-                totalPages = Math.ceil(listedTokenIds.length / PAGE_SIZE);
+                let listedTokenIds;
+                try {
+                    listedTokenIds = await nftTradingContract.methods.getListedNFTs().call();
+                    console.log('[TRADING] loadMarketplace: getListedNFTs returned:', listedTokenIds);
+                } catch (e) {
+                    console.error('[TRADING] loadMarketplace: Failed to get listed NFTs:', e);
+                    ZODIAC_UI.showToast('获取上架列表失败: ' + (e.message || '未知错误'), 'error');
+                    marketplaceGrid.innerHTML = '<div class="col-span-full text-center py-12"><p class="text-red-500">获取上架列表失败</p></div>';
+                    return;
+                }
                 
-                if (listedTokenIds.length === 0) {
+                if (!listedTokenIds || listedTokenIds.length === 0) {
                     allListings = [];
                     pageCache[currentPage] = [];
                     pageCacheTimestamp[currentPage] = Date.now();
@@ -716,6 +724,8 @@
                     return;
                 }
                 
+                totalPages = Math.ceil(listedTokenIds.length / PAGE_SIZE);
+                
                 const startIdx = (currentPage - 1) * PAGE_SIZE;
                 const endIdx = Math.min(startIdx + PAGE_SIZE, listedTokenIds.length);
                 
@@ -723,8 +733,12 @@
                 for (let i = startIdx; i < endIdx; i++) {
                     const tokenId = parseInt(listedTokenIds[i], 10);
                     try {
-                        const [seller, priceWei, listTime] = await nftTradingContract.methods.getListingInfo(tokenId).call();
-                        if (parseInt(listTime, 10) > 0) {
+                        const listingInfo = await nftTradingContract.methods.getListingInfo(tokenId).call();
+                        const seller = listingInfo[0] || listingInfo.seller;
+                        const priceWei = listingInfo[1] || listingInfo.priceWei;
+                        const listTime = listingInfo[2] || listingInfo.listTime;
+                        
+                        if (parseInt(listTime, 10) > 0 && seller !== '0x0000000000000000000000000000000000000000') {
                             const type = await nftMintContract.methods.tokenType(tokenId).call();
                             const level = await nftMintContract.methods.tokenLevel(tokenId).call();
                             listings.push({
@@ -737,7 +751,7 @@
                             });
                         }
                     } catch (e) {
-                        console.warn(`获取NFT ${tokenId} 详情失败:`, e);
+                        console.warn(`[TRADING] 获取NFT ${tokenId} 详情失败:`, e.message);
                     }
                 }
                 
@@ -751,7 +765,7 @@
             } catch (error) {
                 console.error('加载市场数据失败:', error);
                 ZODIAC_UI.showToast('加载市场数据失败: ' + (error.message || '未知错误'), 'error');
-                marketplaceGrid.innerHTML = '<div class="col-span-full text-center py-12"><p class="text-red-500">加载失败，请刷新页面重试</p></div>';
+                marketplaceGrid.innerHTML = `<div class="col-span-full text-center py-12"><p class="text-red-500">加载失败: ${error.message || '未知错误'}</p></div>`;
             }
         }
 
@@ -1175,19 +1189,40 @@
                 }
                 
                 const listings = [];
-                const allListedTokenIds = await nftTradingContract.methods.getListedNFTs().call();
+                let allListedTokenIds;
+                
+                try {
+                    allListedTokenIds = await nftTradingContract.methods.getListedNFTs().call();
+                    console.log('[TRADING] loadMyListings: getListedNFTs returned:', allListedTokenIds);
+                } catch (e) {
+                    console.error('[TRADING] loadMyListings: Failed to get listed NFTs:', e);
+                    myListingsGrid.innerHTML = '<div class="col-span-full text-center py-12"><p class="text-red-500">获取上架列表失败</p></div>';
+                    return;
+                }
+                
+                if (!allListedTokenIds || allListedTokenIds.length === 0) {
+                    myListingsGrid.innerHTML = '<div class="col-span-full text-center py-12"><p class="text-gray-600">暂无上架的NFT</p></div>';
+                    return;
+                }
                 
                 for (const tokenId of allListedTokenIds) {
-                    const [seller, priceWei, listTime] = await nftTradingContract.methods.getListingInfo(tokenId).call();
-                    if (seller.toLowerCase() === account.toLowerCase()) {
-                        const type = await nftMintContract.methods.tokenType(tokenId).call();
-                        const level = await nftMintContract.methods.tokenLevel(tokenId).call();
-                        listings.push({
-                            tokenId: parseInt(tokenId, 10),
-                            price: web3.utils.fromWei(priceWei, 'ether'),
-                            type: type,
-                            level: parseInt(level, 10)
-                        });
+                    try {
+                        const listingInfo = await nftTradingContract.methods.getListingInfo(tokenId).call();
+                        const seller = listingInfo[0] || listingInfo.seller;
+                        const priceWei = listingInfo[1] || listingInfo.priceWei;
+                        
+                        if (seller.toLowerCase() === account.toLowerCase()) {
+                            const type = await nftMintContract.methods.tokenType(tokenId).call();
+                            const level = await nftMintContract.methods.tokenLevel(tokenId).call();
+                            listings.push({
+                                tokenId: parseInt(tokenId, 10),
+                                price: web3.utils.fromWei(priceWei, 'ether'),
+                                type: type,
+                                level: parseInt(level, 10)
+                            });
+                        }
+                    } catch (e) {
+                        console.warn('[TRADING] loadMyListings: Failed to get info for tokenId', tokenId, e.message);
                     }
                 }
                 
@@ -1216,7 +1251,7 @@
                 myListingsGrid.innerHTML = html;
             } catch (error) {
                 console.error('加载我的上架失败:', error);
-                myListingsGrid.innerHTML = '<div class="col-span-full text-center py-12"><p class="text-red-500">加载失败</p></div>';
+                myListingsGrid.innerHTML = `<div class="col-span-full text-center py-12"><p class="text-red-500">加载失败: ${error.message || '未知错误'}</p></div>`;
             }
         }
 
