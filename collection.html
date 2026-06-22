@@ -175,6 +175,32 @@
             </div>
         </div>
 
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-6">
+            <h3 class="text-lg font-bold text-blue-800 mb-2">生肖收集进度</h3>
+            <div class="grid grid-cols-5 gap-2" id="progressGrid">
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-blue-600">水</p>
+                    <p class="text-xs text-gray-500"><span id="waterProgress">0</span>/24</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-green-600">风</p>
+                    <p class="text-xs text-gray-500"><span id="windProgress">0</span>/24</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-red-600">火</p>
+                    <p class="text-xs text-gray-500"><span id="fireProgress">0</span>/24</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-purple-600">暗</p>
+                    <p class="text-xs text-gray-500"><span id="darkProgress">0</span>/24</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm font-semibold text-yellow-600">光</p>
+                    <p class="text-xs text-gray-500"><span id="lightProgress">0</span>/24</p>
+                </div>
+            </div>
+        </div>
+
         <div class="mb-4">
             <h3 class="text-lg font-bold text-gray-800 mb-3">显示模式</h3>
             <div class="flex flex-wrap gap-2">
@@ -203,32 +229,7 @@
             </div>
         </div>
 
-        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 mb-8">
-            <h3 class="text-lg font-bold text-blue-800 mb-2">生肖收集进度</h3>
-            <div class="grid grid-cols-5 gap-2" id="progressGrid">
-                <div class="text-center">
-                    <p class="text-sm font-semibold text-blue-600">水</p>
-                    <p class="text-xs text-gray-500"><span id="waterProgress">0</span>/24</p>
-                </div>
-                <div class="text-center">
-                    <p class="text-sm font-semibold text-green-600">风</p>
-                    <p class="text-xs text-gray-500"><span id="windProgress">0</span>/24</p>
-                </div>
-                <div class="text-center">
-                    <p class="text-sm font-semibold text-red-600">火</p>
-                    <p class="text-xs text-gray-500"><span id="fireProgress">0</span>/24</p>
-                </div>
-                <div class="text-center">
-                    <p class="text-sm font-semibold text-purple-600">暗</p>
-                    <p class="text-xs text-gray-500"><span id="darkProgress">0</span>/24</p>
-                </div>
-                <div class="text-center">
-                    <p class="text-sm font-semibold text-yellow-600">光</p>
-                    <p class="text-xs text-gray-500"><span id="lightProgress">0</span>/24</p>
-                </div>
-            </div>
-        </div>
-    </main>
+            </main>
 
     <div id="cardModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
