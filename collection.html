@@ -576,7 +576,7 @@
                 const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
 
                 html += `
-                    <div class="zodiac-card nft-card-hover cursor-pointer" onclick="showCardModal(${typeId}, ${level}, ${growth})"
+                    <div class="zodiac-card nft-card-hover cursor-pointer"
                          data-nft-typeid="${typeId}" data-nft-tokenid="${token.tokenId}" data-nft-level="${level}" data-nft-growth="${growth}">
                         <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
                         <h4>${nftInfo.name}</h4>
@@ -591,33 +591,42 @@
             lazyLoadImages();
         }
 
-        async function showCardModal(typeId, level, growth = 0) {
+        function showCardModal(typeId, level, growth = 0) {
             console.log('[COLLECTION] showCardModal started:', typeId, level, growth);
             try {
                 const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
                 console.log('[COLLECTION] nftInfo:', nftInfo);
+                
+                if (!nftInfo) {
+                    console.error('[COLLECTION] nftInfo is null or undefined');
+                    return;
+                }
+                
                 const isOwned = ownedTypes.has(typeId);
                 const userToken = userTokens.find(t => t.typeId === typeId);
                 const count = userToken ? userToken.count : 0;
                 const displayGrowth = userToken && userToken.growth ? userToken.growth : growth;
                 
-                const element = nftInfo.elementKey;
+                const element = nftInfo.elementKey || 'water';
                 const isRare = (element === 'light' || element === 'dark');
                 const rarityText = isRare ? '稀有' : '普通';
                 const rarityColor = isRare ? 'text-purple-600' : 'text-gray-600';
                 
-                const weight = await ZODIAC_UTILS.getWeight(level, isRare);
+                const weight = level * (isRare ? 2 : 1);
                 const canBreed = level >= 5;
                 const canBattle = level >= 1;
                 const canStake = level >= 1;
                 
+                const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+                const zodiacName = nftInfo.zodiac !== undefined ? (ZODIAC_CONFIG && ZODIAC_CONFIG.ZODIAC_NAMES ? ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac] : zodiacNames[nftInfo.zodiac]) : '未知';
+                
                 const desc = isOwned 
-                    ? `${nftInfo.attrName}属性生肖·${ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac]}·${nftInfo.genderName} · 持有可享受税收分红` 
+                    ? `${nftInfo.attrName || '未知'}属性生肖·${zodiacName}·${nftInfo.genderName || '未知'} · 持有可享受税收分红` 
                     : '尚未拥有此生肖';
 
-                document.getElementById('modalCardImage').src = isOwned ? nftInfo.imagePath : 'images/fu-cards/shuishu_1.png';
+                document.getElementById('modalCardImage').src = isOwned && nftInfo.imagePath ? nftInfo.imagePath : 'images/fu-cards/shuishu_1.png';
                 document.getElementById('modalCardImage').style.filter = isOwned ? 'none' : 'grayscale(100%)';
-                document.getElementById('modalCardName').textContent = nftInfo.name;
+                document.getElementById('modalCardName').textContent = nftInfo.name || '未知生肖';
                 document.getElementById('modalCardDesc').textContent = desc;
                 document.getElementById('modalCardId').textContent = `类型ID: ${typeId}`;
                 
