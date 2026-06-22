@@ -698,7 +698,7 @@
                     console.log('[COLLECTION] card classes:', card.classList);
                     console.log('[COLLECTION] has-item:', card.classList.contains('has-item'));
                 }
-                if (card && card.classList.contains('has-item')) {
+                if (card && card.hasAttribute('data-nft-typeid')) {
                     const typeId = parseInt(card.getAttribute('data-nft-typeid'));
                     const level = parseInt(card.getAttribute('data-nft-level'));
                     const growth = parseInt(card.getAttribute('data-nft-growth')) || 0;
