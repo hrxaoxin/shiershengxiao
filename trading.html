@@ -1159,11 +1159,22 @@
             const userNftGrid = document.getElementById('userNftGrid');
             let html = '';
 
+            const defaultIpfsBase = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/';
+            const defaultIpfsBaseRare = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/';
+            const ipfsBases = {
+                water: defaultIpfsBase,
+                wind: defaultIpfsBase,
+                fire: defaultIpfsBase,
+                dark: defaultIpfsBaseRare,
+                light: defaultIpfsBaseRare
+            };
+
             for (const nft of nfts) {
                 const nftInfo = window.ZODIAC_UTILS.getNFTInfo(nft.type);
                 const isSelected = selectedTokenId === nft.tokenId;
                 const animalKey = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'][nftInfo.zodiac];
-                const imagePath = `images/fu-cards/${nftInfo.prefix || nftInfo.elementKey}${animalKey}_${nftInfo.gender}.png`;
+                const ipfsBase = ipfsBases[nftInfo.elementKey] || defaultIpfsBase;
+                const imagePath = `${ipfsBase}${nftInfo.prefix || nftInfo.elementKey}${animalKey}_${nftInfo.gender}.png`;
 
                 html += `
                     <div class="nft-card cursor-pointer rounded-lg border-2 ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'} transition-all duration-200 p-3 text-center" 
@@ -1191,14 +1202,25 @@
 
         function selectNft(tokenId, type) {
             const nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
-            const imagePath = `images/fu-cards/${nftInfo.elementPrefix}${nftInfo.animalKey}_${nftInfo.gender}.png`;
+            const defaultIpfsBase = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/';
+            const defaultIpfsBaseRare = 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/';
+            const ipfsBases = {
+                water: defaultIpfsBase,
+                wind: defaultIpfsBase,
+                fire: defaultIpfsBase,
+                dark: defaultIpfsBaseRare,
+                light: defaultIpfsBaseRare
+            };
+            const animalKey = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'][nftInfo.zodiac];
+            const ipfsBase = ipfsBases[nftInfo.elementKey] || defaultIpfsBase;
+            const imagePath = `${ipfsBase}${nftInfo.prefix || nftInfo.elementKey}${animalKey}_${nftInfo.gender}.png`;
 
             selectedTokenId = tokenId;
 
             document.getElementById('selectedNftInfo').classList.remove('hidden');
             document.getElementById('selectedNftIcon').innerHTML = `<img src="${imagePath}" alt="${nftInfo.name}" class="w-full h-full object-cover rounded-lg" onerror="this.parentElement.innerHTML='<span class=\\'text-3xl\\'>🐾</span>';">`;
             document.getElementById('selectedNftName').textContent = nftInfo.name;
-            document.getElementById('selectedNftId').textContent = `NFT #${tokenId} · 等级 ${nft.level}`;
+            document.getElementById('selectedNftId').textContent = `NFT #${tokenId}`;
 
             document.querySelectorAll('.nft-card').forEach(card => {
                 if (parseInt(card.getAttribute('data-tokenid'), 10) === tokenId) {
