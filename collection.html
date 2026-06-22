@@ -380,11 +380,13 @@
                 const tokenInfoPromises = tokenIds.map(tokenId => {
                     return Promise.all([
                         nftContract.methods.tokenType(tokenId).call(),
-                        nftContract.methods.tokenLevel(tokenId).call()
-                    ]).then(([typeId, level]) => ({
+                        nftContract.methods.tokenLevel(tokenId).call(),
+                        nftContract.methods.tokenGrowth(tokenId).call().catch(() => '0')
+                    ]).then(([typeId, level, growth]) => ({
                         tokenId: tokenId,
                         typeId: parseInt(typeId, 10),
-                        level: parseInt(level, 10)
+                        level: parseInt(level, 10),
+                        growth: parseInt(growth, 10)
                     }));
                 });
                 
@@ -394,11 +396,14 @@
                 for (const info of tokenInfos) {
                     ownedTypes.add(info.typeId);
                     if (!typeMap[info.typeId]) {
-                        typeMap[info.typeId] = { typeId: info.typeId, count: 0, level: info.level };
+                        typeMap[info.typeId] = { typeId: info.typeId, count: 0, level: info.level, growth: info.growth };
                     }
                     typeMap[info.typeId].count++;
                     if (info.level > typeMap[info.typeId].level) {
                         typeMap[info.typeId].level = info.level;
+                    }
+                    if (info.growth > typeMap[info.typeId].growth) {
+                        typeMap[info.typeId].growth = info.growth;
                     }
                 }
                 
@@ -527,16 +532,17 @@
                 const userToken = userTokens.find(t => t.typeId === typeId);
                 const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
                 const level = userToken ? userToken.level : 0;
+                const growth = userToken ? userToken.growth : 0;
                 const count = userToken ? userToken.count : 0;
                 
                 html += `
                     <div class="zodiac-card nft-card-hover ${isOwned ? 'has-item' : 'locked'}" 
-                         onclick="${isOwned ? `showCardModal(${typeId}, ${level})` : ''}"
-                         data-nft-typeid="${typeId}" data-nft-level="${level}">
+                         onclick="${isOwned ? `showCardModal(${typeId}, ${level}, ${growth})` : ''}"
+                         data-nft-typeid="${typeId}" data-nft-level="${level}" data-nft-growth="${growth}">
                         ${count > 1 ? `<span class="collection-badge">x${count}</span>` : ''}
                         <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
                         <h4>${nftInfo.name}</h4>
-                        ${isOwned ? `<p>等级: ${getStars(level)}</p>` : '<p class="text-gray-400">未拥有</p>'}
+                        ${isOwned ? `<p>等级: ${getStars(level)}</p><p class="text-xs text-green-600">成长: ${growth}</p>` : '<p class="text-gray-400">未拥有</p>'}
                     </div>
                 `;
             }
@@ -566,14 +572,16 @@
             for (const token of filteredTokens) {
                 const typeId = token.typeId;
                 const level = token.level || 1;
+                const growth = token.growth || 0;
                 const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
 
                 html += `
-                    <div class="zodiac-card nft-card-hover" onclick="showCardModal(${typeId}, ${level})"
-                         data-nft-typeid="${typeId}" data-nft-tokenid="${token.tokenId}" data-nft-level="${level}">
+                    <div class="zodiac-card nft-card-hover cursor-pointer" onclick="showCardModal(${typeId}, ${level}, ${growth})"
+                         data-nft-typeid="${typeId}" data-nft-tokenid="${token.tokenId}" data-nft-level="${level}" data-nft-growth="${growth}">
                         <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
                         <h4>${nftInfo.name}</h4>
                         <p>等级: ${getStars(level)}</p>
+                        <p class="text-xs text-green-600">成长: ${growth}</p>
                         <p>拥有 ${token.count} 张</p>
                     </div>
                 `;
@@ -583,11 +591,12 @@
             lazyLoadImages();
         }
 
-        async function showCardModal(typeId, level) {
+        async function showCardModal(typeId, level, growth = 0) {
             const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
             const isOwned = ownedTypes.has(typeId);
             const userToken = userTokens.find(t => t.typeId === typeId);
             const count = userToken ? userToken.count : 0;
+            const displayGrowth = userToken && userToken.growth ? userToken.growth : growth;
             
             const element = nftInfo.elementKey;
             const isRare = (element === 'light' || element === 'dark');
@@ -630,6 +639,10 @@
                         <div class="bg-yellow-50 rounded-lg p-3">
                             <div class="text-xs text-gray-600 mb-1">当前等级</div>
                             <div class="text-yellow-600 font-bold">${'⭐'.repeat(level)}</div>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-600 mb-1">成长值</div>
+                            <div class="text-purple-600 font-bold">${displayGrowth}</div>
                         </div>
                         <div class="bg-red-50 rounded-lg p-3">
                             <div class="text-xs text-gray-600 mb-1">持有数量</div>

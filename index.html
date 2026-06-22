@@ -535,6 +535,29 @@
         </main>
     </div>
 
+    <!-- NFT详情弹框 -->
+    <div id="zodiacModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <div class="text-center mb-4">
+                <img id="modalZodiacImage" src="" alt="生肖" class="w-32 h-32 mx-auto mb-4 rounded-lg shadow-md">
+                <h3 id="modalZodiacName" class="text-xl font-bold text-gray-800 mb-2">生肖名称</h3>
+                <div class="flex items-center justify-center gap-2 mb-2">
+                    <span id="modalZodiacRarity" class="text-xs font-bold px-2 py-1 rounded bg-gray-100 text-gray-600">普通</span>
+                </div>
+                <p id="modalZodiacDesc" class="text-gray-600 text-sm mb-2">属性信息</p>
+                <p class="text-sm text-gray-500 mb-4">类型ID: <span id="modalZodiacTypeId"></span></p>
+            </div>
+            
+            <div id="modalZodiacStats" class="mb-4">
+            </div>
+            
+            <div class="flex space-x-4">
+                <button class="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg" id="closeZodiacModal">关闭</button>
+                <button class="flex-1 bg-blue-500 text-white py-2 rounded-lg" onclick="window.location.href='mint.html'">去铸造</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const ANIMAL_KEYS = {
             '鼠': 'shu', '牛': 'niu', '虎': 'hu', '兔': 'tu', '龙': 'long',
@@ -568,19 +591,25 @@
             const prefix = attrPrefixes[attr];
             const ipfsBase = ipfsBases[attr];
             const attrName = attrNames[attr];
+            const attrIndex = { water: 0, wind: 1, fire: 2, dark: 3, light: 4 }[attr] || 0;
 
             let html = '';
-            zodiacNames.forEach(animal => {
+            zodiacNames.forEach((animal, zodiacIndex) => {
                 const animalKey = ANIMAL_KEYS[animal];
+                
+                // 公: gender=1, 母: gender=0
+                const maleTypeId = attrIndex * 24 + zodiacIndex * 2 + 1;
+                const femaleTypeId = attrIndex * 24 + zodiacIndex * 2;
+                
                 const maleFile = `${ipfsBase}${prefix}${animalKey}_1.png`;
                 const femaleFile = `${ipfsBase}${prefix}${animalKey}_0.png`;
 
                 html += `
-                    <div class="zodiac-card ${colorClass}">
+                    <div class="zodiac-card ${colorClass} cursor-pointer" onclick="showZodiacModal(${maleTypeId})">
                         <img src="${maleFile}" alt="${attrName}${animal}公" onerror="this.src='${ipfsBase}${prefix}shu_1.png'">
                         <h4>${attrName}${animal}（公）</h4>
                     </div>
-                    <div class="zodiac-card ${colorClass}">
+                    <div class="zodiac-card ${colorClass} cursor-pointer" onclick="showZodiacModal(${femaleTypeId})">
                         <img src="${femaleFile}" alt="${attrName}${animal}母" onerror="this.src='${ipfsBase}${prefix}shu_0.png'">
                         <h4>${attrName}${animal}（母）</h4>
                     </div>
@@ -588,6 +617,57 @@
             });
             grid.innerHTML = html;
         }
+
+        function showZodiacModal(typeId) {
+            const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
+            const isRare = nftInfo.isRare;
+            const rarityText = isRare ? '稀有' : '普通';
+            const rarityColor = isRare ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600';
+            
+            document.getElementById('modalZodiacImage').src = nftInfo.imagePath;
+            document.getElementById('modalZodiacName').textContent = nftInfo.name;
+            document.getElementById('modalZodiacRarity').textContent = rarityText;
+            document.getElementById('modalZodiacRarity').className = `text-xs font-bold px-2 py-1 rounded ${rarityColor}`;
+            document.getElementById('modalZodiacDesc').textContent = `${nftInfo.attrName}属性${ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac]}·${nftInfo.genderName}·生肖NFT`;
+            document.getElementById('modalZodiacTypeId').textContent = typeId;
+            
+            const statsDiv = document.getElementById('modalZodiacStats');
+            statsDiv.innerHTML = `
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-blue-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-600 mb-1">稀有度</div>
+                        <div class="${isRare ? 'text-purple-600' : 'text-gray-600'} font-bold">${rarityText}</div>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-600 mb-1">属性</div>
+                        <div class="text-green-600 font-bold">${nftInfo.attrName}</div>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-600 mb-1">生肖</div>
+                        <div class="text-yellow-600 font-bold">${nftInfo.animalName}</div>
+                    </div>
+                    <div class="bg-red-50 rounded-lg p-3">
+                        <div class="text-xs text-gray-600 mb-1">性别</div>
+                        <div class="text-red-600 font-bold">${nftInfo.genderName}</div>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-gray-500">
+                    <p>💡 持有此NFT可享受税收分红，${isRare ? '稀有属性权重更高' : '基础权重'}。</p>
+                </div>
+            `;
+            
+            document.getElementById('zodiacModal').classList.remove('hidden');
+        }
+
+        document.getElementById('closeZodiacModal').addEventListener('click', function() {
+            document.getElementById('zodiacModal').classList.add('hidden');
+        });
+
+        document.getElementById('zodiacModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                document.getElementById('zodiacModal').classList.add('hidden');
+            }
+        });
 
         async function loadFenHongData() {
             const account = ZODIAC_WEB3.getAccount();
