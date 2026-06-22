@@ -537,8 +537,7 @@
                 const count = userToken ? userToken.count : 0;
                 
                 html += `
-                    <div class="zodiac-card nft-card-hover ${isOwned ? 'has-item' : 'locked'}" 
-                         onclick="${isOwned ? `showCardModal(${typeId}, ${level}, ${growth})` : ''}"
+                    <div class="zodiac-card nft-card-hover ${isOwned ? 'has-item cursor-pointer' : 'locked'}" 
                          data-nft-typeid="${typeId}" data-nft-level="${level}" data-nft-growth="${growth}">
                         ${count > 1 ? `<span class="collection-badge">x${count}</span>` : ''}
                         <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
@@ -682,6 +681,16 @@
             document.getElementById('listForSale').addEventListener('click', function() {
                 document.getElementById('cardModal').classList.add('hidden');
                 window.location.href = 'trading.html';
+            });
+
+            document.getElementById('zodiacGrid').addEventListener('click', function(e) {
+                const card = e.target.closest('.zodiac-card');
+                if (card && card.classList.contains('has-item')) {
+                    const typeId = parseInt(card.getAttribute('data-nft-typeid'));
+                    const level = parseInt(card.getAttribute('data-nft-level'));
+                    const growth = parseInt(card.getAttribute('data-nft-growth')) || 0;
+                    showCardModal(typeId, level, growth);
+                }
             });
         });
 
