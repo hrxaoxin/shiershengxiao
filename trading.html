@@ -282,6 +282,7 @@
         let nftTradingContract;
         let nftMintContract;
         let tokenContract;
+        let authorizerContract;
         let currentTokenIdToBuy;
         let selectedTokenId = null;
         let userNftCache = null;
@@ -535,6 +536,10 @@
                 console.log('[TRADING] getting tokenContract...');
                 tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
                 console.log('[TRADING] tokenContract:', tokenContract);
+                
+                console.log('[TRADING] getting authorizerContract...');
+                authorizerContract = await window.ZODIAC_WEB3.getContract('authorizer');
+                console.log('[TRADING] authorizerContract:', authorizerContract);
                 
                 // 从合约获取手续费率
                 try {
