@@ -1069,10 +1069,17 @@
                 const priceWei = web3.utils.toWei(price, 'ether');
                 console.log('[TRADING] priceWei:', priceWei);
                 console.log('[TRADING] calling listNFT contract method...');
-                await ZODIAC_WEB3.listNFT(tokenId, priceWei);
-                console.log('[TRADING] listNFT contract method success');
-
-                ZODIAC_UI.showToast('上架成功！', 'success');
+                
+                try {
+                    const receipt = await ZODIAC_WEB3.listNFT(tokenId, priceWei);
+                    console.log('[TRADING] listNFT contract method success:', receipt);
+                    ZODIAC_UI.showToast('上架成功！', 'success');
+                } catch (contractError) {
+                    console.error('[TRADING] listNFT contract error:', contractError);
+                    const currentApproval = await checkApprovalForAll();
+                    console.log('[TRADING] Current approval status after error:', currentApproval);
+                    throw contractError;
+                }
 
                 clearNftSelection();
                 userNftCache = null;
@@ -1108,7 +1115,9 @@
 
         async function checkApprovalForAll() {
             if (!account || !nftMintContract) return false;
+            console.log('[TRADING] checkApprovalForAll: checking approval for', account, 'to', ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftTrading);
             const approval = await nftMintContract.methods.isApprovedForAll(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftTrading).call();
+            console.log('[TRADING] checkApprovalForAll result:', approval);
             return approval;
         }
 
