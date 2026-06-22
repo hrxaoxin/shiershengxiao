@@ -263,6 +263,23 @@
         let currentFilter = 'all';
         let currentViewMode = 'collection';
 
+        window.switchViewMode = function(mode) {
+            currentViewMode = mode;
+            document.querySelectorAll('.mode-tab').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(`mode-${mode}`).classList.add('active');
+            renderTokens();
+        };
+
+        window.switchAttribute = function(attr) {
+            currentFilter = attr;
+            document.querySelectorAll('.attribute-tab').forEach(tab => tab.classList.remove('active'));
+            const activeTab = document.querySelector(`.tab-${attr}`) || document.querySelector(`[onclick="switchAttribute('${attr}')"]`);
+            if (activeTab) {
+                activeTab.classList.add('active');
+            }
+            renderTokens();
+        };
+
         // 安全获取 web3 实例（支持事件回调中的延迟调用）
         function safeGetWeb3() {
             if (web3) return web3;
@@ -426,13 +443,6 @@
             document.getElementById('collectionProgress').textContent = collectionProgress + '%';
         }
 
-        function switchViewMode(mode) {
-            currentViewMode = mode;
-            document.querySelectorAll('.mode-tab').forEach(tab => tab.classList.remove('active'));
-            document.getElementById(`mode-${mode}`).classList.add('active');
-            renderTokens();
-        }
-
         let cachedNftTypes = null;
         function getAllNftTypes() {
             if (cachedNftTypes) {
@@ -489,16 +499,6 @@
             document.getElementById('fireProgress').textContent = progress.fire;
             document.getElementById('darkProgress').textContent = progress.dark;
             document.getElementById('lightProgress').textContent = progress.light;
-        }
-
-        function switchAttribute(attr) {
-            currentFilter = attr;
-            document.querySelectorAll('.attribute-tab').forEach(tab => tab.classList.remove('active'));
-            const activeTab = document.querySelector(`.tab-${attr}`) || document.querySelector(`[onclick="switchAttribute('${attr}')"]`);
-            if (activeTab) {
-                activeTab.classList.add('active');
-            }
-            renderTokens();
         }
 
         function renderTokens() {
