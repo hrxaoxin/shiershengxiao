@@ -1060,6 +1060,10 @@
                 console.log('[TRADING] checking approval...');
                 const isApproved = await checkApprovalForAll();
                 console.log('[TRADING] isApproved:', isApproved);
+                
+                console.log('[TRADING] nftMintContract address:', nftMintContract.options.address);
+                console.log('[TRADING] nftTrading address from config:', ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftTrading);
+                
                 if (!isApproved) {
                     console.log('[TRADING] approving...');
                     await approveForAll();
