@@ -592,13 +592,16 @@
         }
 
         async function showCardModal(typeId, level, growth = 0) {
-            const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
-            const isOwned = ownedTypes.has(typeId);
-            const userToken = userTokens.find(t => t.typeId === typeId);
-            const count = userToken ? userToken.count : 0;
-            const displayGrowth = userToken && userToken.growth ? userToken.growth : growth;
-            
-            const element = nftInfo.elementKey;
+            console.log('[COLLECTION] showCardModal started:', typeId, level, growth);
+            try {
+                const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
+                console.log('[COLLECTION] nftInfo:', nftInfo);
+                const isOwned = ownedTypes.has(typeId);
+                const userToken = userTokens.find(t => t.typeId === typeId);
+                const count = userToken ? userToken.count : 0;
+                const displayGrowth = userToken && userToken.growth ? userToken.growth : growth;
+                
+                const element = nftInfo.elementKey;
             const isRare = (element === 'light' || element === 'dark');
             const rarityText = isRare ? '稀有' : '普通';
             const rarityColor = isRare ? 'text-purple-600' : 'text-gray-600';
@@ -665,6 +668,10 @@
             }
             
             document.getElementById('cardModal').classList.remove('hidden');
+                console.log('[COLLECTION] Modal shown successfully');
+            } catch (error) {
+                console.error('[COLLECTION] showCardModal error:', error);
+            }
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -684,11 +691,18 @@
             });
 
             document.getElementById('zodiacGrid').addEventListener('click', function(e) {
+                console.log('[COLLECTION] zodiacGrid clicked', e.target);
                 const card = e.target.closest('.zodiac-card');
+                console.log('[COLLECTION] found card:', card);
+                if (card) {
+                    console.log('[COLLECTION] card classes:', card.classList);
+                    console.log('[COLLECTION] has-item:', card.classList.contains('has-item'));
+                }
                 if (card && card.classList.contains('has-item')) {
                     const typeId = parseInt(card.getAttribute('data-nft-typeid'));
                     const level = parseInt(card.getAttribute('data-nft-level'));
                     const growth = parseInt(card.getAttribute('data-nft-growth')) || 0;
+                    console.log('[COLLECTION] showCardModal called with:', typeId, level, growth);
                     showCardModal(typeId, level, growth);
                 }
             });
