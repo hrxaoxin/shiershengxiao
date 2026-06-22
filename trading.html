@@ -1117,39 +1117,34 @@
             userNftGrid.innerHTML = '<div class="col-span-full text-center py-8"><i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i><p class="text-gray-600">加载用户NFT中...</p></div>';
 
             try {
-                const nfts = [];
-                
                 const balance = parseInt(await nftMintContract.methods.balanceOf(account).call(), 10);
                 
-                for (let i = 0; i < balance; i++) {
-                    try {
-                        const tokenId = parseInt(await nftMintContract.methods.tokenOfOwnerByIndex(account, i).call(), 10);
-                        const nftType = await nftMintContract.methods.tokenType(tokenId).call();
-                        const nftLevel = await nftMintContract.methods.tokenLevel(tokenId).call();
-                        
-                        let isListed = false;
-                        try {
-                            const [seller, priceWei, listTime] = await nftTradingContract.methods.getListingInfo(tokenId).call();
-                            isListed = seller !== '0x0000000000000000000000000000000000000000';
-                        } catch (e) {
-                            console.warn(`获取上架信息失败 tokenId=${tokenId}:`, e);
-                        }
-                        
-                        nfts.push({
-                            tokenId: tokenId,
-                            type: parseInt(nftType, 10),
-                            level: parseInt(nftLevel, 10),
-                            isListed: isListed
-                        });
-                    } catch (e) {
-                        console.warn(`获取NFT详情失败:`, e);
-                    }
-                }
-
-                if (nfts.length === 0) {
+                if (balance === 0) {
                     userNftGrid.innerHTML = '<div class="col-span-full text-center py-8"><p class="text-gray-600">暂无可上架的NFT</p></div>';
                     return;
                 }
+
+                const tokenIds = await Promise.all(
+                    Array.from({ length: balance }, (_, i) => 
+                        nftMintContract.methods.tokenOfOwnerByIndex(account, i).call()
+                    )
+                );
+
+                const nftPromises = tokenIds.map(tokenId => {
+                    const tid = parseInt(tokenId, 10);
+                    return Promise.all([
+                        nftMintContract.methods.tokenType(tid).call(),
+                        nftMintContract.methods.tokenLevel(tid).call(),
+                        nftTradingContract.methods.getListingInfo(tid).call().catch(() => ['0x0000000000000000000000000000000000000000', '0', '0'])
+                    ]).then(([nftType, nftLevel, listingInfo]) => ({
+                        tokenId: tid,
+                        type: parseInt(nftType, 10),
+                        level: parseInt(nftLevel, 10),
+                        isListed: listingInfo[0] !== '0x0000000000000000000000000000000000000000'
+                    }));
+                });
+
+                const nfts = await Promise.all(nftPromises);
 
                 userNftCache = nfts;
                 userNftCacheTimestamp = Date.now();
@@ -1167,7 +1162,8 @@
             for (const nft of nfts) {
                 const nftInfo = window.ZODIAC_UTILS.getNFTInfo(nft.type);
                 const isSelected = selectedTokenId === nft.tokenId;
-                const imagePath = `images/fu-cards/${nftInfo.elementPrefix}${nftInfo.animalKey}_${nftInfo.gender}.png`;
+                const animalKey = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'][nftInfo.zodiac];
+                const imagePath = `images/fu-cards/${nftInfo.prefix || nftInfo.elementKey}${animalKey}_${nftInfo.gender}.png`;
 
                 html += `
                     <div class="nft-card cursor-pointer rounded-lg border-2 ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'} transition-all duration-200 p-3 text-center" 

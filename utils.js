@@ -61,7 +61,8 @@ window.ZODIAC_UTILS = (function() {
             genderName,
             imagePath,
             name: `${attrName}${animalName}（${genderName}）`,
-            isRare
+            isRare,
+            prefix: prefix
         };
     }
 
