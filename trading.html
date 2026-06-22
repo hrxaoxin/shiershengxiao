@@ -281,6 +281,7 @@
         let account;
         let nftTradingContract;
         let nftMintContract;
+        let tokenContract;
         let currentTokenIdToBuy;
         let selectedTokenId = null;
         let userNftCache = null;
@@ -512,10 +513,19 @@
         }
 
         async function initContracts() {
+            console.log('[TRADING] initContracts called');
             try {
+                console.log('[TRADING] getting nftTradingContract...');
                 nftTradingContract = await window.ZODIAC_WEB3.getContract('nftTrading');
+                console.log('[TRADING] nftTradingContract:', nftTradingContract);
+                
+                console.log('[TRADING] getting nftMintContract...');
                 nftMintContract = await window.ZODIAC_WEB3.getContract('nftMint');
+                console.log('[TRADING] nftMintContract:', nftMintContract);
+                
+                console.log('[TRADING] getting tokenContract...');
                 tokenContract = await window.ZODIAC_WEB3.getContract('token');
+                console.log('[TRADING] tokenContract:', tokenContract);
                 
                 // 从合约获取手续费率
                 try {
@@ -533,30 +543,43 @@
                     console.warn('获取手续费率失败，使用默认值:', e);
                 }
                 
+                console.log('[TRADING] calling updateApprovalStatus...');
                 await updateApprovalStatus();
+                console.log('[TRADING] initContracts completed');
             } catch (error) {
-                console.warn('合约初始化失败:', error.message);
+                console.warn('[TRADING] 合约初始化失败:', error.message);
                 ZODIAC_UI.showToast('合约初始化失败: ' + error.message, 'warning');
             }
         }
 
         async function updateWalletStatus() {
-            if (!account) return;
+            console.log('[TRADING] updateWalletStatus called, account:', account);
+            if (!account) {
+                console.log('[TRADING] updateWalletStatus: no account, returning');
+                return;
+            }
             
             try {
+                console.log('[TRADING] getting chainId...');
                 const networkId = await web3.eth.getChainId();
+                console.log('[TRADING] networkId:', networkId);
                 
                 const walletAddressDisplay = document.getElementById('walletAddressDisplay');
                 if (walletAddressDisplay) {
                     walletAddressDisplay.textContent = account.substring(0, 6) + '...' + account.substring(account.length - 4);
                 }
                 
+                console.log('[TRADING] tokenContract:', tokenContract);
                 if (tokenContract) {
+                    console.log('[TRADING] getting token balance...');
                     const balance = await tokenContract.methods.balanceOf(account).call();
+                    console.log('[TRADING] token balance:', balance);
                     const balanceEl = document.getElementById('balance');
                     if (balanceEl) {
                         balanceEl.textContent = web3.utils.fromWei(balance, 'ether') + ' 代币';
                     }
+                } else {
+                    console.log('[TRADING] tokenContract is null, cannot get balance');
                 }
                 
                 let networkName = '未知网络';
@@ -577,9 +600,11 @@
                     approveBtn.disabled = false;
                 }
                 
+                console.log('[TRADING] calling updateApprovalStatus...');
                 await updateApprovalStatus();
+                console.log('[TRADING] updateWalletStatus completed');
             } catch (error) {
-                console.error('更新钱包状态失败:', error);
+                console.error('[TRADING] 更新钱包状态失败:', error);
             }
         }
 
