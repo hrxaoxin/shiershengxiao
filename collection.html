@@ -668,19 +668,21 @@
             document.getElementById('cardModal').classList.remove('hidden');
         }
 
-        document.getElementById('closeModal').addEventListener('click', function() {
-            document.getElementById('cardModal').classList.add('hidden');
-        });
-
-        document.getElementById('cardModal').addEventListener('click', function(e) {
-            if (e.target === this) {
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('closeModal').addEventListener('click', function() {
                 document.getElementById('cardModal').classList.add('hidden');
-            }
-        });
+            });
 
-        document.getElementById('listForSale').addEventListener('click', function() {
-            document.getElementById('cardModal').classList.add('hidden');
-            window.location.href = 'trading.html';
+            document.getElementById('cardModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    document.getElementById('cardModal').classList.add('hidden');
+                }
+            });
+
+            document.getElementById('listForSale').addEventListener('click', function() {
+                document.getElementById('cardModal').classList.add('hidden');
+                window.location.href = 'trading.html';
+            });
         });
 
         document.getElementById('refreshBtn').addEventListener('click', async function() {
