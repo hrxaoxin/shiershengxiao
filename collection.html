@@ -267,7 +267,7 @@
             currentViewMode = mode;
             document.querySelectorAll('.mode-tab').forEach(tab => tab.classList.remove('active'));
             document.getElementById(`mode-${mode}`).classList.add('active');
-            renderTokens();
+            window.renderTokens();
         };
 
         window.switchAttribute = function(attr) {
@@ -277,7 +277,102 @@
             if (activeTab) {
                 activeTab.classList.add('active');
             }
-            renderTokens();
+            window.renderTokens();
+        };
+
+        window.renderTokens = function() {
+            const grid = document.getElementById('zodiacGrid');
+            const emptyState = document.getElementById('emptyState');
+
+            if (!grid || !emptyState) {
+                console.warn('[COLLECTION] zodiacGrid or emptyState not found');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            grid.innerHTML = '';
+            
+            if (currentViewMode === 'collection') {
+                window.renderCollectionView(grid);
+            } else {
+                window.renderMyCollectionView(grid, emptyState);
+            }
+        };
+
+        window.renderCollectionView = function(grid) {
+            const allTypes = getAllNftTypes();
+            let filteredTypes = allTypes;
+            
+            if (currentFilter !== 'all') {
+                const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+                const attrIndex = attrs.indexOf(currentFilter);
+                filteredTypes = allTypes.filter(t => t.elementIndex === attrIndex);
+            }
+            
+            let html = '';
+            
+            for (const nftType of filteredTypes) {
+                const typeId = nftType.typeId;
+                const isOwned = ownedTypes.has(typeId);
+                const userToken = userTokens.find(t => t.typeId === typeId);
+                const nftInfo = window.ZODIAC_UTILS.getNFTInfo(typeId);
+                const level = userToken ? userToken.level : 0;
+                const growth = userToken ? userToken.growth : 0;
+                const count = userToken ? userToken.count : 0;
+                
+                html += `
+                    <div class="zodiac-card nft-card-hover ${isOwned ? 'has-item cursor-pointer' : 'locked'}" 
+                         data-nft-typeid="${typeId}" data-nft-level="${level}" data-nft-growth="${growth}">
+                        ${count > 1 ? '<span class="collection-badge">x' + count + '</span>' : ''}
+                        <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <h4>${nftInfo.name}</h4>
+                        ${isOwned ? '<p>等级: ' + getStars(level) + '</p><p class="text-xs text-green-600">成长: ' + growth + '</p>' : '<p class="text-gray-400">未拥有</p>'}
+                    </div>
+                `;
+            }
+            
+            grid.innerHTML = html;
+            lazyLoadImages();
+        };
+
+        window.renderMyCollectionView = function(grid, emptyState) {
+            let filteredTokens = userTokens;
+            
+            if (currentFilter !== 'all') {
+                const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
+                const attrIndex = attrs.indexOf(currentFilter);
+                filteredTokens = userTokens.filter(t => Math.floor(t.typeId / 24) === attrIndex);
+            }
+
+            if (filteredTokens.length === 0) {
+                grid.innerHTML = '';
+                grid.appendChild(emptyState);
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            let html = '';
+
+            for (const token of filteredTokens) {
+                const typeId = token.typeId;
+                const level = token.level || 1;
+                const growth = token.growth || 0;
+                const nftInfo = window.ZODIAC_UTILS.getNFTInfo(typeId);
+
+                html += `
+                    <div class="zodiac-card nft-card-hover cursor-pointer"
+                         data-nft-typeid="${typeId}" data-nft-tokenid="${token.tokenId}" data-nft-level="${level}" data-nft-growth="${growth}">
+                        <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
+                        <h4>${nftInfo.name}</h4>
+                        <p>等级: ${getStars(level)}</p>
+                        <p class="text-xs text-green-600">成长: ${growth}</p>
+                        <p>拥有 ${token.count} 张</p>
+                    </div>
+                `;
+            }
+
+            grid.innerHTML = html;
+            lazyLoadImages();
         };
 
         // 安全获取 web3 实例（支持事件回调中的延迟调用）
@@ -499,96 +594,6 @@
             document.getElementById('fireProgress').textContent = progress.fire;
             document.getElementById('darkProgress').textContent = progress.dark;
             document.getElementById('lightProgress').textContent = progress.light;
-        }
-
-        function renderTokens() {
-            const grid = document.getElementById('zodiacGrid');
-            const emptyState = document.getElementById('emptyState');
-
-            emptyState.classList.add('hidden');
-            grid.innerHTML = '';
-            
-            if (currentViewMode === 'collection') {
-                renderCollectionView(grid);
-            } else {
-                renderMyCollectionView(grid, emptyState);
-            }
-        }
-
-        function renderCollectionView(grid) {
-            const allTypes = getAllNftTypes();
-            let filteredTypes = allTypes;
-            
-            if (currentFilter !== 'all') {
-                const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
-                const attrIndex = attrs.indexOf(currentFilter);
-                filteredTypes = allTypes.filter(t => t.elementIndex === attrIndex);
-            }
-            
-            let html = '';
-            
-            for (const nftType of filteredTypes) {
-                const typeId = nftType.typeId;
-                const isOwned = ownedTypes.has(typeId);
-                const userToken = userTokens.find(t => t.typeId === typeId);
-                const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
-                const level = userToken ? userToken.level : 0;
-                const growth = userToken ? userToken.growth : 0;
-                const count = userToken ? userToken.count : 0;
-                
-                html += `
-                    <div class="zodiac-card nft-card-hover ${isOwned ? 'has-item cursor-pointer' : 'locked'}" 
-                         data-nft-typeid="${typeId}" data-nft-level="${level}" data-nft-growth="${growth}">
-                        ${count > 1 ? `<span class="collection-badge">x${count}</span>` : ''}
-                        <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
-                        <h4>${nftInfo.name}</h4>
-                        ${isOwned ? `<p>等级: ${getStars(level)}</p><p class="text-xs text-green-600">成长: ${growth}</p>` : '<p class="text-gray-400">未拥有</p>'}
-                    </div>
-                `;
-            }
-            
-            grid.innerHTML = html;
-            lazyLoadImages();
-        }
-
-        function renderMyCollectionView(grid, emptyState) {
-            let filteredTokens = userTokens;
-            
-            if (currentFilter !== 'all') {
-                const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
-                const attrIndex = attrs.indexOf(currentFilter);
-                filteredTokens = userTokens.filter(t => Math.floor(t.typeId / 24) === attrIndex);
-            }
-
-            if (filteredTokens.length === 0) {
-                grid.innerHTML = '';
-                grid.appendChild(emptyState);
-                emptyState.classList.remove('hidden');
-                return;
-            }
-
-            let html = '';
-
-            for (const token of filteredTokens) {
-                const typeId = token.typeId;
-                const level = token.level || 1;
-                const growth = token.growth || 0;
-                const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
-
-                html += `
-                    <div class="zodiac-card nft-card-hover cursor-pointer"
-                         data-nft-typeid="${typeId}" data-nft-tokenid="${token.tokenId}" data-nft-level="${level}" data-nft-growth="${growth}">
-                        <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
-                        <h4>${nftInfo.name}</h4>
-                        <p>等级: ${getStars(level)}</p>
-                        <p class="text-xs text-green-600">成长: ${growth}</p>
-                        <p>拥有 ${token.count} 张</p>
-                    </div>
-                `;
-            }
-
-            grid.innerHTML = html;
-            lazyLoadImages();
         }
 
         function showCardModal(typeId, level, growth = 0) {
