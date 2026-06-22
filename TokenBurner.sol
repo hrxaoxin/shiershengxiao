@@ -144,12 +144,22 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * 用于保护合约配置更新函数，如设置各种合约地址
      */
     modifier onlyAdminOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer, "TokenBurner: Not admin or authorizer");
+        if (msg.sender == owner() || msg.sender == authorizer) {
+            _;
+            return;
+        }
+        IAuthorizer auth = IAuthorizer(authorizer);
+        require(auth.isSystemContract(msg.sender), "TokenBurner: Not admin or authorizer");
         _;
     }
 
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer, "TokenBurner: Not owner or authorizer");
+        if (msg.sender == owner() || msg.sender == authorizer) {
+            _;
+            return;
+        }
+        IAuthorizer auth = IAuthorizer(authorizer);
+        require(auth.isSystemContract(msg.sender), "TokenBurner: Not owner or authorizer");
         _;
     }
 

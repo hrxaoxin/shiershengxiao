@@ -62,6 +62,43 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     /**
+     * @dev 检查一个地址是否是系统合约（在 authorizer 中注册的合约）
+     * @param addr 要检查的地址
+     * @return 是否是系统合约
+     */
+    function isSystemContract(address addr) external view returns (bool) {
+        if (addr == address(0)) return false;
+        if (addr == owner()) return true;
+        if (addr == address(this)) return true;
+        
+        // 检查所有注册的合约地址
+        return 
+            addr == _addresses[keccak256("token")] ||
+            addr == _addresses[keccak256("nftMintCore")] ||
+            addr == _addresses[keccak256("nftMintMetadata")] ||
+            addr == _addresses[keccak256("nftUpdate")] ||
+            addr == _addresses[keccak256("nftData")] ||
+            addr == _addresses[keccak256("tokenBurner")] ||
+            addr == _addresses[keccak256("nftTrading")] ||
+            addr == _addresses[keccak256("nftBuyback")] ||
+            addr == _addresses[keccak256("staking")] ||
+            addr == _addresses[keccak256("tokenStaking")] ||
+            addr == _addresses[keccak256("rewardManager")] ||
+            addr == _addresses[keccak256("dividendManager")] ||
+            addr == _addresses[keccak256("poolManager")] ||
+            addr == _addresses[keccak256("weightManager")] ||
+            addr == _addresses[keccak256("breedingCore")] ||
+            addr == _addresses[keccak256("breedingMarket")] ||
+            addr == _addresses[keccak256("battle")] ||
+            addr == _addresses[keccak256("arena")] ||
+            addr == _addresses[keccak256("arenaPlayer")] ||
+            addr == _addresses[keccak256("arenaReward")] ||
+            addr == _addresses[keccak256("arenaLeaderboard")] ||
+            addr == _addresses[keccak256("arenaBattle")] ||
+            addr == _addresses[keccak256("priceOracle")];
+    }
+
+    /**
      * @dev 简单版设置单个合约地址（使用字符串名称）
      * @param name 合约名称，如 "nftTrading", "nftMintCore", "token" 等
      * @param value 合约地址

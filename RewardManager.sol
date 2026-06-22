@@ -157,7 +157,12 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 检查是否为授权调用者（owner或authorizer）
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer, "RewardManager: Not authorized");
+        if (msg.sender == owner() || msg.sender == authorizer) {
+            _;
+            return;
+        }
+        IAuthorizer auth = IAuthorizer(authorizer);
+        require(auth.isSystemContract(msg.sender), "RewardManager: Not authorized");
         _;
     }
 

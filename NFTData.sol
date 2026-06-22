@@ -202,16 +202,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             return;
         }
         IAuthorizer auth = IAuthorizer(authorizer);
-        require(
-            msg.sender == auth.getNFTUpdate() || 
-            msg.sender == auth.getStaking() || 
-            msg.sender == auth.getNFTTrading() || 
-            msg.sender == auth.getBreedingCore() || 
-            msg.sender == auth.getNFTMintCore() || 
-            msg.sender == auth.getArenaPlayer() || 
-            msg.sender == auth.getNFTBuyback(),
-            "NFTData: Not authorized"
-        );
+        require(auth.isSystemContract(msg.sender), "NFTData: Not authorized");
         _;
     }
 

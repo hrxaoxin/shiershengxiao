@@ -216,18 +216,7 @@ contract WeightManager is
             return;
         }
         IAuthorizer auth = IAuthorizer(authorizer);
-        require(
-            msg.sender == auth.getNFTUpdate() || 
-            msg.sender == auth.getRewardManager() || 
-            msg.sender == auth.getStaking() || 
-            msg.sender == auth.getNFTTrading() || 
-            msg.sender == auth.getBreedingCore() || 
-            msg.sender == auth.getNFTMintCore() || 
-            msg.sender == auth.getArenaPlayer() || 
-            msg.sender == auth.getNFTBuyback() ||
-            msg.sender == auth.getNFTData(),
-            "WeightManager: Not authorized"
-        );
+        require(auth.isSystemContract(msg.sender), "WeightManager: Not authorized");
         _;
     }
     

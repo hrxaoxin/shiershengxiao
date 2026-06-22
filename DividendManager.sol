@@ -80,13 +80,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
             return;
         }
         IAuthorizer auth = IAuthorizer(authorizer);
-        require(
-            msg.sender == auth.getNFTUpdate() || 
-            msg.sender == auth.getRewardManager() || 
-            msg.sender == auth.getWeightManager() ||
-            msg.sender == auth.getNFTData(),
-            "DM: Not authorized"
-        );
+        require(auth.isSystemContract(msg.sender), "DM: Not authorized");
         _;
     }
 

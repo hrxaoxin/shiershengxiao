@@ -101,7 +101,12 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 修饰器：仅所有者或授权器可调用
      */
     modifier onlyOwnerOrAuthorizer() {
-        require(msg.sender == owner() || msg.sender == authorizer, "NFTMintMetadata: Not owner or authorizer");
+        if (msg.sender == owner() || msg.sender == authorizer) {
+            _;
+            return;
+        }
+        IAuthorizer auth = IAuthorizer(authorizer);
+        require(auth.isSystemContract(msg.sender), "NFTMintMetadata: Not owner or authorizer");
         _;
     }
     

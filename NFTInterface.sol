@@ -650,6 +650,13 @@ interface IAuthorizer {
     function getFlapSwapRouter() external view returns (address);
     function getUniswapRouter() external view returns (address);
     function getWBNB() external view returns (address);
+    
+    /**
+     * @dev 检查一个地址是否是系统合约
+     * @param addr 要检查的地址
+     * @return 是否是系统合约
+     */
+    function isSystemContract(address addr) external view returns (bool);
 }
 
 /**
