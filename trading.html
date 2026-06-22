@@ -1083,11 +1083,21 @@
                 await loadMarketplace();
                 await loadMyListings();
             } catch (error) {
+                console.error('[TRADING] listNFT error:', error);
                 let errorMsg = '上架失败';
                 if (error.code === 4001) {
                     errorMsg = '用户取消了操作';
                 } else if (error.message) {
                     errorMsg += ': ' + error.message;
+                    // 提取合约错误信息
+                    if (error.message.includes('NFTTrading: NFT escrow transfer failed')) {
+                        errorMsg = 'NFT托管转移失败，请检查NFT是否已授权给交易合约';
+                    } else if (error.message.includes('execution reverted')) {
+                        const match = error.message.match(/reverted:\s*(.+)/);
+                        if (match) {
+                            errorMsg = '交易失败: ' + match[1];
+                        }
+                    }
                 }
                 ZODIAC_UI.showToast(errorMsg, 'error');
             } finally {
