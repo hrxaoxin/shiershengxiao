@@ -602,72 +602,72 @@
                 const displayGrowth = userToken && userToken.growth ? userToken.growth : growth;
                 
                 const element = nftInfo.elementKey;
-            const isRare = (element === 'light' || element === 'dark');
-            const rarityText = isRare ? '稀有' : '普通';
-            const rarityColor = isRare ? 'text-purple-600' : 'text-gray-600';
-            
-            const weight = await ZODIAC_UTILS.getWeight(level, isRare);
-            const canBreed = level >= 5;
-            const canBattle = level >= 1;
-            const canStake = level >= 1;
-            
-            const desc = isOwned 
-                ? `${nftInfo.attrName}属性生肖·${ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac]}·${nftInfo.genderName} · 持有可享受税收分红` 
-                : '尚未拥有此生肖';
+                const isRare = (element === 'light' || element === 'dark');
+                const rarityText = isRare ? '稀有' : '普通';
+                const rarityColor = isRare ? 'text-purple-600' : 'text-gray-600';
+                
+                const weight = await ZODIAC_UTILS.getWeight(level, isRare);
+                const canBreed = level >= 5;
+                const canBattle = level >= 1;
+                const canStake = level >= 1;
+                
+                const desc = isOwned 
+                    ? `${nftInfo.attrName}属性生肖·${ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac]}·${nftInfo.genderName} · 持有可享受税收分红` 
+                    : '尚未拥有此生肖';
 
-            document.getElementById('modalCardImage').src = isOwned ? nftInfo.imagePath : 'images/fu-cards/shuishu_1.png';
-            document.getElementById('modalCardImage').style.filter = isOwned ? 'none' : 'grayscale(100%)';
-            document.getElementById('modalCardName').textContent = nftInfo.name;
-            document.getElementById('modalCardDesc').textContent = desc;
-            document.getElementById('modalCardId').textContent = `类型ID: ${typeId}`;
-            
-            const rarityBadge = document.getElementById('modalCardRarity');
-            if (rarityBadge) {
-                rarityBadge.textContent = rarityText;
-                rarityBadge.className = `text-xs font-bold px-2 py-1 rounded ${isRare ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`;
-            }
-            
-            const statsDiv = document.getElementById('modalCardStats');
-            if (statsDiv) {
-                statsDiv.innerHTML = `
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="bg-blue-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-600 mb-1">稀有度</div>
-                            <div class="${rarityColor} font-bold">${rarityText}</div>
+                document.getElementById('modalCardImage').src = isOwned ? nftInfo.imagePath : 'images/fu-cards/shuishu_1.png';
+                document.getElementById('modalCardImage').style.filter = isOwned ? 'none' : 'grayscale(100%)';
+                document.getElementById('modalCardName').textContent = nftInfo.name;
+                document.getElementById('modalCardDesc').textContent = desc;
+                document.getElementById('modalCardId').textContent = `类型ID: ${typeId}`;
+                
+                const rarityBadge = document.getElementById('modalCardRarity');
+                if (rarityBadge) {
+                    rarityBadge.textContent = rarityText;
+                    rarityBadge.className = `text-xs font-bold px-2 py-1 rounded ${isRare ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`;
+                }
+                
+                const statsDiv = document.getElementById('modalCardStats');
+                if (statsDiv) {
+                    statsDiv.innerHTML = `
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-blue-50 rounded-lg p-3">
+                                <div class="text-xs text-gray-600 mb-1">稀有度</div>
+                                <div class="${rarityColor} font-bold">${rarityText}</div>
+                            </div>
+                            <div class="bg-green-50 rounded-lg p-3">
+                                <div class="text-xs text-gray-600 mb-1">分红权重</div>
+                                <div class="text-green-600 font-bold">${weight}x</div>
+                            </div>
+                            <div class="bg-yellow-50 rounded-lg p-3">
+                                <div class="text-xs text-gray-600 mb-1">当前等级</div>
+                                <div class="text-yellow-600 font-bold">${'⭐'.repeat(level)}</div>
+                            </div>
+                            <div class="bg-purple-50 rounded-lg p-3">
+                                <div class="text-xs text-gray-600 mb-1">成长值</div>
+                                <div class="text-purple-600 font-bold">${displayGrowth}</div>
+                            </div>
+                            <div class="bg-red-50 rounded-lg p-3">
+                                <div class="text-xs text-gray-600 mb-1">持有数量</div>
+                                <div class="text-red-600 font-bold">${count} 张</div>
+                            </div>
                         </div>
-                        <div class="bg-green-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-600 mb-1">分红权重</div>
-                            <div class="text-green-600 font-bold">${weight}x</div>
+                        <div class="mt-4">
+                            <div class="text-xs text-gray-600 mb-2">可用功能</div>
+                            <div class="flex gap-2 flex-wrap">
+                                ${canBattle ? '<span class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs">⚔️ 战斗</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">⚔️ 战斗</span>'}
+                                ${canStake ? '<span class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs">💰 质押</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">💰 质押</span>'}
+                                ${canBreed ? '<span class="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs">🧬 孕育</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">🧬 孕育</span>'}
+                                <span class="px-2 py-1 bg-yellow-100 text-yellow-600 rounded text-xs">📊 分红</span>
+                            </div>
                         </div>
-                        <div class="bg-yellow-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-600 mb-1">当前等级</div>
-                            <div class="text-yellow-600 font-bold">${'⭐'.repeat(level)}</div>
+                        <div class="mt-4 text-xs text-gray-500">
+                            <p>💡 ${isRare ? '稀有属性' : '普通属性'}NFT，${isRare ? '权重更高' : '基础权重'}，适合参与各类游戏玩法。</p>
                         </div>
-                        <div class="bg-purple-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-600 mb-1">成长值</div>
-                            <div class="text-purple-600 font-bold">${displayGrowth}</div>
-                        </div>
-                        <div class="bg-red-50 rounded-lg p-3">
-                            <div class="text-xs text-gray-600 mb-1">持有数量</div>
-                            <div class="text-red-600 font-bold">${count} 张</div>
-                        </div>
-                    </div>
-                    <div class="mt-4">
-                        <div class="text-xs text-gray-600 mb-2">可用功能</div>
-                        <div class="flex gap-2 flex-wrap">
-                            ${canBattle ? '<span class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs">⚔️ 战斗</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">⚔️ 战斗</span>'}
-                            ${canStake ? '<span class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs">💰 质押</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">💰 质押</span>'}
-                            ${canBreed ? '<span class="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs">🧬 孕育</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">🧬 孕育</span>'}
-                            <span class="px-2 py-1 bg-yellow-100 text-yellow-600 rounded text-xs">📊 分红</span>
-                        </div>
-                    </div>
-                    <div class="mt-4 text-xs text-gray-500">
-                        <p>💡 ${isRare ? '稀有属性' : '普通属性'}NFT，${isRare ? '权重更高' : '基础权重'}，适合参与各类游戏玩法。</p>
-                    </div>
-                `;
-            }
-            
-            const cardModal = document.getElementById('cardModal');
+                    `;
+                }
+                
+                const cardModal = document.getElementById('cardModal');
                 console.log('[COLLECTION] cardModal element:', cardModal);
                 if (cardModal) {
                     cardModal.classList.remove('hidden');
