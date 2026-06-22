@@ -179,7 +179,25 @@ window.ZODIAC_COMPONENTS = (function() {
     }
 
     function handleConnectWallet() {
-        window.ZODIAC_UI.emitEvent('walletConnectRequested');
+        if (window.ZODIAC_WEB3) {
+            ZODIAC_WEB3.initWeb3().then(success => {
+                if (!success) {
+                    if (window.ZODIAC_UI) {
+                        ZODIAC_UI.showToast('连接钱包失败，请确保已安装MetaMask', 'error');
+                    }
+                }
+            }).catch(err => {
+                console.error('[ZODIAC_COMPONENTS] Wallet connection error:', err);
+                if (window.ZODIAC_UI) {
+                    ZODIAC_UI.showToast('连接钱包失败: ' + (err.message || '未知错误'), 'error');
+                }
+            });
+        } else {
+            console.error('[ZODIAC_COMPONENTS] ZODIAC_WEB3 not available');
+            if (window.ZODIAC_UI) {
+                ZODIAC_UI.showToast('钱包服务未初始化，请刷新页面', 'error');
+            }
+        }
     }
 
     let navigationInitialized = false;
