@@ -410,14 +410,23 @@
 
             document.getElementById('listForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                console.log('[TRADING] listForm submit event triggered');
                 const price = document.getElementById('listingPrice').value;
+                console.log('[TRADING] price:', price, 'selectedTokenId:', selectedTokenId);
 
                 if (!selectedTokenId || !price) {
+                    console.log('[TRADING] validation failed: no tokenId or price');
                     ZODIAC_UI.showToast('请选择NFT并填写价格', 'warning');
                     return;
                 }
 
-                await listNFT(selectedTokenId, price);
+                console.log('[TRADING] calling listNFT...');
+                try {
+                    await listNFT(selectedTokenId, price);
+                    console.log('[TRADING] listNFT completed');
+                } catch (err) {
+                    console.error('[TRADING] listNFT error:', err);
+                }
             });
 
             document.getElementById('closeBuyModal').addEventListener('click', () => {
@@ -984,30 +993,54 @@
         }
 
         async function listNFT(tokenId, price) {
-            if (!account || !nftTradingContract || !nftMintContract) return;
+            console.log('[TRADING] listNFT called, tokenId:', tokenId, 'price:', price);
+            console.log('[TRADING] account:', account, 'nftTradingContract:', nftTradingContract, 'nftMintContract:', nftMintContract);
 
+            if (!account || !nftTradingContract || !nftMintContract) {
+                console.log('[TRADING] listNFT: missing account or contracts');
+                ZODIAC_UI.showToast('请先连接钱包', 'warning');
+                return;
+            }
+
+            console.log('[TRADING] calling checkNFT...');
             const isValid = await checkNFT(tokenId);
-            if (!isValid) return;
+            console.log('[TRADING] checkNFT result:', isValid);
+            if (!isValid) {
+                console.log('[TRADING] checkNFT failed, aborting');
+                return;
+            }
 
+            console.log('[TRADING] showing confirm modal...');
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认上架',
                 `将NFT #${tokenId} 以 ${price} 代币 的价格上架，确定继续？`
             );
+            console.log('[TRADING] confirm result:', confirm);
 
-            if (!confirm) return;
+            if (!confirm) {
+                console.log('[TRADING] user cancelled');
+                return;
+            }
 
             const btn = document.getElementById('listNftBtn');
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 上架中...';
             btn.disabled = true;
 
             try {
+                console.log('[TRADING] checking approval...');
                 const isApproved = await checkApprovalForAll();
+                console.log('[TRADING] isApproved:', isApproved);
                 if (!isApproved) {
+                    console.log('[TRADING] approving...');
                     await approveForAll();
                 }
 
+                console.log('[TRADING] converting price to wei...');
                 const priceWei = web3.utils.toWei(price, 'ether');
+                console.log('[TRADING] priceWei:', priceWei);
+                console.log('[TRADING] calling listNFT contract method...');
                 await ZODIAC_WEB3.listNFT(tokenId, priceWei);
+                console.log('[TRADING] listNFT contract method success');
 
                 ZODIAC_UI.showToast('上架成功！', 'success');
 
