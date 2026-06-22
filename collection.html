@@ -667,10 +667,17 @@
                 `;
             }
             
-            document.getElementById('cardModal').classList.remove('hidden');
-                console.log('[COLLECTION] Modal shown successfully');
+            const cardModal = document.getElementById('cardModal');
+                console.log('[COLLECTION] cardModal element:', cardModal);
+                if (cardModal) {
+                    cardModal.classList.remove('hidden');
+                    console.log('[COLLECTION] Modal shown successfully');
+                } else {
+                    console.error('[COLLECTION] cardModal element not found!');
+                }
             } catch (error) {
                 console.error('[COLLECTION] showCardModal error:', error);
+                console.error('[COLLECTION] Error stack:', error.stack);
             }
         }
 
