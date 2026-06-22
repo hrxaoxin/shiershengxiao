@@ -698,38 +698,44 @@
                     tx = await ZODIAC_WEB3.burnAndMint(isRare);
                 }
 
-                if (methodName.includes('Ten')) {
+                if (tx && tx.events && tx.events.Mint) {
                     try {
-                        const mintedTokenIds = [];
-                        const currentNextCardId = parseInt(await nftMintContract.methods.nextCardId().call(), 10);
-                        if (isNaN(currentNextCardId) || currentNextCardId < 10) {
-                            throw new Error('Invalid card ID');
+                        if (methodName.includes('Ten')) {
+                            const mintedTokenIds = [];
+                            const mintEvents = Array.isArray(tx.events.Mint) ? tx.events.Mint : [tx.events.Mint];
+                            
+                            for (const event of mintEvents) {
+                                const tokenId = event.returnValues.tokenId?.toString() || event.returnValues[1]?.toString();
+                                const cardType = event.returnValues.zodiacType?.toString() || event.returnValues[2]?.toString();
+                                if (tokenId && cardType) {
+                                    mintedTokenIds.push({ cardId: tokenId, cardType: cardType });
+                                }
+                            }
+
+                            if (mintedTokenIds.length > 0) {
+                                displayMultiCardInfo(mintedTokenIds);
+                            } else {
+                                throw new Error('No mint events found in transaction');
+                            }
+                        } else {
+                            const mintEvent = tx.events.Mint;
+                            const tokenId = mintEvent.returnValues.tokenId?.toString() || mintEvent.returnValues[1]?.toString();
+                            const cardType = mintEvent.returnValues.zodiacType?.toString() || mintEvent.returnValues[2]?.toString();
+                            
+                            if (tokenId && cardType) {
+                                const cardInfo = { cardId: tokenId, cardType: cardType };
+                                displayCardInfo(cardInfo);
+                            } else {
+                                throw new Error('Failed to extract tokenId from mint event');
+                            }
                         }
-                        for (let i = 0; i < 10; i++) {
-                            const tokenId = (currentNextCardId - 10 + i).toString();
-                            const cardType = await nftMintContract.methods.tokenType(tokenId).call();
-                            mintedTokenIds.push({ cardId: tokenId, cardType: cardType });
-                        }
-                        displayMultiCardInfo(mintedTokenIds);
                     } catch (e) {
-                        console.warn('[MINT] Failed to fetch minted card info:', e.message);
-                        ZODIAC_UI.showToast('铸造成功，但无法获取卡片信息', 'success');
+                        console.warn('[MINT] Failed to fetch minted card info from event:', e.message);
+                        console.warn('[MINT] Falling back to nextCardId method');
+                        await fetchCardInfoAfterMint(methodName);
                     }
                 } else {
-                    try {
-                        const currentNextCardId = parseInt(await nftMintContract.methods.nextCardId().call(), 10);
-                        if (isNaN(currentNextCardId) || currentNextCardId < 1) {
-                            throw new Error('Invalid card ID');
-                        }
-                        const actualCardId = (currentNextCardId - 1).toString();
-                        const cardType = await nftMintContract.methods.tokenType(actualCardId).call();
-
-                        const cardInfo = { cardId: actualCardId, cardType: cardType };
-                        displayCardInfo(cardInfo);
-                    } catch (e) {
-                        console.warn('[MINT] Failed to fetch minted card info:', e.message);
-                        ZODIAC_UI.showToast('铸造成功，但无法获取卡片信息', 'success');
-                    }
+                    await fetchCardInfoAfterMint(methodName);
                 }
 
                 // 获取交易哈希
@@ -820,6 +826,39 @@
             document.getElementById('mintSuccessModal').classList.add('hidden');
             window.location.href = 'collection.html';
         });
+
+        async function fetchCardInfoAfterMint(methodName) {
+            try {
+                const currentNextCardId = parseInt(await nftMintContract.methods.nextCardId().call(), 10);
+                if (isNaN(currentNextCardId) || currentNextCardId < 1) {
+                    throw new Error('Invalid card ID');
+                }
+
+                if (methodName.includes('Ten') || methodName === 'mintTargeted') {
+                    const mintedTokenIds = [];
+                    const count = 10;
+                    
+                    if (currentNextCardId < count) {
+                        throw new Error('Not enough cards minted');
+                    }
+
+                    for (let i = 0; i < count; i++) {
+                        const tokenId = (currentNextCardId - count + i).toString();
+                        const cardType = await nftMintContract.methods.tokenType(tokenId).call();
+                        mintedTokenIds.push({ cardId: tokenId, cardType: cardType });
+                    }
+                    displayMultiCardInfo(mintedTokenIds);
+                } else {
+                    const actualCardId = (currentNextCardId - 1).toString();
+                    const cardType = await nftMintContract.methods.tokenType(actualCardId).call();
+                    const cardInfo = { cardId: actualCardId, cardType: cardType };
+                    displayCardInfo(cardInfo);
+                }
+            } catch (e) {
+                console.warn('[MINT] Failed to fetch minted card info:', e.message);
+                ZODIAC_UI.showToast('铸造成功，但无法获取卡片信息', 'success');
+            }
+        }
 
         function broadcastMintSuccess() {
             try {
