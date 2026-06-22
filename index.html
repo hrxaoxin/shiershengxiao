@@ -659,14 +659,16 @@
             document.getElementById('zodiacModal').classList.remove('hidden');
         }
 
-        document.getElementById('closeZodiacModal').addEventListener('click', function() {
-            document.getElementById('zodiacModal').classList.add('hidden');
-        });
-
-        document.getElementById('zodiacModal').addEventListener('click', function(e) {
-            if (e.target === this) {
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('closeZodiacModal').addEventListener('click', function() {
                 document.getElementById('zodiacModal').classList.add('hidden');
-            }
+            });
+
+            document.getElementById('zodiacModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    document.getElementById('zodiacModal').classList.add('hidden');
+                }
+            });
         });
 
         async function loadFenHongData() {
