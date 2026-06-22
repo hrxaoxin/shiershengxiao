@@ -524,7 +524,7 @@
                 console.log('[TRADING] nftMintContract:', nftMintContract);
                 
                 console.log('[TRADING] getting tokenContract...');
-                tokenContract = await window.ZODIAC_WEB3.getContract('token');
+                tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
                 console.log('[TRADING] tokenContract:', tokenContract);
                 
                 // 从合约获取手续费率
@@ -1293,10 +1293,20 @@
             const approveBtn = document.getElementById('approveBtn');
             const priceInput = document.getElementById('listingPrice');
             
+            console.log('[TRADING] updateListButtonState called');
+            console.log('[TRADING] listBtn:', listBtn);
+            console.log('[TRADING] selectedTokenId:', selectedTokenId);
+            console.log('[TRADING] priceInput value:', priceInput ? priceInput.value : 'null');
+            
             if (!listBtn || !priceInput) return;
             
             const price = priceInput.value;
+            console.log('[TRADING] price:', price);
+            console.log('[TRADING] listBtn.disabled before:', listBtn.disabled);
+            
             listBtn.disabled = !selectedTokenId || !price;
+            
+            console.log('[TRADING] listBtn.disabled after:', listBtn.disabled);
             
             if (approveBtn) {
                 approveBtn.disabled = false;
