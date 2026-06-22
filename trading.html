@@ -454,12 +454,14 @@
             ZODIAC_UI.initWalletButton('connectWalletBtn', 'walletAddress', 'connectionStatus');
             ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddressDesktop', null);
             ZODIAC_UI.on('walletConnected', async () => {
+                console.log('[TRADING] walletConnected event received');
                 await initContracts();
                 await updateWalletStatus();
                 await loadMarketplace();
             });
             // 监听 MetaMask 账户切换事件，自动刷新数据
             ZODIAC_WEB3.on('connect', async () => {
+                console.log('[TRADING] ZODIAC_WEB3 connect event received');
                 await initContracts();
                 await updateWalletStatus();
                 await loadMarketplace();
@@ -471,10 +473,14 @@
         }
 
         async function initWeb3() {
+            console.log('[TRADING] initWeb3 called');
             const connected = await window.ZODIAC_WEB3.initWeb3();
+            console.log('[TRADING] initWeb3 connected:', connected);
             if (connected) {
                 account = window.ZODIAC_WEB3.getAccount();
                 web3 = window.ZODIAC_WEB3.getWeb3();
+                console.log('[TRADING] account:', account);
+                console.log('[TRADING] web3:', web3);
                 await initContracts();
                 await updateWalletStatus();
                 await loadMarketplace();
@@ -527,7 +533,7 @@
                     console.warn('获取手续费率失败，使用默认值:', e);
                 }
                 
-                await updateApproveButtonState();
+                await updateApprovalStatus();
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
                 ZODIAC_UI.showToast('合约初始化失败: ' + error.message, 'warning');
@@ -1269,31 +1275,6 @@
             
             if (approveBtn) {
                 approveBtn.disabled = false;
-            }
-        }
-        
-        async function updateApproveButtonState() {
-            if (!account) return;
-            
-            const approveBtn = document.getElementById('approveBtn');
-            
-            if (!approveBtn) return;
-            
-            try {
-                const isApproved = await checkApprovalForAll();
-                approveBtn.disabled = isApproved;
-                
-                if (isApproved) {
-                    approveBtn.innerHTML = '<i class="fas fa-check mr-1"></i> 已授权';
-                    approveBtn.classList.remove('btn-secondary');
-                    approveBtn.classList.add('bg-green-500', 'hover:bg-green-600');
-                } else {
-                    approveBtn.innerHTML = '<i class="fas fa-key mr-1"></i> 授权NFT系列';
-                    approveBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
-                    approveBtn.classList.add('btn-secondary');
-                }
-            } catch (error) {
-                console.error('updateApproveButtonState error:', error);
             }
         }
         
