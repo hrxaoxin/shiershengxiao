@@ -241,6 +241,12 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _unpause();
     }
 
+    /**
+     * @dev 挑战模拟玩家（PvE战斗）
+     * @param mockIndex 模拟玩家索引（0-99对应排名1-100）
+     * @return isVictory 是否胜利, battleId 战斗ID
+     * @notice 玩家挑战模拟玩家，胜利获得积分，失败扣除积分
+     */
     function challengeMockPlayer(uint256 mockIndex) external nonReentrant whenNotPaused returns (bool, uint256) {
         SeasonInfo storage currentSeason = seasons[currentSeasonId];
         require(currentSeason.isActive, "ArenaBattle: Season not active");
@@ -318,6 +324,13 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return random % 100 < baseChance;
     }
 
+    /**
+     * @dev 内部函数：执行真实战斗（PvP）
+     * @param challenger 挑战者地址
+     * @param challenged 被挑战者地址
+     * @return 挑战者是否胜利
+     * @notice 根据双方积分差距调整胜率，积分高者胜率更高
+     */
     function _executeRealBattle(address challenger, address challenged) internal view returns (bool) {
         PlayerRecord storage challengerRecord = players[challenger];
         PlayerRecord storage challengedRecord = players[challenged];
@@ -341,6 +354,12 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return roll < challengerChance;
     }
 
+    /**
+     * @dev 内部函数：更新玩家分数
+     * @param player 玩家地址
+     * @param isWinner 是否获胜
+     * @notice 胜利加25分，失败扣25分（最低0分），首次战斗初始化玩家数据
+     */
     function _updateScore(address player, bool isWinner) internal {
         SeasonInfo storage currentSeason = seasons[currentSeasonId];
         PlayerRecord storage record = players[player];
@@ -397,11 +416,23 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return players[player].remainingAttempts;
     }
 
+    /**
+     * @dev 获取玩家战斗记录
+     * @param player 玩家地址
+     * @return score 积分, wins 胜利次数, losses 失败次数, seasonId 赛季 ID
+     */
     function getPlayerRecord(address player) external view returns (uint256 score, uint256 wins, uint256 losses, uint256 seasonId) {
         PlayerRecord memory p = players[player];
         return (p.score, p.wins, p.losses, p.seasonId);
     }
 
+    /**
+     * @dev 执行模拟战斗（完整版）
+     * @param playerTeam 玩家队伍（6个NFT ID）
+     * @param mockIndex 模拟玩家索引
+     * @return success_ 是否成功, winner 胜利方(1=玩家,0=模拟), battleId 战斗ID
+     * @notice 仅限owner或authorizer调用，执行完整的NFT战斗逻辑
+     */
     function executeMockBattle(
         uint256[6] calldata playerTeam,
         uint256 mockIndex
@@ -433,6 +464,14 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
     }
 
+    /**
+     * @dev 执行真实战斗（PvP完整版）
+     * @param challengedPlayer 被挑战的玩家地址
+     * @param playerTeam 挑战者队伍（6个NFT ID）
+     * @param challengedTeam 被挑战者队伍（6个NFT ID）
+     * @return success_ 是否成功, winner 胜利方(1=挑战者,0=被挑战者), battleId 战斗ID
+     * @notice 仅限owner或authorizer调用，执行完整的PvP战斗逻辑
+     */
     function executeRealBattle(
         address challengedPlayer,
         uint256[6] calldata playerTeam,
@@ -467,6 +506,11 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
     }
 
+    /**
+     * @dev 内部函数：验证队伍有效性
+     * @param team 队伍数组（6个NFT ID）
+     * @notice 检查所有tokenId是否大于0
+     */
     function _validateTeam(uint256[6] memory team) internal view {
         // 轻量校验：仅检查 tokenId > 0（ArenaRanking会做更深层的所有者验证）
         for (uint256 i = 0; i < TEAM_SIZE; i++) {
@@ -504,6 +548,11 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
     }
 
+    /**
+     * @dev 从战斗解锁NFT
+     * @param team 队伍数组（6个NFT ID）
+     * @notice 仅限owner或authorizer调用，战斗结束后解除锁定
+     */
     function unlockNFTsFromBattle(uint256[6] memory team) external onlyOwnerOrAuthorizer {
         for (uint256 i = 0; i < team.length; i++) {
             if (team[i] > 0) {
@@ -520,10 +569,22 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return battleIdCounter[player];
     }
 
+    /**
+     * @dev 获取玩家上次战斗时间
+     * @param player 玩家地址
+     * @return 时间戳
+     */
     function getLastBattleTime(address player) external view returns (uint256) {
         return lastBattleTime[player];
     }
 
+    /**
+     * @dev 模拟战斗预测
+     * @param playerTeam 玩家队伍
+     * @param mockIndex 模拟玩家索引
+     * @return 是否预测玩家胜利
+     * @notice 基于队伍战力对比预测战斗结果
+     */
     function simulateBattle(uint256[6] memory playerTeam, uint256 mockIndex) external view returns (bool) {
         uint256 playerPower = _calculateTeamPower(playerTeam);
         uint256 mockPower = (mockIndex % 1000) + 500;

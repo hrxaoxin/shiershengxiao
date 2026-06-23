@@ -205,7 +205,8 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     );
 
     /**
-     * @dev 修饰器：仅所有者或授权器可调用
+     * @notice 修饰器：仅所有者或授权器可调用
+     * @dev 双重授权检查：owner或authorizer或authorizer认可的系统合约
      */
     modifier onlyOwnerOrAuthorizer() {
         if (msg.sender == owner() || msg.sender == authorizer) {
@@ -218,8 +219,8 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     }
 
     /**
-     * @dev 修饰器：仅所有者或战斗调用者可调用
-     * 用于战斗发起类函数（如 challenge）
+     * @notice 修饰器：仅所有者或战斗调用者可调用
+     * @dev 用于战斗发起类函数（如 challenge），双重检查：owner或ArenaPlayer
      */
     modifier onlyBattleCaller() {
         address battleCaller = IAuthorizer(authorizer).getArenaPlayer();
@@ -557,11 +558,27 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
     
 
+    /**
+     * @dev 战斗结果结构体
+     * 存储单次攻击的结果信息
+     * @param targetAlive 目标是否存活
+     * @param targetState 目标队伍状态
+     */
     struct BattleResult {
         bool targetAlive;
         TeamState targetState;
     }
 
+    /**
+     * @dev 执行单次攻击
+     * @param attacker 攻击者NFT属性
+     * @param target 目标队伍状态
+     * @param seed 随机种子
+     * @param attackerIdx 攻击者索引
+     * @param canUseSkill 是否可以使用技能
+     * @param skill 技能数据
+     * @return result 攻击结果（包含目标存活状态和更新后的目标状态）
+     */
     function _executeSingleAttack(
         NFTTraits memory attacker,
         TeamState memory target,
@@ -651,6 +668,16 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         }
     }
 
+    /**
+     * @dev 执行队伍攻击
+     * @param speedOrder 速度排序数组（决定攻击顺序）
+     * @param attackerState 攻击方队伍状态
+     * @param targetState 目标队伍状态
+     * @param seed 随机种子
+     * @param attackerAlive 攻击方是否存活
+     * @return alive 攻击方是否仍有存活单位
+     * @return 更新后的目标队伍状态
+     */
     function _executeTeamAttacks(
         uint256[6] memory speedOrder,
         TeamState memory attackerState,
@@ -677,7 +704,14 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     }
 
     /**
-     * @dev 执行单次攻击，返回修改后的目标状态
+     * @dev 执行单次攻击并返回修改后的目标状态
+     * @param attacker 攻击者NFT属性
+     * @param target 目标队伍状态
+     * @param seed 随机种子
+     * @param attackerIdx 攻击者索引
+     * @param canUseSkill 是否可以使用技能
+     * @param skill 技能数据
+     * @return 更新后的目标队伍状态
      */
     function _executeSingleAttackIntoState(
         NFTTraits memory attacker,
@@ -712,7 +746,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     }
 
     /**
-     * @dev 应用技能效果到状态
+     * @dev 应用技能效果到队伍状态（纯函数版本）
+     * @param attacker 攻击者NFT属性
+     * @param target 目标队伍状态
+     * @param attackerIdx 攻击者索引
+     * @param skill 技能数据
+     * @param seed 随机种子
+     * @return 更新后的目标队伍状态
      */
     function _applySkillToState(NFTTraits memory attacker, TeamState memory target, uint attackerIdx, Skill memory skill, uint256 seed) internal pure returns (TeamState memory) {
         uint256 baseDamage = 0;

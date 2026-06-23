@@ -103,7 +103,8 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     mapping(uint256 => uint256) public indexToBattleId;
 
     /**
-     * @dev 仅允许战斗合约调用的修饰器
+     * @notice 仅允许战斗合约调用的修饰器
+     * @dev 防止外部账户或未授权合约篡改战斗历史
      */
     modifier onlyBattleContract() {
         address battleContract = IAuthorizer(authorizer).getBattle();
@@ -138,7 +139,8 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 检查是否为授权调用者（owner或authorizer）
+     * @notice 检查是否为授权调用者（owner或authorizer）
+     * @dev 用于需要双重授权的敏感操作，三重检查：owner/authorizer/系统合约
      */
     modifier onlyOwnerOrAuthorizer() {
         if (msg.sender == owner() || msg.sender == authorizer) {
@@ -194,7 +196,7 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     /**
      * @dev 根据战斗ID获取战斗记录
      * @param battleId 战斗ID
-     * @return SingleBattleResult 战斗结果
+     * @return 战斗结果记录
      */
     function getBattleHistoryById(uint256 battleId) external view returns (BattleLib.SingleBattleResult memory) {
         return battleHistory[battleId];

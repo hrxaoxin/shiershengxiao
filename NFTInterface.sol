@@ -190,6 +190,7 @@ interface IStaking {
     function getUserStakingStats(address user) external view returns (uint256, uint256, uint256, uint256, uint256);
     function getPoolStats() external view returns (uint256, uint256, uint256);
     function paused() external view returns (bool);
+    function userStakedWeight(address user) external view returns (uint256);
 }
 
 /**
@@ -445,8 +446,13 @@ interface IPoolManager {
  * @title IDexRouter
  */
 interface IDexRouter {
-    function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external payable returns (uint256[] memory amounts);
+    function factory() external view returns (address);
     function WETH() external pure returns (address);
+    function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external payable returns (uint256[] memory amounts);
+    function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts);
+    function swapExactTokensForTokens(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts);
+    function addLiquidityETH(address token, uint256 amountTokenDesired, uint256 amountTokenMin, uint256 amountETHMin, address to, uint256 deadline) external payable returns (uint256 amountToken, uint256 amountETH, uint256 liquidity);
+    function removeLiquidityETH(address token, uint256 liquidity, uint256 amountTokenMin, uint256 amountETHMin, address to, uint256 deadline) external returns (uint256 amountToken, uint256 amountETH);
     function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
 }
 
@@ -631,6 +637,9 @@ interface IAuthorizer {
     function getTokenStaking() external view returns (address);
     function getRewardManager() external view returns (address);
     function getDividendManager() external view returns (address);
+    function getDividendManagerLP() external view returns (address);
+    function getTokenStakingLP() external view returns (address);
+    function getArenaRewardLP() external view returns (address);
     function getPoolManager() external view returns (address);
     function getPriceOracle() external view returns (address);
     function getBattle() external view returns (address);
@@ -848,4 +857,116 @@ interface IWeightManager {
     function getUserWeight(address user) external view returns (uint256);
     function getEligibleUsers() external view returns (address[] memory);
     function getMinEligibleWeight() external view returns (uint256);
+}
+
+/**
+ * @title IWBNB
+ * @dev WBNB 合约接口
+ */
+interface IWBNB {
+    function deposit() external payable;
+    function withdraw(uint256 amount) external;
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address to, uint256 value) external returns (bool);
+    function approve(address spender, uint256 value) external returns (bool);
+}
+
+/**
+ * @title IDexFactory
+ * @dev DEX 工厂接口
+ */
+interface IDexFactory {
+    function getPair(address tokenA, address tokenB) external view returns (address);
+}
+
+/**
+ * @title ITokenStaking
+ * @dev 代币质押合约接口
+ */
+interface ITokenStaking {
+    function getTotalStaked() external view returns (uint256);
+    function getUserStake(address user) external view returns (StakeInfo memory);
+    
+    struct StakeInfo {
+        uint256 amount;
+        uint256 lastRewardTime;
+        uint256 accumulatedRewards;
+        uint256 stakedAt;
+    }
+}
+
+/**
+ * @title ITokenStakingLP
+ * @dev 代币质押LP奖励合约接口
+ */
+interface ITokenStakingLP {
+    function recordIncomingBNB(uint256 amount) external;
+    function claimLPReward() external;
+    function getPendingLPReward(address user) external view returns (uint256);
+    function compoundFees() external;
+}
+
+/**
+ * @title IStakingLP
+ * @dev NFT质押LP奖励合约接口
+ */
+interface IStakingLP {
+    function updateTotalWeight(uint256 _totalWeightedNFTs) external;
+    function syncUserWeight(address user, uint256 snapshotWeight) external;
+    function recordIncomingBNB(uint256 amount) external;
+    function claimLPReward() external;
+    function getPendingLPReward(address user) external view returns (uint256);
+    function compoundFees() external;
+}
+
+/**
+ * @title IDividendManagerLP
+ * @dev 分红管理LP奖励合约接口
+ */
+interface IDividendManagerLP {
+    function recordIncomingBNB(uint256 amount) external;
+    function claimLPDividend() external;
+    function getClaimableLPDividend(address user) external view returns (uint256);
+    function compoundFees() external;
+}
+
+/**
+ * @title IArenaRewardLP
+ * @dev 竞技场LP奖励合约接口
+ */
+interface IArenaRewardLP {
+    function recordIncomingBNB(uint256 amount) external;
+    function claimLPReward() external;
+    function getPendingLPReward(address user) external view returns (uint256);
+    function compoundFees() external;
+}
+
+/**
+ * @title IStakingReceiver
+ * @dev NFT质押合约接收接口
+ */
+interface IStakingReceiver {
+    function recordIncomingBNB(uint256 amount) external;
+}
+
+/**
+ * @title IBuybackReceiver
+ * @dev NFT回购合约接收接口
+ */
+interface IBuybackReceiver {
+    function recordIncomingTokens(uint256 amount) external;
+    function recordIncomingBNB(uint256 amount) external;
+}
+
+/**
+ * @title IStakingLP
+ * @dev 质押LP奖励合约接口
+ */
+interface IStakingLP {
+    function updateTotalWeight(uint256 _totalWeightedNFTs) external;
+    function syncUserWeight(address user, uint256 snapshotWeight) external;
+    function recordIncomingBNB(uint256 amount) external;
+    function claimLPReward() external;
+    function getPendingLPReward(address user) external view returns (uint256);
+    function compoundFees() external;
 }

@@ -199,10 +199,14 @@
             </div>
 
             <div class="info-box mb-8">
-                <h3 class="text-xl font-bold text-gray-800 mb-4">🎁 奖励信息</h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-4">🎁 LP奖励信息</h3>
                 <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg mb-4">
-                    <span class="text-lg font-medium text-gray-800">可领取代币</span>
-                    <span class="text-lg font-bold text-gray-800" id="rewardsAmount">0.00</span>
+                    <span class="text-lg font-medium text-gray-800">可领取LP奖励</span>
+                    <span class="text-lg font-bold text-purple-600" id="rewardsAmount">0.00</span>
+                </div>
+                <div class="p-4 bg-purple-50 rounded-lg mb-4">
+                    <div class="text-sm text-purple-600 font-medium mb-2">💡 LP奖励说明</div>
+                    <p class="text-xs text-gray-600">LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包，您将获得双重收益：项目分红 + DEX交易手续费</p>
                 </div>
                 <div id="rewardEstimate" class="p-4 bg-blue-50 rounded-lg mb-4">
                     <div class="text-sm text-blue-600 font-medium mb-2">📈 收益预估</div>
@@ -224,7 +228,7 @@
                     </div>
                 </div>
                 <button id="claimBtn" class="btn-primary w-full" disabled>
-                    领取奖励
+                    <i class="fas fa-gift mr-2"></i>领取LP奖励
                 </button>
             </div>
 
@@ -252,16 +256,17 @@
         </div>
 
         <div id="tokenStakePanel" class="hidden">
-            <p class="text-lg text-gray-600 mb-8">质押代币获得代币奖励，支持弹性释放机制</p>
+            <p class="text-lg text-gray-600 mb-8">质押代币获得LP奖励，支持弹性释放机制</p>
 
             <div class="info-box mb-8">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">🌟 代币质押规则</h3>
                 <ul class="text-gray-600 space-y-2">
-                    <li>• 质押代币获得代币奖励</li>
+                    <li>• 质押代币获得LP奖励</li>
                     <li>• 最低质押时长 <span id="tokenMinDuration">30</span> 分钟</li>
                     <li>• 当前每日释放比例 <span id="dailyReleaseRatioDisplay">1.0</span>%，支持弹性增量机制</li>
                     <li>• 赎回时自动领取累积奖励</li>
-                    <li>• 奖励以代币形式发放</li>
+                    <li>• 奖励以LP形式发放，领取时自动兑换为代币和WBNB</li>
+                    <li>• 双重收益：项目分红 + DEX交易手续费</li>
                 </ul>
             </div>
 
@@ -290,8 +295,8 @@
                             <p class="text-xl font-bold text-gray-800" id="myTokenStakeAmount">0.00</p>
                         </div>
                         <div class="p-4 bg-gray-50 rounded-lg">
-                            <span class="text-sm text-gray-600">可领取奖励 (Token)</span>
-                            <p class="text-xl font-bold text-blue-600" id="tokenRewardsAmount">0.00</p>
+                            <span class="text-sm text-gray-600">可领取LP奖励</span>
+                            <p class="text-xl font-bold text-purple-600" id="tokenRewardsAmount">0.00</p>
                         </div>
                         <div class="p-4 bg-gray-50 rounded-lg">
                             <span class="text-sm text-gray-600">质押时间</span>
@@ -319,7 +324,7 @@
                     <h3 class="text-xl font-bold text-gray-800 mb-4">📊 代币质押合约信息</h3>
                     <div class="space-y-4">
                         <div class="p-4 bg-gray-50 rounded-lg">
-                            <span class="text-sm text-gray-600">合约奖励代币余额</span>
+                            <span class="text-sm text-gray-600">合约LP奖励余额</span>
                             <p class="text-lg font-bold text-gray-800" id="tokenStakingBNBBalance">0.00</p>
                         </div>
                         <div class="p-4 bg-gray-50 rounded-lg">
@@ -335,13 +340,17 @@
             </div>
 
             <div class="info-box">
-                <h3 class="text-xl font-bold text-gray-800 mb-4">🎯 领取奖励</h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-4">🎯 领取LP奖励</h3>
+                <div class="p-4 bg-purple-50 rounded-lg mb-4">
+                    <div class="text-sm text-purple-600 font-medium mb-2">💡 LP奖励说明</div>
+                    <p class="text-xs text-gray-600">LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包</p>
+                </div>
                 <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg mb-4">
-                    <span class="text-lg font-medium text-gray-800">可领取代币奖励</span>
-                    <span class="text-lg font-bold text-blue-600" id="claimableBNB">0.00</span>
+                    <span class="text-lg font-medium text-gray-800">可领取LP奖励</span>
+                    <span class="text-lg font-bold text-purple-600" id="claimableBNB">0.00</span>
                 </div>
                 <button id="claimTokenRewardsBtn" class="btn-primary w-full" disabled>
-                    领取代币奖励
+                    <i class="fas fa-gift mr-2"></i>领取LP奖励
                 </button>
             </div>
         </div>
@@ -358,7 +367,9 @@
         let nftContract;
         let tokenContract;
         let stakingContract;
+        let stakingLPContract;
         let tokenStakingContract;
+        let tokenStakingLPContract;
         let selectedNFTs = [];
 
         document.addEventListener('DOMContentLoaded', async function() {
@@ -437,6 +448,8 @@
             ZODIAC_WEB3.on('disconnect', () => {
                 stopRewardEstimateRefresh();
                 account = null;
+                document.getElementById('rewardsAmount').textContent = '0.00 LP';
+                document.getElementById('tokenRewardsAmount').textContent = '0.00 LP';
             });
         }
 
@@ -549,7 +562,9 @@
                 nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
                 tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
                 stakingContract = await window.ZODIAC_WEB3.getContract('staking');
+                stakingLPContract = await window.ZODIAC_WEB3.getContract('stakingLP');
                 tokenStakingContract = await window.ZODIAC_WEB3.getContract('tokenStaking');
+                tokenStakingLPContract = await window.ZODIAC_WEB3.getContract('tokenStakingLP');
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
                 ZODIAC_UI.showToast('合约初始化失败: ' + error.message, 'warning');
@@ -736,13 +751,13 @@
 
         async function loadRewards() {
             try {
-                const rewards = await stakingContract.methods.getPendingReward(account).call();
-                const rewardsFormatted = web3.utils.fromWei(rewards, 'ether');
-                document.getElementById('rewardsAmount').textContent = parseFloat(rewardsFormatted).toFixed(4);
-                document.getElementById('claimBtn').disabled = rewards === '0';
+                const lpRewards = await stakingLPContract.methods.getPendingLPReward(account).call();
+                const rewardsFormatted = web3.utils.fromWei(lpRewards, 'ether');
+                document.getElementById('rewardsAmount').textContent = parseFloat(rewardsFormatted).toFixed(4) + ' LP';
+                document.getElementById('claimBtn').disabled = lpRewards === '0';
             } catch (error) {
-                console.error('加载奖励失败:', error);
-                ZODIAC_UI.showToast('加载奖励失败: ' + error.message, 'error');
+                console.error('加载LP奖励失败:', error);
+                ZODIAC_UI.showToast('加载LP奖励失败: ' + error.message, 'error');
             }
         }
 
@@ -901,12 +916,12 @@
         async function claimRewards() {
             const btn = document.getElementById('claimBtn');
             btn.disabled = true;
-            btn.textContent = '领取中...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>领取中...';
 
             try {
-                await ZODIAC_WEB3.claimReward();
+                await stakingLPContract.methods.claimLPReward().send({ from: account });
                 
-                ZODIAC_UI.showToast('领取成功！', 'success');
+                ZODIAC_UI.showToast('LP奖励领取成功！已兑换为代币和WBNB', 'success');
                 loadRewards();
                 loadMyStakes();
             } catch (error) {
@@ -914,7 +929,7 @@
                 ZODIAC_UI.showToast('领取失败: ' + (error.message || '未知错误'), 'error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '领取奖励';
+                btn.innerHTML = '<i class="fas fa-gift mr-2"></i>领取LP奖励';
             }
         }
 
@@ -959,10 +974,11 @@
                 
                 document.getElementById('myTokenStakeAmount').textContent = web3.utils.fromWei(parsedStakeInfo.amount, 'ether').substring(0, 10);
                 
-                const claimableTokens = web3.utils.fromWei(parsedStakeInfo.accumulatedRewards.toString(), 'ether').substring(0, 10);
+                // 获取LP奖励
+                const lpRewards = await tokenStakingLPContract.methods.getPendingLPReward(account).call();
+                const claimableLP = web3.utils.fromWei(lpRewards, 'ether').substring(0, 10);
                 
-                document.getElementById('tokenRewardsAmount').textContent = claimableTokens;
-                document.getElementById('claimableBNB').textContent = claimableTokens;
+                document.getElementById('tokenRewardsAmount').textContent = claimableLP + ' LP';
 
                 if (parsedStakeInfo.amount > 0) {
                     if (parsedStakeInfo.stakedAt > 0) {
@@ -975,19 +991,15 @@
                     document.getElementById('tokenStakedAt').textContent = '-';
                 }
 
-                // 读取合约代币余额（通过 TokenStaking 合约的 getRewardTokenBalance 方法）
-                let rewardTokenBalance = '0';
+                // 读取合约LP余额
+                let lpBalance = '0';
                 try {
-                    const tokenBalanceWei = await tokenContract.methods.balanceOf(tokenStakingContract.options.address).call();
-                    const totalStaked = await tokenStakingContract.methods.getTotalStaked().call();
-                    const rewardWei = BigInt(tokenBalanceWei) > BigInt(totalStaked)
-                        ? BigInt(tokenBalanceWei) - BigInt(totalStaked)
-                        : BigInt(0);
-                    rewardTokenBalance = web3.utils.fromWei(rewardWei.toString(), 'ether').substring(0, 10);
+                    const lpBalanceWei = await tokenStakingLPContract.methods.lpRewardPoolBalance().call();
+                    lpBalance = web3.utils.fromWei(lpBalanceWei, 'ether').substring(0, 10);
                 } catch (e) {
                     // 余额读取失败
                 }
-                document.getElementById('tokenStakingBNBBalance').textContent = rewardTokenBalance;
+                document.getElementById('tokenStakingBNBBalance').textContent = lpBalance + ' LP';
 
                 const totalStakedAll = await tokenStakingContract.methods.getTotalStaked().call();
                 document.getElementById('totalStakedTokens').textContent = web3.utils.fromWei(totalStakedAll, 'ether').substring(0, 10);
@@ -1126,19 +1138,19 @@
         async function claimTokenRewards() {
             const btn = document.getElementById('claimTokenRewardsBtn');
             btn.disabled = true;
-            btn.textContent = '领取中...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>领取中...';
 
             try {
-                await ZODIAC_WEB3.claimTokenRewards();
+                await tokenStakingLPContract.methods.claimLPReward().send({ from: account });
 
-                ZODIAC_UI.showToast('代币奖励领取成功！', 'success');
+                ZODIAC_UI.showToast('LP奖励领取成功！已兑换为代币和WBNB', 'success');
                 await loadTokenStakingInfo();
             } catch (error) {
-                console.error('领取代币奖励失败:', error);
-                ZODIAC_UI.showToast('领取代币奖励失败: ' + (error.message || '未知错误'), 'error');
+                console.error('领取LP奖励失败:', error);
+                ZODIAC_UI.showToast('领取LP奖励失败: ' + (error.message || '未知错误'), 'error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '领取代币奖励';
+                btn.innerHTML = '<i class="fas fa-gift mr-2"></i>领取LP奖励';
             }
         }
     </script>

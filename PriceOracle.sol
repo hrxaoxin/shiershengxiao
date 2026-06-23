@@ -130,18 +130,30 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         priceUpdateCooldown = 5 minutes;
     }
     
+    /**
+     * @dev 暂停合约，停止所有价格更新操作
+     * 仅合约所有者可调用，用于紧急情况下暂停服务
+     * @param reason 暂停原因，将被记录在事件日志中
+     */
     function pause(string memory reason) external onlyOwner {
         paused = true;
         pauseReason = reason;
         emit Paused(msg.sender, reason);
     }
     
+    /**
+     * @dev 取消合约暂停，恢复价格更新操作
+     * 仅合约所有者可调用
+     */
     function unpause() external onlyOwner {
         paused = false;
         pauseReason = "";
         emit Unpaused(msg.sender);
     }
     
+    /**
+     * @dev 暂停修饰器：确保合约未处于暂停状态时才能执行函数
+     */
     modifier whenNotPaused() {
         require(!paused, "PriceOracle: Paused");
         _;
@@ -265,16 +277,31 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _;
     }
 
+    /**
+     * @dev 设置价格变动限制百分比
+     * 防止价格单次变动过大
+     * @param percent 新的价格变动限制百分比（1000-10000，对应10%-100%）
+     */
     function setPriceChangeLimit(uint256 percent) external onlyOwner {
         require(percent >= 1000 && percent <= 10000, "PriceOracle: Invalid percent");
         maxPriceChangePercent = percent;
     }
 
+    /**
+     * @dev 设置价格更新冷却时间
+     * 控制价格提议后到执行前的等待时间
+     * @param cooldown 新的冷却时间（1分钟到1小时之间）
+     */
     function setPriceUpdateCooldown(uint256 cooldown) external onlyOwner {
         require(cooldown >= 1 minutes && cooldown <= 1 hours, "PriceOracle: Invalid cooldown");
         priceUpdateCooldown = cooldown;
     }
 
+    /**
+     * @dev 提议更新代币价格（两阶段更新第一阶段）
+     * 所有者提议新价格，需等待priceUpdateCooldown后执行
+     * @param _newPrice 新的代币价格（USD，精度18位）
+     */
     function proposeTokenPrice(uint256 _newPrice) external onlyOwner whenNotPaused {
         require(_newPrice > 0, "PriceOracle: Invalid price");
         require(_newPrice <= 10**27, "PriceOracle: Price too high");
@@ -293,7 +320,12 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit PriceChangeProposed(tokenPriceUSD, _newPrice, pendingPriceEffectiveTime, msg.sender);
     }
 
-    function executePendingTokenPrice() external onlyOwner {
+    /**
+     * @dev 执行待处理的代币价格更新（两阶段更新第二阶段）
+     * 需在提议后等待priceUpdateCooldown且在过期时间前执行
+     * @return 是否执行成功
+     */
+    function executePendingTokenPrice() external onlyOwner returns (bool) {
         require(hasPendingTokenPrice, "PriceOracle: No pending price");
         require(block.timestamp >= pendingPriceEffectiveTime, "PriceOracle: Not yet executable");
         require(block.timestamp <= pendingPriceEffectiveTime + priceUpdateCooldown / 2, "PriceOracle: Pending price expired");
@@ -306,6 +338,10 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit PriceUpdated(tokenPriceUSD, ethPriceUSD, msg.sender);
     }
 
+    /**
+     * @dev 取消待处理的代币价格更新
+     * 仅在价格尚未执行时可以取消
+     */
     function cancelPendingTokenPrice() external onlyOwner {
         require(hasPendingTokenPrice, "PriceOracle: No pending price to cancel");
         uint256 cancelledPrice = pendingTokenPrice;
@@ -313,6 +349,11 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit PendingPriceCancelled(cancelledPrice, true);
     }
 
+    /**
+     * @dev 提议更新ETH价格（两阶段更新第一阶段）
+     * 所有者提议新价格，需等待priceUpdateCooldown后执行
+     * @param _newPrice 新的ETH价格（USD，精度18位）
+     */
     function proposeETHPrice(uint256 _newPrice) external onlyOwner whenNotPaused {
         require(_newPrice > 0, "PriceOracle: Invalid price");
         require(_newPrice <= 10**24, "PriceOracle: Price too high");
@@ -331,7 +372,12 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit PriceChangeProposed(ethPriceUSD, _newPrice, pendingPriceEffectiveTime, msg.sender);
     }
 
-    function executePendingETHPrice() external onlyOwner {
+    /**
+     * @dev 执行待处理的ETH价格更新（两阶段更新第二阶段）
+     * 需在提议后等待priceUpdateCooldown且在过期时间前执行
+     * @return 是否执行成功
+     */
+    function executePendingETHPrice() external onlyOwner returns (bool) {
         require(hasPendingETHPrice, "PriceOracle: No pending price");
         require(block.timestamp >= pendingPriceEffectiveTime, "PriceOracle: Not yet executable");
         require(block.timestamp <= pendingPriceEffectiveTime + priceUpdateCooldown / 2, "PriceOracle: Pending price expired");
@@ -344,6 +390,10 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit PriceUpdated(tokenPriceUSD, ethPriceUSD, msg.sender);
     }
 
+    /**
+     * @dev 取消待处理的ETH价格更新
+     * 仅在价格尚未执行时可以取消
+     */
     function cancelPendingETHPrice() external onlyOwner {
         require(hasPendingETHPrice, "PriceOracle: No pending price to cancel");
         uint256 cancelledPrice = pendingETHPrice;
@@ -352,17 +402,20 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 设置自动价格获取开关
+     * @dev 设置是否启用DEX自动价格获取
+     * @param enabled 是否启用自动价格获取
      */
     function setAutoPriceEnabled(bool enabled) external onlyOwner {
         autoPriceEnabled = enabled;
     }
 
     /**
-     * @dev 从DEX获取当前代币价格（通过WBNB/ETH中转）
-     * @return uint256 代币价格（USD，精度18位）
+     * @dev 从DEX获取当前代币和ETH价格（通过WBNB/ETH中转）
+     * 需要先启用autoPriceEnabled
+     * @return tokenPrice 代币价格（USD，精度18位）
+     * @return ethPrice ETH价格（USD，精度18位）
      */
-    function fetchPriceFromDEX() external onlyOwnerOrAuthorizer whenNotPaused returns (uint256, uint256) {
+    function fetchPriceFromDEX() external onlyOwnerOrAuthorizer whenNotPaused returns (uint256 tokenPrice, uint256 ethPrice) {
         require(autoPriceEnabled, "PriceOracle: Auto price disabled");
         
         address router = _getActiveRouter();
@@ -400,7 +453,9 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取当前活跃的DEX Router
+     * @dev 获取当前活跃的DEX Router地址
+     * 根据activeDEX设置返回对应DEX的路由地址
+     * @return 当前活跃的DEX Router地址
      */
     function _getActiveRouter() internal view returns (address) {
         if (activeDEX == 0) return IAuthorizer(authorizer).getFlapSwapRouter();
@@ -409,7 +464,10 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 从DEX获取代币价格
+     * @dev 从指定DEX Router获取代币价格
+     * 通过代币->WBNB->USDT路径获取价格
+     * @param router DEX路由地址
+     * @return 代币价格（USD，精度18位），获取失败返回0
      */
     function _fetchTokenPrice(address router) internal view returns (uint256) {
         address tokenAddress = IAuthorizer(authorizer).getToken();
@@ -438,7 +496,10 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 从DEX获取ETH价格
+     * @dev 从指定DEX Router获取ETH价格
+     * 通过WBNB->USDT路径获取价格
+     * @param router DEX路由地址
+     * @return ETH价格（USD，精度18位），获取失败返回0
      */
     function _fetchETHPrice(address router) internal view returns (uint256) {
         address usdtAddress = IAuthorizer(authorizer).getUSDT();
@@ -465,9 +526,12 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取所有DEX的价格并返回平均值
+     * @dev 从所有配置的DEX获取价格并计算平均值
+     * 从FlapSwap、PancakeSwap、Uniswap分别获取价格后取平均
+     * @return avgTokenPrice 平均代币价格（USD，精度18位）
+     * @return avgETHPrice 平均ETH价格（USD，精度18位）
      */
-    function fetchPriceFromAllDEX() external onlyOwnerOrAuthorizer whenNotPaused returns (uint256, uint256) {
+    function fetchPriceFromAllDEX() external onlyOwnerOrAuthorizer whenNotPaused returns (uint256 avgTokenPrice, uint256 avgETHPrice) {
         uint256 tokenPriceSum = 0;
         uint256 ethPriceSum = 0;
         uint256 count = 0;
@@ -528,8 +592,8 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 更新代币价格
-     *
+     * @dev 直接更新代币价格（授权合约可调用）
+     * 变动同样受maxPriceChangePercent限制
      * @param _tokenPriceUSD 新的代币价格（USD，精度18位）
      */
     function updateTokenPrice(uint256 _tokenPriceUSD) external onlyOwnerOrAuthorizer whenNotPaused {
@@ -541,8 +605,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 更新ETH价格
-     *
+     * @dev 直接更新ETH价格（授权合约可调用）
      * @param _ethPriceUSD 新的ETH价格（USD，精度18位）
      */
     function updateETHPrice(uint256 _ethPriceUSD) external onlyOwnerOrAuthorizer whenNotPaused {
@@ -554,10 +617,10 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 批量更新价格
-     *
-     * @param _tokenPriceUSD 代币价格
-     * @param _ethPriceUSD ETH价格
+     * @dev 批量更新代币和ETH价格
+     * 仅owner可调用，需满足冷却时间和价格变动限制
+     * @param _tokenPriceUSD 代币价格（USD，精度18位）
+     * @param _ethPriceUSD ETH价格（USD，精度18位）
      */
     function updatePrices(uint256 _tokenPriceUSD, uint256 _ethPriceUSD) external onlyOwner whenNotPaused {
         require(_tokenPriceUSD > 0, "PriceOracle: Invalid token price");
@@ -610,13 +673,17 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 获取价格历史记录长度
+     * @return 价格历史记录总数
      */
     function getPriceHistoryLength() external view returns (uint256) {
         return priceHistory.length;
     }
 
     /**
-     * @dev 获取价格历史记录（分页，支持环形缓冲区）
+     * @dev 获取价格历史记录（分页）
+     * @param startIndex 起始索引
+     * @param count 获取数量
+     * @return PriceRecord[] 价格记录数组
      */
     function getPriceHistory(uint256 startIndex, uint256 count) external view returns (PriceRecord[] memory) {
         require(startIndex < priceHistory.length, "PriceOracle: Invalid start index");
@@ -637,7 +704,8 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 获取最新价格记录
+     * @dev 获取最新一条价格记录
+     * @return PriceRecord 最新价格记录
      */
     function getLatestPriceRecord() external view returns (PriceRecord memory) {
         require(priceHistory.length > 0, "PriceOracle: No history");
@@ -671,7 +739,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 设置价格有效时间
-     *
+     * 超过此时间的价格视为过期失效
      * @param duration 有效时间（秒）
      */
     function setPriceValidityPeriod(uint256 duration) external onlyOwner {
@@ -680,8 +748,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 检查代币价格是否过期
-     *
-     * @return bool 价格是否有效
+     * @return bool 价格是否有效（未过期且非零）
      */
     function isTokenPriceValid() public view returns (bool) {
         return tokenPriceUSD > 0 && (block.timestamp - tokenPriceUpdatedAt) <= priceValidityPeriod;
@@ -689,8 +756,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 检查ETH价格是否过期
-     *
-     * @return bool 价格是否有效
+     * @return bool 价格是否有效（未过期且非零）
      */
     function isETHPriceValid() public view returns (bool) {
         return ethPriceUSD > 0 && (block.timestamp - ethPriceUpdatedAt) <= priceValidityPeriod;
@@ -698,7 +764,6 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 获取代币价格
-     *
      * @return uint256 代币价格（USD，精度18位）
      */
     function getTokenPrice() external view returns (uint256) {
@@ -707,7 +772,6 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 获取ETH价格
-     *
      * @return uint256 ETH价格（USD，精度18位）
      */
     function getETHPrice() external view returns (uint256) {
@@ -783,9 +847,8 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 验证价格是否有效（未过期且非零）
-     *
-     * @return bool 价格是否有效
+     * @dev 验证代币和ETH价格是否都有效（未过期且非零）
+     * @return bool 价格是否都有效
      */
     function isPriceValid() external view returns (bool) {
         return isTokenPriceValid() && isETHPriceValid();

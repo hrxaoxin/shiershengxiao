@@ -10,6 +10,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 import "./ArenaRankingLib.sol";
+import "./LPLib.sol";
 
 /**
  * @title ArenaReward
@@ -17,14 +18,14 @@ import "./ArenaRankingLib.sol";
  * 
  * 核心功能：
  * 1. 赛季奖励计算：根据玩家排名计算奖励分配
- * 2. 奖励发放：处理玩家领取竞技奖励
- * 3. 奖励池管理：管理 BNB 和代币奖励池
+ * 2. 奖励发放：处理玩家领取竞技奖励（LP形式）
+ * 3. 奖励池管理：管理 LP 奖励池
  * 4. 模拟玩家奖励：处理虚拟玩家获得的奖励
  * 
  * 奖励机制：
  * - 赛季结束后计算奖励
  * - 根据玩家排名分配奖励
- * - 支持 BNB 和代币两种奖励类型
+ * - 奖励以LP形式发放，领取时自动兑换为代币+WBNB
  * - 奖励率可配置，影响奖励分配比例
  * 
  * 与其他合约的交互：
@@ -42,6 +43,7 @@ import "./ArenaRankingLib.sol";
  */
 contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
+    using LPLib for IAuthorizer;
 
     /**
      * @dev 赛季奖励信息结构体
@@ -110,7 +112,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 玩家奖励领取状态映射
      */
     mapping(uint256 => mapping(address => bool)) public claimedRewards;
-    
+
     /**
      * @dev 赛季奖励计算事件
      */
@@ -297,6 +299,15 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return _distributeRealPlayerRewards(seasonId, rankings, arenaRankingManager, realPlayerRewardPool, totalRealPlayers);
     }
 
+    /**
+     * @dev 内部函数：分配真实玩家奖励
+     * @param seasonId 赛季 ID
+     * @param rankings 排名数组
+     * @param arenaRankingManager 排名管理合约地址
+     * @param realPlayerRewardPool 真实玩家奖励池
+     * @param totalRealPlayers 真实玩家总数
+     * @return distributed 已分配的奖励总额
+     */
     function _distributeRealPlayerRewards(
         uint256 seasonId,
         address[] memory rankings,
@@ -457,6 +468,10 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return total;
     }
 
+    /**
+     * @dev 添加奖励到池中（用于接收BNB）
+     * @notice 当合约收到BNB时，自动添加到LP奖励池
+     */
     function addRewardToPool() external payable onlyOwnerOrAuthorizer {
         emit RewardAdded(msg.value);
     }
@@ -488,6 +503,11 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return claimedRewards[seasonId][player];
     }
 
+    /**
+     * @dev 计算指定排名的奖励
+     * @param rank 排名
+     * @return 奖励金额
+     */
     function calculateRewardForRank(uint256 rank) external view returns (uint256) {
         require(rank > 0, "ArenaReward: Rank must be > 0");
         address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
@@ -506,6 +526,11 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         rewardRate = rate;
     }
 
+    /**
+     * @dev 设置最大奖励率
+     * @param maxRate 最大奖励率
+     * @notice 仅限owner调用
+     */
     function setMaxRewardRate(uint256 maxRate) external onlyOwner {
         maxRewardRate = maxRate;
     }
@@ -514,6 +539,11 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         rateStep = step;
     }
 
+    /**
+     * @dev 设置奖励类型
+     * @param _rewardType 奖励类型（0=BNB, 1=代币）
+     * @notice 仅限owner或authorizer调用
+     */
     function setRewardType(uint8 _rewardType) external onlyOwnerOrAuthorizer {
         require(_rewardType == 0 || _rewardType == 1, "ArenaReward: Invalid reward type");
         rewardType = _rewardType;
@@ -530,14 +560,27 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
     }
 
+    /**
+     * @dev 更新今日奖励金额
+     * @param amount 今日奖励金额
+     * @notice 仅限owner或authorizer调用
+     */
     function updateTodayRewardAmount(uint256 amount) external onlyOwnerOrAuthorizer {
         todayRewardAmount = amount;
     }
 
+    /**
+     * @dev 更新今日流入奖励
+     * @param amount 流入奖励金额
+     * @notice 仅限owner或authorizer调用，累加到todayIncomingReward
+     */
     function updateTodayIncomingReward(uint256 amount) external onlyOwnerOrAuthorizer {
         todayIncomingReward += amount;
     }
 
+    /**
+     * @dev 内部函数：根据每日流入奖励调整奖励率
+     */
     function _adjustRewardRate() internal {
         if (todayRewardAmount > 0 && todayIncomingReward > todayRewardAmount) {
             uint256 multiple = todayIncomingReward / todayRewardAmount;
@@ -556,5 +599,12 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
     }
 
-    receive() external payable {}
+    /**
+     * @dev 紧急提取WBNB
+     * @param amount WBNB数量
+     * @notice 仅限owner调用，用于紧急情况
+     */
+    function emergencyWithdrawWBNB(uint256 amount) external onlyOwner nonReentrant {
+        IAuthorizer(authorizer).emergencyWithdrawWBNB(amount);
+    }
 }

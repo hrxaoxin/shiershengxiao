@@ -3,6 +3,23 @@ pragma solidity ^0.8.20;
 
 import "./NFTInterface.sol";
 
+/**
+ * @title AuthorizerLib
+ * @dev 授权管理器工具库，提供合约地址管理的辅助函数
+ *
+ * 功能：
+ * 1. 批量地址验证：检查多个地址是否都已设置
+ * 2. 地址转换工具：提供地址到键值的转换
+ * 3. 合约地址结构：定义所有游戏合约的地址结构
+ *
+ * 主要合约分组：
+ * - 代币类：token, usdt, wbnb
+ * - NFT核心类：nftMintCore, nftMintMetadata, nftData
+ * - 游戏核心类：battle, battleSkillData, battleHistory, staking
+ * - 奖励类：rewardManager, dividendManager, poolManager, nftBuyback
+ * - 竞技场类：arenaRankingManager, arenaRankingQuery, arenaPlayer, arenaBattle, arenaLeaderboard
+ * - DEX类：pancakeSwapRouter, flapSwapRouter, uniswapRouter
+ */
 library AuthorizerLib {
     struct ContractAddresses {
         address token;
@@ -15,9 +32,12 @@ library AuthorizerLib {
         address nftTrading;
         address nftBuyback;
         address staking;
+        address stakingLP;
         address tokenStaking;
+        address tokenStakingLP;
         address rewardManager;
         address dividendManager;
+        address dividendManagerLP;
         address poolManager;
         address priceOracle;
         address battle;
@@ -29,6 +49,7 @@ library AuthorizerLib {
         address arenaRankingManager;
         address arenaRankingQuery;
         address arenaReward;
+        address arenaRewardLP;
         address arenaLeaderboard;
         address arenaPlayer;
         address arenaBattle;
@@ -49,28 +70,32 @@ library AuthorizerLib {
     uint256 constant INDEX_NFT_TRADING = 7;
     uint256 constant INDEX_NFT_BUYBACK = 8;
     uint256 constant INDEX_STAKING = 9;
-    uint256 constant INDEX_TOKEN_STAKING = 10;
-    uint256 constant INDEX_REWARD_MANAGER = 11;
-    uint256 constant INDEX_DIVIDEND_MANAGER = 12;
-    uint256 constant INDEX_POOL_MANAGER = 13;
-    uint256 constant INDEX_PRICE_ORACLE = 14;
-    uint256 constant INDEX_BATTLE = 15;
-    uint256 constant INDEX_BATTLE_SKILL_DATA = 16;
-    uint256 constant INDEX_BATTLE_HISTORY = 17;
-    uint256 constant INDEX_BREEDING_CORE = 18;
-    uint256 constant INDEX_BREEDING_MARKET = 19;
-    uint256 constant INDEX_WEIGHT_MANAGER = 20;
-    uint256 constant INDEX_ARENA_RANKING_MANAGER = 21;
-    uint256 constant INDEX_ARENA_RANKING_QUERY = 22;
-    uint256 constant INDEX_ARENA_REWARD = 23;
-    uint256 constant INDEX_ARENA_LEADERBOARD = 24;
-    uint256 constant INDEX_ARENA_PLAYER = 25;
-    uint256 constant INDEX_ARENA_BATTLE = 26;
-    uint256 constant INDEX_FEE_RECEIVER = 27;
-    uint256 constant INDEX_PANCAKE_SWAP_ROUTER = 28;
-    uint256 constant INDEX_FLAP_SWAP_ROUTER = 29;
-    uint256 constant INDEX_UNISWAP_ROUTER = 30;
-    uint256 constant INDEX_WBNB = 31;
+    uint256 constant INDEX_STAKING_LP = 10;
+    uint256 constant INDEX_TOKEN_STAKING = 11;
+    uint256 constant INDEX_TOKEN_STAKING_LP = 12;
+    uint256 constant INDEX_REWARD_MANAGER = 13;
+    uint256 constant INDEX_DIVIDEND_MANAGER = 14;
+    uint256 constant INDEX_DIVIDEND_MANAGER_LP = 15;
+    uint256 constant INDEX_POOL_MANAGER = 16;
+    uint256 constant INDEX_PRICE_ORACLE = 17;
+    uint256 constant INDEX_BATTLE = 18;
+    uint256 constant INDEX_BATTLE_SKILL_DATA = 19;
+    uint256 constant INDEX_BATTLE_HISTORY = 20;
+    uint256 constant INDEX_BREEDING_CORE = 21;
+    uint256 constant INDEX_BREEDING_MARKET = 22;
+    uint256 constant INDEX_WEIGHT_MANAGER = 23;
+    uint256 constant INDEX_ARENA_RANKING_MANAGER = 24;
+    uint256 constant INDEX_ARENA_RANKING_QUERY = 25;
+    uint256 constant INDEX_ARENA_REWARD = 26;
+    uint256 constant INDEX_ARENA_REWARD_LP = 27;
+    uint256 constant INDEX_ARENA_LEADERBOARD = 28;
+    uint256 constant INDEX_ARENA_PLAYER = 29;
+    uint256 constant INDEX_ARENA_BATTLE = 30;
+    uint256 constant INDEX_FEE_RECEIVER = 31;
+    uint256 constant INDEX_PANCAKE_SWAP_ROUTER = 32;
+    uint256 constant INDEX_FLAP_SWAP_ROUTER = 33;
+    uint256 constant INDEX_UNISWAP_ROUTER = 34;
+    uint256 constant INDEX_WBNB = 35;
 
     function setupAllAuthorizers(address _newAuthorizer, address[] calldata _addr) external {
         _setupNFT(_newAuthorizer, _addr);
@@ -97,30 +122,33 @@ library AuthorizerLib {
         if (_addr[11] != address(0)) ISetAuthorizer(_addr[11]).setAuthorizer(_newAuthorizer);
         if (_addr[12] != address(0)) ISetAuthorizer(_addr[12]).setAuthorizer(_newAuthorizer);
         if (_addr[13] != address(0)) ISetAuthorizer(_addr[13]).setAuthorizer(_newAuthorizer);
-        if (_addr[20] != address(0)) ISetAuthorizer(_addr[20]).setAuthorizer(_newAuthorizer);
+        if (_addr[14] != address(0)) ISetAuthorizer(_addr[14]).setAuthorizer(_newAuthorizer);
+        if (_addr[15] != address(0)) ISetAuthorizer(_addr[15]).setAuthorizer(_newAuthorizer);
+        if (_addr[23] != address(0)) ISetAuthorizer(_addr[23]).setAuthorizer(_newAuthorizer);
     }
 
     function _setupBattle(address _newAuthorizer, address[] calldata _addr) private {
-        if (_addr[15] != address(0)) ISetAuthorizer(_addr[15]).setAuthorizer(_newAuthorizer);
-        if (_addr[16] != address(0)) ISetAuthorizer(_addr[16]).setAuthorizer(_newAuthorizer);
-        if (_addr[17] != address(0)) ISetAuthorizer(_addr[17]).setAuthorizer(_newAuthorizer);
+        if (_addr[18] != address(0)) ISetAuthorizer(_addr[18]).setAuthorizer(_newAuthorizer);
+        if (_addr[19] != address(0)) ISetAuthorizer(_addr[19]).setAuthorizer(_newAuthorizer);
+        if (_addr[20] != address(0)) ISetAuthorizer(_addr[20]).setAuthorizer(_newAuthorizer);
     }
 
     function _setupBreeding(address _newAuthorizer, address[] calldata _addr) private {
-        if (_addr[18] != address(0)) ISetAuthorizer(_addr[18]).setAuthorizer(_newAuthorizer);
-        if (_addr[19] != address(0)) ISetAuthorizer(_addr[19]).setAuthorizer(_newAuthorizer);
+        if (_addr[21] != address(0)) ISetAuthorizer(_addr[21]).setAuthorizer(_newAuthorizer);
+        if (_addr[22] != address(0)) ISetAuthorizer(_addr[22]).setAuthorizer(_newAuthorizer);
     }
 
     function _setupArena(address _newAuthorizer, address[] calldata _addr) private {
-        if (_addr[21] != address(0)) ISetAuthorizer(_addr[21]).setAuthorizer(_newAuthorizer);
-        if (_addr[22] != address(0)) ISetAuthorizer(_addr[22]).setAuthorizer(_newAuthorizer);
-        if (_addr[23] != address(0)) ISetAuthorizer(_addr[23]).setAuthorizer(_newAuthorizer);
         if (_addr[24] != address(0)) ISetAuthorizer(_addr[24]).setAuthorizer(_newAuthorizer);
         if (_addr[25] != address(0)) ISetAuthorizer(_addr[25]).setAuthorizer(_newAuthorizer);
         if (_addr[26] != address(0)) ISetAuthorizer(_addr[26]).setAuthorizer(_newAuthorizer);
+        if (_addr[27] != address(0)) ISetAuthorizer(_addr[27]).setAuthorizer(_newAuthorizer);
+        if (_addr[28] != address(0)) ISetAuthorizer(_addr[28]).setAuthorizer(_newAuthorizer);
+        if (_addr[29] != address(0)) ISetAuthorizer(_addr[29]).setAuthorizer(_newAuthorizer);
+        if (_addr[30] != address(0)) ISetAuthorizer(_addr[30]).setAuthorizer(_newAuthorizer);
     }
 
     function _setupOther(address _newAuthorizer, address[] calldata _addr) private {
-        if (_addr[14] != address(0)) ISetAuthorizer(_addr[14]).setAuthorizer(_newAuthorizer);
+        if (_addr[17] != address(0)) ISetAuthorizer(_addr[17]).setAuthorizer(_newAuthorizer);
     }
 }

@@ -187,8 +187,9 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 内部函数：重置玩家的挑战次数
+     * @dev 内部函数：重置玩家挑战次数
      * @param player 玩家地址
+     * @notice 将玩家剩余挑战次数重置为每日默认值
      */
     function _resetAttempts(address player) internal {
         playerLastResetTime[player] = block.timestamp;
@@ -202,6 +203,11 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
     }
 
+    /**
+     * @dev 质押NFT
+     * @param tokenIds NFT ID数组（最多6个）
+     * @notice 玩家质押NFT用于竞技场战斗，质押后NFT转移到合约地址
+     */
     function stakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
         require(tokenIds.length > 0 && tokenIds.length <= 6, "ArenaPlayer: Invalid tokenIds count");
         
@@ -229,6 +235,11 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit NFTsStaked(msg.sender, tokenIds);
     }
 
+    /**
+     * @dev 解除质押NFT
+     * @param tokenIds NFT ID数组
+     * @notice 玩家解除质押NFT，如果解除后无质押NFT则清空战斗队伍
+     */
     function unstakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
         address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "ArenaPlayer: NFT contract not set");
@@ -298,6 +309,11 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit BattleTeamCleared(msg.sender);
     }
 
+    /**
+     * @dev 获取用户质押的NFT列表
+     * @param user 用户地址
+     * @return NFT ID数组
+     */
     function getUserStakedNFTs(address user) external view returns (uint256[] memory) {
         require(user != address(0), "ArenaPlayer: Invalid user address");
         return userStakedNFTs[user];
@@ -328,6 +344,11 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit ChallengeAttemptsRecharged(msg.sender, newAttempts);
     }
 
+    /**
+     * @dev 获取玩家剩余挑战次数
+     * @param player 玩家地址
+     * @return 剩余挑战次数
+     */
     function getRemainingAttempts(address player) external view returns (uint256) {
         if (playerLastResetTime[player] == 0) {
             return DAILY_ATTEMPTS;
@@ -338,6 +359,11 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return playerRemainingAttempts[player];
     }
 
+    /**
+     * @dev 获取玩家挑战状态
+     * @param player 玩家地址
+     * @return remainingAttempts 剩余挑战次数, lastBattleTime 上次战斗时间, hasTeam 是否有战斗队伍
+     */
     function getPlayerChallengeStatus(address player) external view returns (
         uint256 remainingAttempts,
         uint256 lastBattleTime,
@@ -356,6 +382,12 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         rechargeCost = _rechargeCost;
     }
 
+    /**
+     * @dev 更新玩家战斗时间
+     * @param player 玩家地址
+     * @param timestamp 时间戳
+     * @notice 仅限owner或authorizer调用
+     */
     function updatePlayerBattleTime(address player, uint256 timestamp) external onlyOwnerOrAuthorizer {
         playerLastBattleTime[player] = timestamp;
     }
@@ -368,6 +400,12 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         playerLastResetTime[player] = timestamp;
     }
 
+    /**
+     * @dev 生成模拟队伍
+     * @param seed 随机种子
+     * @return 模拟队伍（6个NFT ID）
+     * @notice 根据种子生成确定性的模拟玩家队伍
+     */
     function generateMockTeam(uint256 seed) external view returns (uint256[6] memory) {
         uint256[6] memory team;
         for (uint256 i = 0; i < 6; i++) {
@@ -381,6 +419,11 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return nftStakedOwner[tokenId] != address(0);
     }
 
+    /**
+     * @dev 获取NFT质押所有者
+     * @param tokenId NFT ID
+     * @return 质押所有者地址
+     */
     function getNFTStakedOwner(uint256 tokenId) external view returns (address) {
         return nftStakedOwner[tokenId];
     }

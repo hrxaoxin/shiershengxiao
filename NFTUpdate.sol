@@ -178,6 +178,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         minPancakeSwapLiquidity = 10**15;
     }
 
+    /**
+     * @dev 同步合约地址（从Authorizer获取并更新）
+     */
     function _syncContractAddresses() internal {
         IAuthorizer auth = IAuthorizer(authorizer);
         nftContract = auth.getNFTMintCore();
@@ -186,6 +189,10 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         dividendManager = auth.getDividendManager();
     }
 
+    /**
+     * @dev 设置PancakeSwap交易对地址
+     * @param pair PancakeSwap交易对地址
+     */
     function setPancakeSwapPair(address pair) external onlyOwner {
         pancakeSwapPair = pair;
     }
@@ -319,6 +326,10 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         ];
     }
 
+    /**
+     * @dev 设置最小PancakeSwap流动性要求
+     * @param minLiq 最小流动性数量
+     */
     function setMinPancakeSwapLiquidity(uint256 minLiq) external onlyOwner {
         minPancakeSwapLiquidity = minLiq;
     }
@@ -366,6 +377,12 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         }
     }
     
+    /**
+     * @dev 调整价格的小数位数（内部函数）
+     * @param price 原始价格
+     * @param tokenDecimals 代币小数位数
+     * @return uint256 调整后的价格（精度18位）
+     */
     function _adjustPriceDecimals(uint256 price, uint8 tokenDecimals) internal pure returns (uint256) {
         if (tokenDecimals == 18) {
             return price;

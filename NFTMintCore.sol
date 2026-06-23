@@ -349,6 +349,10 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return tokenId;
     }
     
+    /**
+     * @dev 生成安全随机数（供TokenBurner调用）
+     * @return uint256 随机数
+     */
     function generateSecureRandom() external whenNotPaused onlyTokenBurner returns (uint256) {
         return _generateSecureRandom();
     }
@@ -388,11 +392,21 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return string(buffer);
     }
     
+    /**
+     * @dev 将十六进制数字转换为字符（用于地址转字符串）
+     * @param value 十六进制数字（0-15）
+     * @return bytes1 对应的ASCII字符
+     */
     function _hexChar(uint8 value) internal pure returns (bytes1) {
         if (value < 10) return bytes1(uint8(48 + value));
         return bytes1(uint8(87 + value)); // a-f
     }
     
+    /**
+     * @dev 生成普通NFT类型（随机属性）
+     * @param randomSeed 随机种子
+     * @return uint256 NFT类型（0-119）
+     */
     function _mintNormalType(uint256 randomSeed) internal view returns (uint256) {
         uint256 element = _chooseElement(randomSeed % 100);
         uint256 zodiac = (randomSeed / 100) % 12;
@@ -400,6 +414,11 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return NFTLib.calculateZodiacType(element, zodiac, gender);
     }
     
+    /**
+     * @dev 生成稀有NFT类型（暗/光属性）
+     * @param randomSeed 随机种子
+     * @return uint256 NFT类型（72-119）
+     */
     function _mintRareType(uint256 randomSeed) internal view returns (uint256) {
         uint256 element = _chooseRareElement(randomSeed % 100);
         uint256 zodiac = (randomSeed / 100) % 12;
@@ -407,6 +426,11 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return NFTLib.calculateZodiacType(element, zodiac, gender);
     }
     
+    /**
+     * @dev 根据随机值选择普通属性（水、风、火）
+     * @param randomVal 随机值（0-99）
+     * @return uint256 属性索引（0-4）
+     */
     function _chooseElement(uint256 randomVal) internal view returns (uint256) {
         uint256[5] memory cumulative;
         cumulative[0] = elementProbabilities[0];
@@ -420,11 +444,21 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return 0;
     }
     
+    /**
+     * @dev 根据随机值选择稀有属性（暗、光）
+     * @param randomVal 随机值（0-99）
+     * @return uint256 属性索引（3或4）
+     */
     function _chooseRareElement(uint256 randomVal) internal view returns (uint256) {
         uint256 roll = randomVal % 100;
         return roll < rareElementProbabilities[0] ? 3 : 4;
     }
     
+    /**
+     * @dev 生成安全随机数（内部函数）
+     * 结合区块时间戳、随机数、铸造计数器生成随机种子
+     * @return uint256 随机数
+     */
     function _generateSecureRandom() internal returns (uint256) {
         mintCounter++;
         if (mintCounter > type(uint256).max - MINT_COUNTER_WARNING_THRESHOLD && !mintCounterWarningTriggered) {

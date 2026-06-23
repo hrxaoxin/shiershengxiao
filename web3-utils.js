@@ -187,6 +187,7 @@ window.ZODIAC_WEB3 = (function() {
         'tokenContract': ABIS.tokenABI,
         'nftTrading': ABIS.NFTTradingABI,
         'staking': ABIS.stakingABI,
+        'stakingLP': ABIS.stakingLPABI,
         'tokenStaking': ABIS.tokenStakingABI,
         'breeding': ABIS.breedingABI,
         'breedingCore': ABIS.breedingCoreABI,

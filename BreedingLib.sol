@@ -3,6 +3,26 @@ pragma solidity ^0.8.20;
 
 import "./NFTInterface.sol";
 
+/**
+ * @title BreedingLib
+ * @dev NFT繁殖工具库，提供繁殖相关的计算函数
+ *
+ * 功能：
+ * 1. 子代类型计算：根据父母类型生成子代的类型
+ * 2. 成长值生成：根据种子生成子代的成长值
+ * 3. 繁殖对验证：验证繁殖对是否有效
+ * 4. 每日繁殖限制：检查用户是否超过每日繁殖次数限制
+ *
+ * 繁殖规则：
+ * - 父母必须是同一生肖，不同性别
+ * - 子代继承父母的生肖和属性
+ * - 子代性别由随机数决定
+ * - 成长值在10-100之间随机生成
+ *
+ * 冷却时间：
+ * - 场内繁殖：3小时
+ * - 市场繁殖：24小时
+ */
 library BreedingLib {
     function getChildZodiacType(uint256 fatherType, uint256 motherType, uint256 timestamp) internal pure returns (uint256) {
         uint256 fatherZodiac = (fatherType / 2) % 12;

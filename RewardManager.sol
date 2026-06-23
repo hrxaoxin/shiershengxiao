@@ -9,14 +9,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 
-interface ITokenStaking {
-    function recordIncomingTokens(uint256 amount) external;
-}
-
-interface IBuybackReceiver {
-    function recordIncomingTokens(uint256 amount) external;
-}
-
 /**
  * @title RewardManager
  * @dev 奖励管理合约，统一管理所有游戏奖励的分发
@@ -97,20 +89,42 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     bool public paused;
     string public pauseReason;
 
+    /**
+     * @dev 合约暂停事件
+     * @param account 执行暂停操作的账户
+     * @param reason 暂停原因
+     */
     event Paused(address account, string reason);
+    
+    /**
+     * @dev 合约取消暂停事件
+     * @param account 执行取消暂停操作的账户
+     */
     event Unpaused(address account);
 
+    /**
+     * @dev 暂停修饰器：确保合约未处于暂停状态时才能执行函数
+     */
     modifier whenNotPaused() {
         require(!paused, "RewardManager: Paused");
         _;
     }
 
+    /**
+     * @dev 暂停合约，停止所有奖励分发操作
+     * 仅合约所有者可调用，用于紧急情况下暂停服务
+     * @param reason 暂停原因，将被记录在事件日志中
+     */
     function pause(string memory reason) external onlyOwner {
         paused = true;
         pauseReason = reason;
         emit Paused(msg.sender, reason);
     }
 
+    /**
+     * @dev 取消合约暂停，恢复奖励分发操作
+     * 仅合约所有者可调用
+     */
     function unpause() external onlyOwner {
         paused = false;
         pauseReason = "";
@@ -118,7 +132,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 授权合约地址（Authorizer）
+     * @dev 授权管理合约地址（Authorizer）
      */
     address public authorizer;
 
@@ -316,13 +330,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         if (amount == 0) {
             return;
         }
-        address tokenContract = IAuthorizer(authorizer).getToken();
-        address dexRouter = IAuthorizer(authorizer).getPancakeSwapRouter();
-        require(tokenContract != address(0), "RewardManager: Token contract not set");
-        require(dexRouter != address(0), "RewardManager: DEX router not set");
 
         _distributeDividendPool(amount);
-        _distributeTokenPools(amount, tokenContract);
+        _distributeStakingPool(amount);
+        _distributeTokenStakingPool(amount);
+        _distributeArenaPool(amount);
         _distributeBuybackPool(amount);
     }
 
@@ -372,13 +384,60 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         }
     }
 
+    function _distributeStakingPool(uint256 amount) private {
+        address stakingLP = IAuthorizer(authorizer).getStakingLP();
+        uint256 stakingAmount = amount * nftStakingPercent / PRECISION;
+        
+        if (stakingLP != address(0) && stakingAmount > 0) {
+            (bool success, ) = payable(stakingLP).call{value: stakingAmount}("");
+            if (success) {
+                try IStakingLP(stakingLP).recordIncomingBNB(stakingAmount) {} catch {}
+            } else {
+                lockedBNBAmount += stakingAmount;
+                emit BNBTransferFailed(1, stakingLP, stakingAmount);
+            }
+        }
+    }
+
+    function _distributeTokenStakingPool(uint256 amount) private {
+        address tokenStakingLP = IAuthorizer(authorizer).getTokenStakingLP();
+        uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
+        
+        if (tokenStakingLP != address(0) && tokenStakingAmount > 0) {
+            (bool success, ) = payable(tokenStakingLP).call{value: tokenStakingAmount}("");
+            if (success) {
+                try ITokenStakingLP(tokenStakingLP).recordIncomingBNB(tokenStakingAmount) {} catch {}
+            } else {
+                lockedBNBAmount += tokenStakingAmount;
+                emit BNBTransferFailed(2, tokenStakingLP, tokenStakingAmount);
+            }
+        }
+    }
+
+    function _distributeArenaPool(uint256 amount) private {
+        address arenaRewardLP = IAuthorizer(authorizer).getArenaRewardLP();
+        uint256 arenaAmount = amount * arenaRewardPercent / PRECISION;
+        
+        if (arenaRewardLP != address(0) && arenaAmount > 0) {
+            (bool success, ) = payable(arenaRewardLP).call{value: arenaAmount}("");
+            if (success) {
+                try IArenaRewardLP(arenaRewardLP).recordIncomingBNB(arenaAmount) {} catch {}
+            } else {
+                lockedBNBAmount += arenaAmount;
+                emit BNBTransferFailed(3, arenaRewardLP, arenaAmount);
+            }
+        }
+    }
+
     function _distributeBuybackPool(uint256 amount) private {
         address nftBuybackPool = IAuthorizer(authorizer).getNFTBuyback();
         uint256 buybackAmount = amount * nftBuybackPercent / PRECISION;
         
         if (nftBuybackPool != address(0) && buybackAmount > 0) {
             (bool success, ) = payable(nftBuybackPool).call{value: buybackAmount}("");
-            if (!success) {
+            if (success) {
+                try IBuybackReceiver(nftBuybackPool).recordIncomingBNB(buybackAmount) {} catch {}
+            } else {
                 lockedBNBAmount += buybackAmount;
                 emit BNBTransferFailed(4, nftBuybackPool, buybackAmount);
             }
@@ -490,6 +549,9 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
     /**
      * @dev 添加质押池奖励
+     * 用于直接向指定质押池添加代币奖励
+     * @param amount 奖励代币数量
+     * @param poolType 池子类型（0=NFT质押池, 1=代币质押池, 2=竞技场奖励池）
      */
     function addStakingReward(uint256 amount, uint256 poolType) external onlyOwnerOrAuthorizer whenNotPaused {
         require(amount > 0, "RewardManager: Invalid amount");
@@ -512,25 +574,23 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         }
     }
 
-    /**
-     * @dev 用户可领取分红映射
-     * user => pendingDividend
-     */
+    /// @dev 用户可领取分红映射
     mapping(address => uint256) public pendingDividends;
     
-    /**
-     * @dev 用户权重映射
-     * user => weight
-     */
+    /// @dev 用户权重映射，用于计算分红比例
     mapping(address => uint256) public userWeights;
 
     /**
      * @dev 分红发放事件
+     * @param user 用户地址
+     * @param amount 领取的分红数量
      */
     event DividendClaimed(address indexed user, uint256 amount);
 
     /**
-     * @dev 领取分红（无参版本，前端直接调用 - 领取 msg.sender 的分红）
+     * @dev 领取当前用户的分红（无参版本 - 前端直接调用）
+     * 用户调用此函数领取自己在分红池中的应得分红
+     * @return 实际领取的分红数量
      */
     function claimDividend() external whenNotPaused nonReentrant returns (uint256) {
         address user = msg.sender;
@@ -552,7 +612,10 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 领取分红（带参数版本 - owner/authorizer 可为其他用户领取）
+     * @dev 领取指定用户的分红（带参数版本 - owner/authorizer可为其他用户领取）
+     * 用于批量给用户发放分红或帮助离线用户领取
+     * @param user 目标用户地址
+     * @return 实际领取的分红数量
      */
     function claimDividendFor(address user) external whenNotPaused nonReentrant returns (uint256) {
         require(
@@ -578,21 +641,28 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     /**
-     * @dev 获取用户可领取分红
+     * @dev 获取用户待领取分红金额
+     * @param user 用户地址
+     * @return 用户待领取的分红数量
      */
     function getDividend(address user) external view returns (uint256) {
         return pendingDividends[user];
     }
 
     /**
-     * @dev 计算用户可领取分红（前端调用）
+     * @dev 计算用户可领取分红（用于前端展示）
+     * @param user 用户地址
+     * @return pending 用户待领取的分红数量
+     * @return weight 用户当前权重
      */
-    function calcUserDividend(address user) external view returns (uint256, uint256) {
+    function calcUserDividend(address user) external view returns (uint256 pending, uint256 weight) {
         return (pendingDividends[user], userWeights[user]);
     }
     
     /**
      * @dev 获取用户待领取分红（仅返回金额）
+     * @param user 用户地址
+     * @return 用户待领取的分红数量
      */
     function getUserPendingDividend(address user) external view returns (uint256) {
         return pendingDividends[user];
@@ -600,6 +670,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
     /**
      * @dev 获取分红池余额
+     * @return 分红池中代币余额
      */
     function dividendPoolBalance() external view returns (uint256) {
         address tokenContract = IAuthorizer(authorizer).getToken();
@@ -847,6 +918,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         totalDistributed_ = totalDistributed;
     }
 
+    /**
+     * @dev 紧急提取BNB（仅所有者可调用）
+     * 用于在紧急情况下提取合约持有的BNB
+     * @param amount 提取数量
+     */
     function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "RewardManager: Amount must be > 0");
         require(amount <= address(this).balance, "RewardManager: Insufficient balance");
@@ -855,6 +931,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
+    /**
+     * @dev 紧急提取代币（仅所有者可调用）
+     * 用于在紧急情况下提取合约持有的代币
+     * @param amount 提取数量
+     */
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "RewardManager: Amount must be > 0");
         address tokenContract = IAuthorizer(authorizer).getToken();
@@ -869,7 +950,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
     
     /**
-     * @dev 重试分配锁定的BNB（仅owner或authorizer）
+     * @dev 重试分配锁定的BNB（仅owner或authorizer可调用）
+     * 当BNB转账失败时会被锁定，此函数尝试重新分配锁定的BNB
      */
     function retryLockedBNBDistribution() external onlyOwnerOrAuthorizer nonReentrant {
         uint256 lockedAmount = lockedBNBAmount;

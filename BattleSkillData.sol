@@ -70,15 +70,23 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /**
      * @dev 技能数据映射
      * elementIndex (0-4) => zodiacIndex (0-11) => gender (0-1) => FullSkill
+     * 三维映射：第一维属性，第二维生肖，第三维性别
      */
     mapping(uint256 => mapping(uint256 => mapping(uint256 => BattleLib.FullSkill))) public fullSkills;
 
+    /**
+     * @dev 技能是否已初始化标志
+     */
     bool public skillsInitialized;
 
+    /**
+     * @dev 技能初始化待确认标志（两步初始化机制）
+     */
     bool public skillsInitializationPending;
 
     /**
-     * @dev 修饰器：仅所有者或授权器可调用
+     * @notice 修饰器：仅所有者或授权器可调用
+     * @dev 双重授权检查：owner或authorizer或authorizer认可的系统合约
      */
     modifier onlyOwnerOrAuthorizer() {
         if (msg.sender == owner() || msg.sender == authorizer) {
@@ -146,10 +154,10 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
     /**
      * @dev 通过属性、生肖、性别索引获取技能
-     * @param elementIndex 属性索引 (0-4)
-     * @param zodiacIndex 生肖索引 (0-11)
-     * @param gender 性别 (0-1)
-     * @return FullSkill 技能数据
+     * @param elementIndex 属性索引 (0-4): 0=水, 1=风, 2=火, 3=暗, 4=光
+     * @param zodiacIndex 生肖索引 (0-11): 0=鼠, 1=牛, ..., 11=猪
+     * @param gender 性别 (0-1): 0=母, 1=公
+     * @return FullSkill 完整技能数据（普攻 + 3个技能 + 终极技）
      */
     function getSkillByIndexes(uint256 elementIndex, uint256 zodiacIndex, uint256 gender) external view returns (BattleLib.FullSkill memory) {
         return fullSkills[elementIndex][zodiacIndex][gender];
@@ -171,7 +179,7 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
     /**
      * @dev 获取生肖基础速度（与NFTLib.BASE_SPEED保持一致）
-     * @param zodiac 生肖索引 (0-11)
+     * @param zodiac 生肖索引 (0-11): 0=鼠, 1=牛, 2=虎, 3=兔, 4=龙, 5=蛇, 6=马, 7=羊, 8=猴, 9=鸡, 10=狗, 11=猪
      * @return uint256 基础速度值
      */
     function getZodiacSpeed(uint256 zodiac) external pure returns (uint256) {

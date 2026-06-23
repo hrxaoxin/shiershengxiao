@@ -157,12 +157,19 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         authorizer = _authorizerAddress;
     }
 
+    /**
+     * @dev 暂停合约交易
+     * @param reason 暂停原因
+     */
     function pause(string memory reason) external onlyOwner {
         paused = true;
         pauseReason = reason;
         emit Paused(msg.sender, reason);
     }
 
+    /**
+     * @dev 恢复合约交易
+     */
     function unpause() external onlyOwner {
         paused = false;
         pauseReason = "";

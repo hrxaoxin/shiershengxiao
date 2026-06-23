@@ -132,9 +132,9 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
     /**
      * @dev 获取自动回购（固定价回购）是否开启
-     * @return 固定回购开启状态
+     * @return fixedBuybackOpen 固定回购开启状态
      */
-    function autoBuybackOpen() public view returns (bool) {
+    function autoBuybackOpen() public view returns (bool fixedBuybackOpen) {
         return fixedBuybackOpen;
     }
 
@@ -392,6 +392,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
     /**
      * @dev 销毁NFT后同步权重
+     * 在NFT被销毁前调用，更新用户的权重信息
      * @param user 用户地址
      * @param tokenId NFT ID
      */
@@ -638,12 +639,115 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
     /**
-     * @dev 接收ETH（保留以防意外发送）
+     * @dev 接收BNB并自动兑换为代币用于回购
      */
-    receive() external payable {}
-    
+    receive() external payable {
+        if (msg.value > 0) {
+            _convertBNBToToken(msg.value);
+        }
+    }
+
+    /**
+     * @dev 记录收到的BNB并自动兑换为代币用于回购
+     * @param amount 收到的BNB数量
+     */
+    function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
+        require(amount > 0, "NFTBuyback: Amount must be > 0");
+        _convertBNBToToken(amount);
+    }
+
+    /**
+     * @dev 内部函数：将BNB兑换为代币
+     * 通过PancakeSwap路由将BNB兑换为游戏代币
+     * @param bnbAmount 要兑换的BNB数量
+     */
+    function _convertBNBToToken(uint256 bnbAmount) internal {
+        address token = IAuthorizer(authorizer).getToken();
+        address wbnb = IAuthorizer(authorizer).getWBNB();
+        address router = IAuthorizer(authorizer).getPancakeSwapRouter();
+        
+        require(token != address(0) && wbnb != address(0) && router != address(0), "NFTBuyback: Missing config");
+
+        address[] memory path = new address[](2);
+        path[0] = wbnb;
+        path[1] = token;
+
+        uint256[] memory amounts = IDexRouter(router).getAmountsOut(bnbAmount, path);
+        uint256 expectedOut = amounts[1];
+        uint256 minOut = expectedOut * 95 / 100; // 5%滑点保护
+
+        try IDexRouter(router).swapExactETHForTokens{value: bnbAmount}(
+            minOut,
+            path,
+            address(this),
+            block.timestamp + 300
+        ) returns (uint256[] memory outputAmounts) {
+            emit BNBConverted(bnbAmount, outputAmounts[1]);
+        } catch {
+            emit BNBConversionFailed(bnbAmount);
+        }
+    }
+
+    /**
+     * @dev 紧急提取BNB（仅所有者可调用）
+     * 用于在紧急情况下提取合约持有的BNB
+     * @param amount 提取数量
+     */
+    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
+        require(amount > 0, "NFTBuyback: Amount must be > 0");
+        require(amount <= address(this).balance, "NFTBuyback: Insufficient BNB");
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        require(success, "NFTBuyback: BNB transfer failed");
+        emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
+    }
+
+    /**
+     * @dev 紧急提取WBNB（仅所有者可调用）
+     * 用于在紧急情况下提取合约持有的WBNB
+     * @param amount 提取数量
+     */
+    function emergencyWithdrawWBNB(uint256 amount) external onlyOwner nonReentrant {
+        address wbnb = IAuthorizer(authorizer).getWBNB();
+        require(amount > 0, "NFTBuyback: Amount must be > 0");
+        require(IWBNB(wbnb).balanceOf(address(this)) >= amount, "NFTBuyback: Insufficient WBNB");
+        
+        IWBNB(wbnb).withdraw(amount);
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        require(success, "NFTBuyback: BNB transfer failed");
+        emit EmergencyWBNBWithdrawn(msg.sender, owner(), amount);
+    }
+
     /**
      * @dev 回退函数
      */
     fallback() external payable {}
+
+    /**
+     * @dev BNB兑换成功事件
+     * @param bnbAmount 兑换的BNB数量
+     * @param tokenAmount 获得的代币数量
+     */
+    event BNBConverted(uint256 bnbAmount, uint256 tokenAmount);
+    
+    /**
+     * @dev BNB兑换失败事件
+     * @param bnbAmount 尝试兑换的BNB数量
+     */
+    event BNBConversionFailed(uint256 bnbAmount);
+    
+    /**
+     * @dev 紧急提取BNB事件
+     * @param operator 操作地址
+     * @param to 接收地址
+     * @param amount 提取数量
+     */
+    event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    
+    /**
+     * @dev 紧急提取WBNB事件
+     * @param operator 操作地址
+     * @param to 接收地址
+     * @param amount 提取数量
+     */
+    event EmergencyWBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
 }

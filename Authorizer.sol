@@ -7,6 +7,30 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "./NFTInterface.sol";
 import "./AuthorizerLib.sol";
 
+/**
+ * @title Authorizer
+ * @dev 授权管理器合约，统一管理所有合约地址的注册和验证
+ *
+ * 核心职责：
+ * 1. 地址管理：存储和提供所有游戏合约的地址映射
+ * 2. 系统合约验证：验证调用者是否为合法的系统合约
+ * 3. 全局暂停：支持全局暂停所有合约操作
+ *
+ * 主要地址类型：
+ * - 代币相关：token, usdt, wbnb
+ * - NFT相关：nftMintCore, nftMintMetadata, nftData, nftUpdate
+ * - 质押相关：staking, tokenStaking
+ * - 奖励相关：rewardManager, dividendManager, poolManager, nftBuyback
+ * - 战斗相关：battle, battleSkillData, battleHistory
+ * - 繁殖相关：breedingCore, breedingMarket
+ * - 竞技场相关：arenaRankingManager, arenaRankingQuery, arenaPlayer, arenaBattle, arenaLeaderboard
+ * - DEX相关：pancakeSwapRouter, flapSwapRouter, uniswapRouter
+ *
+ * 安全特性：
+ * - 仅Owner可以更新合约地址
+ * - 系统合约白名单验证
+ * - 可全局暂停所有操作
+ */
 contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     constructor() {
         _disableInitializers();
@@ -33,29 +57,57 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _;
     }
 
+    /**
+     * @dev 暂停合约，停止所有操作
+     * 仅合约所有者可调用，用于紧急情况下暂停服务
+     * @param reason 暂停原因，将被记录在事件日志中
+     */
     function pause(string memory reason) external onlyOwner {
         paused = true;
         pauseReason = reason;
         emit Paused(msg.sender, reason);
     }
 
+    /**
+     * @dev 取消合约暂停，恢复所有操作
+     * 仅合约所有者可调用
+     */
     function unpause() external onlyOwner {
         paused = false;
         pauseReason = "";
         emit Unpaused(msg.sender);
     }
 
+    /**
+     * @dev 初始化合约
+     * 初始化OpenZeppelin升级组件
+     */
     function initialize() external initializer {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
     }
 
-    function _authorizeUpgrade(address) internal override onlyOwner {}
+    /**
+     * @dev UUPS升级授权函数
+     * 仅允许合约所有者升级合约实现
+     * @param newImplementation 新实现合约地址
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
+    /**
+     * @dev 通过key获取合约地址
+     * @param key 合约地址的keccak256哈希key
+     * @return 地址
+     */
     function getAddress(bytes32 key) external view returns (address) {
         return _addresses[key];
     }
 
+    /**
+     * @dev 设置单个合约地址
+     * @param key 合约地址的keccak256哈希key
+     * @param value 合约地址
+     */
     function setAddress(bytes32 key, address value) external onlyOwner whenNotPaused {
         _addresses[key] = value;
         emit ContractAddressUpdated(key, value);
@@ -82,6 +134,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             addr == _addresses[keccak256("nftTrading")] ||
             addr == _addresses[keccak256("nftBuyback")] ||
             addr == _addresses[keccak256("staking")] ||
+            addr == _addresses[keccak256("stakingLP")] ||
             addr == _addresses[keccak256("tokenStaking")] ||
             addr == _addresses[keccak256("rewardManager")] ||
             addr == _addresses[keccak256("dividendManager")] ||
@@ -123,11 +176,20 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         }
     }
 
+    /**
+     * @dev 设置所有合约地址（使用固定顺序数组）
+     * @param _addr 地址数组，按固定顺序填充所有合约地址
+     */
     function setAllContracts(address[] calldata _addr) external onlyOwner whenNotPaused {
         _setAddresses(_addr);
         emit GlobalAddressesUpdated();
     }
 
+    /**
+     * @dev 内部函数：设置所有合约地址
+     * 调用各个分类设置函数
+     * @param _addr 地址数组
+     */
     function _setAddresses(address[] calldata _addr) internal {
         _setCoreAddresses(_addr);
         _setNFTAddresses(_addr);
@@ -138,6 +200,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _setOtherAddresses(_addr);
     }
 
+    /**
+     * @dev 内部函数：设置核心合约地址
+     * @param _addr 地址数组
+     */
     function _setCoreAddresses(address[] calldata _addr) private {
         _addresses[keccak256("token")] = _addr[0];
         _addresses[keccak256("usdt")] = _addr[1];
@@ -147,6 +213,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _addresses[keccak256("priceOracle")] = _addr[14];
     }
 
+    /**
+     * @dev 内部函数：设置NFT相关合约地址
+     * @param _addr 地址数组
+     */
     function _setNFTAddresses(address[] calldata _addr) private {
         _addresses[keccak256("nftMintCore")] = _addr[2];
         _addresses[keccak256("nftMintMetadata")] = _addr[3];
@@ -157,23 +227,40 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _addresses[keccak256("nftBuyback")] = _addr[8];
     }
 
+    /**
+     * @dev 内部函数：设置质押相关合约地址
+     * @param _addr 地址数组
+     */
     function _setStakingAddresses(address[] calldata _addr) private {
         _addresses[keccak256("staking")] = _addr[9];
-        _addresses[keccak256("tokenStaking")] = _addr[10];
+        _addresses[keccak256("stakingLP")] = _addr[10];
+        _addresses[keccak256("tokenStaking")] = _addr[11];
         _addresses[keccak256("weightManager")] = _addr[20];
     }
 
+    /**
+     * @dev 内部函数：设置战斗相关合约地址
+     * @param _addr 地址数组
+     */
     function _setBattleAddresses(address[] calldata _addr) private {
         _addresses[keccak256("battle")] = _addr[15];
         _addresses[keccak256("battleSkillData")] = _addr[16];
         _addresses[keccak256("battleHistory")] = _addr[17];
     }
 
+    /**
+     * @dev 内部函数：设置繁殖相关合约地址
+     * @param _addr 地址数组
+     */
     function _setBreedingAddresses(address[] calldata _addr) private {
         _addresses[keccak256("breedingCore")] = _addr[18];
         _addresses[keccak256("breedingMarket")] = _addr[19];
     }
 
+    /**
+     * @dev 内部函数：设置竞技场相关合约地址
+     * @param _addr 地址数组
+     */
     function _setArenaAddresses(address[] calldata _addr) private {
         _addresses[keccak256("arenaRankingManager")] = _addr[21];
         _addresses[keccak256("arenaRankingQuery")] = _addr[22];
@@ -183,6 +270,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _addresses[keccak256("arenaBattle")] = _addr[26];
     }
 
+    /**
+     * @dev 内部函数：设置其他合约地址
+     * @param _addr 地址数组
+     */
     function _setOtherAddresses(address[] calldata _addr) private {
         _addresses[keccak256("feeReceiver")] = _addr[27];
         _addresses[keccak256("pancakeSwapRouter")] = _addr[28];
@@ -191,6 +282,13 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _addresses[keccak256("wbnb")] = _addr[31];
     }
 
+    /**
+     * @dev 设置所有授权者和合约地址
+     * 用于完全更新授权系统
+     * @param _expectedOldAuthorizer 预期的前一个授权者地址
+     * @param _newAuthorizer 新的授权者地址
+     * @param _contracts 合约地址数组
+     */
     function setAllAuthorizers(
         address _expectedOldAuthorizer,
         address _newAuthorizer,
@@ -206,129 +304,290 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         AuthorizerLib.setupAllAuthorizers(_newAuthorizer, _contracts);
     }
 
+    /**
+     * @dev 获取代币合约地址
+     * @return 代币合约地址
+     */
     function getToken() external view returns (address) {
         return _addresses[keccak256("token")];
     }
 
+    /**
+     * @dev 获取USDT合约地址
+     * @return USDT合约地址
+     */
     function getUSDT() external view returns (address) {
         return _addresses[keccak256("usdt")];
     }
 
+    /**
+     * @dev 获取NFT铸造核心合约地址
+     * @return NFT铸造核心合约地址
+     */
     function getNFTMintCore() external view returns (address) {
         return _addresses[keccak256("nftMintCore")];
     }
+
+    /**
+     * @dev 获取NFT元数据合约地址
+     * @return NFT元数据合约地址
+     */
     function getNFTMintMetadata() external view returns (address) {
         return _addresses[keccak256("nftMintMetadata")];
     }
 
+    /**
+     * @dev 获取NFT升级合约地址
+     * @return NFT升级合约地址
+     */
     function getNFTUpdate() external view returns (address) {
         return _addresses[keccak256("nftUpdate")];
     }
 
+    /**
+     * @dev 获取NFT数据合约地址
+     * @return NFT数据合约地址
+     */
     function getNFTData() external view returns (address) {
         return _addresses[keccak256("nftData")];
     }
 
+    /**
+     * @dev 获取代币销毁合约地址
+     * @return 代币销毁合约地址
+     */
     function getTokenBurner() external view returns (address) {
         return _addresses[keccak256("tokenBurner")];
     }
 
+    /**
+     * @dev 获取NFT交易合约地址
+     * @return NFT交易合约地址
+     */
     function getNFTTrading() external view returns (address) {
         return _addresses[keccak256("nftTrading")];
     }
 
+    /**
+     * @dev 获取NFT回购合约地址
+     * @return NFT回购合约地址
+     */
     function getNFTBuyback() external view returns (address) {
         return _addresses[keccak256("nftBuyback")];
     }
 
+    /**
+     * @dev 获取NFT质押合约地址
+     * @return NFT质押合约地址
+     */
     function getStaking() external view returns (address) {
         return _addresses[keccak256("staking")];
     }
 
+    /**
+     * @dev 获取质押LP奖励合约地址
+     * @return 质押LP奖励合约地址
+     */
+    function getStakingLP() external view returns (address) {
+        return _addresses[keccak256("stakingLP")];
+    }
+
+    /**
+     * @dev 获取代币质押合约地址
+     * @return 代币质押合约地址
+     */
     function getTokenStaking() external view returns (address) {
         return _addresses[keccak256("tokenStaking")];
     }
 
+    /**
+     * @dev 获取奖励管理合约地址
+     * @return 奖励管理合约地址
+     */
     function getRewardManager() external view returns (address) {
         return _addresses[keccak256("rewardManager")];
     }
 
+    /**
+     * @dev 获取分红管理合约地址
+     * @return 分红管理合约地址
+     */
     function getDividendManager() external view returns (address) {
         return _addresses[keccak256("dividendManager")];
     }
 
+    /**
+     * @dev 获取资金池管理合约地址
+     * @return 资金池管理合约地址
+     */
     function getPoolManager() external view returns (address) {
         return _addresses[keccak256("poolManager")];
     }
 
+    /**
+     * @dev 获取价格预言机合约地址
+     * @return 价格预言机合约地址
+     */
     function getPriceOracle() external view returns (address) {
         return _addresses[keccak256("priceOracle")];
     }
 
+    /**
+     * @dev 获取战斗合约地址
+     * @return 战斗合约地址
+     */
     function getBattle() external view returns (address) {
         return _addresses[keccak256("battle")];
     }
 
+    /**
+     * @dev 获取战斗技能数据合约地址
+     * @return 战斗技能数据合约地址
+     */
     function getBattleSkillData() external view returns (address) {
         return _addresses[keccak256("battleSkillData")];
     }
 
+    /**
+     * @dev 获取战斗历史合约地址
+     * @return 战斗历史合约地址
+     */
     function getBattleHistory() external view returns (address) {
         return _addresses[keccak256("battleHistory")];
     }
 
+    /**
+     * @dev 获取繁殖核心合约地址
+     * @return 繁殖核心合约地址
+     */
     function getBreedingCore() external view returns (address) {
         return _addresses[keccak256("breedingCore")];
     }
 
+    /**
+     * @dev 获取繁殖市场合约地址
+     * @return 繁殖市场合约地址
+     */
     function getBreedingMarket() external view returns (address) {
         return _addresses[keccak256("breedingMarket")];
     }
 
+    /**
+     * @dev 获取权重管理合约地址
+     * @return 权重管理合约地址
+     */
     function getWeightManager() external view returns (address) {
         return _addresses[keccak256("weightManager")];
     }
 
+    /**
+     * @dev 获取竞技场排名管理合约地址
+     * @return 竞技场排名管理合约地址
+     */
     function getArenaRankingManager() external view returns (address) {
         return _addresses[keccak256("arenaRankingManager")];
     }
 
+    /**
+     * @dev 获取竞技场排名查询合约地址
+     * @return 竞技场排名查询合约地址
+     */
     function getArenaRankingQuery() external view returns (address) {
         return _addresses[keccak256("arenaRankingQuery")];
     }
 
+    /**
+     * @dev 获取竞技场奖励合约地址
+     * @return 竞技场奖励合约地址
+     */
     function getArenaReward() external view returns (address) {
         return _addresses[keccak256("arenaReward")];
     }
 
+    /**
+     * @dev 获取竞技场奖励LP合约地址
+     * @return 竞技场奖励LP合约地址
+     */
+    function getArenaRewardLP() external view returns (address) {
+        return _addresses[keccak256("arenaRewardLP")];
+    }
+
+    /**
+     * @dev 获取代币质押LP合约地址
+     * @return 代币质押LP合约地址
+     */
+    function getTokenStakingLP() external view returns (address) {
+        return _addresses[keccak256("tokenStakingLP")];
+    }
+
+    /**
+     * @dev 获取分红管理LP合约地址
+     * @return 分红管理LP合约地址
+     */
+    function getDividendManagerLP() external view returns (address) {
+        return _addresses[keccak256("dividendManagerLP")];
+    }
+
+    /**
+     * @dev 获取竞技场排行榜合约地址
+     * @return 竞技场排行榜合约地址
+     */
     function getArenaLeaderboard() external view returns (address) {
         return _addresses[keccak256("arenaLeaderboard")];
     }
 
+    /**
+     * @dev 获取竞技场玩家合约地址
+     * @return 竞技场玩家合约地址
+     */
     function getArenaPlayer() external view returns (address) {
         return _addresses[keccak256("arenaPlayer")];
     }
 
+    /**
+     * @dev 获取竞技场战斗合约地址
+     * @return 竞技场战斗合约地址
+     */
     function getArenaBattle() external view returns (address) {
         return _addresses[keccak256("arenaBattle")];
     }
 
+    /**
+     * @dev 获取费用接收地址
+     * @return 费用接收地址
+     */
     function getFeeReceiver() external view returns (address) {
         return _addresses[keccak256("feeReceiver")];
     }
 
+    /**
+     * @dev 获取PancakeSwap路由地址
+     * @return PancakeSwap路由地址
+     */
     function getPancakeSwapRouter() external view returns (address) {
         return _addresses[keccak256("pancakeSwapRouter")];
     }
 
+    /**
+     * @dev 获取FlapSwap路由地址
+     * @return FlapSwap路由地址
+     */
     function getFlapSwapRouter() external view returns (address) {
         return _addresses[keccak256("flapSwapRouter")];
     }
 
+    /**
+     * @dev 获取Uniswap路由地址
+     * @return Uniswap路由地址
+     */
     function getUniswapRouter() external view returns (address) {
         return _addresses[keccak256("uniswapRouter")];
     }
 
+    /**
+     * @dev 获取WBNB合约地址
+     * @return WBNB合约地址
+     */
     function getWBNB() external view returns (address) {
         return _addresses[keccak256("wbnb")];
     }

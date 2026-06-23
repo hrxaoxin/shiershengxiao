@@ -193,6 +193,10 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         });
     }
 
+    /**
+     * @dev 暂停合约
+     * @notice 仅限owner调用，暂停后将阻止大部分操作
+     */
     function pause() external onlyOwner {
         _pause();
     }
@@ -247,6 +251,11 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @dev 获取玩家排名
      * @param player 玩家地址
      * @return 排名位置（从1开始）
+     */
+    /**
+     * @dev 获取玩家排名
+     * @param player 玩家地址
+     * @return 排名位置（从1开始，未上榜返回0）
      */
     function getPlayerRank(address player) external view returns (uint256) {
         address arenaLeaderboardContract = IAuthorizer(authorizer).getArenaLeaderboard();
@@ -392,7 +401,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     }
 
     /**
-     * @dev 获取当前赛季奖励（重载）
+     * @dev 获取当前赛季奖励
      * @param player 玩家地址
      * @return 奖励金额
      */
@@ -557,7 +566,8 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     }
 
     /**
-     * @dev 领取当前赛季奖励（重载）
+     * @dev 领取当前赛季奖励
+     * @notice 用户调用此函数领取当前赛季的排名奖励
      */
     function claimSeasonReward() external nonReentrant whenNotPaused {
         _claimSeasonReward(currentSeasonId);
@@ -573,9 +583,10 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     }
 
     /**
-     * @dev 内部函数：领取赛季奖励
+     * @dev 内部函数：领取指定赛季奖励
      * @param seasonId 赛季 ID
      * @return 领取的奖励金额
+     * @notice 实际执行奖励领取的内部逻辑
      */
     function _claimSeasonReward(uint256 seasonId) internal returns (uint256) {
         require(seasonId > 0 && seasonId <= currentSeasonId, "ArenaRankingQuery: Invalid season");

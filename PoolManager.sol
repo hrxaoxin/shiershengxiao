@@ -98,6 +98,9 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     bool public paused;
 
+    /**
+     * @dev 暂停修饰器：确保合约未处于暂停状态时才能执行函数
+     */
     modifier whenNotPaused() {
         require(!paused, "PoolManager: Paused");
         _;
@@ -209,6 +212,8 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 获取池子余额
+     * @param poolType 池子类型（0=NFT质押池, 1=代币质押池, 2=竞技场奖励池）
+     * @return 池子当前余额
      */
     function getPoolBalance(uint256 poolType) external view returns (uint256) {
         return poolBalances[poolType];

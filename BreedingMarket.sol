@@ -10,8 +10,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "./NFTInterface.sol";
 
 /**
- * @title BreedingMarket
- * @dev 繁殖市场合约，管理NFT繁殖配对的市场列表
+ * @title BreedingMarket - 繁殖市场合约
+ * @dev 管理NFT繁殖配对的市场列表
  * 
  * 核心职责：
  * 1. 市场挂牌：用户将NFT挂牌到繁殖市场，供其他用户选择配对
@@ -19,11 +19,11 @@ import "./NFTInterface.sol";
  * 3. 下架管理：用户可随时下架自己的NFT
  * 
  * 繁殖市场流程：
- * 1. 用户调用 listNFT(tokenId) 将NFT挂牌到市场
+ * 1. 用户调用 listForMarketBreeding(tokenId) 将NFT挂牌到市场
  * 2. NFT被锁定在合约中，等待配对
- * 3. 其他用户选择该NFT进行繁殖（调用BreedingCore.breedMarket）
+ * 3. 其他用户选择该NFT进行繁殖（调用BreedingCore.createMarketBreedingPairPublic）
  * 4. 繁殖完成后，NFT解锁并返回给原所有者
- * 5. 用户可调用 delistNFT(tokenId) 提前下架NFT
+ * 5. 用户可调用 delistFromMarketBreeding(tokenId) 提前下架NFT
  * 
  * 与BreedingCore的关系：
  * - BreedingCore调用本合约验证NFT是否在市场中
@@ -46,75 +46,72 @@ import "./NFTInterface.sol";
 contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
     
-    /**
-     * @dev 授权合约地址（Authorizer）- 通过此地址获取所有关联合约地址
-     */
+    // ============================
+    // 合约配置
+    // ============================
+    
+    /// @dev 授权合约地址（Authorizer）- 通过此地址获取所有关联合约地址
     address public authorizer;
 
-    /**
-     * @dev 是否暂停市场操作
-     */
+    /// @dev 是否暂停市场操作
     bool public paused;
-    /**
-     * @dev 暂停原因
-     */
+    
+    /// @dev 暂停原因
     string public pauseReason;
 
-    /**
-     * @dev 市场挂牌信息结构体
-     * @param tokenId NFT ID
-     * @param owner NFT所有者
-     * @param listTime 挂牌时间
-     * @param isActive 是否活跃
-     */
+    // ============================
+    // 数据结构
+    // ============================
+    
+    /// @notice 市场挂牌信息结构体
+    /// @dev 记录NFT在市场上挂牌的详细信息
     struct MarketListing { 
-        uint256 tokenId; 
-        address owner; 
-        uint256 listTime; 
-        bool isActive; 
+        uint256 tokenId;     // NFT ID
+        address owner;       // NFT所有者
+        uint256 listTime;    // 挂牌时间
+        bool isActive;       // 是否活跃
     }
 
-    /**
-     * @dev 市场挂牌映射
-     */
+    // ============================
+    // 市场数据映射
+    // ============================
+    
+    /// @dev 市场挂牌映射（tokenId => 挂牌信息）
     mapping(uint256 => MarketListing) public marketListings;
-    /**
-     * @dev 所有已挂牌的NFT ID列表
-     */
+    
+    /// @dev 所有已挂牌的NFT ID列表（包含历史记录）
     uint256[] public listedTokenIds;
-    /**
-     * @dev 当前活跃的挂牌NFT ID列表
-     */
+    
+    /// @dev 当前活跃的挂牌NFT ID列表
     uint256[] public activeListedTokenIds;
 
-    /**
-     * @dev 合约暂停事件
-     */
+    // ============================
+    // 事件定义
+    // ============================
+    
+    /// @dev 合约暂停事件
     event Paused(address indexed account, string reason);
-    /**
-     * @dev 合约取消暂停事件
-     */
+    
+    /// @dev 合约取消暂停事件
     event Unpaused(address indexed account);
-    /**
-     * @dev 市场挂牌创建事件
-     */
+    
+    /// @dev 市场挂牌创建事件
     event MarketListingCreated(uint256 indexed tokenId, address indexed owner);
-    /**
-     * @dev 市场挂牌移除事件
-     */
+    
+    /// @dev 市场挂牌移除事件
     event MarketListingRemoved(uint256 indexed tokenId, address indexed owner);
 
-    /**
-     * @dev 修饰器：确保合约未暂停
-     */
+    // ============================
+    // 修饰器
+    // ============================
+    
+    /// @dev 修饰器：确保合约未暂停
     modifier whenNotPaused() {
         require(!paused, "BM: Paused");
         _;
     }
 
-    /**
-     * @dev 修饰器：仅授权用户（owner或authorizer）
-     */
+    /// @dev 修饰器：仅授权用户（owner或authorizer或系统合约）
     modifier onlyOwnerOrAuthorizer() {
         if (msg.sender == owner() || msg.sender == authorizer) {
             _;
@@ -125,9 +122,11 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         _;
     }
 
-    /**
-     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
-     */
+    // ============================
+    // 构造函数与初始化
+    // ============================
+    
+    /// @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
     constructor() {
         _disableInitializers();
     }
@@ -144,6 +143,10 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         authorizer = _authorizerAddress;
     }
 
+    // ============================
+    // 授权与暂停管理
+    // ============================
+    
     /**
      * @dev 设置授权合约地址
      * @param _authorizerAddress 授权合约地址
@@ -153,9 +156,7 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         authorizer = _authorizerAddress;
     }
 
-    /**
-     * @dev UUPS升级授权
-     */
+    /// @dev UUPS升级授权检查
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /**
@@ -177,6 +178,25 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         emit Unpaused(msg.sender);
     }
 
+    // ============================
+    // 市场挂牌功能
+    // ============================
+    
+    /**
+     * @dev 将NFT挂牌到繁殖市场
+     * @param tokenId 要挂牌的NFT ID
+     * 
+     * 前提条件：
+     * - NFT必须不处于冷却中
+     * - NFT必须不处于活跃繁殖中
+     * - NFT等级必须 >= 5
+     * - 调用者必须是NFT所有者
+     * - NFT不能在市场上已挂牌
+     * 
+     * 效果：
+     * - NFT被转移到合约地址锁定
+     * - 挂牌信息被记录
+     */
     function listForMarketBreeding(uint256 tokenId) external nonReentrant whenNotPaused {
         address nftMintContract = IAuthorizer(authorizer).getNFTMintCore();
         address breedingCoreContract = IAuthorizer(authorizer).getBreedingCore();
@@ -199,11 +219,25 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         emit MarketListingCreated(tokenId, msg.sender);
     }
 
+    /**
+     * @dev 从繁殖市场下架NFT
+     * @param tokenId 要下架的NFT ID
+     * 
+     * 前提条件：
+     * - NFT必须在市场上挂牌
+     * - 调用者必须是挂牌所有者
+     * 
+     * 效果：
+     * - 挂牌信息被删除
+     * - NFT返回给原所有者
+     * - 从活跃列表中移除
+     */
     function delistFromMarketBreeding(uint256 tokenId) external nonReentrant whenNotPaused {
         require(marketListings[tokenId].isActive, "BM: Not listed");
         require(marketListings[tokenId].owner == msg.sender, "BM: Not listing owner");
         delete marketListings[tokenId];
         
+        // 从所有挂牌列表中移除
         for (uint256 i = 0; i < listedTokenIds.length; i++) {
             if (listedTokenIds[i] == tokenId) {
                 for (uint256 j = i; j < listedTokenIds.length - 1; j++) {
@@ -214,6 +248,7 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
             }
         }
         
+        // 从活跃挂牌列表中移除
         for (uint256 i = 0; i < activeListedTokenIds.length; i++) {
             if (activeListedTokenIds[i] == tokenId) {
                 for (uint256 j = i; j < activeListedTokenIds.length - 1; j++) {
@@ -227,18 +262,42 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         emit MarketListingRemoved(tokenId, msg.sender);
     }
 
+    // ============================
+    // 查询功能
+    // ============================
+    
+    /**
+     * @dev 获取所有活跃挂牌的NFT ID列表
+     * @return uint256[] 活跃挂牌NFT ID数组
+     */
     function getMarketListingIds() external view returns (uint256[] memory) {
         return activeListedTokenIds;
     }
 
+    /**
+     * @dev 获取特定NFT的挂牌信息
+     * @param tokenId NFT ID
+     * @return MarketListing 挂牌信息结构体
+     */
     function getMarketListing(uint256 tokenId) external view returns (MarketListing memory) { 
         return marketListings[tokenId]; 
     }
 
+    /**
+     * @dev 获取市场挂牌总数
+     * @return uint256 挂牌总数
+     */
     function getMarketListingCount() external view returns (uint256) { 
         return listedTokenIds.length; 
     }
 
+    // ============================
+    // 接收函数
+    // ============================
+    
+    /// @dev 接收ETH转账
     receive() external payable {}
+    
+    /// @dev 接收ETH转账（备用）
     fallback() external payable {}
 }

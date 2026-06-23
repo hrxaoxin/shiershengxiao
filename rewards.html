@@ -193,19 +193,24 @@
                     <div class="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center mr-3">
                         <span class="text-white text-sm font-bold">生</span>
                     </div>
-                    <h2 class="text-lg font-semibold text-gray-800">生肖奖励</h2>
+                    <h2 class="text-lg font-semibold text-gray-800">生肖LP奖励</h2>
                 </div>
                 <div class="flex space-x-2">
-                    <button class="btn-primary" id="claimAllBtn">领取分红</button>
+                    <button class="btn-primary" id="claimAllBtn"><i class="fas fa-gift mr-2"></i>领取LP分红</button>
                     <button class="btn-secondary" id="refreshRewardBtn">
                         <i class="fas fa-sync-alt mr-2"></i> 刷新分红
                     </button>
                 </div>
             </div>
 
+            <div class="p-4 bg-purple-50 rounded-lg mb-4">
+                <div class="text-sm text-purple-600 font-medium mb-2">💡 LP奖励说明</div>
+                <p class="text-xs text-gray-600">LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包，您将获得双重收益：项目分红 + DEX交易手续费</p>
+            </div>
+
             <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg">
-                <span class="text-lg font-medium text-gray-800">代币奖励</span>
-                <span class="text-lg font-bold text-gray-800" id="bnbReward">0.0000 代币</span>
+                <span class="text-lg font-medium text-gray-800">可领取LP奖励</span>
+                <span class="text-lg font-bold text-purple-600" id="bnbReward">0.0000 LP</span>
             </div>
         </div>
     </main>
@@ -236,7 +241,8 @@
 
         let web3;
         let account;
-        let rewardManagerContract;
+        let dividendManagerContract;
+        let dividendManagerLPContract;
 
         document.addEventListener('DOMContentLoaded', async function() {
             initWalletUI();
@@ -249,15 +255,15 @@
             ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddressDesktop', null);
             ZODIAC_UI.on('walletConnected', async () => {
                 await initContracts();
-                await loadBNBReward();
+                await loadLPReward();
             });
             // 监听 MetaMask 账户切换事件，自动刷新数据
             ZODIAC_WEB3.on('connect', async () => {
                 await initContracts();
-                await loadBNBReward();
+                await loadLPReward();
             });
             ZODIAC_WEB3.on('disconnect', () => {
-                document.getElementById('bnbReward').textContent = '0.0000 代币';
+                document.getElementById('bnbReward').textContent = '0.0000 LP';
             });
         }
 
@@ -272,7 +278,7 @@
                 web3 = window.ZODIAC_WEB3.getWeb3();
                 updateWalletButton();
                 await initContracts();
-                await loadBNBReward();
+                await loadLPReward();
             }
         }
 
@@ -294,8 +300,8 @@
 
         async function initContracts() {
             try {
-                rewardManagerContract = await window.ZODIAC_WEB3.getContract('rewardManager');
-                setupEventListeners();
+                dividendManagerContract = await window.ZODIAC_WEB3.getContract('dividendManager');
+                dividendManagerLPContract = await window.ZODIAC_WEB3.getContract('dividendManagerLP');
                 await loadRewardConfig();
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
@@ -360,65 +366,43 @@
             }
         }
 
-        function setupEventListeners() {
-            if (!rewardManagerContract) return;
-            
+        async function loadLPReward() {
             try {
-                rewardManagerContract.events.DividendPoolAdded({
-                    fromBlock: 'latest'
-                }, async function(error, event) {
-                    if (!error) {
-                        await loadBNBReward();
-                        ZODIAC_UI.showToast('分红池已更新', 'success');
-                    }
-                });
-            } catch (error) {
-                console.warn('监听DividendPoolAdded事件失败:', error.message);
-            }
-        }
-
-        async function loadBNBReward() {
-            try {
-                if (!rewardManagerContract || !account) {
-                    document.getElementById('bnbReward').textContent = '0.0000 代币';
+                if (!dividendManagerContract || !account) {
+                    document.getElementById('bnbReward').textContent = '0.0000 LP';
                     return;
                 }
                 
-                const dividendData = await rewardManagerContract.methods.calcUserDividend(account).call();
-                if (!dividendData || typeof dividendData !== 'object') {
-                    console.error('获取代币分红失败: 返回数据格式异常');
-                    return;
-                }
-                const pendingDividends = dividendData['0'] || dividendData.pendingDividends || '0';
-                const userWeight = dividendData['1'] || dividendData.userWeight || '0';
-                const bnbAmount = web3.utils.fromWei(pendingDividends, 'ether');
-                document.getElementById('bnbReward').textContent = bnbAmount.substring(0, 6) + ' 代币';
-                if (parseInt(userWeight) === 0) {
-                    document.getElementById('bnbReward').textContent = '0.000000 代币';
+                const lpDividend = await dividendManagerLPContract.methods.getClaimableLPDividend(account).call();
+                const lpAmount = web3.utils.fromWei(lpDividend, 'ether');
+                document.getElementById('bnbReward').textContent = parseFloat(lpAmount).toFixed(4) + ' LP';
+                
+                if (parseInt(lpDividend) === 0) {
+                    document.getElementById('bnbReward').textContent = '0.0000 LP';
                 }
             } catch (error) {
-                console.error('获取代币分红失败:', error);
-                document.getElementById('bnbReward').textContent = '0.0000 代币';
+                console.error('获取LP分红失败:', error);
+                document.getElementById('bnbReward').textContent = '0.0000 LP';
             }
         }
 
-        document.getElementById('refreshRewardBtn').addEventListener('click', loadBNBReward);
+        document.getElementById('refreshRewardBtn').addEventListener('click', loadLPReward);
 
         document.getElementById('claimAllBtn').addEventListener('click', async function() {
-            if (!rewardManagerContract || !account) {
+            if (!dividendManagerContract || !account) {
                 ZODIAC_UI.showToast('请先连接钱包', 'warning');
                 return;
             }
 
             const currentReward = document.getElementById('bnbReward').textContent;
-            if (currentReward === '0.0000 代币') {
-                ZODIAC_UI.showToast('当前没有可领取的分红', 'info');
+            if (currentReward === '0.0000 LP') {
+                ZODIAC_UI.showToast('当前没有可领取的LP分红', 'info');
                 return;
             }
 
             const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认领取分红',
-                `当前可领取金额：${currentReward}\n\n领取后，分红将直接发送到您的钱包地址。确定要继续吗？`
+                '确认领取LP分红',
+                `当前可领取LP：${currentReward}\n\n领取后，LP将自动兑换为代币和WBNB发送到您的钱包。您将获得双重收益：项目分红 + DEX交易手续费。确定要继续吗？`
             );
 
             if (!confirm) return;
@@ -428,13 +412,13 @@
             btn.disabled = true;
 
             try {
-                await ZODIAC_WEB3.claimDividend();
-                ZODIAC_UI.showToast('领取成功！', 'success');
-                await loadBNBReward();
+                await dividendManagerLPContract.methods.claimLPDividend().send({ from: account });
+                ZODIAC_UI.showToast('LP分红领取成功！已兑换为代币和WBNB', 'success');
+                await loadLPReward();
             } catch (error) {
-                ZODIAC_UI.handleError(error, '领取分红');
+                ZODIAC_UI.handleError(error, '领取LP分红');
             } finally {
-                btn.innerHTML = '一键领取所有代币';
+                btn.innerHTML = '<i class="fas fa-gift mr-2"></i>领取LP分红';
                 btn.disabled = false;
             }
         });

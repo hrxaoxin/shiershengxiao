@@ -9,6 +9,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "./NFTInterface.sol";
+import "./LPLib.sol";
 
 /**
  * @title TokenStaking
@@ -52,6 +53,7 @@ import "./NFTInterface.sol";
  */
 contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20Upgradeable for IERC20Upgradeable;
+    using LPLib for IAuthorizer;
     
     /** @dev 基础奖励比例（万分比，默认100 = 1%） */
     uint256 public rewardRate = 100;
@@ -74,7 +76,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /** @dev 所有用户待领取奖励总和（简化处理） */
     uint256 public totalPendingRewards;
 
-    /** @dev 奖励精度缩放因子（1e18），用于避免 dailyRewardPerToken 整数截断） */
+    /** @dev 奖励精度缩放因子（1e18），用于避免 dailyRewardPerToken 整数截断 */
     uint256 private constant REWARD_PRECISION = 1e18;
     /** @dev dailyRewardPerToken 最大阈值，超过时触发重置 */
     uint256 public constant MAX_DAILY_REWARD_PER_TOKEN = 1e36;
@@ -108,49 +110,77 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
 
     /**
      * @dev 代币质押事件
-     * @param user 用户地址
+     * @param user 质押用户地址
      * @param amount 质押数量
      */
     event TokensStaked(address indexed user, uint256 amount);
     
     /**
      * @dev 代币解除质押事件
-     * @param user 用户地址
+     * @param user 解除质押用户地址
      * @param amount 解除质押数量
      */
     event TokensUnstaked(address indexed user, uint256 amount);
     
     /**
      * @dev 奖励领取事件
-     * @param user 用户地址
+     * @param user 领取奖励用户地址
      * @param amount 领取奖励数量
      */
     event RewardsClaimed(address indexed user, uint256 amount);
     
-    /** @dev 代币接收事件
+    /**
+     * @dev 代币接收事件
      * @param amount 接收代币数量
      */
     event TokensReceived(uint256 amount);
 
+    /** @dev 紧急提取BNB事件
+     * @param operator 操作者
+     * @param to 接收地址
+     * @param amount 提取金额
+     */
     event EmergencyBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    /** @dev 紧急提取代币事件
+     * @param operator 操作者
+     * @param to 接收地址
+     * @param amount 提取金额
+     */
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
-
-    /** @dev 奖励比例更新事件 */
+    /** @dev 紧急提取WBNB事件
+     * @param operator 操作者
+     * @param to 接收地址
+     * @param amount 提取金额
+     */
+    event EmergencyWBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    /** @dev 奖励比例更新事件
+     * @param newRate 新的奖励率
+     */
     event RewardRateUpdated(uint256 newRate);
-    /** @dev 最大奖励比例更新事件 */
+    /** @dev 最大奖励比例更新事件
+     * @param newMaxRate 新的最大奖励率
+     */
     event MaxRewardRateUpdated(uint256 newMaxRate);
-    /** @dev 上调步长更新事件 */
+    /** @dev 上调步长更新事件
+     * @param newStep 新的步长
+     */
     event RateStepUpdated(uint256 newStep);
-    /** @dev 每日奖励计算事件 */
+    /** @dev 每日奖励计算事件
+     * @param totalReward 当日总奖励
+     * @param totalStaked 当前总质押量
+     */
     event DailyRewardCalculated(uint256 totalReward, uint256 totalStaked);
-    /** @dev 流入代币记录事件 */
+    /** @dev 流入代币记录事件
+     * @param amount 流入数量
+     * @param totalToday 今日总流入
+     */
     event IncomingTokensRecorded(uint256 amount, uint256 totalToday);
 
     /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[50] private __gap;
 
     /**
-     * @dev 构造函数：禁用初始化器
+     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
      */
     constructor() {
         _disableInitializers();
@@ -180,23 +210,28 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         maxUserStaked = type(uint256).max;
     }
     
+    /**
+     * @dev 暂停合约（仅owner）
+     */
     function pause() external onlyOwner {
         _pause();
     }
     
+    /**
+     * @dev 恢复合约（仅owner）
+     */
     function unpause() external onlyOwner {
         _unpause();
     }
 
-    /**
-     * @dev 升级授权函数
-     */
+    /// @dev UUPS升级授权函数
     function _authorizeUpgrade(address) internal override onlyOwner {}
 
     /**
      * @dev 接收代币奖励（通过 token.transfer 进入合约）
      * 提供一个记录函数供外部调用以更新流入统计
      * 仅允许 RewardManager 合约或授权地址调用
+     * @param amount 接收代币数量
      */
     function recordIncomingTokens(uint256 amount) external {
         require(amount > 0, "TokenStaking: Amount must be > 0");
@@ -205,14 +240,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _checkNewDay();
         todayIncomingTokens += amount;
         emit IncomingTokensRecorded(amount, todayIncomingTokens);
-    }
-
-    /**
-     * @dev 回退函数：接收意外转入的 BNB
-     * 合约主要处理代币奖励，但仍需处理意外的 BNB 转入
-     */
-    receive() external payable {
-        // 意外转入的 BNB 通过 emergencyWithdrawBNB 取回
     }
 
     /**
@@ -246,11 +273,19 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         emit TokensStaked(msg.sender, amount);
     }
     
+    /**
+     * @dev 设置最大总质押量
+     * @param _maxTotalStaked 最大总质押数量
+     */
     function setMaxTotalStaked(uint256 _maxTotalStaked) external onlyOwner {
         require(_maxTotalStaked > 0, "TokenStaking: Max total must be greater than 0");
         maxTotalStaked = _maxTotalStaked;
     }
     
+    /**
+     * @dev 设置单用户最大质押量
+     * @param _maxUserStaked 单用户最大质押数量
+     */
     function setMaxUserStaked(uint256 _maxUserStaked) external onlyOwner {
         require(_maxUserStaked > 0, "TokenStaking: Max user must be greater than 0");
         maxUserStaked = _maxUserStaked;
@@ -361,19 +396,12 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         }
     }
 
-    /**
-     * @dev 每日奖励比率（基于质押量）
-     */
+    /** @dev 每日奖励比率（基于质押量），累积值持续递增 */
     uint256 public dailyRewardPerToken;
-    /**
-     * @dev 上次计算奖励的时间
-     */
+    /** @dev 上次计算奖励的时间 */
     uint256 public lastRewardCalculationTime;
 
-    /**
-     * @dev 用户上次累积时使用的奖励率，防止重复累加
-     * user => lastAccumulatedRate
-     */
+    /** @dev 用户上次累积时使用的奖励率，防止重复累加（地址 => 上次累积率） */
     mapping(address => uint256) private lastAccumulatedRate;
 
     /**
@@ -418,6 +446,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         emit DailyRewardPerTokenReset();
     }
 
+    /** @dev dailyRewardPerToken重置事件 */
     event DailyRewardPerTokenReset();
 
     /**
@@ -454,6 +483,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /**
      * @dev 累积用户奖励（在质押/解除质押时调用）
      * dailyRewardPerToken 为累积值，持续递增；通过差值计算用户未领取奖励
+     * @param user 用户地址
      */
     function _accumulateRewards(address user) internal {
         uint256 currentRate = dailyRewardPerToken;
@@ -480,14 +510,14 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /**
      * @dev 获取用户质押信息
      * @param user 用户地址
-     * @return StakeInfo 质押信息
+     * @return StakeInfo 质押信息结构体
      */
     function getUserStake(address user) external view returns (StakeInfo memory) {
         return userStakes[user];
     }
 
     /**
-     * @dev 检查是否为授权调用者（owner或authorizer）
+     * @dev 仅owner或authorizer或系统合约的修饰符
      */
     modifier onlyOwnerOrAuthorizer() {
         if (msg.sender == owner() || msg.sender == authorizer) {
@@ -499,6 +529,10 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         _;
     }
 
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizerAddress 新的授权合约地址
+     */
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "TokenStaking: Invalid authorizer address");
         authorizer = _authorizerAddress;
@@ -541,6 +575,10 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
 
+    /**
+     * @dev 紧急提取代币（仅owner）
+     * @param amount 提取金额
+     */
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "TokenStaking: Amount must be > 0");
         IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getToken());

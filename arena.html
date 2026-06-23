@@ -439,17 +439,20 @@
 
                     <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
                         <h3 class="text-white font-semibold mb-4 flex items-center">
-                            <span class="mr-2">🎁</span> 奖励领取
+                            <span class="mr-2">🎁</span> LP奖励领取
                         </h3>
+                        <div class="p-3 bg-purple-500/20 rounded-lg mb-4">
+                            <p class="text-xs text-purple-300">💡 LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包</p>
+                        </div>
                         <div id="rewardsSection">
                             <div class="mb-4">
-                                <h4 class="text-gray-300 text-sm mb-2">可领取奖励</h4>
+                                <h4 class="text-gray-300 text-sm mb-2">可领取LP奖励</h4>
                                 <div id="unclaimedRewards" class="space-y-2">
                                     <div class="text-center text-gray-500 py-2">加载中...</div>
                                 </div>
                             </div>
                             <div>
-                                <h4 class="text-gray-300 text-sm mb-2">已领取奖励</h4>
+                                <h4 class="text-gray-300 text-sm mb-2">已领取LP奖励</h4>
                                 <div id="claimedRewards" class="space-y-2">
                                     <div class="text-center text-gray-500 py-2">加载中...</div>
                                 </div>
@@ -712,6 +715,7 @@
         let arenaBattleContract;
         let arenaRankingQueryContract;
         let arenaRewardContract;
+        let arenaRewardLPContract;
         
         let matchRound = 1;
         let attackerMatchWins = 0;
@@ -1019,6 +1023,7 @@
             arenaBattleContract = new web3.eth.Contract(config.ABIS.arenaBattleABI, config.CONTRACT_ADDRESSES.arenaBattle);
             arenaRankingQueryContract = new web3.eth.Contract(config.ABIS.arenaRankingQueryABI, config.CONTRACT_ADDRESSES.arenaRankingQuery);
             arenaRewardContract = new web3.eth.Contract(config.ABIS.arenaRewardABI, config.CONTRACT_ADDRESSES.arenaReward);
+            arenaRewardLPContract = new web3.eth.Contract(config.ABIS.arenaRewardLPABI, config.CONTRACT_ADDRESSES.arenaRewardLP);
             nftContract = new web3.eth.Contract(config.ABIS.nftMintABI, config.CONTRACT_ADDRESSES.nftMint);
             await loadArenaConfig();
         }
@@ -1663,7 +1668,7 @@
                         const playerScore = playerRecord.score || '0';
                         let estimatedReward = '0';
                         try {
-                            const rewardWei = await arenaRankingQueryContract.methods.getSeasonReward(accounts[0]).call();
+                            const rewardWei = await arenaRewardLPContract.methods.getPendingLPReward(accounts[0], currentSeasonId).call();
                             estimatedReward = web3.utils.fromWei(rewardWei, 'ether');
                         } catch (e) { /* ignore */ }
 
@@ -1672,9 +1677,9 @@
                                 <div class="text-yellow-400 text-sm font-medium">赛季进行中</div>
                                 <div class="text-gray-300 text-xs mt-1">
                                     当前积分: ${playerScore || '0'} 
-                                    ${parseFloat(estimatedReward) > 0 ? ` | 预估奖励: ${estimatedReward} Token` : ''}
+                                    ${parseFloat(estimatedReward) > 0 ? ` | 预估LP奖励: ${estimatedReward} LP` : ''}
                                 </div>
-                                <div class="text-gray-500 text-xs mt-1">赛季结束后可领取奖励</div>
+                                <div class="text-gray-500 text-xs mt-1">赛季结束后可领取LP奖励</div>
                             </div>
                         `;
                     } catch (e) {
@@ -1690,13 +1695,13 @@
                         claimedDiv.innerHTML = `
                             <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
                                 <div class="text-green-400 text-sm font-medium">已领取</div>
-                                <div class="text-gray-300 text-xs mt-1">赛季奖励已发放</div>
+                                <div class="text-gray-300 text-xs mt-1">LP奖励已发放</div>
                             </div>
                         `;
                     } else {
                         // 未领取：显示可领取的奖励
                         try {
-                            const rewardWei = await arenaRankingQueryContract.methods.getSeasonReward(accounts[0]).call();
+                            const rewardWei = await arenaRewardLPContract.methods.getPendingLPReward(accounts[0], currentSeasonId).call();
                             const rewardAmount = web3.utils.fromWei(rewardWei, 'ether');
 
                             if (parseFloat(rewardAmount) > 0) {
@@ -1705,7 +1710,7 @@
                                         <div class="flex justify-between items-center">
                                             <div>
                                                 <div class="text-blue-400 text-sm font-medium">赛季奖励</div>
-                                                <div class="text-white text-xs mt-1">${rewardAmount} Token</div>
+                                                <div class="text-white text-xs mt-1">${rewardAmount} LP</div>
                                             </div>
                                             <button onclick="claimSeasonReward()" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg transition-colors">
                                                 领取
@@ -1731,12 +1736,12 @@
 
         async function claimSeasonRewardHandler() {
             try {
-                await ZODIAC_WEB3.claimSeasonReward();
-                ZODIAC_UI.showToast('奖励领取成功！', 'success');
+                await arenaRewardLPContract.methods.claimLPReward(currentSeasonId).send({ from: account });
+                ZODIAC_UI.showToast('LP奖励领取成功！已兑换为代币和WBNB', 'success');
                 loadRewards();
             } catch (error) {
-                console.error('领取奖励失败:', error);
-                ZODIAC_UI.handleError(error, '领取奖励');
+                console.error('领取LP奖励失败:', error);
+                ZODIAC_UI.handleError(error, '领取LP奖励');
             }
         }
 

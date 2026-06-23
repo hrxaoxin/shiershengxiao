@@ -175,6 +175,10 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     /**
      * @dev 结束当前赛季（仅所有者）
      */
+    /**
+     * @dev 结束当前赛季并创建新赛季
+     * @notice 仅限owner调用，结算当前赛季并自动开始新赛季
+     */
     function endSeason() external onlyOwner {
         SeasonInfo storage season = seasons[currentSeasonId];
         require(season.isActive, "ArenaLeaderboard: Season not active");
@@ -188,6 +192,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      * @param player 玩家地址
      * @param newScore 新积分
      * @param seasonId 赛季 ID
+     * @notice 当玩家积分变化时调用，自动调整排行榜顺序
      */
     function updateRanking(address player, uint256 newScore, uint256 seasonId) external {
         SeasonInfo storage season = seasons[seasonId];
@@ -265,6 +270,13 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         emit RankingUpdated(player, currentIndex + 1, seasonId);
     }
     
+    /**
+     * @dev 在指定排名位置插入玩家
+     * @param player 玩家地址
+     * @param targetRank 目标排名（从0开始）
+     * @param seasonId 赛季 ID
+     * @notice 用于系统操作，将玩家插入到指定排名位置
+     */
     function insertPlayerAtRank(address player, uint256 targetRank, uint256 seasonId) external {
         SeasonInfo storage season = seasons[seasonId];
         require(season.isActive, "ArenaLeaderboard: Season not active");
@@ -359,6 +371,12 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         totalPlayers = rankings.length;
     }
     
+    /**
+     * @dev 获取排行榜总页数
+     * @param seasonId 赛季 ID
+     * @param pageSize 每页大小
+     * @return 总页数
+     */
     function getLeaderboardPageCount(uint256 seasonId, uint256 pageSize) external view returns (uint256) {
         address[] storage rankings = seasonRankings[seasonId];
         return (rankings.length + pageSize - 1) / pageSize;
@@ -382,6 +400,12 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         return (playerAddrs, scores);
     }
 
+    /**
+     * @dev 获取前N名玩家
+     * @param seasonId 赛季 ID
+     * @param count 数量
+     * @return playerAddrs 玩家地址数组, scores 积分数组
+     */
     function getTopPlayers(uint256 seasonId, uint256 count) external view returns (
         address[] memory playerAddrs,
         uint256[] memory scores
@@ -407,6 +431,11 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         return result;
     }
     
+    /**
+     * @dev 获取最近赛季
+     * @param count 赛季数量
+     * @return 赛季信息数组（从最近到最早）
+     */
     function getRecentSeasons(uint256 count) external view returns (SeasonInfo[] memory) {
         uint256 size = count < currentSeasonId ? count : currentSeasonId;
         SeasonInfo[] memory result = new SeasonInfo[](size);
@@ -435,6 +464,12 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         return (s.startTime, s.endTime, s.isActive, s.isSettled, s.totalPlayers);
     }
     
+    /**
+     * @dev 获取玩家赛季统计
+     * @param player 玩家地址
+     * @param seasonId 赛季 ID
+     * @return score 积分, wins 胜利次数, losses 失败次数, rank 排名, rewardClaimed 奖励是否已领取
+     */
     function getPlayerSeasonStats(address player, uint256 seasonId) external view returns (
         uint256 score,
         uint256 wins,
@@ -460,6 +495,10 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         return (record.score, record.wins, record.losses, record.seasonId);
     }
     
+    /**
+     * @dev 获取当前赛季信息
+     * @return seasonId 赛季ID, startTime 开始时间, endTime 结束时间, isActive 是否进行中
+     */
     function getCurrentSeasonInfo() external view returns (
         uint256 seasonId,
         uint256 startTime,
@@ -487,10 +526,21 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         return playerRankIndex[currentSeasonId][player];
     }
     
+    /**
+     * @dev 获取赛季总玩家数
+     * @param seasonId 赛季 ID
+     * @return 玩家数量
+     */
     function getTotalPlayersInSeason(uint256 seasonId) external view returns (uint256) {
         return seasons[seasonId].totalPlayers;
     }
     
+    /**
+     * @dev 获取玩家赛季奖励
+     * @param player 玩家地址
+     * @return 奖励金额
+     * @notice ArenaLeaderboard中始终返回0，奖励由ArenaReward计算
+     */
     function getSeasonReward(address player) external view returns (uint256) {
         return 0;
     }

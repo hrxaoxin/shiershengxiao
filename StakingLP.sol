@@ -1,0 +1,289 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
+import "./NFTInterface.sol";
+import "./LPLib.sol";
+import "./StakingLib.sol";
+
+/**
+ * @title StakingLP
+ * @dev NFT质押LP奖励合约
+ * 
+ * 核心功能：
+ * 1. LP奖励池管理：接收BNB自动转换为LP
+ * 2. LP奖励领取：用户领取累计的LP奖励，自动兑换为代币+WBNB
+ * 3. 复利功能：自动复投LP交易手续费
+ * 4. 紧急提取：owner紧急提取WBNB
+ * 
+ * 奖励机制：
+ * - 接收BNB后自动一半兑换为代币，一半兑换为WBNB，组成LP
+ * - LP按用户质押权重分配给质押用户
+ * - 用户领取时LP自动解除为代币+WBNB
+ * - LP交易手续费自动复投为更多LP
+ * 
+ * 安全机制：
+ * - ReentrancyGuard：防止重入攻击
+ * - Pausable：可暂停所有操作
+ * - onlyOwner：紧急提取权限控制
+ * 
+ * 合约升级：
+ * - UUPS可升级模式，需onlyOwner授权升级
+ */
+contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    using LPLib for IAuthorizer;
+
+    /** @dev 授权合约地址 */
+    address public authorizer;
+    
+    /** @dev LP奖励池余额 */
+    uint256 public lpRewardPoolBalance;
+    /** @dev 滑点保护参数（默认1000 = 10%容差） */
+    uint256 public slippage = 1000;
+    /** @dev 自动复利开关 */
+    bool public autoCompoundEnabled = true;
+    /** @dev 最小复利金额（0.001 ETH） */
+    uint256 public minCompoundAmount = 1000000000000000;
+    
+    /** @dev 全局LP奖励累积值（每单位权重的LP奖励） */
+    uint256 public globalLPRewardPerWeight;
+    /** @dev 用户LP快照权重映射（地址 => 用户LP快照） */
+    mapping(address => uint256) public userLPSnapshotWeight;
+    
+    /** @dev 质押奖励精度缩放因子（1e18） */
+    uint256 public constant STAKING_REWARD_PRECISION = 1e18;
+    
+    /** @dev 总质押权重（从主合约同步） */
+    uint256 public totalWeightedNFTs;
+
+    /** @dev LP奖励领取事件 */
+    event LPRewardClaimed(address indexed user, uint256 lpAmount);
+    /** @dev LP奖励添加事件 */
+    event LPAddedToPool(uint256 lpAmount);
+    /** @dev 复利执行事件 */
+    event FeesCompounded(uint256 lpAmount);
+    /** @dev 紧急提取WBNB事件 */
+    event EmergencyWBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+
+    /**
+     * @dev 构造函数：禁用初始化器
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @dev 初始化合约函数
+     * @param _authorizerAddress 授权合约地址
+     */
+    function initialize(address _authorizerAddress) external initializer {
+        require(_authorizerAddress != address(0), "StakingLP: Invalid authorizer");
+        
+        __Ownable2Step_init();
+        __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
+        __Pausable_init();
+        
+        authorizer = _authorizerAddress;
+        
+        slippage = 1000;
+        autoCompoundEnabled = true;
+        minCompoundAmount = 1000000000000000;
+    }
+
+    /**
+     * @dev 仅owner或authorizer的修饰符
+     */
+    modifier onlyOwnerOrAuthorizer() {
+        if (msg.sender == owner() || msg.sender == authorizer) {
+            _;
+            return;
+        }
+        IAuthorizer auth = IAuthorizer(authorizer);
+        require(auth.isSystemContract(msg.sender), "StakingLP: Not authorized");
+        _;
+    }
+
+    /**
+     * @dev UUPS升级授权函数
+     */
+    function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    /**
+     * @dev 暂停合约
+     */
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    /**
+     * @dev 取消暂停合约
+     */
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizerAddress 新的授权合约地址
+     */
+    function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
+        require(_authorizerAddress != address(0), "StakingLP: Invalid authorizer");
+        authorizer = _authorizerAddress;
+    }
+
+    /**
+     * @dev 接收BNB - 自动转换为LP
+     */
+    receive() external payable {
+        if (msg.value > 0) {
+            uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(msg.value);
+            if (lpAmount > 0) {
+                _addToLPRewardPool(lpAmount);
+            }
+        }
+    }
+
+    /**
+     * @dev 记录流入的BNB并转换为LP
+     * @param amount BNB数量
+     */
+    function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
+        require(amount > 0, "StakingLP: Amount must be > 0");
+        uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(amount);
+        if (lpAmount > 0) {
+            _addToLPRewardPool(lpAmount);
+        }
+    }
+
+    /**
+     * @dev 更新总质押权重（从主合约同步）
+     * @param _totalWeightedNFTs 新的总质押权重
+     */
+    function updateTotalWeight(uint256 _totalWeightedNFTs) external onlyOwnerOrAuthorizer {
+        totalWeightedNFTs = _totalWeightedNFTs;
+    }
+
+    /**
+     * @dev 同步用户权重快照（从主合约同步）
+     * @param user 用户地址
+     * @param snapshotWeight 用户快照权重
+     */
+    function syncUserWeight(address user, uint256 snapshotWeight) external onlyOwnerOrAuthorizer {
+        userLPSnapshotWeight[user] = snapshotWeight;
+    }
+
+    /**
+     * @dev 添加到LP奖励池（内部函数）
+     * @param lpAmount LP数量
+     */
+    function _addToLPRewardPool(uint256 lpAmount) internal {
+        uint256 newBalance = lpRewardPoolBalance + lpAmount;
+        require(newBalance >= lpRewardPoolBalance, "StakingLP: LP overflow");
+        lpRewardPoolBalance = newBalance;
+
+        if (totalWeightedNFTs > 0) {
+            uint256 increment = (lpAmount * STAKING_REWARD_PRECISION) / totalWeightedNFTs;
+            require(globalLPRewardPerWeight <= type(uint256).max - increment, "StakingLP: LP reward overflow");
+            globalLPRewardPerWeight += increment;
+        }
+        
+        emit LPAddedToPool(lpAmount);
+    }
+
+    /**
+     * @dev 复利手续费（仅owner）
+     */
+    function compoundFees() external onlyOwner whenNotPaused {
+        IAuthorizer(authorizer).compoundFees();
+    }
+
+    /**
+     * @dev 领取LP奖励
+     */
+    function claimLPReward() external nonReentrant whenNotPaused {
+        address staking = IAuthorizer(authorizer).getStaking();
+        uint256 userWeight = IStaking(staking).userStakedWeight(msg.sender);
+        require(userWeight > 0, "StakingLP: No staked NFTs");
+
+        uint256 rewardBase = globalLPRewardPerWeight * userWeight;
+        uint256 snapshotBase = userLPSnapshotWeight[msg.sender];
+        
+        if (rewardBase <= snapshotBase) {
+            return;
+        }
+
+        uint256 lpReward = (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
+        
+        require(lpReward <= lpRewardPoolBalance, "StakingLP: Insufficient LP");
+
+        lpRewardPoolBalance -= lpReward;
+        userLPSnapshotWeight[msg.sender] = globalLPRewardPerWeight;
+
+        IAuthorizer(authorizer).redeemLPToUser(lpReward, msg.sender);
+        emit LPRewardClaimed(msg.sender, lpReward);
+    }
+
+    /**
+     * @dev 查询待领取LP奖励
+     * @param user 用户地址
+     * @return 待领取LP奖励金额
+     */
+    function getPendingLPReward(address user) external view returns (uint256) {
+        address staking = IAuthorizer(authorizer).getStaking();
+        uint256 userWeight = IStaking(staking).userStakedWeight(user);
+        if (userWeight == 0) return 0;
+        
+        uint256 rewardBase = globalLPRewardPerWeight * userWeight;
+        uint256 snapshotBase = userLPSnapshotWeight[user];
+        
+        if (rewardBase <= snapshotBase) {
+            return 0;
+        }
+        
+        return (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
+    }
+
+    /**
+     * @dev 紧急提取WBNB（仅owner）
+     * @param amount 提取金额
+     */
+    function emergencyWithdrawWBNB(uint256 amount) external onlyOwner nonReentrant {
+        IAuthorizer(authorizer).emergencyWithdrawWBNB(amount);
+        emit EmergencyWBNBWithdrawn(msg.sender, owner(), amount);
+    }
+
+    /**
+     * @dev 设置滑点保护参数
+     * @param _slippage 新的滑点参数
+     */
+    function setSlippage(uint256 _slippage) external onlyOwner {
+        require(_slippage > 0 && _slippage <= 10000, "StakingLP: Invalid slippage");
+        slippage = _slippage;
+    }
+
+    /**
+     * @dev 设置自动复利开关
+     * @param _enabled 是否启用自动复利
+     */
+    function setAutoCompoundEnabled(bool _enabled) external onlyOwner {
+        autoCompoundEnabled = _enabled;
+    }
+
+    /**
+     * @dev 设置最小复利金额
+     * @param _amount 最小复利金额
+     */
+    function setMinCompoundAmount(uint256 _amount) external onlyOwner {
+        minCompoundAmount = _amount;
+    }
+
+    /**
+     * @dev Fallback函数
+     */
+    fallback() external payable {}
+}

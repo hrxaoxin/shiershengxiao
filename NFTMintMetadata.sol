@@ -196,6 +196,13 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         });
     }
     
+    /**
+     * @dev 构建TokenURI的JSON内容（Base64编码）
+     * @param tokenId NFT ID
+     * @param tokenType_ NFT类型
+     * @param level NFT等级
+     * @return string JSON字符串（Base64编码）
+     */
     function _buildTokenURIJson(uint256 tokenId, uint256 tokenType_, uint8 level) internal view returns (string memory) {
         uint256 element = tokenType_ / 24;
         uint256 zodiac = (tokenType_ % 24 / 2) % 12;
@@ -208,6 +215,11 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         return NFTLib.buildTokenURIJson(tokenId, tokenType_, level, element, zodiac, isMale, isRare, imagePath);
     }
     
+    /**
+     * @dev 设置IPFS基础URL
+     * @param _ipfsBaseNormal 普通NFT的IPFS基础URL
+     * @param _ipfsBaseRare 稀有NFT的IPFS基础URL
+     */
     function setIPFSBases(string calldata _ipfsBaseNormal, string calldata _ipfsBaseRare) external onlyOwnerOrAuthorizer {
         ipfsBaseNormal = _ipfsBaseNormal;
         ipfsBaseRare = _ipfsBaseRare;

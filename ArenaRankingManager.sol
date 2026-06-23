@@ -59,13 +59,6 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     using SafeERC20 for IERC20;
 
     /**
-     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
-     */
-    constructor() {
-        _disableInitializers();
-    }
-
-    /**
      * @dev 玩家记录结构：
      * @param score 玩家当前积分
      * @param wins 胜利次数
@@ -308,6 +301,11 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      */
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
+    /**
+     * @dev 初始化合约
+     * @notice 初始化函数，设置授权者地址并启动第一个赛季
+     * @param _authorizerAddress 授权合约地址
+     */
     function initialize(
         address _authorizerAddress
     ) external initializer {
@@ -321,14 +319,25 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         _startNewSeason();
     }
 
+    /**
+     * @dev 暂停合约
+     * @notice 暂停所有非管理员操作（仅owner可调用）
+     */
     function pause() external onlyOwner {
         _pause();
     }
 
+    /**
+     * @dev 取消暂停合约
+     * @notice 恢复所有操作（仅owner可调用）
+     */
     function unpause() external onlyOwner {
         _unpause();
     }
 
+    /**
+     * @dev 权限校验修饰符：owner或授权者或系统合约
+     */
     modifier onlyOwnerOrAuthorizer() {
         if (msg.sender == owner() || msg.sender == authorizer) {
             _;
@@ -339,13 +348,25 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         _;
     }
 
+    /**
+     * @dev UUPS升级授权校验
+     * @param newImplementation 新实现合约地址
+     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
+    /**
+     * @dev 设置授权合约地址
+     * @param _authorizerAddress 新的授权合约地址
+     */
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "ArenaRankingManager: Invalid authorizer address");
         authorizer = _authorizerAddress;
     }
 
+    /**
+     * @dev 设置赛季奖励比例
+     * @param rate 奖励比例（万分比）
+     */
     function setSeasonRewardRate(uint256 rate) external onlyOwner {
         require(rate > 0, "ArenaRankingManager: Reward rate must be greater than 0");
         seasonRewardRate = rate;
@@ -526,6 +547,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 启动新赛季（需授权）
+     * @notice 由owner或授权者手动触发启动新赛季
      */
     function startNewSeason() external onlyOwnerOrAuthorizer {
         _tryStartNewSeason();
@@ -533,7 +555,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 内部函数：尝试启动新赛季
-     * 检查当前赛季是否结束，然后结算、清理并启动新赛季
+     * @notice 检查当前赛季是否结束，然后结算、清理并启动新赛季
      */
     function _tryStartNewSeason() internal {
         require(block.timestamp >= seasons[currentSeasonId].endTime, "ArenaRankingManager: Current season not ended");
@@ -544,7 +566,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 检查并启动新赛季（公共接口）
-     * 如果当前赛季已结束，自动启动新赛季
+     * @notice 如果当前赛季已结束，自动启动新赛季（任何人可调用）
      */
     function checkAndStartNewSeason() external whenNotPaused {
         if (block.timestamp >= seasons[currentSeasonId].endTime) {
@@ -554,6 +576,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 内部函数：启动新赛季
+     * @notice 创建新赛季信息，根据模式控制类型设置竞技场模式
      */
     function _startNewSeason() internal {
         currentSeasonId++;
@@ -588,6 +611,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 内部函数：结算当前赛季
+     * @notice 标记当前赛季为已结束和已结算状态
      */
     function _settleCurrentSeason() internal {
         SeasonInfo storage season = seasons[currentSeasonId];
@@ -598,7 +622,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 内部函数：清理旧赛季数据
-     * 保留最近的 MAX_SEASONS_TO_KEEP 个赛季数据，删除更早的赛季
+     * @notice 保留最近的 MAX_SEASONS_TO_KEEP 个赛季数据，删除更早的赛季
      */
     function _cleanupOldSeasons() internal {
         uint256 seasonsToRemove = currentSeasonId > MAX_SEASONS_TO_KEEP ? 
@@ -612,6 +636,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     /**
      * @dev 结算指定赛季
      * @param seasonId 赛季 ID
+     * @notice 由owner或授权者手动结算指定赛季，并计算奖励
      */
     function settleSeason(uint256 seasonId) external onlyOwnerOrAuthorizer {
         require(seasonId <= currentSeasonId, "ArenaRankingManager: Invalid season");
@@ -628,7 +653,8 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev 内部函数：检查是否进入新的一天（用于奖励结算）
+     * @dev 内部函数：检查是否进入新的一天
+     * @notice 用于奖励结算时检查新的一天是否开始
      */
     function _checkNewDay() internal {
         address arenaReward = IAuthorizer(authorizer).getArenaReward();
@@ -640,6 +666,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     /**
      * @dev 内部函数：计算赛季奖励
      * @param seasonId 赛季 ID
+     * @notice 调用ArenaReward合约计算指定赛季的奖励
      */
     function _calculateSeasonRewardsInternal(uint256 seasonId) internal {
         address arenaReward = IAuthorizer(authorizer).getArenaReward();
@@ -659,6 +686,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 向奖励池添加 BNB
+     * @notice 所有者或授权者向当前赛季奖励池添加BNB
      */
     function addRewardToPool() external payable onlyOwnerOrAuthorizer {
         require(msg.value > 0, "ArenaRankingManager: No BNB sent");
@@ -671,7 +699,8 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev 接收 ETH/BNB 的 fallback 函数
+     * @dev 接收 ETH/BNB 的回调函数
+     * @notice 接收ETH时自动更新当日收入奖励和当前赛季奖励池
      */
     receive() external payable {
         _checkNewDay();
@@ -682,7 +711,8 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev fallback 函数（处理未识别的调用）
+     * @dev 处理未识别调用的回调函数
+     * @notice 当调用数据不匹配任何函数时，自动更新当日收入奖励和当前赛季奖励池
      */
     fallback() external payable {
         _checkNewDay();
@@ -694,7 +724,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 获取当前赛季奖励池
-     * @return 当前赛季的奖励池金额
+     * @return 当前赛季的奖励池金额（BNB）
      */
     function getCurrentRewardPool() external view returns (uint256) {
         return seasons[currentSeasonId].rewardPool;
@@ -726,8 +756,24 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev 紧急提取 BNB（仅所有者）
+     * @dev 获取指定赛季的奖励数据（供ArenaReward使用）
+     * @param seasonId 赛季ID
+     * @return rewardPool BNB奖励池
+     * @return tokenRewardPool 代币奖励池（返回0，因为当前使用BNB）
+     * @return totalPlayers 总玩家数
+     */
+    function getSeasonRewardData(uint256 seasonId) external view returns (uint256 rewardPool, uint256 tokenRewardPool, uint256 totalPlayers) {
+        require(seasonId > 0 && seasonId <= currentSeasonId, "ArenaRankingManager: Invalid season ID");
+        SeasonInfo storage season = seasons[seasonId];
+        rewardPool = season.rewardPool;
+        tokenRewardPool = season.tokenRewardPool;
+        totalPlayers = season.totalPlayers;
+    }
+
+    /**
+     * @dev 紧急提取 BNB
      * @param amount 提取金额
+     * @notice 仅所有者可调用，用于紧急情况下的资金提取
      */
     function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "ArenaRankingManager: Amount must be > 0");
@@ -738,8 +784,9 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev 紧急提取代币（仅所有者）
+     * @dev 紧急提取代币
      * @param amount 提取金额
+     * @notice 仅所有者可调用，用于紧急情况下的代币提取
      */
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "ArenaRankingManager: Amount must be > 0");
@@ -753,6 +800,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 充值挑战次数
+     * @notice 玩家使用代币充值挑战次数（RECHARGE_COST代币获得RECHARGE_ATTEMPTS次挑战）
      */
     function rechargeChallengeAttempts() external nonReentrant whenNotPaused {
         address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
@@ -763,6 +811,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     /**
      * @dev 质押 NFT
      * @param tokenIds 要质押的 NFT ID 数组（1-6 个）
+     * @notice 将玩家的NFT质押到竞技场系统，用于战斗队伍配置
      */
     function stakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
         address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
@@ -774,6 +823,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     /**
      * @dev 解除质押 NFT
      * @param tokenIds 要解除质押的 NFT ID 数组（1-6 个）
+     * @notice 将已质押的NFT从竞技场系统解除质押
      */
     function unstakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
         address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
@@ -783,7 +833,8 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev 清除战斗队伍（代理调用 ArenaPlayer）
+     * @dev 清除战斗队伍
+     * @notice 清除玩家当前设置的战斗队伍（代理调用ArenaPlayer）
      */
     function clearBattleTeam() external nonReentrant whenNotPaused {
         address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
@@ -793,9 +844,9 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 内部函数：检查玩家是否设置了战斗队伍
-     * 从 ArenaPlayer 合约获取玩家的战斗队伍信息
      * @param player 玩家地址
-     * @return 是否有战斗队伍
+     * @return 是否有已设置的战斗队伍
+     * @notice 从ArenaPlayer合约获取玩家的战斗队伍信息
      */
     function _hasBattleTeam(address player) internal view returns (bool) {
         address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
@@ -808,9 +859,9 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 内部函数：获取玩家的战斗队伍
-     * 从 ArenaPlayer 合约获取玩家的战斗队伍信息
      * @param player 玩家地址
-     * @return 战斗队伍（6个NFT ID）
+     * @return 战斗队伍（6个NFT ID数组）
+     * @notice 从ArenaPlayer合约获取玩家的战斗队伍信息
      */
     function _getBattleTeam(address player) internal view returns (uint256[6] memory) {
         address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
@@ -825,12 +876,14 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 每次胜利的基础奖励（积分）
+     * @notice 玩家每次战斗胜利获得的基础积分奖励
      */
     uint256 public baseRewardPerWin = 100;
 
     /**
      * @dev 设置每次胜利的基础奖励
      * @param _reward 奖励积分
+     * @notice 仅所有者可设置每次胜利获得的基础积分
      */
     function setBaseRewardPerWin(uint256 _reward) external onlyOwner {
         baseRewardPerWin = _reward;
