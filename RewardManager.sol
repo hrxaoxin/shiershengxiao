@@ -293,8 +293,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 设置滑点保护
      */
     function setSlippage(uint256 _slippage) external onlyOwner {
-        // 修复：滑点必须大于 0 且不超过 20%，否则几乎一定会失败或被MEV套利
-        require(_slippage > 0 && _slippage <= 2000, "RewardManager: Slippage must be > 0 and <= 2000");
+        // 修复：滑点必须大于 0 且不超过 10%（1000），原20%上限过高可能导致大滑点损失
+        require(_slippage > 0 && _slippage <= 1000, "RewardManager: Slippage must be > 0 and <= 1000");
         slippage = _slippage;
     }
 

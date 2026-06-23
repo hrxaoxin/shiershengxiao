@@ -223,6 +223,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             _;
             return;
         }
+        // 修复：先检查authorizer是否有效
+        require(authorizer != address(0), "Staking: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "Staking: Not authorized");
         _;
@@ -329,8 +331,24 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             // 更新用户级别累计跟踪
             userStakedWeight[msg.sender] -= weight;
             uint256 snapshotDecrement = globalRewardPerWeight * weight;
-            // 当 globalRewardPerWeight 重置为 0 时，确保 _userSnapshotWeight 也正确重置
+            // 修复：当 globalRewardPerWeight 重置为 0 时，先处理pendingRewards再重置快照
             if (globalRewardPerWeight == 0) {
+                // 先将pendingRewards转移到用户余额，确保不丢失
+                if (pendingRewards[msg.sender] > 0) {
+                    uint256 pending = pendingRewards[msg.sender];
+                    pendingRewards[msg.sender] = 0;
+                    address rewardTokenContract = IAuthorizer(authorizer).getToken();
+                    if (rewardTokenContract != address(0)) {
+                        IERC20 rewardToken = IERC20(rewardTokenContract);
+                        if (rewardToken.balanceOf(address(this)) >= pending) {
+                            rewardToken.safeTransfer(msg.sender, pending);
+                            emit RewardClaimed(msg.sender, pending);
+                        } else {
+                            // 如果合约余额不足，恢复pendingRewards
+                            pendingRewards[msg.sender] = pending;
+                        }
+                    }
+                }
                 _userSnapshotWeight[msg.sender] = 0;
             } else {
                 require(_userSnapshotWeight[msg.sender] >= snapshotDecrement, "Staking: Snapshot underflow");

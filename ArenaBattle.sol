@@ -194,6 +194,8 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             _;
             return;
         }
+        // 修复：先检查authorizer是否有效，再进行系统合约验证
+        require(authorizer != address(0), "ArenaBattle: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "ArenaBattle: Not authorized");
         _;

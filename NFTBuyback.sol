@@ -160,6 +160,8 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             _;
             return;
         }
+        // 修复：先检查authorizer是否有效
+        require(authorizer != address(0), "NFTBuyback: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "NFTBuyback: Not authorized");
         _;

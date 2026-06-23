@@ -211,6 +211,8 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             _;
             return;
         }
+        // 修复：先检查authorizer是否有效
+        require(authorizer != address(0), "BC: ANS");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "BC: NA");
         _;
@@ -976,9 +978,11 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     function _burnFee(uint256 breedingType) internal {
         address tokenContract = IAuthorizer(authorizer).getToken();
-        if (tokenContract == address(0)) return;
+        // 修复：如果代币合约未设置，应该revert而不是静默跳过，否则繁殖费用会被丢失
+        require(tokenContract != address(0), "BC: TNS");
         uint256 fee = breedingType == BREEDING_TYPE_SELF ? selfBreedingFee : marketBreedingFee;
         if (fee == 0) return;
+        
         IERC20 token = IERC20(tokenContract);
         
         uint256 contractBalance = token.balanceOf(address(this));

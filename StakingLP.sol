@@ -148,6 +148,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             _;
             return;
         }
+        // 修复：先检查authorizer是否有效
+        require(authorizer != address(0), "StakingLP: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "StakingLP: Not authorized");
         _;

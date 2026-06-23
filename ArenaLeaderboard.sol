@@ -123,6 +123,8 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
             _;
             return;
         }
+        // 修复：先检查authorizer是否有效
+        require(authorizer != address(0), "ArenaLeaderboard: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "ArenaLeaderboard: Not authorized");
         _;

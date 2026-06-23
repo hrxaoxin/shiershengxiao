@@ -160,6 +160,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
             _;
             return;
         }
+        // 修复：先检查authorizer是否有效
+        require(authorizer != address(0), "DM: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "DM: Not authorized");
         _;

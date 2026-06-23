@@ -140,6 +140,8 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             _;
             return;
         }
+        // 修复：先检查authorizer是否有效
+        require(authorizer != address(0), "PoolManager: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "PoolManager: Not authorized");
         _;

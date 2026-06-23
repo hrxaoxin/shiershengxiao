@@ -94,6 +94,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             _;
             return;
         }
+        // 修复：先检查authorizer是否有效
+        require(authorizer != address(0), "ArenaReward: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "ArenaReward: Not authorized");
         _;

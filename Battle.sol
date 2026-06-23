@@ -213,6 +213,8 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             _;
             return;
         }
+        // 修复：先检查authorizer是否有效
+        require(authorizer != address(0), "Battle: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "Battle: Not owner or authorizer");
         _;
@@ -223,6 +225,8 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @dev 用于战斗发起类函数（如 challenge），双重检查：owner或ArenaPlayer
      */
     modifier onlyBattleCaller() {
+        // 修复：先检查authorizer是否有效
+        require(authorizer != address(0), "Battle: Authorizer not set");
         address battleCaller = IAuthorizer(authorizer).getArenaPlayer();
         require(msg.sender == owner() || msg.sender == battleCaller, "Battle: Only authorized caller");
         _;

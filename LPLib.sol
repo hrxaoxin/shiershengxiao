@@ -368,10 +368,11 @@ library LPLib {
     }
 
     function swapTokenToBNB(IAuthorizer authorizer, uint256 tokenAmount) internal returns (uint256) {
-        LPConfig memory config = getConfig(authorizer);
+        // 修复：添加dexType参数，默认为0
+        LPConfig memory config = getConfig(authorizer, 0);
         require(config.token != address(0) && config.wbnb != address(0) && config.router != address(0), "LPLib: Missing config");
 
-        uint256 wbnbAmount = _swapTokenToWBNB(config, tokenAmount);
+        uint256 wbnbAmount = _swapTokenToWBNBWithRetry(config, tokenAmount);
         
         if (wbnbAmount == 0) {
             IERC20(config.token).transfer(msg.sender, tokenAmount);
@@ -383,7 +384,8 @@ library LPLib {
     }
 
     function emergencyWithdrawLP(IAuthorizer authorizer, uint256 amount) internal {
-        LPConfig memory config = getConfig(authorizer);
+        // 修复：添加dexType参数，默认为0
+        LPConfig memory config = getConfig(authorizer, 0);
         
         address factory = IDexRouter(config.router).factory();
         address lpToken = IDexFactory(factory).getPair(config.token, config.wbnb);
@@ -409,12 +411,13 @@ library LPLib {
     }
 
     function swapBNBToToken(IAuthorizer authorizer, uint256 bnbAmount) internal returns (uint256) {
-        LPConfig memory config = getConfig(authorizer);
+        // 修复：添加dexType参数，默认为0
+        LPConfig memory config = getConfig(authorizer, 0);
         require(config.token != address(0) && config.wbnb != address(0) && config.router != address(0), "LPLib: Missing config");
 
         IWBNB(config.wbnb).deposit{value: bnbAmount}();
         
-        return _swapWBNBToToken(config, bnbAmount);
+        return _swapWBNBToTokenWithFallback(authorizer, bnbAmount);
     }
 
     function swapWBNBToToken(IAuthorizer authorizer, uint256 wbnbAmount) internal returns (uint256) {
@@ -446,9 +449,9 @@ library LPLib {
         LPConfig memory config = getConfig(authorizer, dexType);
         if (config.router == address(0)) return 0;
         
-        try _generateLPFromWBNB(config, bnbAmount) returns (uint256 liquidity) {
-            if (liquidity > 0) return liquidity;
-        } catch {}
+        // 修复：内部函数不能使用try-catch，改为直接调用
+        uint256 liquidity = _generateLPFromWBNB(config, bnbAmount);
+        if (liquidity > 0) return liquidity;
         
         return 0;
     }
@@ -474,9 +477,9 @@ library LPLib {
         LPConfig memory config = getConfig(authorizer, dexType);
         if (config.router == address(0)) return 0;
         
-        try _generateLPFromWBNB(config, wbnbAmount) returns (uint256 liquidity) {
-            if (liquidity > 0) return liquidity;
-        } catch {}
+        // 修复：内部函数不能使用try-catch，改为直接调用
+        uint256 liquidity = _generateLPFromWBNB(config, wbnbAmount);
+        if (liquidity > 0) return liquidity;
         
         return 0;
     }
@@ -525,9 +528,9 @@ library LPLib {
     }
 
     function _swapTokenToWBNBWithRetry(LPConfig memory config, uint256 tokenAmount) internal returns (uint256) {
-        try _swapTokenToWBNB(config, tokenAmount) returns (uint256 amount) {
-            if (amount > 0) return amount;
-        } catch {}
+        // 修复：内部函数不能使用try-catch，改为直接调用
+        uint256 amount = _swapTokenToWBNB(config, tokenAmount);
+        if (amount > 0) return amount;
         return 0;
     }
 
@@ -536,9 +539,9 @@ library LPLib {
             LPConfig memory config = getConfig(authorizer, i);
             if (config.router == address(0)) continue;
             
-            try _swapWBNBToToken(config, wbnbAmount) returns (uint256 amount) {
-                if (amount > 0) return amount;
-            } catch {}
+            // 修复：内部函数不能使用try-catch，改为直接调用
+            uint256 amount = _swapWBNBToToken(config, wbnbAmount);
+            if (amount > 0) return amount;
         }
         return 0;
     }

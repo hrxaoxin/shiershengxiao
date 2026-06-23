@@ -629,6 +629,14 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         uint8 lv = m.tokenLevel(tokenId);
         require(lv < 5, "E16: Max level reached");
         
+        // 修复：减少局部变量，使用内部函数处理升级逻辑
+        return _upgradeWithUSDValueInternal(tokenId, lv, m, nft);
+    }
+    
+    /**
+     * @dev 使用USD价值升级（内部函数，减少栈深度）
+     */
+    function _upgradeWithUSDValueInternal(uint256 tokenId, uint8 lv, INFTDataInterface m, INFTMint nft) internal returns (uint8) {
         uint256 usdValue;
         if (lv == 1) usdValue = 1e18;      // 1 USD
         else if (lv == 2) usdValue = 4e18;  // 4 USD
@@ -638,30 +646,13 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         
         uint256 price = _getTokenPrice();
         require(price > 0, "E20: Price oracle returned zero");
-        
-        // 价格下限检查：防止价格过低导致费用过高
-        uint256 minPrice = 10**10; // 最小价格：0.000000001 USD
-        require(price >= minPrice, "E20: Price too low");
+        require(price >= 10**10, "E20: Price too low");
         
         uint256 cost = (usdValue * 1e18) / price;
         require(cost > 0, "E21: Invalid cost");
+        require(cost <= 10**30, "E21: Cost exceeds maximum");
         
-        // 费用上限检查：防止费用过高
-        uint256 maxCost = 10**30; // 最大费用：10^12 代币（18位精度）
-        require(cost <= maxCost, "E21: Cost exceeds maximum");
-        
-        IERC20 t = IERC20(tokenContract);
-        
-        // 先检查余额
-        uint256 balance = t.balanceOf(msg.sender);
-        require(balance >= cost, "E8: Insufficient balance");
-        
-        // 检查授权
-        uint256 allowance = t.allowance(msg.sender, address(this));
-        require(allowance >= cost, "E8: Insufficient allowance");
-        
-        // 执行代币转移
-        t.safeTransferFrom(msg.sender, BLACK_HOLE, cost);
+        IERC20(tokenContract).safeTransferFrom(msg.sender, BLACK_HOLE, cost);
         
         NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
         uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);

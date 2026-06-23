@@ -201,6 +201,8 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             _;
             return;
         }
+        // 修复：先检查authorizer是否有效
+        require(authorizer != address(0), "NFTData: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "NFTData: Not authorized");
         _;

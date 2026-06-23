@@ -155,7 +155,7 @@ window.ZODIAC_CONFIG = (function() {
         nftMintCore: getEnvContractAddress('nftMintCore', '0x3648Dd17DD1170FEC42D2BE05CA86E98D5D97d3c'),
         nftMint: getEnvContractAddress('nftMint', '0x3648Dd17DD1170FEC42D2BE05CA86E98D5D97d3c'),
         nftMintMetadata: getEnvContractAddress('nftMintMetadata', '0xf03215F849a0a665f5eCa46c2904553a42b4b1c6'),
-        nftUpdate: getEnvContractAddress('nftUpdate', '0x0A58B12f637C4E8A55Ea963E5F5F5c7134b04D84'),
+        nftUpdate: getEnvContractAddress('nftUpdate', '0x19619283F925Da8cd2796Ec8710C4C0fc1B78605'),
         nftData: getEnvContractAddress('nftData', '0x5f61e3Eba2beECE1A34572bEac7F1748FAb5a0e8'),
         nftTrading: getEnvContractAddress('nftTrading', '0x01023a601053fFDEE23546A132F8cd09AAf1deA6'),
         nftBuyback: getEnvContractAddress('nftBuyback', '0x97d71e490ab4960F4692E52164533a98a4094291'),
@@ -4170,6 +4170,29 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "getAllDEXPrices",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "prices",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "uint256",
+				"name": "lowestPrice",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint8",
+				"name": "bestDEX",
+				"type": "uint8"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "getAllLevelUpgradeCosts",
 		"outputs": [
 			{
@@ -4467,6 +4490,19 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "priceOracle",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
 			}
 		],
 		"stateMutability": "view",
