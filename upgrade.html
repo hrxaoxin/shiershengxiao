@@ -276,6 +276,8 @@
         let nftContract;
         let tokenContract;
         let selectedNft = null;
+        let userNFTsCache = null;
+        let userNFTsCacheTime = 0;
 
         document.addEventListener('DOMContentLoaded', async function() {
             particlesJS('particles-js', {
@@ -537,17 +539,41 @@
             
             try {
                 nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
-                isRare = await nftContract.methods.isRare(id).call();
-                growth = parseInt(await nftContract.methods.tokenGrowth(id).call(), 10);
                 
-                if (nftContract && account) {
-                    const userTokens = await nftContract.methods.getTokenIdsByOwner(account).call();
-                    for (const tid of userTokens) {
-                        const tType = await nftContract.methods.tokenType(tid).call();
-                        if (tType === type.toString()) {
+                const [rareResult, growthResult] = await Promise.all([
+                    nftContract.methods.isRare(id).call(),
+                    nftContract.methods.tokenGrowth(id).call()
+                ]);
+                isRare = rareResult;
+                growth = parseInt(growthResult, 10);
+                
+                const now = Date.now();
+                if (!userNFTsCache || now - userNFTsCacheTime > 30000) {
+                    if (nftContract && account) {
+                        const userTokens = await nftContract.methods.getTokenIdsByOwner(account).call();
+                        const typePromises = [];
+                        const levelPromises = [];
+                        
+                        for (const tid of userTokens) {
+                            typePromises.push(nftContract.methods.tokenType(tid).call());
+                            levelPromises.push(nftContract.methods.tokenLevel(tid).call());
+                        }
+                        
+                        const [types, levels] = await Promise.all([
+                            Promise.all(typePromises),
+                            Promise.all(levelPromises)
+                        ]);
+                        
+                        userNFTsCache = { tokens: userTokens, types, levels };
+                        userNFTsCacheTime = now;
+                    }
+                }
+                
+                if (userNFTsCache) {
+                    for (let i = 0; i < userNFTsCache.tokens.length; i++) {
+                        if (userNFTsCache.types[i] === type.toString()) {
                             sameTypeCount++;
-                            const tLevel = await nftContract.methods.tokenLevel(tid).call();
-                            if (tLevel === level.toString()) {
+                            if (userNFTsCache.levels[i] === level.toString()) {
                                 sameLevelCount++;
                             }
                         }
@@ -687,15 +713,19 @@
                     await ZODIAC_WEB3.approveNFT(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate);
                 }
                 
-                const result = await ZODIAC_WEB3.upgradeWithNFT(selectedNft.id);
+                const gasLimit = 2000000;
+                const result = await nftUpdateContract.methods.upgradeWithNFT(selectedNft.id)
+                    .send({ from: account, gas: gasLimit, gasPrice: await web3.eth.getGasPrice() });
+                
                 ZODIAC_UI.hideLoading();
+                userNFTsCache = null;
                 await ZODIAC_UI.showSuccessModal('升级成功！', `NFT ID ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 级`);
                 await loadUserNFTs();
             } catch (error) {
                 ZODIAC_UI.hideLoading();
                 selectedNft = null;
                 document.getElementById('upgradeSection').classList.add('hidden');
-                const errorMsg = ZODIAC_CONFIG.getErrorMessage(error);
+                const errorMsg = error.message || error.toString();
                 await ZODIAC_UI.showErrorModal(`升级失败: ${errorMsg}`);
             }
         }
@@ -709,6 +739,18 @@
             }
 
             const requiredTokens = await getRequiredTokens(selectedNft.level);
+            
+            try {
+                const balance = await tokenContract.methods.balanceOf(account).call();
+                const requiredWei = web3.utils.toWei(requiredTokens.toString(), 'ether');
+                if (BigInt(balance) < BigInt(requiredWei)) {
+                    await ZODIAC_UI.showErrorModal(`代币余额不足！\n需要 ${requiredTokens.toLocaleString()} 枚代币，当前余额不足`);
+                    return;
+                }
+            } catch (e) {
+                console.error('Failed to check token balance:', e);
+            }
+
             const confirmed = await ZODIAC_UI.showConfirmModal(
                 '升级确认',
                 `确认使用代币升阶？\n\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level} → ${selectedNft.level + 1}\n将消耗 ${requiredTokens.toLocaleString()} 枚代币`
@@ -725,15 +767,19 @@
                     await ZODIAC_WEB3.approveToken(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, requiredTokensWei);
                 }
 
-                const result = await ZODIAC_WEB3.upgradeWithToken(selectedNft.id);
+                const gasLimit = 1500000;
+                const result = await nftUpdateContract.methods.upgradeWithToken(selectedNft.id)
+                    .send({ from: account, gas: gasLimit, gasPrice: await web3.eth.getGasPrice() });
+                
                 ZODIAC_UI.hideLoading();
+                userNFTsCache = null;
                 await ZODIAC_UI.showSuccessModal('升级成功！', `NFT ID ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 级`);
                 await loadUserNFTs();
             } catch (error) {
                 ZODIAC_UI.hideLoading();
                 selectedNft = null;
                 document.getElementById('upgradeSection').classList.add('hidden');
-                const errorMsg = ZODIAC_CONFIG.getErrorMessage(error);
+                const errorMsg = error.message || error.toString();
                 await ZODIAC_UI.showErrorModal(`升级失败: ${errorMsg}`);
             }
         }
