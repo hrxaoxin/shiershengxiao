@@ -353,37 +353,6 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         }
     }
 
-    function _distributeTokenPools(uint256 amount, address tokenContract) private {
-        address dividendPool = IAuthorizer(authorizer).getDividendManager();
-        uint256 nftStakingAmount = amount * nftStakingPercent / PRECISION;
-        uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
-        uint256 arenaRewardAmount = amount * arenaRewardPercent / PRECISION;
-        
-        uint256 totalSwapAmount = nftStakingAmount + tokenStakingAmount + arenaRewardAmount;
-        
-        if (totalSwapAmount > 0) {
-            uint256 tokenAmount = _swapBNBToToken(totalSwapAmount, tokenContract);
-            
-            if (tokenAmount > 0) {
-                _distributeSwappedTokens(tokenAmount, nftStakingAmount, tokenStakingAmount, arenaRewardAmount, totalSwapAmount, tokenContract);
-            } else {
-                if (dividendPool != address(0)) {
-                    (bool fbSuccess, ) = payable(dividendPool).call{value: totalSwapAmount}("");
-                    if (fbSuccess) {
-                        try IDividendManager(dividendPool).syncDividendPool() {} catch {}
-                        emit SwapFailedFallback(totalSwapAmount);
-                    } else {
-                        lockedBNBAmount += totalSwapAmount;
-                        emit SwapFailed(totalSwapAmount);
-                    }
-                } else {
-                    lockedBNBAmount += totalSwapAmount;
-                    emit SwapFailed(totalSwapAmount);
-                }
-            }
-        }
-    }
-
     function _distributeStakingPool(uint256 amount) private {
         address stakingLP = IAuthorizer(authorizer).getStakingLP();
         uint256 stakingAmount = amount * nftStakingPercent / PRECISION;

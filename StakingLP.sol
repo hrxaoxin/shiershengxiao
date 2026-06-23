@@ -40,8 +40,16 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /** @dev 授权合约地址 */
     address public authorizer;
     
+    /** @dev 当前奖励类型 */
+    RewardType public rewardType;
+    
     /** @dev LP奖励池余额 */
     uint256 public lpRewardPoolBalance;
+    /** @dev 代币奖励池余额 */
+    uint256 public tokenRewardPoolBalance;
+    /** @dev BNB奖励池余额 */
+    uint256 public bnbRewardPoolBalance;
+    
     /** @dev 滑点保护参数（默认1000 = 10%容差） */
     uint256 public slippage = 1000;
     /** @dev 自动复利开关 */
@@ -49,10 +57,10 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /** @dev 最小复利金额（0.001 ETH） */
     uint256 public minCompoundAmount = 1000000000000000;
     
-    /** @dev 全局LP奖励累积值（每单位权重的LP奖励） */
-    uint256 public globalLPRewardPerWeight;
-    /** @dev 用户LP快照权重映射（地址 => 用户LP快照） */
-    mapping(address => uint256) public userLPSnapshotWeight;
+    /** @dev 全局奖励累积值（每单位权重的奖励）- 用于LP和TOKEN类型 */
+    uint256 public globalRewardPerWeight;
+    /** @dev 用户奖励快照权重映射（地址 => 用户快照） */
+    mapping(address => uint256) public userRewardSnapshotWeight;
     
     /** @dev 质押奖励精度缩放因子（1e18） */
     uint256 public constant STAKING_REWARD_PRECISION = 1e18;
@@ -62,12 +70,22 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     /** @dev LP奖励领取事件 */
     event LPRewardClaimed(address indexed user, uint256 lpAmount);
+    /** @dev 代币奖励领取事件 */
+    event TokenRewardClaimed(address indexed user, uint256 tokenAmount);
+    /** @dev BNB奖励领取事件 */
+    event BNBRewardClaimed(address indexed user, uint256 bnbAmount);
     /** @dev LP奖励添加事件 */
     event LPAddedToPool(uint256 lpAmount);
+    /** @dev 代币奖励添加事件 */
+    event TokenAddedToPool(uint256 tokenAmount);
+    /** @dev BNB奖励添加事件 */
+    event BNBAddedToPool(uint256 bnbAmount);
     /** @dev 复利执行事件 */
     event FeesCompounded(uint256 lpAmount);
     /** @dev 紧急提取WBNB事件 */
     event EmergencyWBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    /** @dev 奖励类型切换事件 */
+    event RewardTypeChanged(RewardType oldType, RewardType newType);
 
     /**
      * @dev 构造函数：禁用初始化器
@@ -89,6 +107,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         __Pausable_init();
         
         authorizer = _authorizerAddress;
+        rewardType = RewardType.LP;
         
         slippage = 1000;
         autoCompoundEnabled = true;
@@ -137,26 +156,42 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev 接收BNB - 自动转换为LP
+     * @dev 接收BNB - 根据当前奖励类型处理
      */
     receive() external payable {
         if (msg.value > 0) {
-            uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(msg.value);
-            if (lpAmount > 0) {
-                _addToLPRewardPool(lpAmount);
-            }
+            _processIncomingBNB(msg.value);
         }
     }
 
     /**
-     * @dev 记录流入的BNB并转换为LP
+     * @dev 记录流入的BNB并根据奖励类型处理
      * @param amount BNB数量
      */
     function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
         require(amount > 0, "StakingLP: Amount must be > 0");
-        uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(amount);
-        if (lpAmount > 0) {
-            _addToLPRewardPool(lpAmount);
+        _processIncomingBNB(amount);
+    }
+
+    /**
+     * @dev 处理流入的BNB（内部函数）
+     * @param amount BNB数量
+     */
+    function _processIncomingBNB(uint256 amount) internal {
+        RewardType currentType = rewardType;
+        
+        if (currentType == RewardType.LP) {
+            uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(amount);
+            if (lpAmount > 0) {
+                _addToRewardPool(lpAmount, currentType);
+            }
+        } else if (currentType == RewardType.TOKEN) {
+            uint256 tokenAmount = IAuthorizer(authorizer).swapBNBToToken(amount);
+            if (tokenAmount > 0) {
+                _addToRewardPool(tokenAmount, currentType);
+            }
+        } else if (currentType == RewardType.BNB) {
+            _addToRewardPool(amount, currentType);
         }
     }
 
@@ -174,25 +209,110 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param snapshotWeight 用户快照权重
      */
     function syncUserWeight(address user, uint256 snapshotWeight) external onlyOwnerOrAuthorizer {
-        userLPSnapshotWeight[user] = snapshotWeight;
+        userRewardSnapshotWeight[user] = snapshotWeight;
     }
 
     /**
-     * @dev 添加到LP奖励池（内部函数）
-     * @param lpAmount LP数量
+     * @dev 添加到奖励池（内部函数）
+     * @param amount 奖励数量
+     * @param type_ 奖励类型
      */
-    function _addToLPRewardPool(uint256 lpAmount) internal {
-        uint256 newBalance = lpRewardPoolBalance + lpAmount;
-        require(newBalance >= lpRewardPoolBalance, "StakingLP: LP overflow");
-        lpRewardPoolBalance = newBalance;
+    function _addToRewardPool(uint256 amount, RewardType type_) internal {
+        if (type_ == RewardType.LP) {
+            uint256 newBalance = lpRewardPoolBalance + amount;
+            require(newBalance >= lpRewardPoolBalance, "StakingLP: LP overflow");
+            lpRewardPoolBalance = newBalance;
+            emit LPAddedToPool(amount);
+        } else if (type_ == RewardType.TOKEN) {
+            uint256 newBalance = tokenRewardPoolBalance + amount;
+            require(newBalance >= tokenRewardPoolBalance, "StakingLP: Token overflow");
+            tokenRewardPoolBalance = newBalance;
+            emit TokenAddedToPool(amount);
+        } else if (type_ == RewardType.BNB) {
+            uint256 newBalance = bnbRewardPoolBalance + amount;
+            require(newBalance >= bnbRewardPoolBalance, "StakingLP: BNB overflow");
+            bnbRewardPoolBalance = newBalance;
+            emit BNBAddedToPool(amount);
+        }
 
-        if (totalWeightedNFTs > 0) {
-            uint256 increment = (lpAmount * STAKING_REWARD_PRECISION) / totalWeightedNFTs;
-            require(globalLPRewardPerWeight <= type(uint256).max - increment, "StakingLP: LP reward overflow");
-            globalLPRewardPerWeight += increment;
+        if (totalWeightedNFTs > 0 && (type_ == RewardType.LP || type_ == RewardType.TOKEN)) {
+            uint256 increment = (amount * STAKING_REWARD_PRECISION) / totalWeightedNFTs;
+            require(globalRewardPerWeight <= type(uint256).max - increment, "StakingLP: Reward overflow");
+            globalRewardPerWeight += increment;
+        }
+    }
+
+    /**
+     * @dev 设置奖励类型（仅owner）
+     * @param _rewardType 新的奖励类型
+     */
+    function setRewardType(RewardType _rewardType) external onlyOwner {
+        RewardType oldType = rewardType;
+        if (oldType == _rewardType) {
+            return;
         }
         
-        emit LPAddedToPool(lpAmount);
+        _convertPoolAssets(oldType, _rewardType);
+        
+        rewardType = _rewardType;
+        emit RewardTypeChanged(oldType, _rewardType);
+    }
+
+    /**
+     * @dev 转换奖励池资产（内部函数）
+     * @param fromType 原奖励类型
+     * @param toType 目标奖励类型
+     */
+    function _convertPoolAssets(RewardType fromType, RewardType toType) internal {
+        if (fromType == RewardType.LP && toType == RewardType.TOKEN) {
+            if (lpRewardPoolBalance > 0) {
+                uint256 tokenAmount = IAuthorizer(authorizer).redeemLPToToken(lpRewardPoolBalance);
+                lpRewardPoolBalance = 0;
+                if (tokenAmount > 0) {
+                    tokenRewardPoolBalance += tokenAmount;
+                }
+            }
+        } else if (fromType == RewardType.LP && toType == RewardType.BNB) {
+            if (lpRewardPoolBalance > 0) {
+                uint256 wbnbAmount = IAuthorizer(authorizer).redeemLPToWBNB(lpRewardPoolBalance);
+                lpRewardPoolBalance = 0;
+                if (wbnbAmount > 0) {
+                    bnbRewardPoolBalance += wbnbAmount;
+                }
+            }
+        } else if (fromType == RewardType.TOKEN && toType == RewardType.LP) {
+            if (tokenRewardPoolBalance > 0) {
+                uint256 lpAmount = IAuthorizer(authorizer).convertTokenToLP(tokenRewardPoolBalance);
+                tokenRewardPoolBalance = 0;
+                if (lpAmount > 0) {
+                    lpRewardPoolBalance += lpAmount;
+                }
+            }
+        } else if (fromType == RewardType.TOKEN && toType == RewardType.BNB) {
+            if (tokenRewardPoolBalance > 0) {
+                uint256 bnbAmount = IAuthorizer(authorizer).swapTokenToBNB(tokenRewardPoolBalance);
+                tokenRewardPoolBalance = 0;
+                if (bnbAmount > 0) {
+                    bnbRewardPoolBalance += bnbAmount;
+                }
+            }
+        } else if (fromType == RewardType.BNB && toType == RewardType.LP) {
+            if (bnbRewardPoolBalance > 0) {
+                uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(bnbRewardPoolBalance);
+                bnbRewardPoolBalance = 0;
+                if (lpAmount > 0) {
+                    lpRewardPoolBalance += lpAmount;
+                }
+            }
+        } else if (fromType == RewardType.BNB && toType == RewardType.TOKEN) {
+            if (bnbRewardPoolBalance > 0) {
+                uint256 tokenAmount = IAuthorizer(authorizer).swapBNBToToken(bnbRewardPoolBalance);
+                bnbRewardPoolBalance = 0;
+                if (tokenAmount > 0) {
+                    tokenRewardPoolBalance += tokenAmount;
+                }
+            }
+        }
     }
 
     /**
@@ -203,43 +323,68 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
-     * @dev 领取LP奖励
+     * @dev 领取奖励
      */
     function claimLPReward() external nonReentrant whenNotPaused {
         address staking = IAuthorizer(authorizer).getStaking();
         uint256 userWeight = IStaking(staking).userStakedWeight(msg.sender);
         require(userWeight > 0, "StakingLP: No staked NFTs");
 
-        uint256 rewardBase = globalLPRewardPerWeight * userWeight;
-        uint256 snapshotBase = userLPSnapshotWeight[msg.sender];
+        RewardType currentType = rewardType;
+        
+        if (currentType == RewardType.BNB) {
+            uint256 reward = bnbRewardPoolBalance * userWeight / (totalWeightedNFTs + 1);
+            if (reward > 0 && reward <= bnbRewardPoolBalance) {
+                bnbRewardPoolBalance -= reward;
+                payable(msg.sender).transfer(reward);
+                emit BNBRewardClaimed(msg.sender, reward);
+            }
+            return;
+        }
+
+        uint256 rewardBase = globalRewardPerWeight * userWeight;
+        uint256 snapshotBase = userRewardSnapshotWeight[msg.sender];
         
         if (rewardBase <= snapshotBase) {
             return;
         }
 
-        uint256 lpReward = (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
+        uint256 reward = (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
         
-        require(lpReward <= lpRewardPoolBalance, "StakingLP: Insufficient LP");
+        if (currentType == RewardType.LP) {
+            require(reward <= lpRewardPoolBalance, "StakingLP: Insufficient LP");
+            lpRewardPoolBalance -= reward;
+            IAuthorizer(authorizer).redeemLPToUser(reward, msg.sender);
+            emit LPRewardClaimed(msg.sender, reward);
+        } else if (currentType == RewardType.TOKEN) {
+            require(reward <= tokenRewardPoolBalance, "StakingLP: Insufficient Token");
+            tokenRewardPoolBalance -= reward;
+            IBEP20 token = IBEP20(IAuthorizer(authorizer).getToken());
+            token.transfer(msg.sender, reward);
+            emit TokenRewardClaimed(msg.sender, reward);
+        }
 
-        lpRewardPoolBalance -= lpReward;
-        userLPSnapshotWeight[msg.sender] = globalLPRewardPerWeight;
-
-        IAuthorizer(authorizer).redeemLPToUser(lpReward, msg.sender);
-        emit LPRewardClaimed(msg.sender, lpReward);
+        userRewardSnapshotWeight[msg.sender] = globalRewardPerWeight;
     }
 
     /**
-     * @dev 查询待领取LP奖励
+     * @dev 查询待领取奖励
      * @param user 用户地址
-     * @return 待领取LP奖励金额
+     * @return 待领取奖励金额
      */
     function getPendingLPReward(address user) external view returns (uint256) {
         address staking = IAuthorizer(authorizer).getStaking();
         uint256 userWeight = IStaking(staking).userStakedWeight(user);
         if (userWeight == 0) return 0;
+
+        RewardType currentType = rewardType;
         
-        uint256 rewardBase = globalLPRewardPerWeight * userWeight;
-        uint256 snapshotBase = userLPSnapshotWeight[user];
+        if (currentType == RewardType.BNB) {
+            return bnbRewardPoolBalance * userWeight / (totalWeightedNFTs + 1);
+        }
+        
+        uint256 rewardBase = globalRewardPerWeight * userWeight;
+        uint256 snapshotBase = userRewardSnapshotWeight[user];
         
         if (rewardBase <= snapshotBase) {
             return 0;

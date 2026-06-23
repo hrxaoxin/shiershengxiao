@@ -10,7 +10,6 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 import "./ArenaRankingLib.sol";
-import "./LPLib.sol";
 
 /**
  * @title ArenaReward

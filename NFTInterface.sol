@@ -5,6 +5,12 @@ interface IERC721Receiver {
     function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external returns (bytes4);
 }
 
+enum RewardType {
+    LP,
+    TOKEN,
+    BNB
+}
+
 interface IBEP20 {
     function decimals() external view returns (uint8);
     function balanceOf(address account) external view returns (uint256);
@@ -904,6 +910,8 @@ interface ITokenStakingLP {
     function claimLPReward() external;
     function getPendingLPReward(address user) external view returns (uint256);
     function compoundFees() external;
+    function getRewardType() external view returns (RewardType);
+    function setRewardType(RewardType rewardType) external;
 }
 
 /**
@@ -917,6 +925,8 @@ interface IStakingLP {
     function claimLPReward() external;
     function getPendingLPReward(address user) external view returns (uint256);
     function compoundFees() external;
+    function getRewardType() external view returns (RewardType);
+    function setRewardType(RewardType rewardType) external;
 }
 
 /**
@@ -928,6 +938,8 @@ interface IDividendManagerLP {
     function claimLPDividend() external;
     function getClaimableLPDividend(address user) external view returns (uint256);
     function compoundFees() external;
+    function getRewardType() external view returns (RewardType);
+    function setRewardType(RewardType rewardType) external;
 }
 
 /**
@@ -936,9 +948,11 @@ interface IDividendManagerLP {
  */
 interface IArenaRewardLP {
     function recordIncomingBNB(uint256 amount) external;
-    function claimLPReward() external;
-    function getPendingLPReward(address user) external view returns (uint256);
+    function claimLPReward(uint256 seasonId) external;
+    function getPendingLPReward(address user, uint256 seasonId) external view returns (uint256);
     function compoundFees() external;
+    function getRewardType() external view returns (RewardType);
+    function setRewardType(RewardType rewardType) external;
 }
 
 /**
@@ -958,15 +972,4 @@ interface IBuybackReceiver {
     function recordIncomingBNB(uint256 amount) external;
 }
 
-/**
- * @title IStakingLP
- * @dev 质押LP奖励合约接口
- */
-interface IStakingLP {
-    function updateTotalWeight(uint256 _totalWeightedNFTs) external;
-    function syncUserWeight(address user, uint256 snapshotWeight) external;
-    function recordIncomingBNB(uint256 amount) external;
-    function claimLPReward() external;
-    function getPendingLPReward(address user) external view returns (uint256);
-    function compoundFees() external;
-}
+

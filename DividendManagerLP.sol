@@ -38,17 +38,24 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     /** @dev 授权合约地址 */
     address public authorizer;
     
+    /** @dev 当前奖励类型 */
+    RewardType public rewardType;
+    
     /** @dev LP分红池余额 */
     uint256 public lpDividendPoolBalance;
+    /** @dev 代币分红池余额 */
+    uint256 public tokenDividendPoolBalance;
+    /** @dev BNB分红池余额 */
+    uint256 public bnbDividendPoolBalance;
     
-    /** @dev 用户待领取LP分红金额 */
-    mapping(address => uint256) public pendingLPDividends;
+    /** @dev 用户待领取代币分红金额 */
+    mapping(address => uint256) public pendingTokenDividends;
     
-    /** @dev 累计每权重LP分红（用于计算LP分红） */
-    uint256 public cumulativePerWeightLPDividend;
+    /** @dev 累计每权重分红（用于计算LP和代币分红） */
+    uint256 public cumulativePerWeightDividend;
     
-    /** @dev 用户LP分红快照（记录用户上次领取时的累计分红值） */
-    mapping(address => uint256) public userLPSnapshots;
+    /** @dev 用户分红快照（记录用户上次领取时的累计分红值） */
+    mapping(address => uint256) public userRewardSnapshots;
 
     /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[50] private __gap;
@@ -58,7 +65,29 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @param user 用户地址
      * @param amount 领取LP数量
      */
-    event DividendClaimed(address indexed user, uint256 amount);
+    event LPDividendClaimed(address indexed user, uint256 amount);
+    
+    /** @dev 代币分红领取事件
+     * @param user 用户地址
+     * @param amount 领取代币数量
+     */
+    event TokenDividendClaimed(address indexed user, uint256 amount);
+    
+    /** @dev BNB分红领取事件
+     * @param user 用户地址
+     * @param amount 领取BNB数量
+     */
+    event BNBDividendClaimed(address indexed user, uint256 amount);
+
+    /** @dev LP分红添加事件 */
+    event LPAddedToDividendPool(uint256 amount);
+    /** @dev 代币分红添加事件 */
+    event TokenAddedToDividendPool(uint256 amount);
+    /** @dev BNB分红添加事件 */
+    event BNBAddedToDividendPool(uint256 amount);
+
+    /** @dev 奖励类型切换事件 */
+    event RewardTypeChanged(RewardType oldType, RewardType newType);
 
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
@@ -78,6 +107,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         __ReentrancyGuard_init();
         __Pausable_init();
         authorizer = _authorizerAddress;
+        rewardType = RewardType.LP;
     }
     
     /**
@@ -111,47 +141,151 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     }
 
     /**
-     * @dev 回退函数：接收BNB并自动转换为LP
+     * @dev 回退函数：接收BNB并根据奖励类型处理
      */
     receive() external payable {
         if (msg.value > 0) {
-            uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(msg.value);
+            _processIncomingBNB(msg.value);
+        }
+    }
+
+    /**
+     * @dev 记录流入的BNB并根据奖励类型处理
+     * @param amount BNB数量
+     */
+    function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
+        require(amount > 0, "DividendManagerLP: Amount must be > 0");
+        _processIncomingBNB(amount);
+    }
+
+    /**
+     * @dev 处理流入的BNB（内部函数）
+     * @param amount BNB数量
+     */
+    function _processIncomingBNB(uint256 amount) internal {
+        RewardType currentType = rewardType;
+        
+        if (currentType == RewardType.LP) {
+            uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(amount);
             if (lpAmount > 0) {
-                _addToLPDividendPool(lpAmount);
+                _addToDividendPool(lpAmount, currentType);
+            }
+        } else if (currentType == RewardType.TOKEN) {
+            uint256 tokenAmount = IAuthorizer(authorizer).swapBNBToToken(amount);
+            if (tokenAmount > 0) {
+                _addToDividendPool(tokenAmount, currentType);
+            }
+        } else if (currentType == RewardType.BNB) {
+            _addToDividendPool(amount, currentType);
+        }
+    }
+
+    /**
+     * @dev 添加到分红池（内部函数）
+     * @param amount 分红数量
+     * @param type_ 分红类型
+     */
+    function _addToDividendPool(uint256 amount, RewardType type_) internal {
+        if (type_ == RewardType.LP) {
+            uint256 newBalance = lpDividendPoolBalance + amount;
+            require(newBalance >= lpDividendPoolBalance, "DividendManagerLP: LP overflow");
+            lpDividendPoolBalance = newBalance;
+            emit LPAddedToDividendPool(amount);
+        } else if (type_ == RewardType.TOKEN) {
+            uint256 newBalance = tokenDividendPoolBalance + amount;
+            require(newBalance >= tokenDividendPoolBalance, "DividendManagerLP: Token overflow");
+            tokenDividendPoolBalance = newBalance;
+            emit TokenAddedToDividendPool(amount);
+        } else if (type_ == RewardType.BNB) {
+            uint256 newBalance = bnbDividendPoolBalance + amount;
+            require(newBalance >= bnbDividendPoolBalance, "DividendManagerLP: BNB overflow");
+            bnbDividendPoolBalance = newBalance;
+            emit BNBAddedToDividendPool(amount);
+        }
+
+        if (type_ == RewardType.LP || type_ == RewardType.TOKEN) {
+            address dividendManager = IAuthorizer(authorizer).getDividendManager();
+            uint256 totalWeight = IDividendManager(dividendManager).getTotalWeight();
+            
+            if (totalWeight > 0) {
+                uint256 perWeightIncrement = (amount * 1e18) / totalWeight;
+                uint256 newCumulative = cumulativePerWeightDividend + perWeightIncrement;
+                require(newCumulative >= cumulativePerWeightDividend, "DividendManagerLP: Cumulative overflow");
+                cumulativePerWeightDividend = newCumulative;
             }
         }
     }
 
     /**
-     * @dev 记录流入的BNB并转换为LP
-     * @param amount BNB数量
+     * @dev 设置奖励类型（仅owner）
+     * @param _rewardType 新的奖励类型
      */
-    function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
-        require(amount > 0, "DividendManagerLP: Amount must be > 0");
-        uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(amount);
-        if (lpAmount > 0) {
-            _addToLPDividendPool(lpAmount);
+    function setRewardType(RewardType _rewardType) external onlyOwner {
+        RewardType oldType = rewardType;
+        if (oldType == _rewardType) {
+            return;
         }
+        
+        _convertPoolAssets(oldType, _rewardType);
+        
+        rewardType = _rewardType;
+        emit RewardTypeChanged(oldType, _rewardType);
     }
 
     /**
-     * @dev 添加到LP分红池（内部函数）
-     * @param lpAmount LP数量
+     * @dev 转换奖励池资产（内部函数）
+     * @param fromType 原奖励类型
+     * @param toType 目标奖励类型
      */
-    function _addToLPDividendPool(uint256 lpAmount) internal {
-        uint256 newBalance = lpDividendPoolBalance + lpAmount;
-        require(newBalance >= lpDividendPoolBalance, "DividendManagerLP: LP overflow");
-        lpDividendPoolBalance = newBalance;
-
-        // 获取DividendManager总权重
-        address dividendManager = IAuthorizer(authorizer).getDividendManager();
-        uint256 totalWeight = IDividendManager(dividendManager).getTotalWeight();
-        
-        if (totalWeight > 0) {
-            uint256 perWeightIncrement = (lpAmount * 1e18) / totalWeight;
-            uint256 newCumulative = cumulativePerWeightLPDividend + perWeightIncrement;
-            require(newCumulative >= cumulativePerWeightLPDividend, "DividendManagerLP: LP cumulative overflow");
-            cumulativePerWeightLPDividend = newCumulative;
+    function _convertPoolAssets(RewardType fromType, RewardType toType) internal {
+        if (fromType == RewardType.LP && toType == RewardType.TOKEN) {
+            if (lpDividendPoolBalance > 0) {
+                uint256 tokenAmount = IAuthorizer(authorizer).redeemLPToToken(lpDividendPoolBalance);
+                lpDividendPoolBalance = 0;
+                if (tokenAmount > 0) {
+                    tokenDividendPoolBalance += tokenAmount;
+                }
+            }
+        } else if (fromType == RewardType.LP && toType == RewardType.BNB) {
+            if (lpDividendPoolBalance > 0) {
+                uint256 wbnbAmount = IAuthorizer(authorizer).redeemLPToWBNB(lpDividendPoolBalance);
+                lpDividendPoolBalance = 0;
+                if (wbnbAmount > 0) {
+                    bnbDividendPoolBalance += wbnbAmount;
+                }
+            }
+        } else if (fromType == RewardType.TOKEN && toType == RewardType.LP) {
+            if (tokenDividendPoolBalance > 0) {
+                uint256 lpAmount = IAuthorizer(authorizer).convertTokenToLP(tokenDividendPoolBalance);
+                tokenDividendPoolBalance = 0;
+                if (lpAmount > 0) {
+                    lpDividendPoolBalance += lpAmount;
+                }
+            }
+        } else if (fromType == RewardType.TOKEN && toType == RewardType.BNB) {
+            if (tokenDividendPoolBalance > 0) {
+                uint256 bnbAmount = IAuthorizer(authorizer).swapTokenToBNB(tokenDividendPoolBalance);
+                tokenDividendPoolBalance = 0;
+                if (bnbAmount > 0) {
+                    bnbDividendPoolBalance += bnbAmount;
+                }
+            }
+        } else if (fromType == RewardType.BNB && toType == RewardType.LP) {
+            if (bnbDividendPoolBalance > 0) {
+                uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(bnbDividendPoolBalance);
+                bnbDividendPoolBalance = 0;
+                if (lpAmount > 0) {
+                    lpDividendPoolBalance += lpAmount;
+                }
+            }
+        } else if (fromType == RewardType.BNB && toType == RewardType.TOKEN) {
+            if (bnbDividendPoolBalance > 0) {
+                uint256 tokenAmount = IAuthorizer(authorizer).swapBNBToToken(bnbDividendPoolBalance);
+                bnbDividendPoolBalance = 0;
+                if (tokenAmount > 0) {
+                    tokenDividendPoolBalance += tokenAmount;
+                }
+            }
         }
     }
 
@@ -163,43 +297,71 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     }
 
     /**
-     * @dev 领取LP分红
+     * @dev 领取分红
      */
     function claimLPDividend() external nonReentrant whenNotPaused {
-        // 获取用户权重
         address dividendManager = IAuthorizer(authorizer).getDividendManager();
         uint256 userWeight = IDividendManager(dividendManager).getUserWeight(msg.sender);
         require(userWeight > 0, "DividendManagerLP: No weight");
 
-        uint256 cumulativeDiff = cumulativePerWeightLPDividend - userLPSnapshots[msg.sender];
-        uint256 lpDividend = userWeight * cumulativeDiff / 1e18;
+        RewardType currentType = rewardType;
         
-        if (lpDividend == 0) {
+        if (currentType == RewardType.BNB) {
+            uint256 totalWeight = IDividendManager(dividendManager).getTotalWeight();
+            uint256 reward = bnbDividendPoolBalance * userWeight / (totalWeight + 1);
+            if (reward > 0 && reward <= bnbDividendPoolBalance) {
+                bnbDividendPoolBalance -= reward;
+                payable(msg.sender).transfer(reward);
+                emit BNBDividendClaimed(msg.sender, reward);
+            }
             return;
         }
 
-        require(lpDividend <= lpDividendPoolBalance, "DividendManagerLP: Insufficient LP");
+        uint256 cumulativeDiff = cumulativePerWeightDividend - userRewardSnapshots[msg.sender];
+        uint256 dividend = userWeight * cumulativeDiff / 1e18;
+        
+        if (dividend == 0) {
+            return;
+        }
 
-        lpDividendPoolBalance -= lpDividend;
-        userLPSnapshots[msg.sender] = cumulativePerWeightLPDividend;
+        if (currentType == RewardType.LP) {
+            require(dividend <= lpDividendPoolBalance, "DividendManagerLP: Insufficient LP");
+            lpDividendPoolBalance -= dividend;
+            IAuthorizer(authorizer).redeemLPToUser(dividend, msg.sender);
+            emit LPDividendClaimed(msg.sender, dividend);
+        } else if (currentType == RewardType.TOKEN) {
+            require(dividend <= tokenDividendPoolBalance, "DividendManagerLP: Insufficient Token");
+            tokenDividendPoolBalance -= dividend;
+            IBEP20 token = IBEP20(IAuthorizer(authorizer).getToken());
+            token.transfer(msg.sender, dividend);
+            emit TokenDividendClaimed(msg.sender, dividend);
+        }
 
-        IAuthorizer(authorizer).redeemLPToUser(lpDividend, msg.sender);
-        emit DividendClaimed(msg.sender, lpDividend);
+        userRewardSnapshots[msg.sender] = cumulativePerWeightDividend;
     }
 
     /**
-     * @dev 获取用户可领取的LP分红金额
+     * @dev 获取用户可领取的分红金额
      * @param user 用户地址
-     * @return 可领取的LP分红总额
+     * @return 可领取的分红总额
      */
     function getClaimableLPDividend(address user) external view returns (uint256) {
         address dividendManager = IAuthorizer(authorizer).getDividendManager();
         uint256 userWeight = IDividendManager(dividendManager).getUserWeight(user);
-        if (userWeight == 0) return pendingLPDividends[user];
         
-        uint256 cumulativeDiff = cumulativePerWeightLPDividend - userLPSnapshots[user];
-        uint256 newLPDividend = userWeight * cumulativeDiff / 1e18;
-        return pendingLPDividends[user] + newLPDividend;
+        RewardType currentType = rewardType;
+        
+        if (currentType == RewardType.BNB) {
+            if (userWeight == 0) return 0;
+            uint256 totalWeight = IDividendManager(dividendManager).getTotalWeight();
+            return bnbDividendPoolBalance * userWeight / (totalWeight + 1);
+        }
+        
+        if (userWeight == 0) return pendingTokenDividends[user];
+        
+        uint256 cumulativeDiff = cumulativePerWeightDividend - userRewardSnapshots[user];
+        uint256 newDividend = userWeight * cumulativeDiff / 1e18;
+        return pendingTokenDividends[user] + newDividend;
     }
 
     /**

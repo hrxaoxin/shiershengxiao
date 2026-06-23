@@ -136,8 +136,10 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             addr == _addresses[keccak256("staking")] ||
             addr == _addresses[keccak256("stakingLP")] ||
             addr == _addresses[keccak256("tokenStaking")] ||
+            addr == _addresses[keccak256("tokenStakingLP")] ||
             addr == _addresses[keccak256("rewardManager")] ||
             addr == _addresses[keccak256("dividendManager")] ||
+            addr == _addresses[keccak256("dividendManagerLP")] ||
             addr == _addresses[keccak256("poolManager")] ||
             addr == _addresses[keccak256("weightManager")] ||
             addr == _addresses[keccak256("breedingCore")] ||
@@ -146,6 +148,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             addr == _addresses[keccak256("arena")] ||
             addr == _addresses[keccak256("arenaPlayer")] ||
             addr == _addresses[keccak256("arenaReward")] ||
+            addr == _addresses[keccak256("arenaRewardLP")] ||
             addr == _addresses[keccak256("arenaLeaderboard")] ||
             addr == _addresses[keccak256("arenaBattle")] ||
             addr == _addresses[keccak256("priceOracle")];
