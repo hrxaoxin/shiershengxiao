@@ -628,20 +628,20 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         uint256 price = getTokenPriceFromPancakeSwap();
         require(price > 0, "E20: Price oracle returned zero");
         
-        // 防御同一区块内的价格操纵：要求至少间隔 minPriceUpdateBlocks 个区块
-        require(block.number >= lastPriceUpdateBlock + minPriceUpdateBlocks, "E31: Price update too frequent");
-        // 防御时间窗口攻击：要求至少间隔 minPriceUpdateSeconds 秒
-        require(block.timestamp >= lastPriceUpdateTime + minPriceUpdateSeconds, "E32: Price update too frequent (time)");
-        
         // 首次价格获取：直接使用，同时缓存
         if (lastPrice == 0) {
             lastPrice = price;
             lastPriceUpdateTime = block.timestamp;
             lastPriceUpdateBlock = block.number;
             emit PriceUpdated(price, block.timestamp);
+        } else {
+            // 防御同一区块内的价格操纵：要求至少间隔 minPriceUpdateBlocks 个区块
+            require(block.number >= lastPriceUpdateBlock + minPriceUpdateBlocks, "E31: Price update too frequent");
+            // 防御时间窗口攻击：要求至少间隔 minPriceUpdateSeconds 秒
+            require(block.timestamp >= lastPriceUpdateTime + minPriceUpdateSeconds, "E32: Price update too frequent (time)");
+            
+            require(block.timestamp <= lastPriceUpdateTime + priceExpirySeconds, "E30: Price expired");
         }
-        
-        require(block.timestamp <= lastPriceUpdateTime + priceExpirySeconds, "E30: Price expired");
         
         uint256 deviation;
         if (price > lastPrice) {

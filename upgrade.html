@@ -716,6 +716,10 @@
                 ZODIAC_UI.hideLoading();
                 ZODIAC_UI.showLoading('升级中...');
                 
+                if (!window.ZODIAC_WEB3 || typeof window.ZODIAC_WEB3.upgradeWithNFT !== 'function') {
+                    throw new Error('ZODIAC_WEB3 未正确初始化');
+                }
+                
                 const result = await window.ZODIAC_WEB3.upgradeWithNFT(selectedNft.id);
                 
                 ZODIAC_UI.hideLoading();
@@ -771,6 +775,10 @@
                 ZODIAC_UI.hideLoading();
                 ZODIAC_UI.showLoading('升级中...');
                 
+                if (!window.ZODIAC_WEB3 || typeof window.ZODIAC_WEB3.upgradeWithToken !== 'function') {
+                    throw new Error('ZODIAC_WEB3 未正确初始化');
+                }
+                
                 const result = await window.ZODIAC_WEB3.upgradeWithToken(selectedNft.id);
                 
                 ZODIAC_UI.hideLoading();
@@ -822,6 +830,10 @@
                 
                 ZODIAC_UI.hideLoading();
                 ZODIAC_UI.showLoading('升级中...');
+                
+                if (!window.ZODIAC_WEB3 || typeof window.ZODIAC_WEB3.upgradeWithUSDValue !== 'function') {
+                    throw new Error('ZODIAC_WEB3 未正确初始化');
+                }
                 
                 const result = await window.ZODIAC_WEB3.upgradeWithUSDValue(selectedNft.id);
                 
