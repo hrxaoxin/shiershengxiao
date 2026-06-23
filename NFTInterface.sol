@@ -589,6 +589,7 @@ interface IAuthorizer {
     struct ContractAddresses {
         address token;
         address usdt;
+        address wbnb;
         address nftMintCore;
         address nftMintMetadata;
         address nftUpdate;
@@ -597,9 +598,12 @@ interface IAuthorizer {
         address nftTrading;
         address nftBuyback;
         address staking;
+        address stakingLP;
         address tokenStaking;
+        address tokenStakingLP;
         address rewardManager;
         address dividendManager;
+        address dividendManagerLP;
         address poolManager;
         address priceOracle;
         address battle;
@@ -611,6 +615,7 @@ interface IAuthorizer {
         address arenaRankingManager;
         address arenaRankingQuery;
         address arenaReward;
+        address arenaRewardLP;
         address arenaLeaderboard;
         address arenaPlayer;
         address arenaBattle;
@@ -618,7 +623,6 @@ interface IAuthorizer {
         address pancakeSwapRouter;
         address flapSwapRouter;
         address uniswapRouter;
-        address wbnb;
     }
     
     function getGlobalAddresses() external view returns (ContractAddresses memory);

@@ -210,10 +210,11 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function _setCoreAddresses(address[] calldata _addr) private {
         _addresses[keccak256("token")] = _addr[0];
         _addresses[keccak256("usdt")] = _addr[1];
-        _addresses[keccak256("rewardManager")] = _addr[11];
-        _addresses[keccak256("dividendManager")] = _addr[12];
-        _addresses[keccak256("poolManager")] = _addr[13];
-        _addresses[keccak256("priceOracle")] = _addr[14];
+        _addresses[keccak256("wbnb")] = _addr[2];
+        _addresses[keccak256("rewardManager")] = _addr[14];
+        _addresses[keccak256("dividendManager")] = _addr[15];
+        _addresses[keccak256("poolManager")] = _addr[17];
+        _addresses[keccak256("priceOracle")] = _addr[18];
     }
 
     /**
@@ -221,13 +222,13 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _addr 地址数组
      */
     function _setNFTAddresses(address[] calldata _addr) private {
-        _addresses[keccak256("nftMintCore")] = _addr[2];
-        _addresses[keccak256("nftMintMetadata")] = _addr[3];
-        _addresses[keccak256("nftUpdate")] = _addr[4];
-        _addresses[keccak256("nftData")] = _addr[5];
-        _addresses[keccak256("tokenBurner")] = _addr[6];
-        _addresses[keccak256("nftTrading")] = _addr[7];
-        _addresses[keccak256("nftBuyback")] = _addr[8];
+        _addresses[keccak256("nftMintCore")] = _addr[3];
+        _addresses[keccak256("nftMintMetadata")] = _addr[4];
+        _addresses[keccak256("nftUpdate")] = _addr[5];
+        _addresses[keccak256("nftData")] = _addr[6];
+        _addresses[keccak256("tokenBurner")] = _addr[7];
+        _addresses[keccak256("nftTrading")] = _addr[8];
+        _addresses[keccak256("nftBuyback")] = _addr[9];
     }
 
     /**
@@ -235,10 +236,11 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _addr 地址数组
      */
     function _setStakingAddresses(address[] calldata _addr) private {
-        _addresses[keccak256("staking")] = _addr[9];
-        _addresses[keccak256("stakingLP")] = _addr[10];
-        _addresses[keccak256("tokenStaking")] = _addr[11];
-        _addresses[keccak256("weightManager")] = _addr[20];
+        _addresses[keccak256("staking")] = _addr[10];
+        _addresses[keccak256("stakingLP")] = _addr[11];
+        _addresses[keccak256("tokenStaking")] = _addr[12];
+        _addresses[keccak256("tokenStakingLP")] = _addr[13];
+        _addresses[keccak256("weightManager")] = _addr[24];
     }
 
     /**
@@ -246,9 +248,9 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _addr 地址数组
      */
     function _setBattleAddresses(address[] calldata _addr) private {
-        _addresses[keccak256("battle")] = _addr[15];
-        _addresses[keccak256("battleSkillData")] = _addr[16];
-        _addresses[keccak256("battleHistory")] = _addr[17];
+        _addresses[keccak256("battle")] = _addr[19];
+        _addresses[keccak256("battleSkillData")] = _addr[20];
+        _addresses[keccak256("battleHistory")] = _addr[21];
     }
 
     /**
@@ -256,8 +258,8 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _addr 地址数组
      */
     function _setBreedingAddresses(address[] calldata _addr) private {
-        _addresses[keccak256("breedingCore")] = _addr[18];
-        _addresses[keccak256("breedingMarket")] = _addr[19];
+        _addresses[keccak256("breedingCore")] = _addr[22];
+        _addresses[keccak256("breedingMarket")] = _addr[23];
     }
 
     /**
@@ -265,12 +267,13 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _addr 地址数组
      */
     function _setArenaAddresses(address[] calldata _addr) private {
-        _addresses[keccak256("arenaRankingManager")] = _addr[21];
-        _addresses[keccak256("arenaRankingQuery")] = _addr[22];
-        _addresses[keccak256("arenaReward")] = _addr[23];
-        _addresses[keccak256("arenaLeaderboard")] = _addr[24];
-        _addresses[keccak256("arenaPlayer")] = _addr[25];
-        _addresses[keccak256("arenaBattle")] = _addr[26];
+        _addresses[keccak256("arenaRankingManager")] = _addr[25];
+        _addresses[keccak256("arenaRankingQuery")] = _addr[26];
+        _addresses[keccak256("arenaReward")] = _addr[27];
+        _addresses[keccak256("arenaRewardLP")] = _addr[28];
+        _addresses[keccak256("arenaLeaderboard")] = _addr[29];
+        _addresses[keccak256("arenaPlayer")] = _addr[30];
+        _addresses[keccak256("arenaBattle")] = _addr[31];
     }
 
     /**
@@ -278,11 +281,11 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param _addr 地址数组
      */
     function _setOtherAddresses(address[] calldata _addr) private {
-        _addresses[keccak256("feeReceiver")] = _addr[27];
-        _addresses[keccak256("pancakeSwapRouter")] = _addr[28];
-        _addresses[keccak256("flapSwapRouter")] = _addr[29];
-        _addresses[keccak256("uniswapRouter")] = _addr[30];
-        _addresses[keccak256("wbnb")] = _addr[31];
+        _addresses[keccak256("dividendManagerLP")] = _addr[16];
+        _addresses[keccak256("feeReceiver")] = _addr[32];
+        _addresses[keccak256("pancakeSwapRouter")] = _addr[33];
+        _addresses[keccak256("flapSwapRouter")] = _addr[34];
+        _addresses[keccak256("uniswapRouter")] = _addr[35];
     }
 
     /**
