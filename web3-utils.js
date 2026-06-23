@@ -931,19 +931,10 @@ window.ZODIAC_WEB3 = (function() {
         let gas = opts.gas;
         let usedDefaultGas = false;
         if (!gas) {
-            try {
-                const gasResult = await estimateGas(contract, methodName, args, from);
-                gas = gasResult.gas;
-                if (!gasResult.estimated) {
-                    usedDefaultGas = true;
-                    console.warn(`[ZODIAC_WEB3] Using default gas limit of ${gas} for ${methodName}`);
-                }
-            } catch (gasError) {
-                console.warn(`[ZODIAC_WEB3] Gas estimation failed, using default gas for ${methodName}`, gasError);
-                const defaultGas = getGasLimit(methodName);
-                gas = defaultGas.gas;
-                usedDefaultGas = true;
-            }
+            console.warn(`[ZODIAC_WEB3] Using default gas limit for ${methodName} to avoid estimation issues`);
+            const defaultGas = getGasLimit(methodName);
+            gas = defaultGas.gas;
+            usedDefaultGas = true;
         }
 
         let lastTxHash = null;
