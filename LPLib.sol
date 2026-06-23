@@ -54,6 +54,62 @@ library LPLib {
         return _generateLPFromWBNB(config, wbnbAmount);
     }
 
+    function convertTokenToLP(IAuthorizer authorizer, uint256 tokenAmount) internal returns (uint256) {
+        LPConfig memory config = getConfig(authorizer);
+        require(config.token != address(0) && config.wbnb != address(0) && config.router != address(0), "LPLib: Missing config");
+
+        uint256 halfToken = tokenAmount / 2;
+        uint256 wbnbAmount = _swapTokenToWBNB(config, halfToken);
+
+        if (wbnbAmount == 0) {
+            IERC20(config.token).transfer(msg.sender, tokenAmount);
+            return 0;
+        }
+
+        IERC20(config.token).approve(config.router, halfToken);
+        IERC20(config.wbnb).approve(config.router, wbnbAmount);
+
+        try IDexRouter(config.router).addLiquidityETH{value: wbnbAmount}(
+            config.token,
+            halfToken,
+            halfToken * (10000 - config.slippage) / 10000,
+            wbnbAmount * (10000 - config.slippage) / 10000,
+            address(this),
+            block.timestamp + 300
+        ) returns (uint256, uint256, uint256 liquidity) {
+            return liquidity;
+        } catch {
+            IWBNB(config.wbnb).withdraw(wbnbAmount);
+            payable(msg.sender).transfer(wbnbAmount);
+            IERC20(config.token).transfer(msg.sender, halfToken);
+            return 0;
+        }
+    }
+
+    function _swapTokenToWBNB(LPConfig memory config, uint256 tokenAmount) internal returns (uint256) {
+        address[] memory path = new address[](2);
+        path[0] = config.token;
+        path[1] = config.wbnb;
+
+        uint256[] memory amounts = IDexRouter(config.router).getAmountsOut(tokenAmount, path);
+        uint256 expectedOut = amounts[1];
+        uint256 minOut = expectedOut * (10000 - config.slippage) / 10000;
+
+        IERC20(config.token).approve(config.router, tokenAmount);
+
+        try IDexRouter(config.router).swapExactTokensForTokens(
+            tokenAmount,
+            minOut,
+            path,
+            address(this),
+            block.timestamp + 300
+        ) returns (uint256[] memory outputAmounts) {
+            return outputAmounts[1];
+        } catch {
+            return 0;
+        }
+    }
+
     function _generateLPFromWBNB(LPConfig memory config, uint256 wbnbAmount) internal returns (uint256) {
         uint256 halfWBNB = wbnbAmount / 2;
         uint256 tokenAmount = _swapWBNBToToken(config, halfWBNB);
@@ -135,6 +191,59 @@ library LPLib {
         _transferRewards(authorizer, user, tokenAmount, wbnbAmount);
     }
 
+    function redeemLPToToken(IAuthorizer authorizer, uint256 lpAmount) internal returns (uint256) {
+        LPConfig memory config = getConfig(authorizer);
+        
+        address factory = IDexRouter(config.router).factory();
+        address lpToken = IDexFactory(factory).getPair(config.token, config.wbnb);
+        require(lpToken != address(0), "LPLib: LP token not found");
+
+        IERC20(lpToken).approve(config.router, lpAmount);
+
+        (uint256 tokenAmount, uint256 wbnbAmount) = IDexRouter(config.router).removeLiquidityETH(
+            config.token,
+            lpAmount,
+            0,
+            0,
+            address(this),
+            block.timestamp + 300
+        );
+
+        if (wbnbAmount > 0) {
+            uint256 convertedToken = _swapWBNBToToken(config, wbnbAmount);
+            tokenAmount += convertedToken;
+        }
+
+        return tokenAmount;
+    }
+
+    function redeemLPToWBNB(IAuthorizer authorizer, uint256 lpAmount) internal returns (uint256) {
+        LPConfig memory config = getConfig(authorizer);
+        
+        address factory = IDexRouter(config.router).factory();
+        address lpToken = IDexFactory(factory).getPair(config.token, config.wbnb);
+        require(lpToken != address(0), "LPLib: LP token not found");
+
+        IERC20(lpToken).approve(config.router, lpAmount);
+
+        (uint256 tokenAmount, uint256 wbnbAmount) = IDexRouter(config.router).removeLiquidityETH(
+            config.token,
+            lpAmount,
+            0,
+            0,
+            address(this),
+            block.timestamp + 300
+        );
+
+        if (tokenAmount > 0) {
+            uint256 convertedWBNB = _swapTokenToWBNB(config, tokenAmount);
+            wbnbAmount += convertedWBNB;
+        }
+
+        IWBNB(config.wbnb).withdraw(wbnbAmount);
+        return wbnbAmount;
+    }
+
     function _transferRewards(IAuthorizer authorizer, address user, uint256 tokenAmount, uint256 wbnbAmount) internal {
         address token = authorizer.getToken();
         address wbnb = authorizer.getWBNB();
@@ -170,6 +279,21 @@ library LPLib {
         require(success, "LPLib: BNB transfer failed");
     }
 
+    function swapTokenToBNB(IAuthorizer authorizer, uint256 tokenAmount) internal returns (uint256) {
+        LPConfig memory config = getConfig(authorizer);
+        require(config.token != address(0) && config.wbnb != address(0) && config.router != address(0), "LPLib: Missing config");
+
+        uint256 wbnbAmount = _swapTokenToWBNB(config, tokenAmount);
+        
+        if (wbnbAmount == 0) {
+            IERC20(config.token).transfer(msg.sender, tokenAmount);
+            return 0;
+        }
+
+        IWBNB(config.wbnb).withdraw(wbnbAmount);
+        return wbnbAmount;
+    }
+
     function emergencyWithdrawLP(IAuthorizer authorizer, uint256 amount) internal {
         LPConfig memory config = getConfig(authorizer);
         
@@ -194,5 +318,21 @@ library LPLib {
             (bool success, ) = payable(msg.sender).call{value: wbnbAmount}("");
             require(success, "LPLib: BNB transfer failed");
         }
+    }
+
+    function swapBNBToToken(IAuthorizer authorizer, uint256 bnbAmount) internal returns (uint256) {
+        LPConfig memory config = getConfig(authorizer);
+        require(config.token != address(0) && config.wbnb != address(0) && config.router != address(0), "LPLib: Missing config");
+
+        IWBNB(config.wbnb).deposit{value: bnbAmount}();
+        
+        return _swapWBNBToToken(config, bnbAmount);
+    }
+
+    function swapWBNBToToken(IAuthorizer authorizer, uint256 wbnbAmount) internal returns (uint256) {
+        LPConfig memory config = getConfig(authorizer);
+        require(config.token != address(0) && config.wbnb != address(0) && config.router != address(0), "LPLib: Missing config");
+        
+        return _swapWBNBToToken(config, wbnbAmount);
     }
 }

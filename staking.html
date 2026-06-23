@@ -752,12 +752,54 @@
         async function loadRewards() {
             try {
                 const lpRewards = await stakingLPContract.methods.getPendingLPReward(account).call();
+                const rewardType = await stakingLPContract.methods.rewardType().call();
+                
                 const rewardsFormatted = web3.utils.fromWei(lpRewards, 'ether');
-                document.getElementById('rewardsAmount').textContent = parseFloat(rewardsFormatted).toFixed(4) + ' LP';
+                const unit = getRewardUnit(rewardType);
+                const displayText = getRewardDisplayText(rewardType);
+                
+                document.getElementById('rewardsAmount').textContent = parseFloat(rewardsFormatted).toFixed(4) + ' ' + unit;
                 document.getElementById('claimBtn').disabled = lpRewards === '0';
+                
+                updateRewardDescription(rewardType);
             } catch (error) {
                 console.error('加载LP奖励失败:', error);
                 ZODIAC_UI.showToast('加载LP奖励失败: ' + error.message, 'error');
+            }
+        }
+
+        function getRewardUnit(rewardType) {
+            switch(parseInt(rewardType)) {
+                case 0: return 'LP';
+                case 1: return 'TOKEN';
+                case 2: return 'BNB';
+                default: return 'LP';
+            }
+        }
+
+        function getRewardDisplayText(rewardType) {
+            switch(parseInt(rewardType)) {
+                case 0: return 'LP奖励';
+                case 1: return '代币奖励';
+                case 2: return 'BNB奖励';
+                default: return 'LP奖励';
+            }
+        }
+
+        function updateRewardDescription(rewardType) {
+            const descElement = document.querySelector('#rewardEstimate .text-xs.text-gray-500');
+            if (!descElement) return;
+            
+            switch(parseInt(rewardType)) {
+                case 0:
+                    descElement.textContent = '收益预估基于当前总权重计算，实际收益可能因其他用户质押/解质押而变化。LP奖励领取后自动兑换为代币和WBNB';
+                    break;
+                case 1:
+                    descElement.textContent = '收益预估基于当前总权重计算，实际收益可能因其他用户质押/解质押而变化';
+                    break;
+                case 2:
+                    descElement.textContent = '收益预估基于当前总权重计算，实际收益可能因其他用户质押/解质押而变化。BNB奖励直接发放至钱包';
+                    break;
             }
         }
 
@@ -1004,26 +1046,8 @@
                 const totalStakedAll = await tokenStakingContract.methods.getTotalStaked().call();
                 document.getElementById('totalStakedTokens').textContent = web3.utils.fromWei(totalStakedAll, 'ether').substring(0, 10);
 
-                let releaseRatio = '0';
-                let releaseRatioDisplay = '15';
-                try {
-                    const rate = await tokenStakingContract.methods.rewardRate().call();
-                    const rateNum = parseInt(rate, 10);
-                    if (rateNum > 0) {
-                        if (rateNum > 1000) {
-                            releaseRatio = rateNum.toString();
-                            releaseRatioDisplay = rateNum.toString();
-                        } else {
-                            releaseRatio = (rateNum / 100).toFixed(2);
-                            releaseRatioDisplay = (rateNum / 100).toFixed(2);
-                        }
-                    }
-                } catch (e) {
-                    releaseRatio = '15';
-                    releaseRatioDisplay = '15';
-                }
-                document.getElementById('currentReleaseRatio').textContent = releaseRatio + '%';
-                document.getElementById('dailyReleaseRatioDisplay').textContent = releaseRatioDisplay;
+                document.getElementById('currentReleaseRatio').textContent = '由LP合约管理';
+                document.getElementById('dailyReleaseRatioDisplay').textContent = '--';
                 
                 // 读取最低质押时长
                 try {

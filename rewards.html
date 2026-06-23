@@ -374,15 +374,62 @@
                 }
                 
                 const lpDividend = await dividendManagerLPContract.methods.getClaimableLPDividend(account).call();
+                const rewardType = await dividendManagerLPContract.methods.rewardType().call();
+                
                 const lpAmount = web3.utils.fromWei(lpDividend, 'ether');
-                document.getElementById('bnbReward').textContent = parseFloat(lpAmount).toFixed(4) + ' LP';
+                const unit = getRewardUnit(rewardType);
+                
+                document.getElementById('bnbReward').textContent = parseFloat(lpAmount).toFixed(4) + ' ' + unit;
                 
                 if (parseInt(lpDividend) === 0) {
-                    document.getElementById('bnbReward').textContent = '0.0000 LP';
+                    document.getElementById('bnbReward').textContent = '0.0000 ' + unit;
                 }
+                
+                updateRewardInfo(rewardType);
             } catch (error) {
                 console.error('获取LP分红失败:', error);
                 document.getElementById('bnbReward').textContent = '0.0000 LP';
+            }
+        }
+
+        function getRewardUnit(rewardType) {
+            switch(parseInt(rewardType)) {
+                case 0: return 'LP';
+                case 1: return 'TOKEN';
+                case 2: return 'BNB';
+                default: return 'LP';
+            }
+        }
+
+        function updateRewardInfo(rewardType) {
+            const typeNum = parseInt(rewardType);
+            const claimBtn = document.getElementById('claimAllBtn');
+            const rewardDesc = document.querySelector('.reward-description');
+            
+            let btnText = '领取LP分红';
+            let descText = '';
+            
+            switch(typeNum) {
+                case 0:
+                    btnText = '领取LP分红';
+                    descText = '领取后，LP将自动兑换为代币和WBNB发送到您的钱包';
+                    break;
+                case 1:
+                    btnText = '领取代币分红';
+                    descText = '代币奖励将直接发放至您的钱包';
+                    break;
+                case 2:
+                    btnText = '领取BNB分红';
+                    descText = 'BNB奖励将直接发放至您的钱包';
+                    break;
+            }
+            
+            if (claimBtn) {
+                claimBtn.innerHTML = `<i class="fas fa-gift mr-2"></i>${btnText}`;
+            }
+            
+            if (rewardDesc) {
+                rewardDesc.textContent = descText;
             }
         }
 
@@ -395,15 +442,33 @@
             }
 
             const currentReward = document.getElementById('bnbReward').textContent;
-            if (currentReward === '0.0000 LP') {
-                ZODIAC_UI.showToast('当前没有可领取的LP分红', 'info');
+            const rewardType = await dividendManagerLPContract.methods.rewardType().call();
+            const unit = getRewardUnit(rewardType);
+            
+            if (currentReward === '0.0000 ' + unit) {
+                ZODIAC_UI.showToast('当前没有可领取的分红', 'info');
                 return;
             }
 
-            const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认领取LP分红',
-                `当前可领取LP：${currentReward}\n\n领取后，LP将自动兑换为代币和WBNB发送到您的钱包。您将获得双重收益：项目分红 + DEX交易手续费。确定要继续吗？`
-            );
+            let title = '确认领取分红';
+            let message = `当前可领取：${currentReward}\n\n`;
+            
+            switch(parseInt(rewardType)) {
+                case 0:
+                    title = '确认领取LP分红';
+                    message += '领取后，LP将自动兑换为代币和WBNB发送到您的钱包。您将获得双重收益：项目分红 + DEX交易手续费。确定要继续吗？';
+                    break;
+                case 1:
+                    title = '确认领取代币分红';
+                    message += '代币奖励将直接发放至您的钱包。确定要继续吗？';
+                    break;
+                case 2:
+                    title = '确认领取BNB分红';
+                    message += 'BNB奖励将直接发放至您的钱包。确定要继续吗？';
+                    break;
+            }
+
+            const confirm = await ZODIAC_UI.showConfirmModal(title, message);
 
             if (!confirm) return;
 
@@ -413,12 +478,26 @@
 
             try {
                 await dividendManagerLPContract.methods.claimLPDividend().send({ from: account });
-                ZODIAC_UI.showToast('LP分红领取成功！已兑换为代币和WBNB', 'success');
+                
+                let successMsg = '';
+                switch(parseInt(rewardType)) {
+                    case 0:
+                        successMsg = 'LP分红领取成功！已兑换为代币和WBNB';
+                        break;
+                    case 1:
+                        successMsg = '代币分红领取成功！';
+                        break;
+                    case 2:
+                        successMsg = 'BNB分红领取成功！';
+                        break;
+                }
+                
+                ZODIAC_UI.showToast(successMsg, 'success');
                 await loadLPReward();
             } catch (error) {
-                ZODIAC_UI.handleError(error, '领取LP分红');
+                ZODIAC_UI.handleError(error, '领取分红');
             } finally {
-                btn.innerHTML = '<i class="fas fa-gift mr-2"></i>领取LP分红';
+                updateRewardInfo(rewardType);
                 btn.disabled = false;
             }
         });

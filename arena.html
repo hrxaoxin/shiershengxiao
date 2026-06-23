@@ -366,7 +366,7 @@
                         <div id="rewardPoolDisplay" class="text-center mb-4 p-4 bg-yellow-500/10 rounded-lg">
                             <div class="text-yellow-400 text-2xl font-bold" id="rewardPoolAmount">--</div>
                             <div class="text-gray-400 text-sm mt-1">代币总奖励</div>
-                            <div class="text-gray-500 text-xs mt-2" id="rewardRateInfo">奖励比例: --</div>
+                            <div class="text-gray-500 text-xs mt-2" id="rewardRateInfo">奖励由LP合约发放</div>
                         </div>
                         <div id="rewardRules" class="mt-4 p-3 bg-blue-500/10 rounded-lg">
                             <div class="text-blue-400 text-xs font-medium mb-2">📖 奖励规则</div>
@@ -1635,13 +1635,7 @@
                 document.getElementById('rewardPoolAmount').textContent = parseFloat(rewardPoolEth) > 0 ? rewardPoolEth : '--';
                 
                 // 获取奖励比例
-                try {
-                    const rate = await arenaContract.methods.seasonRewardRate().call();
-                    const ratePercent = rate + '%';
-                    document.getElementById('rewardRateInfo').textContent = `奖励比例: ${ratePercent} (赛季结束发放)`;
-                } catch (e) {
-                    document.getElementById('rewardRateInfo').textContent = '奖励比例: 0.2% (赛季结束发放)';
-                }
+                document.getElementById('rewardRateInfo').textContent = '奖励由LP合约发放';
             } catch (error) {
                 console.error('加载奖励池失败:', error);
             }
@@ -1667,19 +1661,24 @@
                         const playerRecord = await arenaBattleContract.methods.players(accounts[0]).call();
                         const playerScore = playerRecord.score || '0';
                         let estimatedReward = '0';
+                        let rewardType = 0;
                         try {
                             const rewardWei = await arenaRewardLPContract.methods.getPendingLPReward(accounts[0], currentSeasonId).call();
                             estimatedReward = web3.utils.fromWei(rewardWei, 'ether');
+                            rewardType = parseInt(await arenaRewardLPContract.methods.rewardType().call());
                         } catch (e) { /* ignore */ }
+
+                        const rewardUnit = getRewardUnit(rewardType);
+                        const rewardName = getRewardName(rewardType);
 
                         unclaimedDiv.innerHTML = `
                             <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
                                 <div class="text-yellow-400 text-sm font-medium">赛季进行中</div>
                                 <div class="text-gray-300 text-xs mt-1">
                                     当前积分: ${playerScore || '0'} 
-                                    ${parseFloat(estimatedReward) > 0 ? ` | 预估LP奖励: ${estimatedReward} LP` : ''}
+                                    ${parseFloat(estimatedReward) > 0 ? ` | 预估${rewardName}: ${estimatedReward} ${rewardUnit}` : ''}
                                 </div>
-                                <div class="text-gray-500 text-xs mt-1">赛季结束后可领取LP奖励</div>
+                                <div class="text-gray-500 text-xs mt-1">赛季结束后可领取${rewardName}</div>
                             </div>
                         `;
                     } catch (e) {
@@ -1688,6 +1687,9 @@
                 } else {
                     // 赛季已结束：检查是否已领取奖励
                     const claimed = await arenaRankingQueryContract.methods.seasonRewardsClaimed(currentSeasonId, accounts[0]).call();
+                    const rewardType = parseInt(await arenaRewardLPContract.methods.rewardType().call());
+                    const rewardUnit = getRewardUnit(rewardType);
+                    const rewardName = getRewardName(rewardType);
 
                     if (claimed) {
                         // 已领取
@@ -1695,7 +1697,7 @@
                         claimedDiv.innerHTML = `
                             <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
                                 <div class="text-green-400 text-sm font-medium">已领取</div>
-                                <div class="text-gray-300 text-xs mt-1">LP奖励已发放</div>
+                                <div class="text-gray-300 text-xs mt-1">${rewardName}已发放</div>
                             </div>
                         `;
                     } else {
@@ -1710,7 +1712,7 @@
                                         <div class="flex justify-between items-center">
                                             <div>
                                                 <div class="text-blue-400 text-sm font-medium">赛季奖励</div>
-                                                <div class="text-white text-xs mt-1">${rewardAmount} LP</div>
+                                                <div class="text-white text-xs mt-1">${rewardAmount} ${rewardUnit}</div>
                                             </div>
                                             <button onclick="claimSeasonReward()" class="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs rounded-lg transition-colors">
                                                 领取
@@ -1727,6 +1729,24 @@
                         claimedDiv.innerHTML = '<div class="text-center text-gray-500 py-2">暂无已领取奖励</div>';
                     }
                 }
+
+                function getRewardUnit(type) {
+                    switch(type) {
+                        case 0: return 'LP';
+                        case 1: return 'TOKEN';
+                        case 2: return 'BNB';
+                        default: return 'LP';
+                    }
+                }
+
+                function getRewardName(type) {
+                    switch(type) {
+                        case 0: return 'LP奖励';
+                        case 1: return '代币奖励';
+                        case 2: return 'BNB奖励';
+                        default: return 'LP奖励';
+                    }
+                }
             } catch (error) {
                 console.error('加载奖励失败:', error);
                 document.getElementById('unclaimedRewards').innerHTML = '<div class="text-center text-gray-500 py-2">加载失败</div>';
@@ -1736,12 +1756,30 @@
 
         async function claimSeasonRewardHandler() {
             try {
+                const rewardType = parseInt(await arenaRewardLPContract.methods.rewardType().call());
+                
                 await arenaRewardLPContract.methods.claimLPReward(currentSeasonId).send({ from: account });
-                ZODIAC_UI.showToast('LP奖励领取成功！已兑换为代币和WBNB', 'success');
+                
+                let successMsg = '';
+                switch(rewardType) {
+                    case 0:
+                        successMsg = 'LP奖励领取成功！已兑换为代币和WBNB';
+                        break;
+                    case 1:
+                        successMsg = '代币奖励领取成功！';
+                        break;
+                    case 2:
+                        successMsg = 'BNB奖励领取成功！';
+                        break;
+                    default:
+                        successMsg = '奖励领取成功！';
+                }
+                
+                ZODIAC_UI.showToast(successMsg, 'success');
                 loadRewards();
             } catch (error) {
-                console.error('领取LP奖励失败:', error);
-                ZODIAC_UI.handleError(error, '领取LP奖励');
+                console.error('领取奖励失败:', error);
+                ZODIAC_UI.handleError(error, '领取奖励');
             }
         }
 

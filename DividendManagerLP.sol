@@ -159,6 +159,35 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     }
 
     /**
+     * @dev 接收ERC20代币（WBNB或Token）并根据奖励类型处理
+     * @param token 代币地址
+     * @param amount 代币数量
+     */
+    function receiveToken(address token, uint256 amount) external onlyOwnerOrAuthorizer {
+        require(token != address(0), "DividendManagerLP: Invalid token address");
+        require(amount > 0, "DividendManagerLP: Amount must be > 0");
+        
+        IBEP20(token).transferFrom(msg.sender, address(this), amount);
+        _processIncomingToken(token, amount);
+    }
+
+    /**
+     * @dev 批量接收多种资产
+     * @param tokens 代币地址数组
+     * @param amounts 代币数量数组
+     */
+    function receiveMultipleTokens(address[] calldata tokens, uint256[] calldata amounts) external onlyOwnerOrAuthorizer {
+        require(tokens.length == amounts.length, "DividendManagerLP: Arrays length mismatch");
+        
+        for (uint256 i = 0; i < tokens.length; i++) {
+            if (amounts[i] > 0) {
+                IBEP20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
+                _processIncomingToken(tokens[i], amounts[i]);
+            }
+        }
+    }
+
+    /**
      * @dev 处理流入的BNB（内部函数）
      * @param amount BNB数量
      */
@@ -177,6 +206,54 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (currentType == RewardType.BNB) {
             _addToDividendPool(amount, currentType);
+        }
+    }
+
+    /**
+     * @dev 处理流入的代币（内部函数）
+     * @param token 代币地址
+     * @param amount 代币数量
+     */
+    function _processIncomingToken(address token, uint256 amount) internal {
+        RewardType currentType = rewardType;
+        address wbnb = IAuthorizer(authorizer).getWBNB();
+        address mainToken = IAuthorizer(authorizer).getToken();
+        
+        if (token == wbnb) {
+            if (currentType == RewardType.LP) {
+                IWBNB(wbnb).withdraw(amount);
+                uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(amount);
+                if (lpAmount > 0) {
+                    _addToDividendPool(lpAmount, currentType);
+                }
+            } else if (currentType == RewardType.TOKEN) {
+                uint256 tokenAmount = IAuthorizer(authorizer).swapWBNBToToken(amount);
+                if (tokenAmount > 0) {
+                    _addToDividendPool(tokenAmount, currentType);
+                }
+            } else if (currentType == RewardType.BNB) {
+                IWBNB(wbnb).withdraw(amount);
+                _addToDividendPool(amount, currentType);
+            }
+        } else if (token == mainToken) {
+            if (currentType == RewardType.LP) {
+                uint256 lpAmount = IAuthorizer(authorizer).convertTokenToLP(amount);
+                if (lpAmount > 0) {
+                    _addToDividendPool(lpAmount, currentType);
+                }
+            } else if (currentType == RewardType.TOKEN) {
+                _addToDividendPool(amount, currentType);
+            } else if (currentType == RewardType.BNB) {
+                uint256 bnbAmount = IAuthorizer(authorizer).swapTokenToBNB(amount);
+                if (bnbAmount > 0) {
+                    _addToDividendPool(bnbAmount, currentType);
+                }
+            }
+        } else {
+            uint256 bnbAmount = IAuthorizer(authorizer).swapTokenToBNB(amount);
+            if (bnbAmount > 0) {
+                _processIncomingBNB(bnbAmount);
+            }
         }
     }
 

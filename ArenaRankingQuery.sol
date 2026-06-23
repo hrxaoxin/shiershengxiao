@@ -591,9 +591,9 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     function _claimSeasonReward(uint256 seasonId) internal returns (uint256) {
         require(seasonId > 0 && seasonId <= currentSeasonId, "ArenaRankingQuery: Invalid season");
         require(!seasonRewardsClaimed[seasonId][msg.sender], "ArenaRankingQuery: Already claimed");
-        address arenaRewardContract = IAuthorizer(authorizer).getArenaReward();
-        require(arenaRewardContract != address(0), "ArenaRankingQuery: ArenaReward not set");
-        uint256 amount = IArenaReward(arenaRewardContract).claimSeasonReward(msg.sender, seasonId);
+        address arenaRewardLPContract = IAuthorizer(authorizer).getArenaRewardLP();
+        require(arenaRewardLPContract != address(0), "ArenaRankingQuery: ArenaRewardLP not set");
+        uint256 amount = IArenaRewardLP(arenaRewardLPContract).claimLPReward(seasonId);
         seasonRewardsClaimed[seasonId][msg.sender] = true;
         emit RewardClaimed(msg.sender, amount, seasonId);
         return amount;

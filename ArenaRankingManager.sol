@@ -436,15 +436,17 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
 
     /**
      * @dev 设置奖励类型
-     * @param _rewardType 奖励类型：0 = BNB, 1 = 代币
+     * @param _rewardType 奖励类型：LP = 0, TOKEN = 1, BNB = 2
      */
-    function setRewardType(uint8 _rewardType) external onlyOwner {
-        require(_rewardType == 0 || _rewardType == 1, "ArenaRankingManager: Invalid reward type");
-        address arenaReward = IAuthorizer(authorizer).getArenaReward();
-        require(arenaReward != address(0), "ArenaRankingManager: Reward contract not set");
-        uint8 oldRewardType = IArenaReward(arenaReward).rewardType();
-        IArenaReward(arenaReward).setRewardType(_rewardType);
-        emit RewardTypeUpdated(oldRewardType, _rewardType);
+    function setRewardType(RewardType _rewardType) external onlyOwner {
+        address arenaRewardLP = IAuthorizer(authorizer).getArenaRewardLP();
+        require(arenaRewardLP != address(0), "ArenaRankingManager: ArenaRewardLP contract not set");
+        
+        RewardType oldRewardType = IArenaRewardLP(arenaRewardLP).rewardType();
+        
+        IArenaRewardLP(arenaRewardLP).setRewardType(_rewardType);
+        
+        emit RewardTypeUpdated(uint8(oldRewardType), uint8(_rewardType));
     }
 
     /**

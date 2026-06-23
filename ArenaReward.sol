@@ -42,7 +42,6 @@ import "./ArenaRankingLib.sol";
  */
 contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
-    using LPLib for IAuthorizer;
 
     /**
      * @dev 赛季奖励信息结构体
@@ -61,43 +60,9 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 模拟玩家奖励接收地址
-     */
-    address public mockRewardRecipient;
-    /**
      * @dev 授权合约地址
      */
     address public authorizer;
-    /**
-     * @dev 奖励类型：0 = BNB, 1 = 代币
-     */
-    uint8 public rewardType;
-    
-    /**
-     * @dev 今日奖励金额
-     */
-    uint256 public todayRewardAmount;
-    /**
-     * @dev 奖励率（百分比）
-     */
-    uint256 public rewardRate = 100;
-    /**
-     * @dev 最大奖励率
-     */
-    uint256 public maxRewardRate = 200;
-    /**
-     * @dev 奖励率步长
-     */
-    uint256 public rateStep = 10;
-    
-    /**
-     * @dev 今日开始时间
-     */
-    uint256 public todayStart;
-    /**
-     * @dev 今日流入奖励
-     */
-    uint256 public todayIncomingReward;
     
     /**
      * @dev 赛季奖励信息映射
@@ -117,25 +82,9 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     event SeasonRewardsCalculated(uint256 seasonId, uint256 totalReward, uint256 distributed);
     /**
-     * @dev 奖励领取事件
-     */
-    event RewardClaimed(address player, uint256 seasonId, uint256 amount);
-    /**
-     * @dev 模拟玩家奖励发放事件
-     */
-    event MockRewardDistributed(address recipient, uint256 amount, uint256 seasonId);
-    /**
-     * @dev 模拟玩家奖励分配失败事件
-     */
-    event MockRewardDistributionFailed(uint256 amount, uint256 seasonId);
-    /**
      * @dev 奖励添加事件
      */
     event RewardAdded(uint256 amount);
-    /**
-     * @dev 紧急提取事件
-     */
-    event EmergencyWithdraw(address recipient, uint256 amount);
 
     /**
      * @dev 授权检查修饰器
@@ -163,7 +112,6 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         __Pausable_init();
         
         authorizer = _authorizerAddress;
-        rewardType = 1;
     }
     
     /**
@@ -195,14 +143,6 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 设置模拟玩家奖励接收地址
-     * @param recipient 接收地址
-     */
-    function setMockRewardRecipient(address recipient) external onlyOwner {
-        mockRewardRecipient = recipient;
-    }
-
-    /**
      * @dev 计算赛季奖励
      * @param seasonId 赛季 ID
      */
@@ -216,35 +156,14 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         seasonReward.rewardPool = rewardPool;
         seasonReward.tokenRewardPool = tokenRewardPool;
         
-        uint256 totalReward = rewardPool;
-        if (rewardType == 1) {
-            totalReward = tokenRewardPool;
-        }
-        
-        uint256 mockRewardTotal = _calculateMockRewards(seasonId, totalReward);
-        uint256 distributed = _calculateRealPlayerRewards(seasonId, totalReward, mockRewardTotal);
+        uint256 mockRewardTotal = _calculateMockRewards(seasonId, rewardPool);
+        uint256 distributed = _calculateRealPlayerRewards(seasonId, rewardPool, mockRewardTotal);
         
         seasonReward.pendingRewards += distributed;
         seasonReward.rewardCalculated = true;
         seasonReward.totalDistributed = distributed;
         
-        if (mockRewardTotal > 0 && mockRewardRecipient != address(0)) {
-            if (rewardType == 0) {
-                (bool success, ) = payable(mockRewardRecipient).call{value: mockRewardTotal}("");
-                if (success) {
-                    emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonId);
-                } else {
-                    emit MockRewardDistributionFailed(mockRewardTotal, seasonId);
-                }
-            } else {
-                address tokenContract = IAuthorizer(authorizer).getToken();
-                require(tokenContract != address(0), "ArenaReward: Token contract not set");
-                SafeERC20.safeTransfer(IERC20(tokenContract), mockRewardRecipient, mockRewardTotal);
-                emit MockRewardDistributed(mockRewardRecipient, mockRewardTotal, seasonId);
-            }
-        }
-        
-        emit SeasonRewardsCalculated(seasonId, totalReward, distributed);
+        emit SeasonRewardsCalculated(seasonId, rewardPool, distributed);
     }
 
     /**
@@ -329,103 +248,6 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @dev 内部函数：发放模拟玩家奖励
-     * @param amount 奖励金额
-     */
-    function _distributeMockReward(uint256 amount) internal {
-        if (rewardType == 0) {
-            (bool success, ) = payable(mockRewardRecipient).call{value: amount}("");
-            require(success, "ArenaReward: Mock reward transfer failed");
-        } else {
-            address tokenContract = IAuthorizer(authorizer).getToken();
-            require(tokenContract != address(0), "ArenaReward: Token contract not set");
-            SafeERC20.safeTransfer(IERC20(tokenContract), mockRewardRecipient, amount);
-        }
-    }
-
-    /**
-     * @dev 领取赛季奖励
-     * @param seasonId 赛季 ID
-     */
-    function claimReward(uint256 seasonId) external nonReentrant whenNotPaused {
-        require(seasonRewards[seasonId].rewardCalculated, "ArenaReward: Rewards not calculated");
-        require(!claimedRewards[seasonId][msg.sender], "ArenaReward: Already claimed");
-        
-        uint256 reward = playerSeasonRewards[seasonId][msg.sender];
-        require(reward > 0, "ArenaReward: No reward to claim");
-        
-        claimedRewards[seasonId][msg.sender] = true;
-        
-        if (rewardType == 0) {
-            require(address(this).balance >= reward, "ArenaReward: Insufficient balance");
-            (bool success, ) = payable(msg.sender).call{value: reward}("");
-            require(success, "ArenaReward: Transfer failed");
-        } else {
-            address tokenContract = IAuthorizer(authorizer).getToken();
-            require(tokenContract != address(0), "ArenaReward: Token contract not set");
-            IERC20 token = IERC20(tokenContract);
-            require(token.balanceOf(address(this)) >= reward, "ArenaReward: Insufficient token balance");
-            token.safeTransfer(msg.sender, reward);
-        }
-        
-        emit RewardClaimed(msg.sender, seasonId, reward);
-    }
-
-    /**
-     * @dev 领取当前赛季奖励（重载）
-     */
-    function claimSeasonReward() external nonReentrant whenNotPaused {
-        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
-        uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
-        _claimRewardFor(msg.sender, currentSeasonId);
-    }
-
-    /**
-     * @dev 领取指定赛季奖励（可代领）
-     * @param player 玩家地址
-     * @param seasonId 赛季 ID
-     * @return 领取的奖励金额
-     */
-    function claimSeasonReward(address player, uint256 seasonId) external nonReentrant whenNotPaused returns (uint256) {
-        require(player != address(0), "ArenaReward: Invalid player address");
-        require(seasonId > 0, "ArenaReward: Invalid season ID");
-        require(msg.sender == player || msg.sender == authorizer || msg.sender == owner(),
-            "ArenaReward: Not authorized to claim for this player");
-        return _claimRewardFor(player, seasonId);
-    }
-
-    /**
-     * @dev 内部函数：为指定玩家领取指定赛季奖励
-     * @param player 玩家地址
-     * @param seasonId 赛季 ID
-     * @return 领取的奖励金额
-     */
-    function _claimRewardFor(address player, uint256 seasonId) internal returns (uint256) {
-        require(seasonRewards[seasonId].rewardCalculated, "ArenaReward: Rewards not calculated");
-        require(!claimedRewards[seasonId][player], "ArenaReward: Reward already claimed");
-
-        uint256 reward = playerSeasonRewards[seasonId][player];
-        require(reward > 0, "ArenaReward: No reward to claim");
-
-        claimedRewards[seasonId][player] = true;
-
-        if (rewardType == 0) {
-            require(address(this).balance >= reward, "ArenaReward: Insufficient balance");
-            (bool success, ) = payable(player).call{value: reward}("");
-            require(success, "ArenaReward: BNB transfer failed");
-        } else {
-            address tokenContract = IAuthorizer(authorizer).getToken();
-            require(tokenContract != address(0), "ArenaReward: Token contract not set");
-            IERC20 token = IERC20(tokenContract);
-            require(token.balanceOf(address(this)) >= reward, "ArenaReward: Insufficient token balance");
-            token.safeTransfer(player, reward);
-        }
-
-        emit RewardClaimed(player, seasonId, reward);
-        return reward;
-    }
-
-    /**
      * @dev 获取指定赛季的待领取奖励（调用者自己）
      * @param seasonId 赛季 ID
      * @return 待领取奖励金额
@@ -475,29 +297,6 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit RewardAdded(msg.value);
     }
 
-    function emergencyWithdrawBNB() external onlyOwner nonReentrant {
-        uint256 balance = address(this).balance;
-        (bool success, ) = payable(owner()).call{value: balance}("");
-        require(success, "ArenaReward: Withdraw failed");
-        emit EmergencyWithdraw(owner(), balance);
-    }
-
-    function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
-        require(address(this).balance >= amount, "ArenaReward: Insufficient balance");
-        (bool success, ) = payable(owner()).call{value: amount}("");
-        require(success, "ArenaReward: Withdraw failed");
-        emit EmergencyWithdraw(owner(), amount);
-    }
-
-    function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
-        address tokenContract = IAuthorizer(authorizer).getToken();
-        require(tokenContract != address(0), "ArenaReward: Token contract not set");
-        IERC20 token = IERC20(tokenContract);
-        require(token.balanceOf(address(this)) >= amount, "ArenaReward: Insufficient token balance");
-        token.safeTransfer(owner(), amount);
-        emit EmergencyWithdraw(owner(), amount);
-    }
-
     function isRewardClaimed(address player, uint256 seasonId) external view returns (bool) {
         return claimedRewards[seasonId][player];
     }
@@ -520,82 +319,14 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return this.calculateRewardForRank(rank);
     }
 
-    function setRewardRate(uint256 rate) external onlyOwner {
-        require(rate <= maxRewardRate, "ArenaReward: Rate exceeds max");
-        rewardRate = rate;
-    }
-
     /**
-     * @dev 设置最大奖励率
-     * @param maxRate 最大奖励率
-     * @notice 仅限owner调用
+     * @dev 标记奖励已领取（由 ArenaRewardLP 调用）
+     * @param player 玩家地址
+     * @param seasonId 赛季 ID
      */
-    function setMaxRewardRate(uint256 maxRate) external onlyOwner {
-        maxRewardRate = maxRate;
-    }
-
-    function setRateStep(uint256 step) external onlyOwner {
-        rateStep = step;
-    }
-
-    /**
-     * @dev 设置奖励类型
-     * @param _rewardType 奖励类型（0=BNB, 1=代币）
-     * @notice 仅限owner或authorizer调用
-     */
-    function setRewardType(uint8 _rewardType) external onlyOwnerOrAuthorizer {
-        require(_rewardType == 0 || _rewardType == 1, "ArenaReward: Invalid reward type");
-        rewardType = _rewardType;
-    }
-
-    function checkNewDay() external onlyOwnerOrAuthorizer {
-        uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
-
-        if (todayStart != currentDayStart) {
-            todayStart = currentDayStart;
-            todayIncomingReward = 0;
-            todayRewardAmount = 0;
-            _adjustRewardRate();
-        }
-    }
-
-    /**
-     * @dev 更新今日奖励金额
-     * @param amount 今日奖励金额
-     * @notice 仅限owner或authorizer调用
-     */
-    function updateTodayRewardAmount(uint256 amount) external onlyOwnerOrAuthorizer {
-        todayRewardAmount = amount;
-    }
-
-    /**
-     * @dev 更新今日流入奖励
-     * @param amount 流入奖励金额
-     * @notice 仅限owner或authorizer调用，累加到todayIncomingReward
-     */
-    function updateTodayIncomingReward(uint256 amount) external onlyOwnerOrAuthorizer {
-        todayIncomingReward += amount;
-    }
-
-    /**
-     * @dev 内部函数：根据每日流入奖励调整奖励率
-     */
-    function _adjustRewardRate() internal {
-        if (todayRewardAmount > 0 && todayIncomingReward > todayRewardAmount) {
-            uint256 multiple = todayIncomingReward / todayRewardAmount;
-            uint256 maxSteps = (maxRewardRate - rewardRate) / rateStep;
-            uint256 steps = multiple - 1;
-
-            if (steps > maxSteps) {
-                steps = maxSteps;
-            }
-
-            uint256 newRate = rewardRate + (steps * rateStep);
-
-            if (newRate != rewardRate) {
-                rewardRate = newRate;
-            }
-        }
+    function markRewardClaimed(address player, uint256 seasonId) external {
+        require(msg.sender == IAuthorizer(authorizer).getArenaRewardLP(), "ArenaReward: Only ArenaRewardLP can call");
+        claimedRewards[seasonId][player] = true;
     }
 
     /**
@@ -604,6 +335,12 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 仅限owner调用，用于紧急情况
      */
     function emergencyWithdrawWBNB(uint256 amount) external onlyOwner nonReentrant {
-        IAuthorizer(authorizer).emergencyWithdrawWBNB(amount);
+        address wbnb = IAuthorizer(authorizer).getWBNB();
+        require(amount > 0, "ArenaReward: Amount must be > 0");
+        require(IWBNB(wbnb).balanceOf(address(this)) >= amount, "ArenaReward: Insufficient WBNB");
+        
+        IWBNB(wbnb).withdraw(amount);
+        (bool success, ) = payable(owner()).call{value: amount}("");
+        require(success, "ArenaReward: BNB transfer failed");
     }
 }

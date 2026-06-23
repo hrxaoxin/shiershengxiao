@@ -416,25 +416,18 @@ interface IArenaBattle {
  */
 interface IArenaReward {
     function calculateSeasonRewards(uint256 seasonId) external;
-    function claimReward(uint256 seasonId) external;
-    function claimSeasonReward() external;
-    function claimSeasonReward(address player, uint256 seasonId) external returns (uint256);
     function getPendingRewardsByPlayer(address player, uint256 seasonId) external view returns (uint256);
     function getPendingRewardsBySeason(uint256 seasonId) external view returns (uint256);
     function getTotalPendingRewards(address player) external view returns (uint256);
     function isRewardClaimed(address player, uint256 seasonId) external view returns (bool);
-    function rewardType() external view returns (uint8);
-    function setRewardType(uint8 _rewardType) external;
+    function markRewardClaimed(address player, uint256 seasonId) external;
     function setRewardRate(uint256 rate) external;
     function setMaxRewardRate(uint256 maxRate) external;
-    function setRateStep(uint256 step) external;
     function checkNewDay() external;
     function updateTodayRewardAmount(uint256 amount) external;
     function updateTodayIncomingReward(uint256 amount) external;
     function calculateRewardForRank(uint256 rank) external view returns (uint256);
     function getRewardForRank(uint256 rank) external view returns (uint256);
-    function emergencyWithdrawBNB(uint256 amount) external;
-    function emergencyWithdrawTokens(uint256 amount) external;
     function addRewardToPool() external payable;
 }
 
@@ -640,6 +633,7 @@ interface IAuthorizer {
     function getNFTTrading() external view returns (address);
     function getNFTBuyback() external view returns (address);
     function getStaking() external view returns (address);
+    function getStakingLP() external view returns (address);
     function getTokenStaking() external view returns (address);
     function getRewardManager() external view returns (address);
     function getDividendManager() external view returns (address);
@@ -728,6 +722,8 @@ interface IDividendManager {
     function totalDistributed() external view returns (uint256);
     function updateUserWeight(address user, uint256 level, bool isAdd, uint8 element) external;
     function syncUserWeight(address user) external;
+    function getTotalWeight() external view returns (uint256);
+    function getUserWeight(address user) external view returns (uint256);
 }
 
 /**
@@ -892,6 +888,7 @@ interface IDexFactory {
 interface ITokenStaking {
     function getTotalStaked() external view returns (uint256);
     function getUserStake(address user) external view returns (StakeInfo memory);
+    function recordIncomingTokens(uint256 amount) external;
     
     struct StakeInfo {
         uint256 amount;
@@ -907,11 +904,20 @@ interface ITokenStaking {
  */
 interface ITokenStakingLP {
     function recordIncomingBNB(uint256 amount) external;
+    function receiveToken(address token, uint256 amount) external;
+    function receiveMultipleTokens(address[] calldata tokens, uint256[] calldata amounts) external;
     function claimLPReward() external;
     function getPendingLPReward(address user) external view returns (uint256);
     function compoundFees() external;
     function getRewardType() external view returns (RewardType);
     function setRewardType(RewardType rewardType) external;
+    function setRewardRate(uint256 _rewardRate) external;
+    function setMaxRewardRate(uint256 _maxRewardRate) external;
+    function setMaxDailyRewardPercent(uint256 _percent) external;
+    function shouldCalculateDailyReward() external view returns (bool);
+    function calculateDailyReward() external;
+    function rewardRate() external view returns (uint256);
+    function todayRewardAmount() external view returns (uint256);
 }
 
 /**
@@ -922,11 +928,20 @@ interface IStakingLP {
     function updateTotalWeight(uint256 _totalWeightedNFTs) external;
     function syncUserWeight(address user, uint256 snapshotWeight) external;
     function recordIncomingBNB(uint256 amount) external;
+    function receiveToken(address token, uint256 amount) external;
+    function receiveMultipleTokens(address[] calldata tokens, uint256[] calldata amounts) external;
     function claimLPReward() external;
     function getPendingLPReward(address user) external view returns (uint256);
     function compoundFees() external;
     function getRewardType() external view returns (RewardType);
     function setRewardType(RewardType rewardType) external;
+    function setRewardRate(uint256 _rewardRate) external;
+    function setMaxRewardRate(uint256 _maxRewardRate) external;
+    function setMaxDailyRewardPercent(uint256 _percent) external;
+    function shouldCalculateDailyReward() external view returns (bool);
+    function calculateDailyReward() external;
+    function rewardRate() external view returns (uint256);
+    function todayRewardAmount() external view returns (uint256);
 }
 
 /**
@@ -935,6 +950,8 @@ interface IStakingLP {
  */
 interface IDividendManagerLP {
     function recordIncomingBNB(uint256 amount) external;
+    function receiveToken(address token, uint256 amount) external;
+    function receiveMultipleTokens(address[] calldata tokens, uint256[] calldata amounts) external;
     function claimLPDividend() external;
     function getClaimableLPDividend(address user) external view returns (uint256);
     function compoundFees() external;
@@ -948,11 +965,21 @@ interface IDividendManagerLP {
  */
 interface IArenaRewardLP {
     function recordIncomingBNB(uint256 amount) external;
-    function claimLPReward(uint256 seasonId) external;
+    function receiveToken(address token, uint256 amount) external;
+    function receiveMultipleTokens(address[] calldata tokens, uint256[] calldata amounts) external;
+    function claimLPReward(uint256 seasonId) external returns (uint256);
     function getPendingLPReward(address user, uint256 seasonId) external view returns (uint256);
     function compoundFees() external;
     function getRewardType() external view returns (RewardType);
+    function rewardType() external view returns (RewardType);
     function setRewardType(RewardType rewardType) external;
+    function setRewardRate(uint256 _rewardRate) external;
+    function setMaxRewardRate(uint256 _maxRewardRate) external;
+    function setMaxDailyRewardPercent(uint256 _percent) external;
+    function shouldCalculateDailyReward() external view returns (bool);
+    function calculateDailyReward() external;
+    function rewardRate() external view returns (uint256);
+    function todayRewardAmount() external view returns (uint256);
 }
 
 /**

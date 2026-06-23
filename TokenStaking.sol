@@ -55,12 +55,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     using SafeERC20Upgradeable for IERC20Upgradeable;
     using LPLib for IAuthorizer;
     
-    /** @dev 基础奖励比例（万分比，默认100 = 1%） */
-    uint256 public rewardRate = 100;
-    /** @dev 最大奖励比例（万分比，默认200 = 2%） */
-    uint256 public maxRewardRate = 200;
-    /** @dev 每次上调比例（万分比，10 = 0.1%） */
-    uint256 public rateStep = 10;
     /** @dev 最小质押锁定时间（30分钟） */
     uint256 public constant MIN_STAKING_DURATION = 30 minutes;
     /** @dev 最大总质押数量（无限制） */
@@ -69,10 +63,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     uint256 public maxUserStaked = type(uint256).max;
     /** @dev 今日已进入合约的代币数量 */
     uint256 public todayIncomingTokens;
-    /** @dev 今日奖励总量 */
-    uint256 public todayRewardAmount;
-    /** @dev 今日开始时间 */
-    uint256 public todayStart;
     /** @dev 所有用户待领取奖励总和（简化处理） */
     uint256 public totalPendingRewards;
 
@@ -161,10 +151,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @param newMaxRate 新的最大奖励率
      */
     event MaxRewardRateUpdated(uint256 newMaxRate);
-    /** @dev 上调步长更新事件
-     * @param newStep 新的步长
-     */
-    event RateStepUpdated(uint256 newStep);
     /** @dev 每日奖励计算事件
      * @param totalReward 当日总奖励
      * @param totalStaked 当前总质押量
@@ -203,9 +189,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         dailyRewardDistributed = 0;
         
         // 初始化带默认值的参数
-        rewardRate = 100;
-        maxRewardRate = 200;
-        rateStep = 10;
         maxTotalStaked = type(uint256).max;
         maxUserStaked = type(uint256).max;
     }
@@ -237,7 +220,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(amount > 0, "TokenStaking: Amount must be > 0");
         require(msg.sender == owner() || msg.sender == authorizer || msg.sender == IAuthorizer(authorizer).getRewardManager(), 
                 "TokenStaking: Not authorized");
-        _checkNewDay();
         todayIncomingTokens += amount;
         emit IncomingTokensRecorded(amount, todayIncomingTokens);
     }
@@ -249,8 +231,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function stakeTokens(uint256 amount) external nonReentrant whenNotPaused {
         require(amount > 0, "TokenStaking: Amount must be > 0");
 
-        _checkNewDay();
-        
         _accumulateRewards(msg.sender);
         
         StakeInfo storage stake = userStakes[msg.sender];
@@ -327,75 +307,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         emit TokensUnstaked(msg.sender, amount);
     }
 
-    /**
-     * @dev 设置奖励比例（仅owner）
-     * @param _rewardRate 新的奖励比例（万分比）
-     */
-    function setRewardRate(uint256 _rewardRate) external onlyOwner {
-        require(_rewardRate > 0 && _rewardRate <= maxRewardRate, "TokenStaking: Invalid reward rate");
-        rewardRate = _rewardRate;
-        emit RewardRateUpdated(_rewardRate);
-    }
-
-    /**
-     * @dev 设置最大奖励比例（仅owner）
-     * @param _maxRewardRate 最大奖励比例（万分比）
-     */
-    function setMaxRewardRate(uint256 _maxRewardRate) external onlyOwner {
-        require(_maxRewardRate >= rewardRate, "TokenStaking: Max rate must be >= current rate");
-        maxRewardRate = _maxRewardRate;
-        emit MaxRewardRateUpdated(_maxRewardRate);
-    }
-
-    /**
-     * @dev 设置上调步长（仅owner）
-     * @param _rateStep 上调步长（万分比）
-     */
-    function setRateStep(uint256 _rateStep) external onlyOwner {
-        require(_rateStep > 0, "TokenStaking: Step must be > 0");
-        rateStep = _rateStep;
-        emit RateStepUpdated(_rateStep);
-    }
-
-    /**
-     * @dev 检查是否进入新的一天
-     * 仅重置每日统计，dailyRewardPerToken 保持累计不重置
-     */
-    function _checkNewDay() internal {
-        uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
-
-        if (todayStart != currentDayStart) {
-            todayStart = currentDayStart;
-            todayIncomingTokens = 0;
-            todayRewardAmount = 0;
-            // dailyRewardPerToken 为累积值，跨日不重置
-            _adjustRewardRate();
-        }
-    }
-
-    /**
-     * @dev 动态调整奖励比例
-     * 规则：流入代币量是每日奖励总量的倍数，每增加1倍，比例上调0.01%，最多上调0.1%
-     */
-    function _adjustRewardRate() internal {
-        if (todayRewardAmount > 0 && todayIncomingTokens > todayRewardAmount) {
-            uint256 multiple = todayIncomingTokens / todayRewardAmount;
-            uint256 maxSteps = (maxRewardRate - rewardRate) / rateStep;
-            uint256 steps = multiple - 1;
-
-            if (steps > maxSteps) {
-                steps = maxSteps;
-            }
-
-            uint256 newRate = rewardRate + (steps * rateStep);
-
-            if (newRate != rewardRate) {
-                rewardRate = newRate;
-                emit RewardRateUpdated(rewardRate);
-            }
-        }
-    }
-
     /** @dev 每日奖励比率（基于质押量），累积值持续递增 */
     uint256 public dailyRewardPerToken;
     /** @dev 上次计算奖励的时间 */
@@ -404,38 +315,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /** @dev 用户上次累积时使用的奖励率，防止重复累加（地址 => 上次累积率） */
     mapping(address => uint256) private lastAccumulatedRate;
 
-    /**
-     * @dev 计算并分发每日奖励
-     * dailyRewardPerToken 为累积值（持续递增），避免跨日覆盖导致奖励丢失
-     */
-    function calculateDailyReward() external onlyOwnerOrAuthorizer {
-        _checkNewDay();
-        
-        require(todayRewardAmount == 0, "TokenStaking: Daily reward already calculated");
-
-        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getToken());
-        uint256 contractTokenBalance = token.balanceOf(address(this));
-        // 可用奖励余额 = 总代币余额 - 已质押的代币（质押的代币需要归还用户）
-        // 由于质押和奖励都在合约中，我们区分：totalStakedTokens 是用户质押的本金
-        uint256 availableBalance = contractTokenBalance > totalStakedTokens
-            ? contractTokenBalance - totalStakedTokens - totalPendingRewards
-            : 0;
-        
-        if (availableBalance > 0 && totalStakedTokens > 0) {
-            todayRewardAmount = availableBalance * rewardRate / 10000;
-            
-            // 检查溢出风险
-            uint256 rewardIncrement = todayRewardAmount * REWARD_PRECISION / totalStakedTokens;
-            require(dailyRewardPerToken + rewardIncrement <= MAX_DAILY_REWARD_PER_TOKEN, 
-                    "TokenStaking: dailyRewardPerToken overflow risk");
-            
-            // 使用高精度累积 dailyRewardPerToken，持续递增而非覆盖
-            dailyRewardPerToken += rewardIncrement;
-            lastRewardCalculationTime = block.timestamp;
-            emit DailyRewardCalculated(todayRewardAmount, totalStakedTokens);
-        }
-    }
-    
     /**
      * @dev 重置 dailyRewardPerToken（当接近溢出时调用）
      * 注意：调用此函数前必须确保所有用户已领取奖励，否则会导致奖励丢失

@@ -71,25 +71,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
 
     /** @dev 最小质押持续时间（30分钟），防止刷奖励 */
     uint256 public minStakingDuration = 30 minutes;
-    /** @dev 基础奖励率（万分比，100 = 1%），每日奖励计算基准 */
-    uint256 public rewardRate = 100;
-    /** @dev 最大奖励率（万分比，200 = 2%），奖励率上调上限 */
-    uint256 public maxRewardRate = 200;
-    /** @dev 奖励率调整步长（万分比，10 = 0.1%），每次上调的最小单位 */
-    uint256 public rateStep = 10;
 
     /** @dev 已质押NFT总数 */
     uint256 public totalStakedNFTs;
     /** @dev 已质押NFT的总权重（用于计算奖励分配） */
     uint256 public totalWeightedNFTs;
-    
-    /** @dev 核心优化：全局累积的每单位权重奖励，每次 calculateDailyReward 时增加，用户领取时做差值计算 */
-    uint256 public globalRewardPerWeight;
-    
-    /** @dev 奖励累积变量溢出预警阈值（约50%的uint256最大值），接近时触发重置 */
-    uint256 public constant REWARD_OVERFLOW_THRESHOLD = 0x8000000000000000000000000000000000000000000000000000000000000000;
-    /** @dev 全局奖励重置计数器，用于追踪溢出重置次数 */
-    uint256 public rewardResetCount;
 
     /** @dev 紧急提取timelock锁定期（48小时），防止恶意owner立即提取 */
     uint256 public emergencyWithdrawTimelock = 48 hours;
@@ -100,10 +86,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     mapping(address => uint256) public pendingRewards;
     /** @dev 今日流入合约的代币数量（用于动态奖励率调整） */
     uint256 public todayIncomingTokens;
-    /** @dev 今日计算出的奖励总量 */
-    uint256 public todayRewardAmount;
-    /** @dev 今日开始时间戳（用于判断是否进入新的一天） */
-    uint256 public todayStart;
+    /** @dev 全局累积奖励（每单位权重），用于O(1)奖励计算 */
+    uint256 public globalRewardPerWeight;
 
     /** @dev 用户质押的NFT总权重（地址 => 总权重），优化getPendingReward/claimReward的Gas消耗 */
     mapping(address => uint256) public userStakedWeight;
@@ -172,12 +156,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     /** @dev 奖励率更新事件
      * @param newRate 新的奖励率
      */
-    event RewardRateUpdated(uint256 newRate);
-    /** @dev 每日奖励计算事件
-     * @param totalReward 当日总奖励
-     * @param incrementPerWeight 每权重奖励增量
-     */
-    event DailyRewardCalculated(uint256 totalReward, uint256 incrementPerWeight);
     /** @dev 合约暂停事件
      * @param account 暂停操作者
      * @param reason 暂停原因
@@ -213,9 +191,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         
         // 初始化带默认值的参数
         minStakingDuration = 30 minutes;
-        rewardRate = 100;
-        maxRewardRate = 200;
-        rateStep = 10;
         emergencyWithdrawTimelock = 48 hours;
         minStakingLevel = 1;
         
@@ -275,9 +250,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         require(tokenIds.length > 0, "Staking: Empty tokenIds");
         address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "Staking: NFT contract not set");
-        
-        _checkNewDay();
-        _autoCalculateDailyReward();
 
         if (!isStakingUser[msg.sender] && userStakedNFTs[msg.sender].length == 0) {
             isStakingUser[msg.sender] = true;
@@ -456,145 +428,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     /** @dev 质押奖励精度缩放因子（1e18），用于避免整数截断 */
     uint256 public constant STAKING_REWARD_PRECISION = 1e18;
 
-    /**
-     * @dev 每日奖励计算函数（仅增加全局增量，不遍历用户）
-     */
-    function calculateDailyReward() external whenNotPaused onlyOwnerOrAuthorizer {
-        address rewardTokenContract = IAuthorizer(authorizer).getToken();
-        require(rewardTokenContract != address(0), "Staking: Reward token contract not set");
-        _checkNewDay();
-        require(todayRewardAmount == 0, "Staking: Daily reward already calculated");
-        _doCalculateDailyReward(rewardTokenContract);
-    }
-
-    /**
-     * @dev 检查是否应该计算每日奖励（内部函数）
-     * @param rewardTokenContract 奖励代币合约地址
-     * @return bool 是否应该计算
-     */
-    function _shouldCalculateDailyReward(address rewardTokenContract) internal view returns (bool) {
-        return rewardTokenContract != address(0) && 
-               totalWeightedNFTs > 0;
-    }
-
-    /**
-     * @dev 执行每日奖励计算（内部函数，核心奖励计算逻辑）
-     * @param rewardTokenContract 奖励代币合约地址
-     */
-    function _doCalculateDailyReward(address rewardTokenContract) internal {
-        if (!_shouldCalculateDailyReward(rewardTokenContract)) return;
-        
-        IERC20 rewardToken = IERC20(rewardTokenContract);
-        uint256 contractBalance = rewardToken.balanceOf(address(this));
-        
-        uint256 dailyReward = contractBalance * rewardRate / 10000;
-        uint256 maxDailyReward = contractBalance / 10;
-        if (dailyReward > maxDailyReward) {
-            dailyReward = maxDailyReward;
-        }
-        
-        if (totalWeightedNFTs > 0 && dailyReward > 0) {
-            // 修复：移除 unchecked 块，添加安全检查防止溢出
-            uint256 increment = (dailyReward * STAKING_REWARD_PRECISION) / totalWeightedNFTs;
-            require(globalRewardPerWeight <= type(uint256).max - increment, "Staking: Reward overflow imminent");
-            if (globalRewardPerWeight + increment >= REWARD_OVERFLOW_THRESHOLD) {
-                _resetRewardTracking();
-            }
-            globalRewardPerWeight += increment;
-            todayRewardAmount = dailyReward;
-            emit DailyRewardCalculated(dailyReward, increment);
-        }
-    }
-
-    /**
-     * @dev 检查globalRewardPerWeight溢出风险（内部函数）
-     */
-    function _checkRewardOverflow() internal {
-        if (globalRewardPerWeight >= REWARD_OVERFLOW_THRESHOLD) {
-            _resetRewardTracking();
-        }
-    }
-
-    /**
-     * @dev 重置奖励跟踪（溢出保护，内部函数）
-     */
-    function _resetRewardTracking() internal {
-        rewardResetCount++;
-        
-        uint256 batchSize = 100;
-        uint256 totalUsers = stakingUsers.length;
-        uint256 processed = 0;
-        
-        while (processed < totalUsers && gasleft() > 200000) {
-            uint256 end = processed + batchSize;
-            if (end > totalUsers) {
-                end = totalUsers;
-            }
-            
-            for (uint256 i = processed; i < end && gasleft() > 200000; i++) {
-                address user = stakingUsers[i];
-                if (isStakingUser[user]) {
-                    uint256 pending = _calcUserPending(user);
-                    pendingRewards[user] += pending;
-                    _userSnapshotWeight[user] = 0;
-                }
-            }
-            
-            processed = end;
-        }
-        
-        globalRewardPerWeight = 0;
-        
-        if (processed < totalUsers) {
-            emit PartialResetWarning(rewardResetCount, processed, totalUsers);
-        }
-    }
     
-    /**
-     * @dev 继续未完成的重置操作（公开调用，用于分批处理大批量用户）
-     * @param startIndex 开始索引
-     * @param batchSize 批量大小
-     */
-    function continueResetRewardTracking(uint256 startIndex, uint256 batchSize) external onlyOwnerOrAuthorizer {
-        uint256 totalUsers = stakingUsers.length;
-        uint256 endIndex = startIndex + batchSize;
-        if (endIndex > totalUsers) {
-            endIndex = totalUsers;
-        }
-        
-        for (uint256 i = startIndex; i < endIndex; i++) {
-            address user = stakingUsers[i];
-            if (isStakingUser[user]) {
-                uint256 pending = _calcUserPending(user);
-                pendingRewards[user] += pending;
-                _userSnapshotWeight[user] = 0;
-            }
-        }
-        
-        emit ResetContinued(startIndex, endIndex, totalUsers);
-    }
-    
-    /** @dev 部分重置警告事件
-     * @param resetCount 重置计数
-     * @param processedUsers 已处理用户数
-     * @param totalUsers 总用户数
-     */
-    event PartialResetWarning(uint256 resetCount, uint256 processedUsers, uint256 totalUsers);
-    /** @dev 重置继续事件
-     * @param startIndex 开始索引
-     * @param endIndex 结束索引
-     * @param totalUsers 总用户数
-     */
-    event ResetContinued(uint256 startIndex, uint256 endIndex, uint256 totalUsers);
-
-    /**
-     * @dev 自动触发每日奖励计算（内部函数，在用户操作时调用）
-     */
-    function _autoCalculateDailyReward() internal {
-        _checkNewDay();
-        address rewardTokenContract = IAuthorizer(authorizer).getToken();
-        _doCalculateDailyReward(rewardTokenContract);
-    }
 
     /**
      * @dev 从用户质押列表中移除NFT（内部函数）
@@ -636,55 +470,6 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         stakingUsers.pop();
         delete stakingUserIndex[user];
         delete isStakingUser[user];
-    }
-
-    /**
-     * @dev 设置奖励率
-     * @param _rewardRate 新的奖励率（万分比）
-     */
-    function setRewardRate(uint256 _rewardRate) external onlyOwner {
-        require(_rewardRate > 0 && _rewardRate <= maxRewardRate, "Staking: Invalid reward rate");
-        rewardRate = _rewardRate;
-        emit RewardRateUpdated(_rewardRate);
-    }
-
-    /**
-     * @dev 设置最大奖励率
-     * @param _maxRewardRate 最大奖励率（万分比）
-     */
-    function setMaxRewardRate(uint256 _maxRewardRate) external onlyOwner {
-        require(_maxRewardRate >= rewardRate, "Staking: Max rate must be >= current rate");
-        maxRewardRate = _maxRewardRate;
-    }
-
-    /**
-     * @dev 设置奖励率调整步长
-     * @param _rateStep 调整步长（万分比）
-     */
-    function setRateStep(uint256 _rateStep) external onlyOwner {
-        require(_rateStep > 0, "Staking: Step must be > 0");
-        rateStep = _rateStep;
-    }
-
-    /**
-     * @dev 记录流入代币（用于动态奖励率调整）
-     * @param amount 流入代币数量
-     */
-    function recordIncomingTokens(uint256 amount) external onlyOwnerOrAuthorizer {
-        _checkNewDay();
-        todayIncomingTokens += amount;
-    }
-
-    /**
-     * @dev 检查是否进入新的一天并重置每日统计（内部函数）
-     */
-    function _checkNewDay() internal {
-        uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
-        if (todayStart != currentDayStart) {
-            todayStart = currentDayStart;
-            todayIncomingTokens = 0;
-            todayRewardAmount = 0;
-        }
     }
 
     /**
