@@ -194,6 +194,7 @@ window.ZODIAC_WEB3 = (function() {
         'breedingMarket': ABIS.breedingMarketABI,
         'rewardManager': ABIS.rewardManagerABI,
         'dividendManager': ABIS.dividendManagerABI,
+        'dividendManagerLP': ABIS.dividendManagerLPABI,
         'tokenBurner': ABIS.tokenBurnerABI,
         'nftUpdate': ABIS.nftUpdateABI,
         'battle': ABIS.battleABI,

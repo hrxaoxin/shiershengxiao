@@ -322,11 +322,11 @@
                 // 从 RewardManager 读取分配比例
                 try {
                     const percents = await rewardManager.methods.getDistributionPercents().call();
-                    const dividendPercent = (parseInt(percents[0]) / 100).toFixed(1);
-                    const nftStakingPercent = (parseInt(percents[1]) / 100).toFixed(1);
-                    const tokenStakingPercent = (parseInt(percents[2]) / 100).toFixed(1);
-                    const arenaPercent = (parseInt(percents[3]) / 100).toFixed(1);
-                    const buybackPercent = percents[4] ? (parseInt(percents[4]) / 100).toFixed(1) : '0.0';
+                    const dividendPercent = (parseInt(percents[0]) / 5000).toFixed(1);
+                    const nftStakingPercent = (parseInt(percents[1]) / 5000).toFixed(1);
+                    const tokenStakingPercent = (parseInt(percents[2]) / 5000).toFixed(1);
+                    const arenaPercent = (parseInt(percents[3]) / 5000).toFixed(1);
+                    const buybackPercent = percents[4] ? (parseInt(percents[4]) / 5000).toFixed(1) : '0.2';
                     
                     document.getElementById('dividendPercentReward').textContent = dividendPercent;
                     document.getElementById('nftStakingPercentReward').textContent = nftStakingPercent;
