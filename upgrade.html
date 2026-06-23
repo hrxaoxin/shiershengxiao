@@ -670,7 +670,7 @@
         async function handleUpgradeWithNFT() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
-            if (!nftUpdateContract || !nftContract) {
+            if (!nftContract) {
                 await ZODIAC_UI.showErrorModal('合约未初始化');
                 return;
             }
@@ -716,20 +716,7 @@
                 ZODIAC_UI.hideLoading();
                 ZODIAC_UI.showLoading('升级中...');
                 
-                let gasLimit = 2000000;
-                try {
-                    gasLimit = await nftUpdateContract.methods.upgradeWithNFT(selectedNft.id).estimateGas({ from: account });
-                    gasLimit = Math.floor(gasLimit * 1.5);
-                } catch (e) {
-                    console.warn('Failed to estimate gas, using default:', e);
-                }
-                
-                const result = await nftUpdateContract.methods.upgradeWithNFT(selectedNft.id)
-                    .send({ 
-                        from: account, 
-                        gas: gasLimit, 
-                        gasPrice: await web3.eth.getGasPrice() 
-                    });
+                const result = await window.ZODIAC_WEB3.upgradeWithNFT(selectedNft.id);
                 
                 ZODIAC_UI.hideLoading();
                 userNFTsCache = null;
@@ -747,7 +734,7 @@
         async function handleUpgradeWithToken() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
-            if (!nftUpdateContract || !tokenContract) {
+            if (!tokenContract) {
                 await ZODIAC_UI.showErrorModal('合约未初始化');
                 return;
             }
@@ -784,20 +771,7 @@
                 ZODIAC_UI.hideLoading();
                 ZODIAC_UI.showLoading('升级中...');
                 
-                let gasLimit = 1500000;
-                try {
-                    gasLimit = await nftUpdateContract.methods.upgradeWithToken(selectedNft.id).estimateGas({ from: account });
-                    gasLimit = Math.floor(gasLimit * 1.5);
-                } catch (e) {
-                    console.warn('Failed to estimate gas, using default:', e);
-                }
-                
-                const result = await nftUpdateContract.methods.upgradeWithToken(selectedNft.id)
-                    .send({ 
-                        from: account, 
-                        gas: gasLimit, 
-                        gasPrice: await web3.eth.getGasPrice() 
-                    });
+                const result = await window.ZODIAC_WEB3.upgradeWithToken(selectedNft.id);
                 
                 ZODIAC_UI.hideLoading();
                 userNFTsCache = null;
@@ -815,10 +789,6 @@
         async function handleUpgradeWithUSDValue() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
-            if (!nftUpdateContract) {
-                await ZODIAC_UI.showErrorModal('合约未初始化');
-                return;
-            }
 
             const requiredUSD = getUSDValue(selectedNft.level);
             
@@ -853,20 +823,7 @@
                 ZODIAC_UI.hideLoading();
                 ZODIAC_UI.showLoading('升级中...');
                 
-                let gasLimit = 1500000;
-                try {
-                    gasLimit = await nftUpdateContract.methods.upgradeWithUSDValue(selectedNft.id).estimateGas({ from: account });
-                    gasLimit = Math.floor(gasLimit * 1.5);
-                } catch (e) {
-                    console.warn('Failed to estimate gas, using default:', e);
-                }
-                
-                const result = await nftUpdateContract.methods.upgradeWithUSDValue(selectedNft.id)
-                    .send({ 
-                        from: account, 
-                        gas: gasLimit, 
-                        gasPrice: await web3.eth.getGasPrice() 
-                    });
+                const result = await window.ZODIAC_WEB3.upgradeWithUSDValue(selectedNft.id);
                 
                 ZODIAC_UI.hideLoading();
                 userNFTsCache = null;
