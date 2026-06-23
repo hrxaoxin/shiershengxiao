@@ -854,7 +854,7 @@
                 console.error('检查合约暂停状态失败:', e);
             }
 
-            const requiredUSD = getUSDValue(selectedNft.level);
+            const requiredUSD = await getUSDValue(selectedNft.level);
             const nftId = parseInt(selectedNft.id, 10);
             
             // 检查价格有效性
@@ -951,13 +951,38 @@
             }
         }
 
-        function getUSDValue(level) {
-            switch (level) {
-                case 1: return 1;
-                case 2: return 4;
-                case 3: return 12;
-                case 4: return 48;
-                default: return 0;
+        async function getUSDValue(level) {
+            if (!nftUpdateContract) {
+                // 回退到硬编码值
+                switch (level) {
+                    case 1: return 1;
+                    case 2: return 4;
+                    case 3: return 12;
+                    case 4: return 48;
+                    default: return 0;
+                }
+            }
+            try {
+                const costWei = level == 1 
+                    ? await nftUpdateContract.methods.level1USDUpgradeCost().call()
+                    : level == 2
+                    ? await nftUpdateContract.methods.level2USDUpgradeCost().call()
+                    : level == 3
+                    ? await nftUpdateContract.methods.level3USDUpgradeCost().call()
+                    : level == 4
+                    ? await nftUpdateContract.methods.level4USDUpgradeCost().call()
+                    : '0';
+                return parseInt(costWei) / 10**18;
+            } catch (e) {
+                console.error('Failed to get USD upgrade cost from contract:', e);
+                // 回退到硬编码值
+                switch (level) {
+                    case 1: return 1;
+                    case 2: return 4;
+                    case 3: return 12;
+                    case 4: return 48;
+                    default: return 0;
+                }
             }
         }
 

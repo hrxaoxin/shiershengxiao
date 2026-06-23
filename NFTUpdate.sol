@@ -146,9 +146,20 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     
     /** @dev USD价值升级方式是否隐藏（默认隐藏） */
     bool public usdUpgradeHidden = true;
+    
+    /** @dev USD价值升级各级别费用（USDT数量，精度18位）
+     *  level1USDUpgradeCost: 1级→2级所需USDT价值
+     *  level2USDUpgradeCost: 2级→3级所需USDT价值
+     *  level3USDUpgradeCost: 3级→4级所需USDT价值
+     *  level4USDUpgradeCost: 4级→5级所需USDT价值
+     */
+    uint256 public level1USDUpgradeCost = 1e18;      // 1 USDT
+    uint256 public level2USDUpgradeCost = 4e18;      // 4 USDT
+    uint256 public level3USDUpgradeCost = 12e18;     // 12 USDT
+    uint256 public level4USDUpgradeCost = 48e18;     // 48 USDT
 
     /** @dev 存储间隙，用于合约升级兼容性 */
-    uint256[49] private __gap;
+    uint256[45] private __gap;
 
     /** @dev 初始化函数
      * @param initialOwner 初始所有者地址
@@ -325,6 +336,81 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             level2UpgradeCost,
             level3UpgradeCost,
             level4UpgradeCost
+        ];
+    }
+
+    /**
+     * @dev 设置USD价值升级的1级升级费用（USDT数量）
+     * @param cost USDT数量（精度18位）
+     */
+    function setLevel1USDUpgradeCost(uint256 cost) external onlyOwner {
+        require(cost > 0, "NFTUpdate: USD cost must be > 0");
+        level1USDUpgradeCost = cost;
+        emit USDUpgradeCostChanged(1, cost);
+    }
+
+    /**
+     * @dev 设置USD价值升级的2级升级费用（USDT数量）
+     * @param cost USDT数量（精度18位）
+     */
+    function setLevel2USDUpgradeCost(uint256 cost) external onlyOwner {
+        require(cost > 0, "NFTUpdate: USD cost must be > 0");
+        level2USDUpgradeCost = cost;
+        emit USDUpgradeCostChanged(2, cost);
+    }
+
+    /**
+     * @dev 设置USD价值升级的3级升级费用（USDT数量）
+     * @param cost USDT数量（精度18位）
+     */
+    function setLevel3USDUpgradeCost(uint256 cost) external onlyOwner {
+        require(cost > 0, "NFTUpdate: USD cost must be > 0");
+        level3USDUpgradeCost = cost;
+        emit USDUpgradeCostChanged(3, cost);
+    }
+
+    /**
+     * @dev 设置USD价值升级的4级升级费用（USDT数量）
+     * @param cost USDT数量（精度18位）
+     */
+    function setLevel4USDUpgradeCost(uint256 cost) external onlyOwner {
+        require(cost > 0, "NFTUpdate: USD cost must be > 0");
+        level4USDUpgradeCost = cost;
+        emit USDUpgradeCostChanged(4, cost);
+    }
+
+    /**
+     * @dev 批量设置所有等级的USD价值升级费用
+     * @param costs 所有等级的USD升级费用数组（长度4，索引0对应等级1）
+     */
+    function setAllLevelUSDUpgradeCosts(uint256[4] calldata costs) external onlyOwner {
+        uint256 maxCost = 1e30;
+        require(costs[0] > 0 && costs[0] <= maxCost, "NFTUpdate: Invalid level 1 USD cost");
+        require(costs[1] > 0 && costs[1] <= maxCost, "NFTUpdate: Invalid level 2 USD cost");
+        require(costs[2] > 0 && costs[2] <= maxCost, "NFTUpdate: Invalid level 3 USD cost");
+        require(costs[3] > 0 && costs[3] <= maxCost, "NFTUpdate: Invalid level 4 USD cost");
+        
+        level1USDUpgradeCost = costs[0];
+        level2USDUpgradeCost = costs[1];
+        level3USDUpgradeCost = costs[2];
+        level4USDUpgradeCost = costs[3];
+        
+        emit USDUpgradeCostChanged(1, costs[0]);
+        emit USDUpgradeCostChanged(2, costs[1]);
+        emit USDUpgradeCostChanged(3, costs[2]);
+        emit USDUpgradeCostChanged(4, costs[3]);
+    }
+
+    /**
+     * @dev 获取所有等级的USD价值升级费用
+     * @return 所有等级的USD升级费用数组
+     */
+    function getAllLevelUSDUpgradeCosts() external view returns (uint256[4] memory) {
+        return [
+            level1USDUpgradeCost,
+            level2USDUpgradeCost,
+            level3USDUpgradeCost,
+            level4USDUpgradeCost
         ];
     }
 
@@ -637,11 +723,12 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 使用USD价值升级（内部函数，减少栈深度）
      */
     function _upgradeWithUSDValueInternal(uint256 tokenId, uint8 lv, INFTDataInterface m, INFTMint nft) internal returns (uint8) {
+        // 使用可配置的USD升级费用
         uint256 usdValue;
-        if (lv == 1) usdValue = 1e18;      // 1 USD
-        else if (lv == 2) usdValue = 4e18;  // 4 USD
-        else if (lv == 3) usdValue = 12e18; // 12 USD
-        else if (lv == 4) usdValue = 48e18; // 48 USD
+        if (lv == 1) usdValue = level1USDUpgradeCost;
+        else if (lv == 2) usdValue = level2USDUpgradeCost;
+        else if (lv == 3) usdValue = level3USDUpgradeCost;
+        else if (lv == 4) usdValue = level4USDUpgradeCost;
         else revert("E18: Invalid level");
         
         uint256 price = _getTokenPrice();
@@ -652,7 +739,15 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(cost > 0, "E21: Invalid cost");
         require(cost <= 10**30, "E21: Cost exceeds maximum");
         
-        IERC20(tokenContract).safeTransferFrom(msg.sender, BLACK_HOLE, cost);
+        // 添加余额和授权检查
+        IERC20 t = IERC20(tokenContract);
+        uint256 balance = t.balanceOf(msg.sender);
+        require(balance >= cost, "E8: Insufficient balance");
+        
+        uint256 allowance = t.allowance(msg.sender, address(this));
+        require(allowance >= cost, "E8: Insufficient allowance");
+        
+        t.safeTransferFrom(msg.sender, BLACK_HOLE, cost);
         
         NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
         uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);
@@ -876,6 +971,13 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param hidden 是否隐藏
      */
     event USDUpgradeHiddenChanged(bool hidden);
+    
+    /**
+     * @dev USD价值升级费用变更事件
+     * @param level 等级（1-4）
+     * @param cost 新的USDT费用（精度18位）
+     */
+    event USDUpgradeCostChanged(uint8 level, uint256 cost);
     
     /**
      * @dev 紧急提取BNB（仅限合约所有者）
