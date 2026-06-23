@@ -639,12 +639,28 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         uint256 price = _getTokenPrice();
         require(price > 0, "E20: Price oracle returned zero");
         
+        // 价格下限检查：防止价格过低导致费用过高
+        uint256 minPrice = 10**10; // 最小价格：0.000000001 USD
+        require(price >= minPrice, "E20: Price too low");
+        
         uint256 cost = (usdValue * 1e18) / price;
         require(cost > 0, "E21: Invalid cost");
         
+        // 费用上限检查：防止费用过高
+        uint256 maxCost = 10**30; // 最大费用：10^12 代币（18位精度）
+        require(cost <= maxCost, "E21: Cost exceeds maximum");
+        
         IERC20 t = IERC20(tokenContract);
-        require(t.balanceOf(msg.sender) >= cost, "E8: Insufficient balance");
-        require(t.allowance(msg.sender, address(this)) >= cost, "E8: Insufficient allowance");
+        
+        // 先检查余额
+        uint256 balance = t.balanceOf(msg.sender);
+        require(balance >= cost, "E8: Insufficient balance");
+        
+        // 检查授权
+        uint256 allowance = t.allowance(msg.sender, address(this));
+        require(allowance >= cost, "E8: Insufficient allowance");
+        
+        // 执行代币转移
         t.safeTransferFrom(msg.sender, BLACK_HOLE, cost);
         
         NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
@@ -654,28 +670,152 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
     
     /**
-     * @dev 获取代币价格（优先从PriceOracle获取，支持FlapSwap等多DEX）
+     * @dev 获取代币价格（自动检查所有DEX，选择最低价格）
      * 价格获取优先级：
-     * 1. PriceOracle（支持FlapSwap、PancakeSwap、Uniswap多DEX取平均）
-     * 2. PancakeSwap Pair（备用）
+     * 1. PriceOracle（如果有效且非零）
+     * 2. 自动扫描所有DEX（FlapSwap、PancakeSwap、Uniswap），选择最低价格
      * @return uint256 代币价格（精度18位）
      */
     function _getTokenPrice() internal view returns (uint256) {
+        uint256 lowestPrice = 0;
+        
         // 优先从PriceOracle获取价格（支持多DEX，包括FlapSwap内盘）
         if (priceOracle != address(0)) {
             try IPriceOracle(priceOracle).getTokenPrice() returns (uint256 price) {
-                if (price > 0 && IPriceOracle(priceOracle).isTokenPriceValid()) {
-                    return price;
+                if (price > 0) {
+                    // 检查价格是否有效（未过期）
+                    try IPriceOracle(priceOracle).isTokenPriceValid() returns (bool isValid) {
+                        if (isValid) {
+                            lowestPrice = price;
+                        }
+                    } catch {
+                        // 如果isTokenPriceValid调用失败，直接使用价格（兼容旧版本）
+                        lowestPrice = price;
+                    }
                 }
             } catch {}
         }
         
-        // 备用：从PancakeSwap Pair获取价格
-        if (pancakeSwapPair != address(0)) {
-            return getTokenPriceFromPancakeSwap();
+        // 自动扫描所有DEX，获取最低价格
+        uint256[] memory dexPrices = _getAllDEXPrices();
+        for (uint256 i = 0; i < dexPrices.length; i++) {
+            uint256 dexPrice = dexPrices[i];
+            if (dexPrice > 0) {
+                if (lowestPrice == 0 || dexPrice < lowestPrice) {
+                    lowestPrice = dexPrice;
+                }
+            }
         }
         
+        return lowestPrice;
+    }
+    
+    /**
+     * @dev 从所有DEX获取价格数组
+     * @return prices 价格数组（索引0=FlapSwap, 1=PancakeSwap, 2=Uniswap）
+     */
+    function _getAllDEXPrices() internal view returns (uint256[] memory) {
+        uint256[] memory prices = new uint256[](3);
+        
+        IAuthorizer auth = IAuthorizer(authorizer);
+        
+        // FlapSwap (dexType = 0)
+        address flapSwapRouter = auth.getFlapSwapRouter();
+        if (flapSwapRouter != address(0)) {
+            prices[0] = _getPriceFromRouter(flapSwapRouter);
+        }
+        
+        // PancakeSwap (dexType = 1)
+        address pancakeSwapRouter = auth.getPancakeSwapRouter();
+        if (pancakeSwapRouter != address(0)) {
+            prices[1] = _getPriceFromRouter(pancakeSwapRouter);
+        }
+        
+        // Uniswap (dexType = 2)
+        address uniswapRouter = auth.getUniswapRouter();
+        if (uniswapRouter != address(0)) {
+            prices[2] = _getPriceFromRouter(uniswapRouter);
+        }
+        
+        return prices;
+    }
+    
+    /**
+     * @dev 从特定DEX Router获取代币价格
+     * 通过代币->WBNB->USDT路径获取价格
+     * @param router DEX路由地址
+     * @return 代币价格（USD，精度18位），获取失败返回0
+     */
+    function _getPriceFromRouter(address router) internal view returns (uint256) {
+        if (router == address(0) || tokenContract == address(0)) {
+            return 0;
+        }
+        
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address usdtAddress = auth.getUSDT();
+        address wbnbAddress = auth.getWBNB();
+        
+        if (usdtAddress == address(0) || wbnbAddress == address(0)) {
+            return 0;
+        }
+        
+        // 路径：代币 -> WBNB -> USDT
+        address[] memory path = new address[](3);
+        path[0] = tokenContract;
+        path[1] = wbnbAddress;
+        path[2] = usdtAddress;
+        
+        try IDexRouter(router).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
+            if (amounts.length == 3 && amounts[2] > 0) {
+                // amounts[2] 是 USDT 数量（6位精度）
+                // 转换为 USD 价格（18位精度）
+                return amounts[2] * 10**12;
+            }
+        } catch {}
+        
+        // 备用：尝试直接路径 代币 -> USDT
+        address[] memory directPath = new address[](2);
+        directPath[0] = tokenContract;
+        directPath[1] = usdtAddress;
+        
+        try IDexRouter(router).getAmountsOut(10**18, directPath) returns (uint256[] memory amounts) {
+            if (amounts.length == 2 && amounts[1] > 0) {
+                return amounts[1] * 10**12;
+            }
+        } catch {}
+        
         return 0;
+    }
+    
+    /**
+     * @dev 公开函数：获取所有DEX的价格（供前端展示）
+     * @return prices 价格数组（索引0=FlapSwap, 1=PancakeSwap, 2=Uniswap）
+     * @return lowestPrice 最低价格
+     * @return bestDEX 最佳DEX索引
+     */
+    function getAllDEXPrices() external view returns (uint256[] memory prices, uint256 lowestPrice, uint8 bestDEX) {
+        prices = _getAllDEXPrices();
+        lowestPrice = 0;
+        bestDEX = 0;
+        
+        for (uint8 i = 0; i < 3; i++) {
+            if (prices[i] > 0) {
+                if (lowestPrice == 0 || prices[i] < lowestPrice) {
+                    lowestPrice = prices[i];
+                    bestDEX = i;
+                }
+            }
+        }
+        
+        // 也检查PriceOracle
+        if (priceOracle != address(0)) {
+            try IPriceOracle(priceOracle).getTokenPrice() returns (uint256 oraclePrice) {
+                if (oraclePrice > 0 && oraclePrice < lowestPrice) {
+                    lowestPrice = oraclePrice;
+                    bestDEX = 255; // 特殊值表示来自PriceOracle
+                }
+            } catch {}
+        }
     }
 
     /**
