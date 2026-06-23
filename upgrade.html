@@ -476,9 +476,10 @@
         async function loadSingleNFT(index) {
             const tokenId = await nftContract.methods.tokenOfOwnerByIndex(account, index).call();
             
-            const [tokenType, tokenLevel] = await Promise.all([
+            const [tokenType, tokenLevel, tokenGrowth] = await Promise.all([
                 nftContract.methods.tokenType(tokenId).call(),
-                nftContract.methods.tokenLevel(tokenId).call()
+                nftContract.methods.tokenLevel(tokenId).call(),
+                nftContract.methods.tokenGrowth(tokenId).call()
             ]);
             
             const nftInfo = window.ZODIAC_UTILS.getNFTInfo(tokenType);
@@ -487,6 +488,7 @@
                 id: tokenId.toString(),
                 type: tokenType.toString(),
                 level: tokenLevel.toString(),
+                growth: tokenGrowth.toString(),
                 name: nftInfo.name,
                 image: nftInfo.imagePath
             };
@@ -511,7 +513,7 @@
                         <img src="${nft.image}" alt="${nft.name}">
                         <h4>${nft.name}</h4>
                         <p class="text-xs text-gray-500">等级: ${getStars(nft.level)}</p>
-                        <p class="text-xs text-gray-500">ID: ${nft.id}</p>
+                        <p class="text-xs text-gray-500">成长值: ${nft.growth}</p>
                         ${isSelected ? '<div class="absolute top-2 left-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center"><svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg></div>' : ''}
                     </div>
                 `;
