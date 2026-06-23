@@ -117,6 +117,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     address public tokenContract;
     address public metadataContract;
     address public dividendManager;
+    address public priceOracle;
     address public pancakeSwapPair;
 
     /** @dev 最小PancakeSwap流动性（防止价格操纵） */
@@ -187,8 +188,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         tokenContract = auth.getToken();
         metadataContract = auth.getNFTData();
         dividendManager = auth.getDividendManager();
-        // 注意：pancakeSwapPair 需要单独通过 setPancakeSwapPair() 设置为 Pair 地址（非 Router）
-        // 因为 getTokenPriceFromPancakeSwap() 需要调用 Pair 的 getReserves()/token0()/token1()
+        priceOracle = auth.getPriceOracle();
     }
 
     /**
@@ -620,7 +620,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(nftContract != address(0), "NFTUpdate: NFT contract not set");
         require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
         require(tokenContract != address(0), "NFTUpdate: Token contract not set");
-        require(pancakeSwapPair != address(0), "NFTUpdate: PancakeSwap pair not set");
         require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
         
         INFTMint nft = INFTMint(nftContract);
@@ -637,36 +636,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         else if (lv == 4) usdValue = 48e18; // 48 USD
         else revert("E18: Invalid level");
         
-        uint256 price = getTokenPriceFromPancakeSwap();
+        uint256 price = _getTokenPrice();
         require(price > 0, "E20: Price oracle returned zero");
-        
-        // 首次价格获取：直接使用，同时缓存
-        if (lastPrice == 0) {
-            lastPrice = price;
-            lastPriceUpdateTime = block.timestamp;
-            lastPriceUpdateBlock = block.number;
-            emit PriceUpdated(price, block.timestamp);
-        } else {
-            // 防御同一区块内的价格操纵：要求至少间隔 minPriceUpdateBlocks 个区块
-            require(block.number >= lastPriceUpdateBlock + minPriceUpdateBlocks, "E31: Price update too frequent");
-            // 防御时间窗口攻击：要求至少间隔 minPriceUpdateSeconds 秒
-            require(block.timestamp >= lastPriceUpdateTime + minPriceUpdateSeconds, "E32: Price update too frequent (time)");
-            
-            require(block.timestamp <= lastPriceUpdateTime + priceExpirySeconds, "E30: Price expired");
-        }
-        
-        uint256 deviation;
-        if (price > lastPrice) {
-            deviation = ((price - lastPrice) * 10000) / lastPrice;
-        } else {
-            deviation = ((lastPrice - price) * 10000) / lastPrice;
-        }
-        require(deviation <= priceDeviationThreshold, "E23: Price deviation too high");
-        
-        lastPrice = price;
-        lastPriceUpdateTime = block.timestamp;
-        lastPriceUpdateBlock = block.number;
-        emit PriceUpdated(price, block.timestamp);
         
         uint256 cost = (usdValue * 1e18) / price;
         require(cost > 0, "E21: Invalid cost");
@@ -680,6 +651,31 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);
         emit USDValueUpgraded(tokenId, zodiacType, lv, newLv, usdValue, cost, price, msg.sender, uint64(block.timestamp));
         return newLv;
+    }
+    
+    /**
+     * @dev 获取代币价格（优先从PriceOracle获取，支持FlapSwap等多DEX）
+     * 价格获取优先级：
+     * 1. PriceOracle（支持FlapSwap、PancakeSwap、Uniswap多DEX取平均）
+     * 2. PancakeSwap Pair（备用）
+     * @return uint256 代币价格（精度18位）
+     */
+    function _getTokenPrice() internal view returns (uint256) {
+        // 优先从PriceOracle获取价格（支持多DEX，包括FlapSwap内盘）
+        if (priceOracle != address(0)) {
+            try IPriceOracle(priceOracle).getTokenPrice() returns (uint256 price) {
+                if (price > 0 && IPriceOracle(priceOracle).isTokenPriceValid()) {
+                    return price;
+                }
+            } catch {}
+        }
+        
+        // 备用：从PancakeSwap Pair获取价格
+        if (pancakeSwapPair != address(0)) {
+            return getTokenPriceFromPancakeSwap();
+        }
+        
+        return 0;
     }
 
     /**
