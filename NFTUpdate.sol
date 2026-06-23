@@ -187,6 +187,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         tokenContract = auth.getToken();
         metadataContract = auth.getNFTData();
         dividendManager = auth.getDividendManager();
+        // 注意：pancakeSwapPair 需要单独通过 setPancakeSwapPair() 设置为 Pair 地址（非 Router）
+        // 因为 getTokenPriceFromPancakeSwap() 需要调用 Pair 的 getReserves()/token0()/token1()
     }
 
     /**
@@ -416,7 +418,10 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @return uint8 新等级
      */
     function upgradeWithNFT(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
+        require(nftContract != address(0), "NFTUpdate: NFT contract not set");
         require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
+        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
+        
         INFTMint nft = INFTMint(nftContract);
         require(nft.ownerOf(tokenId) == msg.sender, "E15");
         
@@ -576,10 +581,13 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @return uint8 新等级
      */
     function upgradeWithToken(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
+        require(nftContract != address(0), "NFTUpdate: NFT contract not set");
         require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
+        require(tokenContract != address(0), "E7: Token contract not set");
+        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
+        
         INFTMint nft = INFTMint(nftContract);
         require(nft.ownerOf(tokenId) == msg.sender, "E15: Not owner");
-        require(tokenContract != address(0), "E7: Token contract not set");
         
         INFTDataInterface m = INFTDataInterface(metadataContract);
         uint8 lv = m.tokenLevel(tokenId);
@@ -609,10 +617,14 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @return uint8 新等级
      */
     function upgradeWithUSDValue(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
+        require(nftContract != address(0), "NFTUpdate: NFT contract not set");
         require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
+        require(tokenContract != address(0), "NFTUpdate: Token contract not set");
+        require(pancakeSwapPair != address(0), "NFTUpdate: PancakeSwap pair not set");
+        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
+        
         INFTMint nft = INFTMint(nftContract);
         require(nft.ownerOf(tokenId) == msg.sender, "E15: Not owner");
-        require(tokenContract != address(0) && pancakeSwapPair != address(0), "E19: Missing contracts");
         
         INFTDataInterface m = INFTDataInterface(metadataContract);
         uint8 lv = m.tokenLevel(tokenId);

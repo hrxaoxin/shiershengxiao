@@ -768,7 +768,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
     }
     
-    function adminSetNFTLevel(uint256 tokenId, uint256 newLevel) external onlyOwner {
+    function adminSetNFTLevel(uint256 tokenId, uint256 newLevel) external onlyOwnerOrAuthorizer {
         require(_exists(tokenId), "NFTMint: Token not exists");
         require(newLevel >= 1 && newLevel <= 5, "NFTMint: Invalid level");
         tokenLevel[tokenId] = uint8(newLevel);
