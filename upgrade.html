@@ -354,11 +354,20 @@
         let nftUpdateContract;
 
         async function initContracts() {
-            nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
-            tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
-            nftUpdateContract = await window.ZODIAC_WEB3.getContract('nftUpdate');
-            await checkUSDUpgradeHidden();
-            await loadUpgradeCosts();
+            const [nft, token, nftUpdate] = await Promise.all([
+                window.ZODIAC_WEB3.getContract('nftMint'),
+                window.ZODIAC_WEB3.getContract('tokenContract'),
+                window.ZODIAC_WEB3.getContract('nftUpdate')
+            ]);
+            
+            nftContract = nft;
+            tokenContract = token;
+            nftUpdateContract = nftUpdate;
+            
+            await Promise.all([
+                checkUSDUpgradeHidden(),
+                loadUpgradeCosts()
+            ]);
         }
 
         async function loadUpgradeCosts() {
@@ -368,27 +377,25 @@
                     return;
                 }
                 
-                // 从合约读取代币升级费用
-                try {
-                    const level1Cost = await nftUpdateContract.methods.level1UpgradeCost().call();
-                    const level2Cost = await nftUpdateContract.methods.level2UpgradeCost().call();
-                    const level3Cost = await nftUpdateContract.methods.level3UpgradeCost().call();
-                    const level4Cost = await nftUpdateContract.methods.level4UpgradeCost().call();
-                    
-                    const cost1 = (parseInt(level1Cost) / 10**18).toLocaleString();
-                    const cost2 = (parseInt(level2Cost) / 10**18).toLocaleString();
-                    const cost3 = (parseInt(level3Cost) / 10**18).toLocaleString();
-                    const cost4 = (parseInt(level4Cost) / 10**18).toLocaleString();
-                    
-                    document.getElementById('tokenCost1').textContent = cost1;
-                    document.getElementById('tokenCost2').textContent = cost2;
-                    document.getElementById('tokenCost3').textContent = cost3;
-                    document.getElementById('tokenCost4').textContent = cost4;
-                    
-                    console.log('Upgrade costs loaded from contract:', { cost1, cost2, cost3, cost4 });
-                } catch (e) {
-                    console.error('Failed to load upgrade costs:', e);
-                }
+                // 并行读取所有升级费用
+                const [level1Cost, level2Cost, level3Cost, level4Cost] = await Promise.all([
+                    nftUpdateContract.methods.level1UpgradeCost().call(),
+                    nftUpdateContract.methods.level2UpgradeCost().call(),
+                    nftUpdateContract.methods.level3UpgradeCost().call(),
+                    nftUpdateContract.methods.level4UpgradeCost().call()
+                ]);
+                
+                const cost1 = (parseInt(level1Cost) / 10**18).toLocaleString();
+                const cost2 = (parseInt(level2Cost) / 10**18).toLocaleString();
+                const cost3 = (parseInt(level3Cost) / 10**18).toLocaleString();
+                const cost4 = (parseInt(level4Cost) / 10**18).toLocaleString();
+                
+                document.getElementById('tokenCost1').textContent = cost1;
+                document.getElementById('tokenCost2').textContent = cost2;
+                document.getElementById('tokenCost3').textContent = cost3;
+                document.getElementById('tokenCost4').textContent = cost4;
+                
+                console.log('Upgrade costs loaded from contract:', { cost1, cost2, cost3, cost4 });
             } catch (error) {
                 console.error('Load upgrade costs failed:', error);
             }
@@ -429,25 +436,15 @@
                     return;
                 }
 
-                const balance = await nftContract.methods.balanceOf(account).call();
-                const userNFTs = [];
-
-                for (let i = 0; i < balance; i++) {
-                    const tokenId = await nftContract.methods.tokenOfOwnerByIndex(account, i).call();
-                    const tokenType = await nftContract.methods.tokenType(tokenId).call();
-                    const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
-                    
-                    const nftInfo = window.ZODIAC_UTILS.getNFTInfo(tokenType);
-                    
-                    userNFTs.push({
-                        id: tokenId.toString(),
-                        type: tokenType.toString(),
-                        level: tokenLevel.toString(),
-                        name: nftInfo.name,
-                        image: nftInfo.imagePath
-                    });
+                const balance = parseInt(await nftContract.methods.balanceOf(account).call(), 10);
+                
+                if (balance === 0) {
+                    nftGrid.innerHTML = '<div class="col-span-full text-center py-12">你还没有NFT，去铸造页面创建一个吧！</div>';
+                    ZODIAC_UI.hideLoading();
+                    return;
                 }
 
+                const userNFTs = await loadNFTsParallel(balance);
                 renderNFTs(userNFTs);
             } catch (error) {
                 console.error('加载NFT失败:', error);
@@ -455,6 +452,44 @@
                 ZODIAC_UI.showToast('加载NFT失败: ' + error.message, 'error');
             }
             ZODIAC_UI.hideLoading();
+        }
+
+        async function loadNFTsParallel(balance) {
+            const BATCH_SIZE = 10;
+            const batches = [];
+            
+            for (let i = 0; i < balance; i += BATCH_SIZE) {
+                const end = Math.min(i + BATCH_SIZE, balance);
+                const batchPromises = [];
+                
+                for (let j = i; j < end; j++) {
+                    batchPromises.push(loadSingleNFT(j));
+                }
+                
+                batches.push(Promise.all(batchPromises));
+            }
+            
+            const results = await Promise.all(batches);
+            return results.flat();
+        }
+
+        async function loadSingleNFT(index) {
+            const tokenId = await nftContract.methods.tokenOfOwnerByIndex(account, index).call();
+            
+            const [tokenType, tokenLevel] = await Promise.all([
+                nftContract.methods.tokenType(tokenId).call(),
+                nftContract.methods.tokenLevel(tokenId).call()
+            ]);
+            
+            const nftInfo = window.ZODIAC_UTILS.getNFTInfo(tokenType);
+            
+            return {
+                id: tokenId.toString(),
+                type: tokenType.toString(),
+                level: tokenLevel.toString(),
+                name: nftInfo.name,
+                image: nftInfo.imagePath
+            };
         }
 
         function renderNFTs(nfts) {
