@@ -670,9 +670,20 @@
         async function handleUpgradeWithNFT() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
-            if (!nftContract) {
+            if (!nftContract || !nftUpdateContract) {
                 await ZODIAC_UI.showErrorModal('合约未初始化');
                 return;
+            }
+            
+            try {
+                const isPaused = await nftUpdateContract.methods.paused().call();
+                if (isPaused) {
+                    const reason = await nftUpdateContract.methods.pauseReason().call();
+                    await ZODIAC_UI.showErrorModal(`合约已暂停\n原因: ${reason || '未知'}`);
+                    return;
+                }
+            } catch (e) {
+                console.error('Failed to check contract paused status:', e);
             }
 
             const requiredNFTs = parseInt(selectedNft.level, 10);
@@ -738,9 +749,20 @@
         async function handleUpgradeWithToken() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
-            if (!tokenContract) {
+            if (!tokenContract || !nftUpdateContract) {
                 await ZODIAC_UI.showErrorModal('合约未初始化');
                 return;
+            }
+            
+            try {
+                const isPaused = await nftUpdateContract.methods.paused().call();
+                if (isPaused) {
+                    const reason = await nftUpdateContract.methods.pauseReason().call();
+                    await ZODIAC_UI.showErrorModal(`合约已暂停\n原因: ${reason || '未知'}`);
+                    return;
+                }
+            } catch (e) {
+                console.error('Failed to check contract paused status:', e);
             }
 
             const requiredTokens = await getRequiredTokens(selectedNft.level);
@@ -797,6 +819,21 @@
         async function handleUpgradeWithUSDValue() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
+            if (!nftUpdateContract) {
+                await ZODIAC_UI.showErrorModal('合约未初始化');
+                return;
+            }
+            
+            try {
+                const isPaused = await nftUpdateContract.methods.paused().call();
+                if (isPaused) {
+                    const reason = await nftUpdateContract.methods.pauseReason().call();
+                    await ZODIAC_UI.showErrorModal(`合约已暂停\n原因: ${reason || '未知'}`);
+                    return;
+                }
+            } catch (e) {
+                console.error('Failed to check contract paused status:', e);
+            }
 
             const requiredUSD = getUSDValue(selectedNft.level);
             
