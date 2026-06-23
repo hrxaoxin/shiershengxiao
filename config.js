@@ -155,7 +155,7 @@ window.ZODIAC_CONFIG = (function() {
         nftMintCore: getEnvContractAddress('nftMintCore', '0x3648Dd17DD1170FEC42D2BE05CA86E98D5D97d3c'),
         nftMint: getEnvContractAddress('nftMint', '0x3648Dd17DD1170FEC42D2BE05CA86E98D5D97d3c'),
         nftMintMetadata: getEnvContractAddress('nftMintMetadata', '0xf03215F849a0a665f5eCa46c2904553a42b4b1c6'),
-        nftUpdate: getEnvContractAddress('nftUpdate', '0x19619283F925Da8cd2796Ec8710C4C0fc1B78605'),
+        nftUpdate: getEnvContractAddress('nftUpdate', '0x0F617Cdb57E10DA596cA8D125C1fEE804C044BA0'),
         nftData: getEnvContractAddress('nftData', '0x5f61e3Eba2beECE1A34572bEac7F1748FAb5a0e8'),
         nftTrading: getEnvContractAddress('nftTrading', '0x01023a601053fFDEE23546A132F8cd09AAf1deA6'),
         nftBuyback: getEnvContractAddress('nftBuyback', '0x97d71e490ab4960F4692E52164533a98a4094291'),
@@ -3960,6 +3960,25 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"indexed": false,
+				"internalType": "uint8",
+				"name": "level",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "cost",
+				"type": "uint256"
+			}
+		],
+		"name": "USDUpgradeCostChanged",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
 				"internalType": "bool",
 				"name": "hidden",
 				"type": "bool"
@@ -4193,6 +4212,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "getAllLevelUSDUpgradeCosts",
+		"outputs": [
+			{
+				"internalType": "uint256[4]",
+				"name": "",
+				"type": "uint256[4]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "getAllLevelUpgradeCosts",
 		"outputs": [
 			{
@@ -4276,7 +4308,33 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "level1USDUpgradeCost",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "level1UpgradeCost",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "level2USDUpgradeCost",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -4302,7 +4360,33 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "level3USDUpgradeCost",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "level3UpgradeCost",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "level4USDUpgradeCost",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -4543,6 +4627,19 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256[4]"
 			}
 		],
+		"name": "setAllLevelUSDUpgradeCosts",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256[4]",
+				"name": "costs",
+				"type": "uint256[4]"
+			}
+		],
 		"name": "setAllLevelUpgradeCosts",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -4569,7 +4666,33 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			}
 		],
+		"name": "setLevel1USDUpgradeCost",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "cost",
+				"type": "uint256"
+			}
+		],
 		"name": "setLevel1UpgradeCost",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "cost",
+				"type": "uint256"
+			}
+		],
+		"name": "setLevel2USDUpgradeCost",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -4595,7 +4718,33 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			}
 		],
+		"name": "setLevel3USDUpgradeCost",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "cost",
+				"type": "uint256"
+			}
+		],
 		"name": "setLevel3UpgradeCost",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "cost",
+				"type": "uint256"
+			}
+		],
+		"name": "setLevel4USDUpgradeCost",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
