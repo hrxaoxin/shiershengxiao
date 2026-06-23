@@ -529,16 +529,73 @@
             const requiredTokens = level < 5 ? await getRequiredTokens(level) : 0;
             const requiredNFTs = level < 5 ? parseInt(level, 10) : 0;
             
+            let nftInfo = {};
+            let isRare = false;
+            let growth = 0;
+            let sameTypeCount = 0;
+            let sameLevelCount = 0;
+            
+            try {
+                nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
+                isRare = await nftContract.methods.isRare(id).call();
+                growth = parseInt(await nftContract.methods.tokenGrowth(id).call(), 10);
+                
+                if (nftContract && account) {
+                    const userTokens = await nftContract.methods.getTokenIdsByOwner(account).call();
+                    for (const tid of userTokens) {
+                        const tType = await nftContract.methods.tokenType(tid).call();
+                        if (tType === type.toString()) {
+                            sameTypeCount++;
+                            const tLevel = await nftContract.methods.tokenLevel(tid).call();
+                            if (tLevel === level.toString()) {
+                                sameLevelCount++;
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to load NFT details:', e);
+            }
+            
+            const rarityText = isRare ? '稀有' : '普通';
+            const rarityColor = isRare ? 'text-purple-600' : 'text-gray-600';
+            const rarityBg = isRare ? 'bg-purple-100' : 'bg-gray-100';
+            const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+            const zodiacName = nftInfo.zodiac !== undefined ? (ZODIAC_CONFIG && ZODIAC_CONFIG.ZODIAC_NAMES ? ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac] : zodiacNames[nftInfo.zodiac]) : '未知';
+            
+            const hasEnoughNFTs = sameLevelCount >= (parseInt(level, 10) + 1);
+            const nftStatusColor = hasEnoughNFTs ? 'text-green-600' : 'text-red-600';
+            const nftStatusText = hasEnoughNFTs ? '✅ 数量充足' : `❌ 需要 ${parseInt(level, 10) + 1} 张，当前 ${sameLevelCount} 张`;
+            
             selectedNftInfo.innerHTML = `
                 <div class="flex items-center gap-4 mb-4">
-                    <img src="${image}" alt="${name}" class="w-20 h-20 object-contain">
-                    <div>
-                        <h4 class="text-lg font-bold">${name}</h4>
-                        <p class="text-gray-600">等级: ${getStars(level)}</p>
-                        <p class="text-gray-600">ID: ${id}</p>
-                        ${level < 5 ? `<p class="text-green-600 font-medium">可升级到 ${getStars(level + 1)}</p>` : `<p class="text-red-600 font-medium">已达到最高等级</p>`}
+                    <img src="${image}" alt="${name}" class="w-20 h-20 object-contain rounded-lg shadow-md">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <h4 class="text-lg font-bold">${name}</h4>
+                            <span class="text-xs font-bold px-2 py-0.5 rounded ${rarityBg} ${rarityColor}">${rarityText}</span>
+                        </div>
+                        <p class="text-gray-600 text-sm">${nftInfo.attrName || '未知'}·${zodiacName}·${nftInfo.genderName || '未知'}</p>
+                        <div class="flex gap-4 mt-2 text-sm">
+                            <span>等级: ${getStars(level)}</span>
+                            <span>ID: ${id}</span>
+                            <span>成长: ${growth}</span>
+                        </div>
+                        ${level < 5 ? `<p class="text-green-600 font-medium mt-1">可升级到 ${getStars(level + 1)}</p>` : `<p class="text-red-600 font-medium mt-1">已达到最高等级</p>`}
                     </div>
                 </div>
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="p-3 bg-blue-50 rounded-lg">
+                        <div class="text-xs text-gray-500 mb-1">同类型NFT数量</div>
+                        <div class="font-bold text-blue-600">${sameTypeCount} 张</div>
+                    </div>
+                    <div class="p-3 bg-purple-50 rounded-lg">
+                        <div class="text-xs text-gray-500 mb-1">同级NFT数量</div>
+                        <div class="font-bold text-purple-600">${sameLevelCount} 张</div>
+                    </div>
+                </div>
+                
                 ${level < 5 ? `
                 <div id="upgradeCostPreview" class="p-4 bg-blue-50 rounded-lg">
                     <div class="text-sm text-blue-600 font-medium mb-2">📈 升级费用预览</div>
@@ -546,11 +603,16 @@
                         <div>
                             <span class="text-xs text-gray-500">使用NFT升级</span>
                             <p class="text-lg font-bold text-gray-800">${requiredNFTs} 张相同类型NFT</p>
+                            <p class="text-xs ${nftStatusColor} mt-1">${nftStatusText}</p>
                         </div>
                         <div>
                             <span class="text-xs text-gray-500">使用代币升级</span>
                             <p class="text-lg font-bold text-gray-800">${requiredTokens.toLocaleString()} Token</p>
+                            <p class="text-xs text-gray-400 mt-1">代币将被销毁</p>
                         </div>
+                    </div>
+                    <div class="mt-3 p-3 bg-yellow-50 rounded-lg">
+                        <p class="text-xs text-yellow-700">💡 <strong>NFT升阶要求：</strong>升级到${getStars(level + 1)}需要消耗${requiredNFTs}张同类型同级NFT（总共需要${parseInt(level, 10) + 1}张）</p>
                     </div>
                 </div>
                 ` : ''}
@@ -582,12 +644,34 @@
         async function handleUpgradeWithNFT() {
             if (!selectedNft) return;
             if (selectedNft.level >= 5) return;
-            if (!nftUpdateContract) {
+            if (!nftUpdateContract || !nftContract) {
                 await ZODIAC_UI.showErrorModal('合约未初始化');
                 return;
             }
 
             const requiredNFTs = parseInt(selectedNft.level, 10);
+            
+            try {
+                const userTokens = await nftContract.methods.getTokenIdsByOwner(account).call();
+                let sameLevelCount = 0;
+                for (const tid of userTokens) {
+                    const tType = await nftContract.methods.tokenType(tid).call();
+                    if (tType === selectedNft.type.toString()) {
+                        const tLevel = await nftContract.methods.tokenLevel(tid).call();
+                        if (tLevel === selectedNft.level.toString()) {
+                            sameLevelCount++;
+                        }
+                    }
+                }
+                
+                if (sameLevelCount < requiredNFTs + 1) {
+                    await ZODIAC_UI.showErrorModal(`NFT数量不足！\n需要 ${requiredNFTs + 1} 张同类型同级NFT（升级的1张 + 消耗的${requiredNFTs}张），当前只有 ${sameLevelCount} 张`);
+                    return;
+                }
+            } catch (e) {
+                console.error('Failed to check NFT count:', e);
+            }
+
             const confirmed = await ZODIAC_UI.showConfirmModal(
                 '升级确认',
                 `确认使用NFT升阶？\n\nNFT ID: ${selectedNft.id}\n当前等级: ${selectedNft.level} → ${selectedNft.level + 1}\n将消耗 ${requiredNFTs} 张相同类型的NFT`
@@ -597,6 +681,12 @@
 
             try {
                 ZODIAC_UI.showLoading('升级中...');
+                
+                const isApproved = await nftContract.methods.isApprovedForAll(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
+                if (!isApproved) {
+                    await ZODIAC_WEB3.approveNFT(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate);
+                }
+                
                 const result = await ZODIAC_WEB3.upgradeWithNFT(selectedNft.id);
                 ZODIAC_UI.hideLoading();
                 await ZODIAC_UI.showSuccessModal('升级成功！', `NFT ID ${selectedNft.id} 已升级到 ${selectedNft.level + 1} 级`);
