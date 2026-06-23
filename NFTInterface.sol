@@ -670,6 +670,36 @@ interface IAuthorizer {
      * @return 是否是系统合约
      */
     function isSystemContract(address addr) external view returns (bool);
+    
+    /**
+     * @dev 从特定DEX赎回LP
+     * @param lpAmount LP数量
+     * @param dexType DEX类型（0=FlapSwap, 1=PancakeSwap, 2=Uniswap）
+     * @return tokenAmount 代币数量, wbnbAmount WBNB数量
+     */
+    function redeemLPFromDEX(uint256 lpAmount, uint8 dexType) external returns (uint256, uint256);
+    
+    /**
+     * @dev 将代币+WBNB转换为特定DEX的LP
+     * @param tokenAmount 代币数量
+     * @param wbnbAmount WBNB数量
+     * @param dexType DEX类型
+     * @return LP数量
+     */
+    function convertToLP(uint256 tokenAmount, uint256 wbnbAmount, uint8 dexType) external returns (uint256);
+    
+    /**
+     * @dev 自动赎回所有LP（尝试所有DEX）
+     * @return tokenAmount 代币数量, wbnbAmount WBNB数量
+     */
+    function redeemAllLP() external returns (uint256, uint256);
+    
+    /**
+     * @dev 获取特定DEX上的LP余额
+     * @param dexType DEX类型
+     * @return LP余额
+     */
+    function getLPBalanceOnDEX(uint8 dexType) external view returns (uint256);
 }
 
 /**

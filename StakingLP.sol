@@ -108,6 +108,10 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     event DailyRewardCalculated(uint256 dailyReward, uint256 increment);
     /** @dev 奖励率更新事件 */
     event RewardRateUpdated(uint256 rewardRate);
+    /** @dev LP迁移事件 */
+    event LPMigrated(uint8 oldDexType, uint8 newDexType, uint256 oldLPAmount, uint256 newLPAmount);
+    /** @dev 紧急赎回LP事件 */
+    event EmergencyLPRedeemed(uint256 tokenAmount, uint256 wbnbAmount);
 
     /**
      * @dev 构造函数：禁用初始化器
@@ -499,6 +503,87 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     function emergencyWithdrawWBNB(uint256 amount) external onlyOwner nonReentrant {
         IAuthorizer(authorizer).emergencyWithdrawWBNB(amount);
         emit EmergencyWBNBWithdrawn(msg.sender, owner(), amount);
+    }
+
+    /**
+     * @dev LP迁移：将旧DEX的LP转换为新DEX的LP（用于FlapSwap迁移到PancakeSwap等场景）
+     * 步骤：
+     * 1. 从旧DEX赎回LP获得代币+WBNB
+     * 2. 使用代币+WBNB在新DEX创建新LP
+     * @param oldDexType 旧DEX类型（0=FlapSwap, 1=PancakeSwap, 2=Uniswap）
+     * @param newDexType 新DEX类型（0=FlapSwap, 1=PancakeSwap, 2=Uniswap）
+     * @param lpAmount 要迁移的LP数量
+     * @return 新DEX的LP数量
+     */
+    function migrateLP(uint8 oldDexType, uint8 newDexType, uint256 lpAmount) external onlyOwner nonReentrant whenNotPaused returns (uint256) {
+        require(oldDexType != newDexType, "StakingLP: Same DEX type");
+        require(lpAmount > 0, "StakingLP: Amount must be > 0");
+        require(lpAmount <= lpRewardPoolBalance, "StakingLP: Insufficient LP");
+
+        uint256 tokenAmount;
+        uint256 wbnbAmount;
+        
+        (tokenAmount, wbnbAmount) = IAuthorizer(authorizer).redeemLPFromDEX(lpAmount, oldDexType);
+        
+        require(tokenAmount > 0 || wbnbAmount > 0, "StakingLP: Failed to redeem old LP");
+
+        uint256 newLPAmount = IAuthorizer(authorizer).convertToLP(tokenAmount, wbnbAmount, newDexType);
+        
+        require(newLPAmount > 0, "StakingLP: Failed to create new LP");
+
+        lpRewardPoolBalance -= lpAmount;
+        lpRewardPoolBalance += newLPAmount;
+        
+        emit LPMigrated(oldDexType, newDexType, lpAmount, newLPAmount);
+        return newLPAmount;
+    }
+
+    /**
+     * @dev 批量迁移所有LP到新DEX
+     * @param oldDexType 旧DEX类型
+     * @param newDexType 新DEX类型
+     * @return 迁移后的新LP数量
+     */
+    function migrateAllLP(uint8 oldDexType, uint8 newDexType) external onlyOwner nonReentrant whenNotPaused returns (uint256) {
+        require(oldDexType != newDexType, "StakingLP: Same DEX type");
+        
+        if (lpRewardPoolBalance == 0) {
+            return 0;
+        }
+        
+        return migrateLP(oldDexType, newDexType, lpRewardPoolBalance);
+    }
+
+    /**
+     * @dev 紧急赎回所有LP为代币+WBNB（在DEX池子关闭前使用）
+     * 将所有LP奖励池转换为代币和WBNB，用户领取时直接获得代币/WBNB
+     */
+    function emergencyRedeemAllLP() external onlyOwner nonReentrant whenNotPaused {
+        if (lpRewardPoolBalance == 0) {
+            return;
+        }
+
+        uint256 tokenAmount;
+        uint256 wbnbAmount;
+        
+        (tokenAmount, wbnbAmount) = IAuthorizer(authorizer).redeemAllLP();
+        
+        lpRewardPoolBalance = 0;
+        tokenRewardPoolBalance += tokenAmount;
+        bnbRewardPoolBalance += wbnbAmount;
+        
+        rewardType = RewardType.TOKEN;
+        
+        emit EmergencyLPRedeemed(tokenAmount, wbnbAmount);
+    }
+
+    /**
+     * @dev 检查特定DEX的LP余额
+     * @param dexType DEX类型
+     * @return LP余额
+     */
+    function checkLPBalanceOnDEX(uint8 dexType) external view returns (uint256) {
+        return IAuthorizer(authorizer).getLPBalanceOnDEX(dexType);
     }
 
     /**
