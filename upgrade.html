@@ -671,7 +671,7 @@
             if (!selectedNft) return;
             if (parseInt(selectedNft.level) >= 5) return;
             if (!nftContract || !nftUpdateContract || !account) {
-                await ZODIAC_UI.showErrorModal('合约未初始化');
+                ZODIAC_UI.showToast('合约未初始化', 'error');
                 return;
             }
             
@@ -680,7 +680,7 @@
                 const isPaused = await nftUpdateContract.methods.paused().call();
                 if (isPaused) {
                     const reason = await nftUpdateContract.methods.pauseReason().call();
-                    await ZODIAC_UI.showErrorModal('合约已暂停\n原因: ' + (reason || '未知'));
+                    ZODIAC_UI.showToast('合约已暂停: ' + (reason || '未知'), 'error');
                     return;
                 }
             } catch (e) {
@@ -705,7 +705,7 @@
                 }
                 
                 if (sameLevelCount < requiredNFTs + 1) {
-                    await ZODIAC_UI.showErrorModal('NFT数量不足！\n需要 ' + (requiredNFTs + 1) + ' 张同类型同级NFT（升级的1张 + 消耗的' + requiredNFTs + '张），当前只有 ' + sameLevelCount + ' 张');
+                    ZODIAC_UI.showToast('NFT数量不足！需要 ' + (requiredNFTs + 1) + ' 张同类型同级NFT', 'error');
                     return;
                 }
             } catch (e) {
@@ -722,11 +722,11 @@
             try {
                 ZODIAC_UI.showLoading('检查授权...');
                 
-                // 检查NFT授权
+                // 检查NFT授权 - 直接调用合约
                 const isApproved = await nftContract.methods.isApprovedForAll(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
                 if (!isApproved) {
                     ZODIAC_UI.showLoading('请求授权...');
-                    await window.ZODIAC_WEB3.approveNFT(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate);
+                    await nftContract.methods.setApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, true).send({ from: account, gas: 100000 });
                 }
                 
                 ZODIAC_UI.showLoading('升级中，请确认钱包交易...');
@@ -742,7 +742,7 @@
                 userNFTsCache = null;
                 selectedNft = null;
                 document.getElementById('upgradeSection').classList.add('hidden');
-                await ZODIAC_UI.showSuccessModal('升级成功！', 'NFT ID ' + nftId + ' 已升级到 ' + newLevel + ' 级');
+                ZODIAC_UI.showToast('升级成功！NFT ID ' + nftId + ' 已升级到 ' + newLevel + ' 级', 'success');
                 await loadUserNFTs();
             } catch (error) {
                 ZODIAC_UI.hideLoading();
@@ -751,7 +751,7 @@
                 if (errorMsg.includes('User denied') || errorMsg.includes('user rejected')) {
                     errorMsg = '用户取消了交易';
                 }
-                await ZODIAC_UI.showErrorModal('升级失败: ' + errorMsg);
+                ZODIAC_UI.showToast('升级失败: ' + errorMsg, 'error');
             }
         }
 
@@ -759,7 +759,7 @@
             if (!selectedNft) return;
             if (parseInt(selectedNft.level) >= 5) return;
             if (!tokenContract || !nftUpdateContract || !account) {
-                await ZODIAC_UI.showErrorModal('合约未初始化');
+                ZODIAC_UI.showToast('合约未初始化', 'error');
                 return;
             }
             
@@ -768,7 +768,7 @@
                 const isPaused = await nftUpdateContract.methods.paused().call();
                 if (isPaused) {
                     const reason = await nftUpdateContract.methods.pauseReason().call();
-                    await ZODIAC_UI.showErrorModal('合约已暂停\n原因: ' + (reason || '未知'));
+                    ZODIAC_UI.showToast('合约已暂停: ' + (reason || '未知'), 'error');
                     return;
                 }
             } catch (e) {
@@ -783,7 +783,7 @@
                 const balance = await tokenContract.methods.balanceOf(account).call();
                 const requiredWei = web3.utils.toWei(requiredTokens.toString(), 'ether');
                 if (BigInt(balance) < BigInt(requiredWei)) {
-                    await ZODIAC_UI.showErrorModal('代币余额不足！\n需要 ' + requiredTokens.toLocaleString() + ' 枚代币');
+                    ZODIAC_UI.showToast('代币余额不足！需要 ' + requiredTokens.toLocaleString() + ' 枚代币', 'error');
                     return;
                 }
             } catch (e) {
@@ -800,12 +800,12 @@
             try {
                 ZODIAC_UI.showLoading('检查授权...');
                 
-                // 检查代币授权
+                // 检查代币授权 - 直接调用合约
                 const requiredTokensWei = web3.utils.toWei(requiredTokens.toString(), 'ether');
                 const allowance = await tokenContract.methods.allowance(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
                 if (BigInt(allowance) < BigInt(requiredTokensWei)) {
                     ZODIAC_UI.showLoading('请求授权...');
-                    await window.ZODIAC_WEB3.approveToken(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, requiredTokensWei);
+                    await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, requiredTokensWei).send({ from: account, gas: 100000 });
                 }
                 
                 ZODIAC_UI.showLoading('升级中，请确认钱包交易...');
@@ -821,7 +821,7 @@
                 userNFTsCache = null;
                 selectedNft = null;
                 document.getElementById('upgradeSection').classList.add('hidden');
-                await ZODIAC_UI.showSuccessModal('升级成功！', 'NFT ID ' + nftId + ' 已升级到 ' + newLevel + ' 级');
+                ZODIAC_UI.showToast('升级成功！NFT ID ' + nftId + ' 已升级到 ' + newLevel + ' 级', 'success');
                 await loadUserNFTs();
             } catch (error) {
                 ZODIAC_UI.hideLoading();
@@ -830,7 +830,7 @@
                 if (errorMsg.includes('User denied') || errorMsg.includes('user rejected')) {
                     errorMsg = '用户取消了交易';
                 }
-                await ZODIAC_UI.showErrorModal('升级失败: ' + errorMsg);
+                ZODIAC_UI.showToast('升级失败: ' + errorMsg, 'error');
             }
         }
 
@@ -838,7 +838,7 @@
             if (!selectedNft) return;
             if (parseInt(selectedNft.level) >= 5) return;
             if (!nftUpdateContract || !account) {
-                await ZODIAC_UI.showErrorModal('合约未初始化');
+                ZODIAC_UI.showToast('合约未初始化', 'error');
                 return;
             }
             
@@ -847,7 +847,7 @@
                 const isPaused = await nftUpdateContract.methods.paused().call();
                 if (isPaused) {
                     const reason = await nftUpdateContract.methods.pauseReason().call();
-                    await ZODIAC_UI.showErrorModal('合约已暂停\n原因: ' + (reason || '未知'));
+                    ZODIAC_UI.showToast('合约已暂停: ' + (reason || '未知'), 'error');
                     return;
                 }
             } catch (e) {
@@ -861,7 +861,7 @@
             try {
                 const isPriceValid = await window.ZODIAC_WEB3.isTokenPriceValid();
                 if (!isPriceValid) {
-                    await ZODIAC_UI.showErrorModal('价格数据过期，请稍后重试');
+                    ZODIAC_UI.showToast('价格数据过期，请稍后重试', 'error');
                     return;
                 }
             } catch (e) {
@@ -884,7 +884,7 @@
                     const maxAllowance = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
                     if (BigInt(allowance) < BigInt(maxAllowance)) {
                         ZODIAC_UI.showLoading('请求授权...');
-                        await window.ZODIAC_WEB3.approveToken(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, maxAllowance);
+                        await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, maxAllowance).send({ from: account, gas: 100000 });
                     }
                 }
                 
@@ -901,7 +901,7 @@
                 userNFTsCache = null;
                 selectedNft = null;
                 document.getElementById('upgradeSection').classList.add('hidden');
-                await ZODIAC_UI.showSuccessModal('升级成功！', 'NFT ID ' + nftId + ' 已升级到 ' + newLevel + ' 级');
+                ZODIAC_UI.showToast('升级成功！NFT ID ' + nftId + ' 已升级到 ' + newLevel + ' 级', 'success');
                 await loadUserNFTs();
             } catch (error) {
                 ZODIAC_UI.hideLoading();
@@ -910,7 +910,7 @@
                 if (errorMsg.includes('User denied') || errorMsg.includes('user rejected')) {
                     errorMsg = '用户取消了交易';
                 }
-                await ZODIAC_UI.showErrorModal('升级失败: ' + errorMsg);
+                ZODIAC_UI.showToast('升级失败: ' + errorMsg, 'error');
             }
         }
 
