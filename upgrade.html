@@ -379,14 +379,20 @@
                     return;
                 }
                 
-                // 并行读取所有升级费用
-                const [level1Cost, level2Cost, level3Cost, level4Cost] = await Promise.all([
+                // 并行读取所有升级费用（代币费用 + USD费用）
+                const [level1Cost, level2Cost, level3Cost, level4Cost,
+                       usdCost1, usdCost2, usdCost3, usdCost4] = await Promise.all([
                     nftUpdateContract.methods.level1UpgradeCost().call(),
                     nftUpdateContract.methods.level2UpgradeCost().call(),
                     nftUpdateContract.methods.level3UpgradeCost().call(),
-                    nftUpdateContract.methods.level4UpgradeCost().call()
+                    nftUpdateContract.methods.level4UpgradeCost().call(),
+                    nftUpdateContract.methods.level1USDUpgradeCost().call(),
+                    nftUpdateContract.methods.level2USDUpgradeCost().call(),
+                    nftUpdateContract.methods.level3USDUpgradeCost().call(),
+                    nftUpdateContract.methods.level4USDUpgradeCost().call()
                 ]);
                 
+                // 更新代币升级费用显示
                 const cost1 = (parseInt(level1Cost) / 10**18).toLocaleString();
                 const cost2 = (parseInt(level2Cost) / 10**18).toLocaleString();
                 const cost3 = (parseInt(level3Cost) / 10**18).toLocaleString();
@@ -397,7 +403,18 @@
                 document.getElementById('tokenCost3').textContent = cost3;
                 document.getElementById('tokenCost4').textContent = cost4;
                 
-                console.log('Upgrade costs loaded from contract:', { cost1, cost2, cost3, cost4 });
+                // 更新USD价值升级费用显示
+                const usd1 = (parseInt(usdCost1) / 10**18).toLocaleString();
+                const usd2 = (parseInt(usdCost2) / 10**18).toLocaleString();
+                const usd3 = (parseInt(usdCost3) / 10**18).toLocaleString();
+                const usd4 = (parseInt(usdCost4) / 10**18).toLocaleString();
+                
+                document.getElementById('usdCost1').textContent = usd1;
+                document.getElementById('usdCost2').textContent = usd2;
+                document.getElementById('usdCost3').textContent = usd3;
+                document.getElementById('usdCost4').textContent = usd4;
+                
+                console.log('Upgrade costs loaded from contract:', { cost1, cost2, cost3, cost4, usd1, usd2, usd3, usd4 });
             } catch (error) {
                 console.error('Load upgrade costs failed:', error);
             }
