@@ -664,7 +664,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     
     /**
      * @dev 公开函数：获取所有DEX的价格（供前端展示）
-     * @return prices 价格数组（索引0=FlapSwap, 1=PancakeSwap, 2=Uniswap）
+     * @return prices 价格数组（索引0=FlapSwap, 1=PancakeSwap）
      * @return lowestPrice 最低价格
      * @return bestDEX 最佳DEX索引
      */

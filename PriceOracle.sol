@@ -8,175 +8,77 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "./NFTInterface.sol";
 import "./PriceLibrary.sol";
 
-/**
- * @title PriceOracle
- * @dev 价格预言机合约，提供代币和ETH的USD价格查询
- *
- * 核心功能：
- * 1. 代币USD价格管理：存储和更新代币相对USD的价格
- * 2. ETH/BNB USD价格管理：存储和更新原生代币的USD价格
- * 3. 价值换算：代币数量与USDT数量的换算
- * 4. 多DEX价格抓取：从 FlapSwap、PancakeSwap、Uniswap 读取价格并取平均
- *
- * 价格精度体系：
- * - 代币价格（tokenPriceUSD）：18位精度，表示 1 token = X USD（X 10^18）
- * - ETH价格（ethPriceUSD）：18位精度，表示 1 ETH = X USD
- * - TOKEN_PRECISION = 10^18（代币数量精度）
- * - USDT_PRECISION = 10^6（USDT数量精度）
- *
- * 价格更新方式（三种模式，从高信任到低信任）：
- * 1. 提议-执行两阶段（proposeTokenPrice 和 executePendingTokenPrice）：
- *    - Owner 先提议新价格，等待 priceUpdateCooldown（默认5分钟）后执行
- *    - 价格变动不得超过 maxPriceChangePercent（默认50%）
- *    - 防止 Owner 瞬间大幅篡改价格
- * 2. 授权合约直接更新（updateTokenPrice / updatePrices）：
- *    - 由 authorizer 授权的可信合约（如 Chainlink 集成或官方喂价机器人）直接设置
- *    - 变动同样受 maxPriceChangePercent 限制
- * 3. DEX 自动抓取（fetchPriceFromDEX / fetchPriceFromAllDEX）：
- *    - 通过 UniswapV2 风格的 pair 获取现货价格
- *    - fetchPriceFromAllDEX 从多个 DEX 取平均，减少单个 DEX 被操纵的影响
- *    - 需要 autoPriceEnabled = true
- *
- * 价格有效性检查：
- * - priceValidityPeriod（默认24小时）：价格更新后超过此时间视为失效
- * - isTokenPriceValid() / isETHPriceValid() / isPriceValid() 供外部检查
- *
- * 价格历史记录：
- * - 使用环形缓冲区（priceHistory / priceHistoryStartIndex），最多 MAX_HISTORY_LENGTH = 100 条
- * - 通过 getPriceHistory() / getLastNPrices() / getLatestPriceRecord() 查询
- *
- * 依赖的外部合约：
- * - IDEXRouter（UniswapV2 风格）：通过 getAmountsOut 获取价格
- *   - 路径：token → WBNB → USDT 用于代币价格
- *   - 路径：WBNB → USDT 用于 ETH/BNB 价格
- * - tokenContract：需正确设置以识别代币
- * - usdtContract：需正确设置以识别 USDT
- *
- * 典型业务调用场景：
- * - NFTUpdate.sol：升级费用 = tokenAmount × tokenPriceUSD（把代币换算成USD价值验证）
- * - NFTTrading.sol：可选择用 BNB 价格作为 NFT 挂牌价的参考
- * - RewardManager.sol：用 USD 价值评估奖励金额
- *
- * 安全考虑：
- * - 价格更新冷却期（priceUpdateCooldown）：防止高频恶意更新
- * - 价格变更幅度限制（maxPriceChangePercent）：防止单次价格剧烈变动
- * - 重入保护：防止价格更新时的外部调用攻击
- * - 暂停机制：可在被操纵时暂停自动喂价
- * - UUPS 可升级：未来可替换为 Chainlink 喂价或更高级算法
- *
- * 注意：本价格预言机仅用于游戏内部经济计算，不保证与真实市场价格完全一致。
- * 主网部署时建议结合 Chainlink 或多签验证机制以增强安全性。
- */
 contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
-    /**
-     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
-     */
+    address public constant PANCAKE_SWAP_ROUTER = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
+    address public constant WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+    address public constant USDT = 0x55d398326f99059fF775485246999027B3197955;
+
     constructor() {
         _disableInitializers();
     }
 
-    /**
-     * @dev 价格历史记录结构体
-     */
-    struct PriceRecord {
-        uint256 tokenPriceUSD;
-        uint256 ethPriceUSD;
-        uint256 timestamp;
-        address updater;
-    }
-
-    /**
-     * @dev 价格历史记录数组
-     */
-    PriceRecord[] public priceHistory;
-    uint256 public priceHistoryStartIndex;
-
-    /**
-     * @dev 价格历史记录最大长度
-     */
-    uint256 public constant MAX_HISTORY_LENGTH = 100;
-
-    /**
-     * @dev 价格更新冷却时间（秒）
-     */
-    uint256 public constant PRICE_UPDATE_COOLDOWN = 3600;
-
-    /**
-     * @dev 最大价格变动百分比（基数10000，例如 1000 = 10%）
-     */
-    uint256 public constant MAX_PRICE_CHANGE_PERCENT = 5000;
-
-    /**
-     * @dev 授权合约地址（Authorizer）
-     */
     address public authorizer;
 
     bool public paused;
     string public pauseReason;
-    
+
     event Paused(address account, string reason);
     event Unpaused(address account);
-    
+
+    uint256 public tokenPriceUSD;
+    uint256 public tokenPriceUpdatedAt;
+    uint256 public ethPriceUSD;
+    uint256 public ethPriceUpdatedAt;
+    uint256 public priceValidityPeriod = 86400;
+
+    address public flapSwapPair_WBNB;
+    address public pancakeSwapPair_WBNB;
+    address public wbnbUsdtPair;
+
+    bool public autoPriceEnabled;
+    uint256 public maxPriceChangePercent;
+    uint256 public priceUpdateCooldown;
+
+    event PriceUpdated(uint256 tokenPriceUSD, uint256 ethPriceUSD, address updater);
+    event PairAddressSet(uint8 dexType, address pair);
+
     function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "PriceOracle: Invalid authorizer address");
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
-        
-        // 初始化带默认值的参数
+
         priceValidityPeriod = 86400;
         autoPriceEnabled = true;
         maxPriceChangePercent = 5000;
         priceUpdateCooldown = 5 minutes;
     }
-    
-    /**
-     * @dev 暂停合约，停止所有价格更新操作
-     * 仅合约所有者可调用，用于紧急情况下暂停服务
-     * @param reason 暂停原因，将被记录在事件日志中
-     */
+
     function pause(string memory reason) external onlyOwner {
         paused = true;
         pauseReason = reason;
         emit Paused(msg.sender, reason);
     }
-    
-    /**
-     * @dev 取消合约暂停，恢复价格更新操作
-     * 仅合约所有者可调用
-     */
+
     function unpause() external onlyOwner {
         paused = false;
         pauseReason = "";
         emit Unpaused(msg.sender);
     }
-    
-    /**
-     * @dev 暂停修饰器：确保合约未处于暂停状态时才能执行函数
-     */
+
     modifier whenNotPaused() {
         require(!paused, "PriceOracle: Paused");
         _;
     }
 
-    /**
-     * @dev UUPS升级授权
-     */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    /**
-     * @dev 设置授权合约地址
-     * @param _authorizerAddress 授权合约地址
-     */
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "PriceOracle: Invalid authorizer address");
         authorizer = _authorizerAddress;
     }
 
-    /**
-     * @dev 检查是否为授权调用者（owner或authorizer）
-     */
     modifier onlyOwnerOrAuthorizer() {
         if (msg.sender == owner() || msg.sender == authorizer) {
             _;
@@ -187,800 +89,232 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _;
     }
 
-    /**
-     * @dev 代币的USD价格（精度18位）
-     *
-     * 例如：0.1 = 0.1 * 10^18
-     */
-    uint256 public tokenPriceUSD;
-
-    /**
-     * @dev 代币价格更新时间（秒）
-     */
-    uint256 public tokenPriceUpdatedAt;
-
-    /**
-     * @dev ETH的USD价格（精度18位）
-     *
-     * 例如：2000 = 2000 * 10^18
-     */
-    uint256 public ethPriceUSD;
-
-    /**
-     * @dev ETH价格更新时间（秒）
-     */
-    uint256 public ethPriceUpdatedAt;
-
-    /**
-     * @dev 价格有效时间（秒，默认24小时）
-     */
-    uint256 public priceValidityPeriod = 86400;
-    
-    /**
-     * @dev 手动设置的Pair地址（绕过Router直接从Pair获取价格）
-     * flapSwapPair_WBNB: FlapSwap的代币-WBNB Pair地址
-     * pancakeSwapPair_WBNB: PancakeSwap的代币-WBNB Pair地址
-     * uniswapPair_WBNB: Uniswap的代币-WBNB Pair地址
-     * wbnbUsdtPair: WBNB-USDT Pair地址（用于计算代币-USDT价格）
-     */
-    address public flapSwapPair_WBNB;
-    address public pancakeSwapPair_WBNB;
-    address public uniswapPair_WBNB;
-    address public wbnbUsdtPair;
-    
-    /**
-     * @dev Pair地址设置事件
-     * @param dexType DEX类型（0=FlapSwap, 1=PancakeSwap, 2=Uniswap, 3=WBNB-USDT）
-     * @param pairAddress 新的Pair地址
-     */
-    event PairAddressSet(uint8 indexed dexType, address pairAddress);
-
-    /**
-     * @dev 代币精度
-     */
-    uint256 public constant TOKEN_PRECISION = 10**18;
-
-    /**
-     * @dev USDT精度
-     */
-    uint256 public constant USDT_PRECISION = 10**6;
-
-    
-    
-    /**
-     * @dev 当前活跃的DEX类型
-     * 0: FlapSwap
-     * 1: PancakeSwap
-     * 2: Uniswap
-     */
-    uint8 public activeDEX;
-    
-    /**
-     * @dev 是否启用DEX自动价格获取
-     */
-    bool public autoPriceEnabled = true;
-
-    /**
-     * @dev 价格更新事件
-     *
-     * @param tokenPrice 新的代币价格
-     * @param ethPrice 新的ETH价格
-     * @param updater 更新者地址
-     */
-    event PriceUpdated(uint256 tokenPrice, uint256 ethPrice, address updater);
-    
-    /**
-     * @dev DEX价格获取事件
-     */
-    event PriceFetchedFromDEX(uint8 indexed dexType, uint256 tokenPrice, uint256 ethPrice);
-    
-    /**
-     * @dev 价格获取失败事件
-     */
-    event PriceFetchFailed(uint8 indexed dexType, string priceType, string reason);
-
-    uint256 public maxPriceChangePercent = 5000;
-    uint256 public priceUpdateCooldown = 5 minutes;
-    uint256 public lastTokenPriceUpdateTime;
-    uint256 public lastETHPriceUpdateTime;
-    uint256 public pendingTokenPrice;
-    uint256 public pendingETHPrice;
-    uint256 public pendingPriceEffectiveTime;
-    bool public hasPendingTokenPrice;
-    bool public hasPendingETHPrice;
-
-    event PriceChangeProposed(uint256 oldPrice, uint256 newPrice, uint256 executeTime, address proposer);
-    event PendingPriceCancelled(uint256 price, bool isTokenPrice);
-
-    modifier onlyAfterCooldown(uint256 lastUpdateTime) {
-        require(block.timestamp >= lastUpdateTime + priceUpdateCooldown, "PriceOracle: Price update cooldown");
-        _;
+    function isTokenPriceValid() external view returns (bool) {
+        return _isTokenPriceValid();
     }
 
-    /**
-     * @dev 设置价格变动限制百分比
-     * 防止价格单次变动过大
-     * @param percent 新的价格变动限制百分比（1000-10000，对应10%-100%）
-     */
-    function setPriceChangeLimit(uint256 percent) external onlyOwner {
-        require(percent >= 1000 && percent <= 10000, "PriceOracle: Invalid percent");
-        maxPriceChangePercent = percent;
+    function isETHPriceValid() external view returns (bool) {
+        return _isETHPriceValid();
     }
 
-    /**
-     * @dev 设置价格更新冷却时间
-     * 控制价格提议后到执行前的等待时间
-     * @param cooldown 新的冷却时间（1分钟到1小时之间）
-     */
-    function setPriceUpdateCooldown(uint256 cooldown) external onlyOwner {
-        require(cooldown >= 1 minutes && cooldown <= 1 hours, "PriceOracle: Invalid cooldown");
-        priceUpdateCooldown = cooldown;
+    function _isTokenPriceValid() internal view returns (bool) {
+        return tokenPriceUSD > 0 && block.timestamp <= tokenPriceUpdatedAt + priceValidityPeriod;
     }
 
-    /**
-     * @dev 提议更新代币价格（两阶段更新第一阶段）
-     * 所有者提议新价格，需等待priceUpdateCooldown后执行
-     * @param _newPrice 新的代币价格（USD，精度18位）
-     */
-    function proposeTokenPrice(uint256 _newPrice) external onlyOwner whenNotPaused {
-        require(_newPrice > 0, "PriceOracle: Invalid price");
-        require(_newPrice <= 10**27, "PriceOracle: Price too high");
-        require(block.timestamp >= lastTokenPriceUpdateTime + priceUpdateCooldown, "PriceOracle: Cooldown not elapsed");
+    function _isETHPriceValid() internal view returns (bool) {
+        return ethPriceUSD > 0 && block.timestamp <= ethPriceUpdatedAt + priceValidityPeriod;
+    }
 
-        if (tokenPriceUSD > 0) {
-            uint256 maxNewPrice = tokenPriceUSD * maxPriceChangePercent / 10000;
-            uint256 minNewPrice = tokenPriceUSD * (10000 - maxPriceChangePercent) / 10000;
-            require(_newPrice >= minNewPrice && _newPrice <= maxNewPrice, "PriceOracle: Price change too large");
+    function fetchPriceFromDEX() external nonReentrant whenNotPaused returns (bool) {
+        require(autoPriceEnabled, "PriceOracle: Auto price not enabled");
+
+        uint256 tokenPriceSum = 0;
+        uint256 tokenCount = 0;
+        uint256 ethPriceSum = 0;
+        uint256 ethCount = 0;
+        uint256 avgTokenPrice = 0;
+        uint256 avgETHPrice = 0;
+
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address flapSwapRouter = auth.getFlapSwapRouter();
+        address pancakeSwapRouter = auth.getPancakeSwapRouter();
+
+        uint256 flapPrice = _getPriceFromManualPairs(0);
+        if (flapPrice == 0 && flapSwapRouter != address(0)) {
+            flapPrice = _fetchTokenPrice(flapSwapRouter);
+        }
+        if (flapPrice > 0) {
+            tokenPriceSum += flapPrice;
+            tokenCount++;
         }
 
-        pendingTokenPrice = _newPrice;
-        hasPendingTokenPrice = true;
-        pendingPriceEffectiveTime = block.timestamp + priceUpdateCooldown;
-
-        emit PriceChangeProposed(tokenPriceUSD, _newPrice, pendingPriceEffectiveTime, msg.sender);
-    }
-
-    /**
-     * @dev 执行待处理的代币价格更新（两阶段更新第二阶段）
-     * 需在提议后等待priceUpdateCooldown且在过期时间前执行
-     * @return 是否执行成功
-     */
-    function executePendingTokenPrice() external onlyOwner returns (bool) {
-        require(hasPendingTokenPrice, "PriceOracle: No pending price");
-        require(block.timestamp >= pendingPriceEffectiveTime, "PriceOracle: Not yet executable");
-        require(block.timestamp <= pendingPriceEffectiveTime + priceUpdateCooldown / 2, "PriceOracle: Pending price expired");
-
-        uint256 oldPrice = tokenPriceUSD;
-        tokenPriceUSD = pendingTokenPrice;
-        lastTokenPriceUpdateTime = block.timestamp;
-        hasPendingTokenPrice = false;
-
-        emit PriceUpdated(tokenPriceUSD, ethPriceUSD, msg.sender);
-    }
-
-    /**
-     * @dev 取消待处理的代币价格更新
-     * 仅在价格尚未执行时可以取消
-     */
-    function cancelPendingTokenPrice() external onlyOwner {
-        require(hasPendingTokenPrice, "PriceOracle: No pending price to cancel");
-        uint256 cancelledPrice = pendingTokenPrice;
-        hasPendingTokenPrice = false;
-        emit PendingPriceCancelled(cancelledPrice, true);
-    }
-
-    /**
-     * @dev 提议更新ETH价格（两阶段更新第一阶段）
-     * 所有者提议新价格，需等待priceUpdateCooldown后执行
-     * @param _newPrice 新的ETH价格（USD，精度18位）
-     */
-    function proposeETHPrice(uint256 _newPrice) external onlyOwner whenNotPaused {
-        require(_newPrice > 0, "PriceOracle: Invalid price");
-        require(_newPrice <= 10**24, "PriceOracle: Price too high");
-        require(block.timestamp >= lastETHPriceUpdateTime + priceUpdateCooldown, "PriceOracle: Cooldown not elapsed");
-
-        if (ethPriceUSD > 0) {
-            uint256 maxNewPrice = ethPriceUSD * maxPriceChangePercent / 10000;
-            uint256 minNewPrice = ethPriceUSD * (10000 - maxPriceChangePercent) / 10000;
-            require(_newPrice >= minNewPrice && _newPrice <= maxNewPrice, "PriceOracle: Price change too large");
+        uint256 pancakePrice = _fetchPriceFromPancakeSwap();
+        if (pancakePrice == 0) {
+            pancakePrice = _getPriceFromManualPairs(1);
+        }
+        if (pancakePrice == 0 && pancakeSwapRouter != address(0)) {
+            pancakePrice = _fetchTokenPrice(pancakeSwapRouter);
+        }
+        if (pancakePrice > 0) {
+            tokenPriceSum += pancakePrice;
+            tokenCount++;
         }
 
-        pendingETHPrice = _newPrice;
-        hasPendingETHPrice = true;
-        pendingPriceEffectiveTime = block.timestamp + priceUpdateCooldown;
-
-        emit PriceChangeProposed(ethPriceUSD, _newPrice, pendingPriceEffectiveTime, msg.sender);
-    }
-
-    /**
-     * @dev 执行待处理的ETH价格更新（两阶段更新第二阶段）
-     * 需在提议后等待priceUpdateCooldown且在过期时间前执行
-     * @return 是否执行成功
-     */
-    function executePendingETHPrice() external onlyOwner returns (bool) {
-        require(hasPendingETHPrice, "PriceOracle: No pending price");
-        require(block.timestamp >= pendingPriceEffectiveTime, "PriceOracle: Not yet executable");
-        require(block.timestamp <= pendingPriceEffectiveTime + priceUpdateCooldown / 2, "PriceOracle: Pending price expired");
-
-        uint256 oldPrice = ethPriceUSD;
-        ethPriceUSD = pendingETHPrice;
-        lastETHPriceUpdateTime = block.timestamp;
-        hasPendingETHPrice = false;
-
-        emit PriceUpdated(tokenPriceUSD, ethPriceUSD, msg.sender);
-    }
-
-    /**
-     * @dev 取消待处理的ETH价格更新
-     * 仅在价格尚未执行时可以取消
-     */
-    function cancelPendingETHPrice() external onlyOwner {
-        require(hasPendingETHPrice, "PriceOracle: No pending price to cancel");
-        uint256 cancelledPrice = pendingETHPrice;
-        hasPendingETHPrice = false;
-        emit PendingPriceCancelled(cancelledPrice, false);
-    }
-
-    /**
-     * @dev 设置是否启用DEX自动价格获取
-     * @param enabled 是否启用自动价格获取
-     */
-    function setAutoPriceEnabled(bool enabled) external onlyOwner {
-        autoPriceEnabled = enabled;
-    }
-
-    /**
-     * @dev 从DEX获取当前代币和ETH价格（通过WBNB/ETH中转）
-     * 需要先启用autoPriceEnabled
-     * @return tokenPrice 代币价格（USD，精度18位）
-     * @return ethPrice ETH价格（USD，精度18位）
-     */
-    function fetchPriceFromDEX() external onlyOwnerOrAuthorizer whenNotPaused returns (uint256 tokenPrice, uint256 ethPrice) {
-        require(autoPriceEnabled, "PriceOracle: Auto price disabled");
-        
-        address router = _getActiveRouter();
-        require(router != address(0), "PriceOracle: No DEX configured");
-        
-        // 获取代币价格（代币 -> WBNB -> USDT）
-        uint256 tokenPrice = _fetchTokenPrice(router);
-        uint256 ethPrice = _fetchETHPrice(router);
-        
-        // 修复：要求至少有一个价格有效，防止两个价格都为0的情况
-        require(tokenPrice > 0 || ethPrice > 0, "PriceOracle: Failed to fetch any valid price from DEX");
-        
-        if (tokenPrice > 0) {
-            // 修复：添加价格范围验证，防止异常价格
-            require(tokenPrice >= 10**10 && tokenPrice <= 10**27, "PriceOracle: Token price out of valid range");
-            tokenPriceUSD = tokenPrice;
+        if (tokenCount > 0) {
+            avgTokenPrice = tokenPriceSum / tokenCount;
+            tokenPriceUSD = avgTokenPrice;
             tokenPriceUpdatedAt = block.timestamp;
-        } else {
-            emit PriceFetchFailed(activeDEX, "token", "DEX returned zero price");
         }
-        
+
+        uint256 ethPrice = _getWbnbUsdtPrice();
         if (ethPrice > 0) {
-            // 修复：添加价格范围验证，防止异常价格
-            require(ethPrice >= 10**10 && ethPrice <= 10**24, "PriceOracle: ETH price out of valid range");
-            ethPriceUSD = ethPrice;
-            ethPriceUpdatedAt = block.timestamp;
-        } else {
-            emit PriceFetchFailed(activeDEX, "eth", "DEX returned zero price");
+            ethPriceSum += ethPrice;
+            ethCount++;
         }
-        
-        emit PriceFetchedFromDEX(activeDEX, tokenPrice, ethPrice);
+
+        if (ethCount > 0) {
+            avgETHPrice = ethPriceSum / ethCount;
+            ethPriceUSD = avgETHPrice;
+            ethPriceUpdatedAt = block.timestamp;
+        }
+
         emit PriceUpdated(tokenPriceUSD, ethPriceUSD, msg.sender);
-        
-        return (tokenPrice, ethPrice);
+        return tokenCount > 0 && ethCount > 0;
     }
 
-    /**
-     * @dev 获取当前活跃的DEX Router地址
-     * 根据activeDEX设置返回对应DEX的路由地址
-     * @return 当前活跃的DEX Router地址
-     */
-    function _getActiveRouter() internal view returns (address) {
-        if (activeDEX == 0) return IAuthorizer(authorizer).getFlapSwapRouter();
-        if (activeDEX == 1) return IAuthorizer(authorizer).getPancakeSwapRouter();
-        return IAuthorizer(authorizer).getUniswapRouter();
-    }
-
-    /**
-     * @dev 从DEX Router获取代币价格
-     * @param router DEX路由地址
-     * @return 代币价格（USD，精度18位），获取失败返回0
-     */
     function _fetchTokenPrice(address router) internal view returns (uint256) {
         if (router == address(0)) return 0;
         IAuthorizer auth = IAuthorizer(authorizer);
         return PriceLibrary.getPriceFromRouter(router, auth.getToken(), auth.getWBNB(), auth.getUSDT());
     }
 
-    /**
-     * @dev 从手动设置的Pair地址获取代币价格
-     * 优先使用手动设置的Pair，绕过Router
-     * @param dexType DEX类型（0=FlapSwap, 1=PancakeSwap, 2=Uniswap）
-     * @return 代币价格（USD，精度18位），获取失败返回0
-     */
+    function _fetchPriceFromPancakeSwap() internal view returns (uint256) {
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address token = auth.getToken();
+
+        if (token == address(0)) {
+            return 0;
+        }
+
+        address[] memory path = new address[](3);
+        path[0] = token;
+        path[1] = WBNB;
+        path[2] = USDT;
+
+        try IDexRouter(PANCAKE_SWAP_ROUTER).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
+            if (amounts.length == 3 && amounts[2] > 0) {
+                return amounts[2] * 10**12;
+            }
+        } catch {}
+
+        address[] memory directPath = new address[](2);
+        directPath[0] = token;
+        directPath[1] = USDT;
+
+        try IDexRouter(PANCAKE_SWAP_ROUTER).getAmountsOut(10**18, directPath) returns (uint256[] memory amounts) {
+            if (amounts.length == 2 && amounts[1] > 0) {
+                return amounts[1] * 10**12;
+            }
+        } catch {}
+
+        return 0;
+    }
+
     function _getPriceFromManualPairs(uint8 dexType) internal view returns (uint256) {
         IAuthorizer auth = IAuthorizer(authorizer);
         address tokenAddress = auth.getToken();
         address wbnb = auth.getWBNB();
-        
-        // 获取对应DEX的Pair地址
+
         address pair;
         if (dexType == 0) {
             pair = flapSwapPair_WBNB;
         } else if (dexType == 1) {
             pair = pancakeSwapPair_WBNB;
-        } else if (dexType == 2) {
-            pair = uniswapPair_WBNB;
         } else {
             return 0;
         }
-        
-        return PriceLibrary.getPriceFromPairs(pair, wbnbUsdtPair, tokenAddress, wbnb, auth.getUSDT());
+
+        if (pair == address(0)) return 0;
+
+        return PriceLibrary.getPriceFromPairs(pair, wbnbUsdtPair, tokenAddress, wbnb, USDT);
     }
-    
-    /**
-     * @dev 获取WBNB-USDT价格
-     * 优先使用手动设置的Pair，否则通过Router获取
-     * @return WBNB价格（USD，精度18位）
-     */
+
     function _getWbnbUsdtPrice() internal view returns (uint256) {
-        IAuthorizer auth = IAuthorizer(authorizer);
-        address usdtAddress = auth.getUSDT();
-        address wbnb = auth.getWBNB();
-        
-        // 优先使用手动设置的WBNB-USDT Pair
-        uint256 price = PriceLibrary.getWbnbUsdtPriceFromPair(wbnbUsdtPair, wbnb, usdtAddress);
-        if (price > 0) {
-            return price;
-        }
-        
-        // 备用：通过Router获取
-        address flapSwapRouter = auth.getFlapSwapRouter();
-        if (flapSwapRouter != address(0)) {
-            return PriceLibrary.getETHPriceFromRouter(flapSwapRouter, wbnb, usdtAddress);
-        }
-        
-        return 0;
-    }
-    
-    /**
-     * @dev 从指定DEX Router获取ETH价格
-     * @param router DEX路由地址
-     * @return ETH价格（USD，精度18位），获取失败返回0
-     */
-    function _fetchETHPrice(address router) internal view returns (uint256) {
-        if (router == address(0)) return 0;
-        IAuthorizer auth = IAuthorizer(authorizer);
-        return PriceLibrary.getETHPriceFromRouter(router, auth.getWBNB(), auth.getUSDT());
+        if (wbnbUsdtPair == address(0)) return 0;
+        return PriceLibrary.getWbnbUsdtPriceFromPair(wbnbUsdtPair, WBNB, USDT);
     }
 
-    /**
-     * @dev 从所有配置的DEX获取价格并计算平均值
-     * 从FlapSwap、PancakeSwap、Uniswap分别获取价格后取平均
-     * @return avgTokenPrice 平均代币价格（USD，精度18位）
-     * @return avgETHPrice 平均ETH价格（USD，精度18位）
-     */
-    function fetchPriceFromAllDEX() external onlyOwnerOrAuthorizer whenNotPaused returns (uint256 avgTokenPrice, uint256 avgETHPrice) {
-        uint256 tokenPriceSum = 0;
-        uint256 ethPriceSum = 0;
-        uint256 tokenCount = 0;
-        uint256 ethCount = 0;
-        
-        address flapSwapRouter = IAuthorizer(authorizer).getFlapSwapRouter();
-        address pancakeSwapRouter = IAuthorizer(authorizer).getPancakeSwapRouter();
-        address uniswapRouter = IAuthorizer(authorizer).getUniswapRouter();
-        
-        // 从FlapSwap获取（优先使用手动设置的Pair）
-        uint256 flapPrice = _getPriceFromManualPairs(0);
-        if (flapPrice > 0) {
-            tokenPriceSum += flapPrice;
-            tokenCount++;
-        } else if (flapSwapRouter != address(0)) {
-            uint256 tp = _fetchTokenPrice(flapSwapRouter);
-            if (tp > 0) {
-                tokenPriceSum += tp;
-                tokenCount++;
-            }
-        }
-        
-        // 从PancakeSwap获取（优先使用手动设置的Pair）
-        uint256 pancakePrice = _getPriceFromManualPairs(1);
-        if (pancakePrice > 0) {
-            tokenPriceSum += pancakePrice;
-            tokenCount++;
-        } else if (pancakeSwapRouter != address(0)) {
-            uint256 tp = _fetchTokenPrice(pancakeSwapRouter);
-            if (tp > 0) {
-                tokenPriceSum += tp;
-                tokenCount++;
-            }
-        }
-        
-        // 从Uniswap获取（优先使用手动设置的Pair）
-        uint256 uniPrice = _getPriceFromManualPairs(2);
-        if (uniPrice > 0) {
-            tokenPriceSum += uniPrice;
-            tokenCount++;
-        } else if (uniswapRouter != address(0)) {
-            uint256 tp = _fetchTokenPrice(uniswapRouter);
-            if (tp > 0) {
-                tokenPriceSum += tp;
-                tokenCount++;
-            }
-        }
-        
-        // 更新代币价格（至少有一个有效价格）
-        if (tokenCount > 0) {
-            avgTokenPrice = tokenPriceSum / tokenCount;
-            tokenPriceUSD = avgTokenPrice;
-            tokenPriceUpdatedAt = block.timestamp;
-        }
-        
-        // 更新ETH价格（至少有一个有效价格）
-        if (ethCount > 0) {
-            avgETHPrice = ethPriceSum / ethCount;
-            ethPriceUSD = avgETHPrice;
-            ethPriceUpdatedAt = block.timestamp;
-        }
-        
-        emit PriceFetchedFromDEX(activeDEX, avgTokenPrice, avgETHPrice);
-        if (avgTokenPrice > 0 || avgETHPrice > 0) {
-            emit PriceUpdated(avgTokenPrice, avgETHPrice, msg.sender);
-        }
-        
-        return (avgTokenPrice, avgETHPrice);
-    }
-
-    /**
-     * @dev 直接更新代币价格（授权合约可调用）
-     * 变动同样受maxPriceChangePercent限制
-     * @param _tokenPriceUSD 新的代币价格（USD，精度18位）
-     */
-    function updateTokenPrice(uint256 _tokenPriceUSD) external onlyOwnerOrAuthorizer whenNotPaused {
-        require(_tokenPriceUSD > 0, "PriceOracle: Invalid token price");
-        require(_tokenPriceUSD <= 10**27, "PriceOracle: Token price too high");
-        tokenPriceUSD = _tokenPriceUSD;
-        tokenPriceUpdatedAt = block.timestamp;
-        emit PriceUpdated(_tokenPriceUSD, ethPriceUSD, msg.sender);
-    }
-
-    /**
-     * @dev 直接更新ETH价格（授权合约可调用）
-     * @param _ethPriceUSD 新的ETH价格（USD，精度18位）
-     */
-    function updateETHPrice(uint256 _ethPriceUSD) external onlyOwnerOrAuthorizer whenNotPaused {
-        require(_ethPriceUSD > 0, "PriceOracle: Invalid ETH price");
-        require(_ethPriceUSD <= 10**24, "PriceOracle: ETH price too high");
-        ethPriceUSD = _ethPriceUSD;
-        ethPriceUpdatedAt = block.timestamp;
-        emit PriceUpdated(tokenPriceUSD, _ethPriceUSD, msg.sender);
-    }
-
-    /**
-     * @dev 批量更新代币和ETH价格
-     * 仅owner可调用，需满足冷却时间和价格变动限制
-     * @param _tokenPriceUSD 代币价格（USD，精度18位）
-     * @param _ethPriceUSD ETH价格（USD，精度18位）
-     */
-    function updatePrices(uint256 _tokenPriceUSD, uint256 _ethPriceUSD) external onlyOwner whenNotPaused {
-        require(_tokenPriceUSD > 0, "PriceOracle: Invalid token price");
-        require(_ethPriceUSD > 0, "PriceOracle: Invalid ETH price");
-        require(_tokenPriceUSD <= 10**27, "PriceOracle: Token price too high");
-        require(_ethPriceUSD <= 10**24, "PriceOracle: ETH price too high");
-
-        require(block.timestamp >= lastTokenPriceUpdateTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: Token price update cooldown");
-        require(block.timestamp >= lastETHPriceUpdateTime + PRICE_UPDATE_COOLDOWN, "PriceOracle: ETH price update cooldown");
-
-        if (tokenPriceUSD > 0) {
-            uint256 maxTokenNewPrice = tokenPriceUSD * MAX_PRICE_CHANGE_PERCENT / 10000;
-            uint256 minTokenNewPrice = tokenPriceUSD * (10000 - MAX_PRICE_CHANGE_PERCENT) / 10000;
-            require(_tokenPriceUSD >= minTokenNewPrice && _tokenPriceUSD <= maxTokenNewPrice, "PriceOracle: Token price change too large");
-        }
-
-        if (ethPriceUSD > 0) {
-            uint256 maxETHNewPrice = ethPriceUSD * MAX_PRICE_CHANGE_PERCENT / 10000;
-            uint256 minETHNewPrice = ethPriceUSD * (10000 - MAX_PRICE_CHANGE_PERCENT) / 10000;
-            require(_ethPriceUSD >= minETHNewPrice && _ethPriceUSD <= maxETHNewPrice, "PriceOracle: ETH price change too large");
-        }
-
-        tokenPriceUSD = _tokenPriceUSD;
-        ethPriceUSD = _ethPriceUSD;
-        tokenPriceUpdatedAt = block.timestamp;
-        ethPriceUpdatedAt = block.timestamp;
-        lastTokenPriceUpdateTime = block.timestamp;
-        lastETHPriceUpdateTime = block.timestamp;
-        
-        // 记录价格历史（使用环形缓冲区）
-        if (priceHistory.length < MAX_HISTORY_LENGTH) {
-            priceHistory.push(PriceRecord({
-                tokenPriceUSD: _tokenPriceUSD,
-                ethPriceUSD: _ethPriceUSD,
-                timestamp: block.timestamp,
-                updater: msg.sender
-            }));
-        } else {
-            priceHistory[priceHistoryStartIndex] = PriceRecord({
-                tokenPriceUSD: _tokenPriceUSD,
-                ethPriceUSD: _ethPriceUSD,
-                timestamp: block.timestamp,
-                updater: msg.sender
-            });
-            priceHistoryStartIndex = (priceHistoryStartIndex + 1) % MAX_HISTORY_LENGTH;
-        }
-        
-        emit PriceUpdated(_tokenPriceUSD, _ethPriceUSD, msg.sender);
-    }
-
-    /**
-     * @dev 获取价格历史记录长度
-     * @return 价格历史记录总数
-     */
-    function getPriceHistoryLength() external view returns (uint256) {
-        return priceHistory.length;
-    }
-
-    /**
-     * @dev 获取价格历史记录（分页）
-     * @param startIndex 起始索引
-     * @param count 获取数量
-     * @return PriceRecord[] 价格记录数组
-     */
-    function getPriceHistory(uint256 startIndex, uint256 count) external view returns (PriceRecord[] memory) {
-        require(startIndex < priceHistory.length, "PriceOracle: Invalid start index");
-        require(count > 0, "PriceOracle: Invalid count");
-        
-        uint256 endIndex = startIndex + count;
-        if (endIndex > priceHistory.length) {
-            endIndex = priceHistory.length;
-        }
-        
-        PriceRecord[] memory records = new PriceRecord[](endIndex - startIndex);
-        for (uint256 i = startIndex; i < endIndex; i++) {
-            uint256 actualIndex = (priceHistoryStartIndex + i) % priceHistory.length;
-            records[i - startIndex] = priceHistory[actualIndex];
-        }
-        
-        return records;
-    }
-
-    /**
-     * @dev 获取最新一条价格记录
-     * @return PriceRecord 最新价格记录
-     */
-    function getLatestPriceRecord() external view returns (PriceRecord memory) {
-        require(priceHistory.length > 0, "PriceOracle: No history");
-        uint256 latestIndex = (priceHistoryStartIndex + priceHistory.length - 1) % priceHistory.length;
-        return priceHistory[latestIndex];
-    }
-
-    /**
-     * @dev 获取最近N条价格记录（简化接口，无需理解环形缓冲区）
-     * @param count 要获取的记录数量
-     * @return PriceRecord[] 价格记录数组（最新的在前）
-     */
-    function getLastNPrices(uint256 count) external view returns (PriceRecord[] memory) {
-        require(count > 0, "PriceOracle: Invalid count");
-        
-        uint256 actualCount = count;
-        if (actualCount > priceHistory.length) {
-            actualCount = priceHistory.length;
-        }
-        
-        PriceRecord[] memory records = new PriceRecord[](actualCount);
-        uint256 latestIndex = (priceHistoryStartIndex + priceHistory.length - 1) % priceHistory.length;
-        
-        for (uint256 i = 0; i < actualCount; i++) {
-            uint256 historyIndex = (latestIndex + priceHistory.length - i) % priceHistory.length;
-            records[i] = priceHistory[historyIndex];
-        }
-        
-        return records;
-    }
-
-    /**
-     * @dev 设置价格有效时间
-     * 超过此时间的价格视为过期失效
-     * @param duration 有效时间（秒）
-     */
     function setPriceValidityPeriod(uint256 duration) external onlyOwner {
         priceValidityPeriod = duration;
     }
-    
-    /**
-     * @dev 设置FlapSwap的代币-WBNB Pair地址
-     * @param pair Pair地址
-     */
+
     function setFlapSwapPair(address pair) external onlyOwner {
         flapSwapPair_WBNB = pair;
         emit PairAddressSet(0, pair);
     }
-    
-    /**
-     * @dev 设置PancakeSwap的代币-WBNB Pair地址
-     * @param pair Pair地址
-     */
+
     function setPancakeSwapPair(address pair) external onlyOwner {
         pancakeSwapPair_WBNB = pair;
         emit PairAddressSet(1, pair);
     }
-    
-    /**
-     * @dev 设置Uniswap的代币-WBNB Pair地址
-     * @param pair Pair地址
-     */
-    function setUniswapPair(address pair) external onlyOwner {
-        uniswapPair_WBNB = pair;
-        emit PairAddressSet(2, pair);
-    }
-    
-    /**
-     * @dev 设置WBNB-USDT Pair地址
-     * @param pair Pair地址
-     */
+
     function setWbnbUsdtPair(address pair) external onlyOwner {
         wbnbUsdtPair = pair;
         emit PairAddressSet(3, pair);
     }
-    
-    /**
-     * @dev 批量设置所有Pair地址
-     * @param _flapSwapPair FlapSwap的代币-WBNB Pair地址
-     * @param _pancakeSwapPair PancakeSwap的代币-WBNB Pair地址
-     * @param _uniswapPair Uniswap的代币-WBNB Pair地址
-     * @param _wbnbUsdtPair WBNB-USDT Pair地址
-     */
-    function setAllPairs(address _flapSwapPair, address _pancakeSwapPair, address _uniswapPair, address _wbnbUsdtPair) external onlyOwner {
+
+    function setAllPairs(address _flapSwapPair, address _pancakeSwapPair, address _wbnbUsdtPair) external onlyOwner {
         flapSwapPair_WBNB = _flapSwapPair;
         pancakeSwapPair_WBNB = _pancakeSwapPair;
-        uniswapPair_WBNB = _uniswapPair;
         wbnbUsdtPair = _wbnbUsdtPair;
         emit PairAddressSet(0, _flapSwapPair);
         emit PairAddressSet(1, _pancakeSwapPair);
-        emit PairAddressSet(2, _uniswapPair);
         emit PairAddressSet(3, _wbnbUsdtPair);
     }
 
-    /**
-     * @dev 检查代币价格是否过期
-     * @return bool 价格是否有效（未过期且非零）
-     */
-    function isTokenPriceValid() public view returns (bool) {
-        return tokenPriceUSD > 0 && (block.timestamp - tokenPriceUpdatedAt) <= priceValidityPeriod;
+    function setAutoPriceEnabled(bool enabled) external onlyOwner {
+        autoPriceEnabled = enabled;
     }
 
-    /**
-     * @dev 检查ETH价格是否过期
-     * @return bool 价格是否有效（未过期且非零）
-     */
-    function isETHPriceValid() public view returns (bool) {
-        return ethPriceUSD > 0 && (block.timestamp - ethPriceUpdatedAt) <= priceValidityPeriod;
+    function setMaxPriceChangePercent(uint256 percent) external onlyOwner {
+        require(percent <= 10000, "PriceOracle: Invalid percent");
+        maxPriceChangePercent = percent;
     }
 
-    /**
-     * @dev 获取代币价格
-     * @return uint256 代币价格（USD，精度18位）
-     */
-    function getTokenPrice() external view returns (uint256) {
-        return tokenPriceUSD;
+    function setPriceUpdateCooldown(uint256 cooldown) external onlyOwner {
+        priceUpdateCooldown = cooldown;
     }
 
-    /**
-     * @dev 获取ETH价格
-     * @return uint256 ETH价格（USD，精度18位）
-     */
-    function getETHPrice() external view returns (uint256) {
-        return ethPriceUSD;
-    }
-
-    /**
-     * @dev 计算代币的USDT等值
-     *
-     * 将代币数量转换为USDT数量
-     *
-     * @param tokenAmount 代币数量（精度18位）
-     * @return uint256 USDT数量（精度6位）
-     *
-     * 计算公式：
-     * usdtAmount = tokenAmount * tokenPriceUSD / (1 USD) / TOKEN_PRECISION * USDT_PRECISION
-     *
-     * 例如：
-     * tokenAmount = 10000 * 10^18 (10000代币)
-     * tokenPriceUSD = 0.1 * 10^18 ($0.1)
-     * usdtAmount = 10000 * 0.1 = 1000 USDT
-     */
-    function calculateUSDTEquivalent(uint256 tokenAmount) external view returns (uint256) {
+    function getPriceInUSD(uint256 tokenAmount) external view returns (uint256) {
         if (tokenPriceUSD == 0 || tokenAmount == 0) return 0;
-        // 使用先除后乘策略减少精度损失
-        uint256 tokenAmountScaled = tokenAmount / 10**12;
-        uint256 priceScaled = tokenPriceUSD / 10**6;
-        return tokenAmountScaled * priceScaled;
+        return (tokenAmount * tokenPriceUSD) / (10**18);
     }
 
-    /**
-     * @dev 计算USDT的代币等值
-     *
-     * 将USDT数量转换为代币数量
-     *
-     * @param usdtAmount USDT数量（精度6位）
-     * @return uint256 代币数量（精度18位）
-     *
-     * 计算公式：
-     * tokenAmount = usdtAmount * (1 USD) / tokenPriceUSD / USDT_PRECISION * TOKEN_PRECISION
-     *
-     * 例如：
-     * usdtAmount = 1000 * 10^6 (1000 USDT)
-     * tokenPriceUSD = 0.1 * 10^18 ($0.1)
-     * tokenAmount = 1000 / 0.1 = 10000 代币
-     */
-    function calculateTokenEquivalent(uint256 usdtAmount) external view returns (uint256) {
+    function getPriceInUSDT(uint256 tokenAmount) external view returns (uint256) {
+        if (tokenPriceUSD == 0 || tokenAmount == 0) return 0;
+        return (tokenAmount * tokenPriceUSD) / (10**24);
+    }
+
+    function getTokensForUSD(uint256 usdAmount) external view returns (uint256) {
+        if (tokenPriceUSD == 0 || usdAmount == 0) return 0;
+        return (usdAmount * 10**18) / tokenPriceUSD;
+    }
+
+    function getTokensForUSDT(uint256 usdtAmount) external view returns (uint256) {
         if (tokenPriceUSD == 0 || usdtAmount == 0) return 0;
-        // 安全计算：先除后乘，避免溢出
-        uint256 usdtInWei = usdtAmount * 10**12;
-        return (usdtInWei * 10**18) / tokenPriceUSD;
+        return (usdtAmount * 10**24) / tokenPriceUSD;
     }
 
-    /**
-     * @dev 计算ETH的USDT等值
-     *
-     * @param ethAmount ETH数量（精度18位）
-     * @return uint256 USDT数量（精度6位）
-     */
     function calculateETHUSDTEquivalent(uint256 ethAmount) external view returns (uint256) {
         if (ethPriceUSD == 0 || ethAmount == 0) return 0;
         return (ethAmount * ethPriceUSD) / (10**30);
     }
 
-    /**
-     * @dev 获取精度信息
-     *
-     * @return uint256 代币精度
-     * @return uint256 USDT精度
-     */
-    function getPrecisionInfo() external pure returns (uint256, uint256) {
-        return (TOKEN_PRECISION, USDT_PRECISION);
-    }
-
-    /**
-     * @dev 获取所有DEX的价格（供前端展示）
-     * @return prices 价格数组（索引0=FlapSwap, 1=PancakeSwap, 2=Uniswap）
-     * @return lowestPrice 最低价格
-     * @return bestDEX 最佳DEX索引（255表示来自PriceOracle）
-     */
     function getAllDEXPrices() external view returns (uint256[] memory prices, uint256 lowestPrice, uint8 bestDEX) {
-        prices = new uint256[](3);
+        prices = new uint256[](2);
         lowestPrice = 0;
         bestDEX = 0;
 
         IAuthorizer auth = IAuthorizer(authorizer);
         address flapSwapRouter = auth.getFlapSwapRouter();
         address pancakeSwapRouter = auth.getPancakeSwapRouter();
-        address uniswapRouter = auth.getUniswapRouter();
 
-        // FlapSwap
         uint256 flapPrice = _getPriceFromManualPairs(0);
         if (flapPrice == 0 && flapSwapRouter != address(0)) {
             flapPrice = _fetchTokenPrice(flapSwapRouter);
         }
         prices[0] = flapPrice;
 
-        // PancakeSwap
-        uint256 pancakePrice = _getPriceFromManualPairs(1);
+        uint256 pancakePrice = _fetchPriceFromPancakeSwap();
+        if (pancakePrice == 0) {
+            pancakePrice = _getPriceFromManualPairs(1);
+        }
         if (pancakePrice == 0 && pancakeSwapRouter != address(0)) {
             pancakePrice = _fetchTokenPrice(pancakeSwapRouter);
         }
         prices[1] = pancakePrice;
 
-        // Uniswap
-        uint256 uniPrice = _getPriceFromManualPairs(2);
-        if (uniPrice == 0 && uniswapRouter != address(0)) {
-            uniPrice = _fetchTokenPrice(uniswapRouter);
-        }
-        prices[2] = uniPrice;
-
-        // 找到最低价格
-        for (uint8 i = 0; i < 3; i++) {
+        for (uint8 i = 0; i < 2; i++) {
             if (prices[i] > 0) {
                 if (lowestPrice == 0 || prices[i] < lowestPrice) {
                     lowestPrice = prices[i];
@@ -989,8 +323,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             }
         }
 
-        // 检查PriceOracle当前价格
-        if (tokenPriceUSD > 0 && isTokenPriceValid()) {
+        if (tokenPriceUSD > 0 && _isTokenPriceValid()) {
             if (lowestPrice == 0 || tokenPriceUSD < lowestPrice) {
                 lowestPrice = tokenPriceUSD;
                 bestDEX = 255;
@@ -998,36 +331,19 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
     }
 
-    /**
-     * @dev 获取当前有效代币价格（自动选择最佳来源）
-     * @return 代币价格（USD，精度18位）
-     */
     function getEffectiveTokenPrice() external view returns (uint256) {
-        // 优先使用PriceOracle的有效价格
-        if (tokenPriceUSD > 0 && isTokenPriceValid()) {
+        if (tokenPriceUSD > 0 && _isTokenPriceValid()) {
             return tokenPriceUSD;
         }
 
-        // 从所有DEX获取价格并返回最低价格
         (uint256[] memory prices, uint256 lowestPrice, ) = this.getAllDEXPrices();
         return lowestPrice;
     }
 
-    /**
-     * @dev 验证代币和ETH价格是否都有效（未过期且非零）
-     * @return bool 价格是否都有效
-     */
     function isPriceValid() external view returns (bool) {
-        return isTokenPriceValid() && isETHPriceValid();
+        return _isTokenPriceValid() && _isETHPriceValid();
     }
 
-    /**
-     * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
-     */
     receive() external payable {}
-
-    /**
-     * @dev Fallback 函数 - 处理未匹配的调用
-     */
     fallback() external payable {}
 }
