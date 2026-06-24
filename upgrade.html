@@ -410,10 +410,10 @@
                 const usd3 = parseInt(usdCost3) > 0 ? (parseInt(usdCost3) / 10**18).toFixed(4) : defaultUsdCosts[2].toFixed(4);
                 const usd4 = parseInt(usdCost4) > 0 ? (parseInt(usdCost4) / 10**18).toFixed(4) : defaultUsdCosts[3].toFixed(4);
                 
-                document.getElementById('usdCost1').textContent = parseFloat(usd1).toString();
-                document.getElementById('usdCost2').textContent = parseFloat(usd2).toString();
-                document.getElementById('usdCost3').textContent = parseFloat(usd3).toString();
-                document.getElementById('usdCost4').textContent = parseFloat(usd4).toString();
+                document.getElementById('usdCost1').textContent = usd1;
+                document.getElementById('usdCost2').textContent = usd2;
+                document.getElementById('usdCost3').textContent = usd3;
+                document.getElementById('usdCost4').textContent = usd4;
                 
                 console.log('Upgrade costs loaded from contract:', { cost1, cost2, cost3, cost4, usd1, usd2, usd3, usd4 });
             } catch (error) {
@@ -556,7 +556,7 @@
                 const requiredUSDWei = await getUSDValue(levelNum);
                 const requiredUSD = Number(BigInt(requiredUSDWei) / 10n**18n);
                 console.log('selectNFT - level:', levelNum, 'requiredUSDWei:', requiredUSDWei, 'requiredUSD:', requiredUSD);
-                requiredUSDDisplay = requiredUSD + ' USDT';
+               const requiredUSDDisplay = requiredUSD.toFixed(4) + ' USDT';
                 
                 try {
                 const priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
@@ -717,12 +717,18 @@
                 upgradeWithTokenBtn.classList.add('opacity-50', 'cursor-not-allowed');
                 upgradeWithUSDValueBtn.classList.add('opacity-50', 'cursor-not-allowed');
             } else {
-                upgradeWithNftBtn.disabled = false;
                 upgradeWithTokenBtn.disabled = false;
                 upgradeWithUSDValueBtn.disabled = false;
-                upgradeWithNftBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 upgradeWithTokenBtn.classList.remove('opacity-50', 'cursor-not-allowed');
                 upgradeWithUSDValueBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                
+                if (hasEnoughNFTs) {
+                    upgradeWithNftBtn.disabled = false;
+                    upgradeWithNftBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                } else {
+                    upgradeWithNftBtn.disabled = true;
+                    upgradeWithNftBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
             }
 
             upgradeSection.classList.remove('hidden');
@@ -1028,7 +1034,7 @@
             
             const confirmed = await ZODIAC_UI.showConfirmModal(
                 '升级确认',
-                '确认使用USDT价值升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗价值 ' + requiredUSD + ' USDT的代币（约 ' + requiredTokensDisplay + ' Token）'
+                '确认使用USDT价值升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗价值 ' + requiredUSD.toFixed(4) + ' USDT的代币（约 ' + requiredTokensDisplay + ' Token）'
             );
 
             if (!confirmed) return;
