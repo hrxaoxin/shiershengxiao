@@ -801,7 +801,7 @@
                 // 直接调用合约，不使用 ZODIAC_WEB3 的封装
                 const result = await nftUpdateContract.methods.upgradeWithNFT(nftId).send({ 
                     from: account, 
-                    gas: 2000000 
+                    gas: 4000000 
                 });
                 
                 ZODIAC_UI.hideLoading();
@@ -880,7 +880,7 @@
                 // 直接调用合约
                 const result = await nftUpdateContract.methods.upgradeWithToken(nftId).send({ 
                     from: account, 
-                    gas: 1500000 
+                    gas: 3000000 
                 });
                 
                 ZODIAC_UI.hideLoading();
@@ -942,20 +942,11 @@
                 console.error('检查合约暂停状态失败:', e);
             }
 
-            // 检查NFTUpdate合约的priceOracle地址是否正确设置
-            try {
-                const contractPriceOracle = await nftUpdateContract.methods.priceOracle().call();
-                const expectedPriceOracle = ZODIAC_CONFIG.CONTRACT_ADDRESSES.priceOracle;
-                if (contractPriceOracle === '0x0000000000000000000000000000000000000000') {
-                    ZODIAC_UI.showToast('价格预言机地址未配置，请联系管理员', 'error');
-                    return;
-                }
-                if (contractPriceOracle.toLowerCase() !== expectedPriceOracle.toLowerCase()) {
-                    console.warn('NFTUpdate.priceOracle mismatch:', contractPriceOracle, 'vs expected:', expectedPriceOracle);
-                    ZODIAC_UI.showToast('警告：合约价格预言机地址与配置不一致，可能影响计算准确性', 'warning');
-                }
-            } catch (e) {
-                console.error('检查priceOracle地址失败:', e);
+            // 检查配置中的priceOracle地址是否正确设置
+            const expectedPriceOracle = ZODIAC_CONFIG.CONTRACT_ADDRESSES.priceOracle;
+            if (!expectedPriceOracle || expectedPriceOracle === '0x0000000000000000000000000000000000000000') {
+                ZODIAC_UI.showToast('价格预言机地址未配置，请联系管理员', 'error');
+                return;
             }
 
             const levelNum = parseInt(selectedNft.level, 10);
@@ -1061,7 +1052,7 @@
                 // 调用合约升级
                 const result = await nftUpdateContract.methods.upgradeWithUSDValue(nftId).send({ 
                     from: account, 
-                    gas: 2000000 
+                    gas: 4000000 
                 });
                 
                 ZODIAC_UI.hideLoading();

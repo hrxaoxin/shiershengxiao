@@ -111,13 +111,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     
     /** @dev 授权合约地址 */
     address public authorizer;
-
-    /** @dev 合约地址 */
-    address public nftContract;
-    address public tokenContract;
-    address public metadataContract;
-    address public dividendManager;
-    address public priceOracle;
     
     /** @dev 各级别升级费用（代币数量，含精度18位） */
     uint256 public level1UpgradeCost = 10000 * 10**18;
@@ -155,9 +148,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         transferOwnership(initialOwner);
         authorizer = _authorizerAddress;
         
-        // 从 Authorizer 初始化合约地址
-        _syncContractAddresses();
-        
         // 初始化带默认值的参数
         level1UpgradeCost = 10000 * 10**18;
         level2UpgradeCost = 40000 * 10**18;
@@ -172,19 +162,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         level4USDUpgradeCost = 48e18;     // 48 USDT
     }
 
-    /**
-     * @dev 同步合约地址（从Authorizer获取并更新）
-     */
-    function _syncContractAddresses() internal {
-        IAuthorizer auth = IAuthorizer(authorizer);
-        nftContract = auth.getNFTMintCore();
-        tokenContract = auth.getToken();
-        metadataContract = auth.getNFTData();
-        dividendManager = auth.getDividendManager();
-        priceOracle = auth.getPriceOracle();
-    }
-
-    
     /**
      * @dev 升级授权函数
      */
@@ -401,23 +378,28 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @return uint8 新等级
      */
     function upgradeWithNFT(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
-        require(nftContract != address(0), "NFTUpdate: NFT contract not set");
-        require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
-        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address nftAddr = auth.getNFTMintCore();
+        address metadataAddr = auth.getNFTData();
+        address dividendAddr = auth.getDividendManager();
         
-        INFTMint nft = INFTMint(nftContract);
+        require(nftAddr != address(0), "NFTUpdate: NFT contract not set");
+        require(metadataAddr != address(0), "NFTUpdate: Metadata contract not set");
+        require(dividendAddr != address(0), "NFTUpdate: Dividend manager not set");
+        
+        INFTMint nft = INFTMint(nftAddr);
         require(nft.ownerOf(tokenId) == msg.sender, "E15");
         
-        INFTDataInterface m = INFTDataInterface(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataAddr);
         uint256 tokenTypeValue = m.tokenType(tokenId);
         NFTDataTypes.ZodiacType t = NFTDataTypes.ZodiacType(tokenTypeValue);
         uint8 lv = m.tokenLevel(tokenId);
         require(lv < 5, "E16");
         
-        uint256[] memory burnCandidates = _findBurnCandidates(tokenId, lv, tokenTypeValue, nft);
+        uint256[] memory burnCandidates = _findBurnCandidates(tokenId, lv, tokenTypeValue, nft, nftAddr);
         // 修复：先完成升级逻辑（状态变更、跨合约权重更新）再销毁 NFT，避免升级失败导致 NFT 永久损失
-        _completeUpgrade(tokenId, lv, t, m, nft);
-        _burnNFTs(burnCandidates, t, nft);
+        _completeUpgrade(tokenId, lv, t, m, nft, dividendAddr);
+        _burnNFTs(burnCandidates, t, nft, metadataAddr, dividendAddr);
         
         return lv + 1;
     }
@@ -430,7 +412,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param nft NFT合约实例
      * @return 可销毁的NFT ID数组
      */
-    function _findBurnCandidates(uint256 tokenId, uint8 lv, uint256 tokenTypeValue, INFTMint nft) internal view returns (uint256[] memory) {
+    function _findBurnCandidates(uint256 tokenId, uint8 lv, uint256 tokenTypeValue, INFTMint nft, address nftAddr) internal view returns (uint256[] memory) {
         uint256[] memory allUserTokens = nft.getTokenIdsByOwner(msg.sender);
         uint256 maxIterations = 100;
         uint256 actualIterations = allUserTokens.length;
@@ -477,17 +459,17 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param t NFT类型
      * @param nft NFT合约实例
      */
-    function _burnNFTs(uint256[] memory burnCandidates, NFTDataTypes.ZodiacType t, INFTMint nft) internal {
-        INFTDataInterface m = INFTDataInterface(metadataContract);
+    function _burnNFTs(uint256[] memory burnCandidates, NFTDataTypes.ZodiacType t, INFTMint nft, address metadataAddr, address dividendAddr) internal {
+        INFTDataInterface m = INFTDataInterface(metadataAddr);
         NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         uint8 burnLevel = m.tokenLevel(burnCandidates[0]); // 同类型同级NFT
         
         for (uint i = 0; i < burnCandidates.length; i++) {
             uint burnId = burnCandidates[i];
             // 同步权重：移除被销毁NFT的权重
-            _updateUserWeight(msg.sender, burnLevel, false, element);
+            _updateUserWeight(msg.sender, burnLevel, false, element, dividendAddr);
             // 从NFTData用户NFT列表中移除
-            _removeUserNFT(msg.sender, burnId);
+            _removeUserNFT(msg.sender, burnId, metadataAddr);
             nft.safeTransferFrom(msg.sender, BLACK_HOLE, burnId);
             emit CardBurned(burnId, t, msg.sender);
         }
@@ -498,8 +480,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param user 用户地址
      * @param tokenId NFT ID
      */
-    function _removeUserNFT(address user, uint256 tokenId) internal {
-        try INFTDataInterface(metadataContract).removeUserNFT(user, tokenId) {
+    function _removeUserNFT(address user, uint256 tokenId, address metadataAddr) internal {
+        try INFTDataInterface(metadataAddr).removeUserNFT(user, tokenId) {
             // 成功
         } catch {
             // 忽略错误，继续执行
@@ -515,14 +497,14 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param nft NFT合约实例
      * @return 新等级
      */
-    function _completeUpgrade(uint256 tokenId, uint8 lv, NFTDataTypes.ZodiacType t, INFTDataInterface m, INFTMint nft) internal returns (uint8) {
+    function _completeUpgrade(uint256 tokenId, uint8 lv, NFTDataTypes.ZodiacType t, INFTDataInterface m, INFTMint nft, address dividendAddr) internal returns (uint8) {
         uint8 newLv = lv + 1;
         NFTDataTypes.ElementType element = NFTDataTypes.getElement(t);
         
-        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
+        require(dividendAddr != address(0), "NFTUpdate: Dividend manager not set");
         
-        _updateUserWeight(msg.sender, lv, false, element);
-        _updateUserWeight(msg.sender, newLv, true, element);
+        _updateUserWeight(msg.sender, lv, false, element, dividendAddr);
+        _updateUserWeight(msg.sender, newLv, true, element, dividendAddr);
         
         m.setTokenLevel(tokenId, newLv);
         nft.adminSetNFTLevel(tokenId, newLv);
@@ -538,8 +520,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param isAdd 是否增加
      * @param element 属性类型
      */
-    function _updateUserWeight(address user, uint8 level, bool isAdd, NFTDataTypes.ElementType element) internal {
-        try IDividendManager(dividendManager).updateUserWeight(user, uint256(level), isAdd, uint8(element)) {
+    function _updateUserWeight(address user, uint8 level, bool isAdd, NFTDataTypes.ElementType element, address dividendAddr) internal {
+        try IDividendManager(dividendAddr).updateUserWeight(user, uint256(level), isAdd, uint8(element)) {
             // 成功
         } catch Error(string memory reason) {
             revert(string(abi.encodePacked("NFTUpdate: Update weight failed - ", reason)));
@@ -564,15 +546,21 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @return uint8 新等级
      */
     function upgradeWithToken(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
-        require(nftContract != address(0), "NFTUpdate: NFT contract not set");
-        require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
-        require(tokenContract != address(0), "E7: Token contract not set");
-        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address nftAddr = auth.getNFTMintCore();
+        address metadataAddr = auth.getNFTData();
+        address tokenAddr = auth.getToken();
+        address dividendAddr = auth.getDividendManager();
         
-        INFTMint nft = INFTMint(nftContract);
+        require(nftAddr != address(0), "NFTUpdate: NFT contract not set");
+        require(metadataAddr != address(0), "NFTUpdate: Metadata contract not set");
+        require(tokenAddr != address(0), "E7: Token contract not set");
+        require(dividendAddr != address(0), "NFTUpdate: Dividend manager not set");
+        
+        INFTMint nft = INFTMint(nftAddr);
         require(nft.ownerOf(tokenId) == msg.sender, "E15: Not owner");
         
-        INFTDataInterface m = INFTDataInterface(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataAddr);
         uint8 lv = m.tokenLevel(tokenId);
         require(lv < 5, "E16: Max level reached");
         
@@ -583,13 +571,13 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         else if (lv == 4) cost = level4UpgradeCost;
         else revert("E18: Invalid level");
         
-        IERC20 t = IERC20(tokenContract);
+        IERC20 t = IERC20(tokenAddr);
         require(t.balanceOf(msg.sender) >= cost, "E8: Insufficient balance");
         require(t.allowance(msg.sender, address(this)) >= cost, "E8: Insufficient allowance");
         t.safeTransferFrom(msg.sender, BLACK_HOLE, cost);
         
         NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
-        uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);
+        uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft, dividendAddr);
         emit TokenUpgraded(tokenId, zodiacType, lv, newLv, cost, msg.sender, uint64(block.timestamp));
         return newLv;
     }
@@ -600,26 +588,34 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @return uint8 新等级
      */
     function upgradeWithUSDValue(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
-        require(nftContract != address(0), "NFTUpdate: NFT contract not set");
-        require(metadataContract != address(0), "NFTUpdate: Metadata contract not set");
-        require(tokenContract != address(0), "NFTUpdate: Token contract not set");
-        require(dividendManager != address(0), "NFTUpdate: Dividend manager not set");
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address nftAddr = auth.getNFTMintCore();
+        address metadataAddr = auth.getNFTData();
+        address tokenAddr = auth.getToken();
+        address dividendAddr = auth.getDividendManager();
+        address priceOracleAddr = auth.getPriceOracle();
         
-        INFTMint nft = INFTMint(nftContract);
+        require(nftAddr != address(0), "NFTUpdate: NFT contract not set");
+        require(metadataAddr != address(0), "NFTUpdate: Metadata contract not set");
+        require(tokenAddr != address(0), "NFTUpdate: Token contract not set");
+        require(dividendAddr != address(0), "NFTUpdate: Dividend manager not set");
+        require(priceOracleAddr != address(0), "NFTUpdate: Price oracle not set");
+        
+        INFTMint nft = INFTMint(nftAddr);
         require(nft.ownerOf(tokenId) == msg.sender, "E15: Not owner");
         
-        INFTDataInterface m = INFTDataInterface(metadataContract);
+        INFTDataInterface m = INFTDataInterface(metadataAddr);
         uint8 lv = m.tokenLevel(tokenId);
         require(lv < 5, "E16: Max level reached");
         
         // 修复：减少局部变量，使用内部函数处理升级逻辑
-        return _upgradeWithUSDValueInternal(tokenId, lv, m, nft);
+        return _upgradeWithUSDValueInternal(tokenId, lv, m, nft, tokenAddr, dividendAddr, priceOracleAddr);
     }
     
     /**
      * @dev 使用USD价值升级（内部函数，减少栈深度）
      */
-    function _upgradeWithUSDValueInternal(uint256 tokenId, uint8 lv, INFTDataInterface m, INFTMint nft) internal returns (uint8) {
+    function _upgradeWithUSDValueInternal(uint256 tokenId, uint8 lv, INFTDataInterface m, INFTMint nft, address tokenAddr, address dividendAddr, address priceOracleAddr) internal returns (uint8) {
         uint256 usdValue;
         if (lv == 1) usdValue = level1USDUpgradeCost;
         else if (lv == 2) usdValue = level2USDUpgradeCost;
@@ -629,7 +625,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         
         require(usdValue > 0, "E22: USD upgrade cost not set");
         
-        uint256 price = _getTokenPriceInternal();
+        uint256 price = _getTokenPriceInternal(priceOracleAddr);
         require(price > 0, "E20: Price oracle returned zero");
         require(price >= 10**10, "E20: Price too low");
         
@@ -637,17 +633,17 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(cost > 0, "E21: Invalid cost");
         require(cost <= 10**30, "E21: Cost exceeds maximum");
         
-        IERC20(tokenContract).safeTransferFrom(msg.sender, BLACK_HOLE, cost);
+        IERC20(tokenAddr).safeTransferFrom(msg.sender, BLACK_HOLE, cost);
         
         NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
-        uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);
+        uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft, dividendAddr);
         _emitUSDValueUpgraded(tokenId, zodiacType, lv, newLv, usdValue, cost, price);
         return newLv;
     }
 
-    function _getTokenPriceInternal() internal view returns (uint256) {
-        require(priceOracle != address(0), "NFTUpdate: Price oracle not set");
-        return IPriceOracle(priceOracle).getTokenPriceUSD();
+    function _getTokenPriceInternal(address priceOracleAddr) internal view returns (uint256) {
+        require(priceOracleAddr != address(0), "NFTUpdate: Price oracle not set");
+        return IPriceOracle(priceOracleAddr).getTokenPriceUSD();
     }
 
     function _emitUSDValueUpgraded(uint256 tokenId, NFTDataTypes.ZodiacType zodiacType, uint8 lv, uint8 newLv, uint256 usdValue, uint256 cost, uint256 price) internal {
@@ -746,8 +742,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "NFTUpdate: Amount must be > 0");
-        require(tokenContract != address(0), "NFTUpdate: Token contract not set");
-        IERC20 token = IERC20(tokenContract);
+        address tokenAddr = IAuthorizer(authorizer).getToken();
+        require(tokenAddr != address(0), "NFTUpdate: Token contract not set");
+        IERC20 token = IERC20(tokenAddr);
         require(token.balanceOf(address(this)) >= amount, "NFTUpdate: Insufficient token balance");
         token.safeTransfer(owner(), amount);
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
