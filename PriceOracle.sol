@@ -6,6 +6,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "./NFTInterface.sol";
+import "./PriceLibrary.sol";
 
 /**
  * @title PriceOracle
@@ -484,47 +485,15 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 从DEX Router获取代币价格
-     * 通过代币->WBNB->USDT路径获取价格
      * @param router DEX路由地址
      * @return 代币价格（USD，精度18位），获取失败返回0
      */
     function _fetchTokenPrice(address router) internal view returns (uint256) {
-        address tokenAddress = IAuthorizer(authorizer).getToken();
-        address usdtAddress = IAuthorizer(authorizer).getUSDT();
-        address wbnb = IAuthorizer(authorizer).getWBNB();
-        
-        if (tokenAddress == address(0) || usdtAddress == address(0) || wbnb == address(0)) {
-            return 0;
-        }
-        
-        // 路径：代币 -> WBNB -> USDT
-        address[] memory path = new address[](3);
-        path[0] = tokenAddress;
-        path[1] = wbnb;
-        path[2] = usdtAddress;
-        
-        try IDexRouter(router).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
-            if (amounts.length == 3 && amounts[2] > 0) {
-                // amounts[2] 是 USDT 数量（6位精度）
-                // 转换为 USD 价格（18位精度）
-                return amounts[2] * 10**12;
-            }
-        } catch {}
-        
-        // 备用：尝试直接路径 代币 -> USDT
-        address[] memory directPath = new address[](2);
-        directPath[0] = tokenAddress;
-        directPath[1] = usdtAddress;
-        
-        try IDexRouter(router).getAmountsOut(10**18, directPath) returns (uint256[] memory amounts) {
-            if (amounts.length == 2 && amounts[1] > 0) {
-                return amounts[1] * 10**12;
-            }
-        } catch {}
-        
-        return 0;
+        if (router == address(0)) return 0;
+        IAuthorizer auth = IAuthorizer(authorizer);
+        return PriceLibrary.getPriceFromRouter(router, auth.getToken(), auth.getWBNB(), auth.getUSDT());
     }
-    
+
     /**
      * @dev 从手动设置的Pair地址获取代币价格
      * 优先使用手动设置的Pair，绕过Router
@@ -532,12 +501,9 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 代币价格（USD，精度18位），获取失败返回0
      */
     function _getPriceFromManualPairs(uint8 dexType) internal view returns (uint256) {
-        address tokenAddress = IAuthorizer(authorizer).getToken();
-        address wbnb = IAuthorizer(authorizer).getWBNB();
-        
-        if (tokenAddress == address(0) || wbnb == address(0)) {
-            return 0;
-        }
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address tokenAddress = auth.getToken();
+        address wbnb = auth.getWBNB();
         
         // 获取对应DEX的Pair地址
         address pair;
@@ -551,29 +517,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             return 0;
         }
         
-        if (pair == address(0)) {
-            return 0;
-        }
-        
-        // 直接从Pair获取储备计算价格
-        try IPancakeSwapPair(pair).getReserves() returns (uint112 reserve0, uint112 reserve1, uint32) {
-            address token0 = IPancakeSwapPair(pair).token0();
-            uint256 tokenReserve = token0 == tokenAddress ? uint256(reserve0) : uint256(reserve1);
-            uint256 wbnbReserve = token0 == tokenAddress ? uint256(reserve1) : uint256(reserve0);
-            
-            if (tokenReserve > 0 && wbnbReserve > 0) {
-                // 使用手动设置的WBNB-USDT Pair或通过Router获取
-                uint256 usdtPrice = _getWbnbUsdtPrice();
-                if (usdtPrice > 0) {
-                    // 计算：1 token = (wbnbReserve / tokenReserve) * usdtPrice USD
-                    uint256 wbnbPerToken = (wbnbReserve * 1e18) / tokenReserve;
-                    uint256 tokenPrice = (wbnbPerToken * usdtPrice) / 1e18;
-                    return tokenPrice * 10**12;
-                }
-            }
-        } catch {}
-        
-        return 0;
+        return PriceLibrary.getPriceFromPairs(pair, wbnbUsdtPair, tokenAddress, wbnb, auth.getUSDT());
     }
     
     /**
@@ -582,39 +526,20 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return WBNB价格（USD，精度18位）
      */
     function _getWbnbUsdtPrice() internal view returns (uint256) {
-        address usdtAddress = IAuthorizer(authorizer).getUSDT();
-        address wbnb = IAuthorizer(authorizer).getWBNB();
-        
-        if (usdtAddress == address(0) || wbnb == address(0)) {
-            return 0;
-        }
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address usdtAddress = auth.getUSDT();
+        address wbnb = auth.getWBNB();
         
         // 优先使用手动设置的WBNB-USDT Pair
-        if (wbnbUsdtPair != address(0)) {
-            try IPancakeSwapPair(wbnbUsdtPair).getReserves() returns (uint112 reserve0, uint112 reserve1, uint32) {
-                address token0 = IPancakeSwapPair(wbnbUsdtPair).token0();
-                uint256 wbnbReserve = token0 == wbnb ? uint256(reserve0) : uint256(reserve1);
-                uint256 usdtReserve = token0 == wbnb ? uint256(reserve1) : uint256(reserve0);
-                
-                if (wbnbReserve > 0 && usdtReserve > 0) {
-                    // usdtReserve 是6位精度
-                    return (usdtReserve * 1e18) / wbnbReserve;
-                }
-            } catch {}
+        uint256 price = PriceLibrary.getWbnbUsdtPriceFromPair(wbnbUsdtPair, wbnb, usdtAddress);
+        if (price > 0) {
+            return price;
         }
         
         // 备用：通过Router获取
-        address flapSwapRouter = IAuthorizer(authorizer).getFlapSwapRouter();
+        address flapSwapRouter = auth.getFlapSwapRouter();
         if (flapSwapRouter != address(0)) {
-            address[] memory path = new address[](2);
-            path[0] = wbnb;
-            path[1] = usdtAddress;
-            
-            try IDexRouter(flapSwapRouter).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
-                if (amounts.length == 2 && amounts[1] > 0) {
-                    return amounts[1] * 10**12;
-                }
-            } catch {}
+            return PriceLibrary.getETHPriceFromRouter(flapSwapRouter, wbnb, usdtAddress);
         }
         
         return 0;
@@ -622,32 +547,13 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     
     /**
      * @dev 从指定DEX Router获取ETH价格
-     * 通过WBNB->USDT路径获取价格
      * @param router DEX路由地址
      * @return ETH价格（USD，精度18位），获取失败返回0
      */
     function _fetchETHPrice(address router) internal view returns (uint256) {
-        address usdtAddress = IAuthorizer(authorizer).getUSDT();
-        address wbnb = IAuthorizer(authorizer).getWBNB();
-        
-        if (usdtAddress == address(0) || wbnb == address(0)) {
-            return 0;
-        }
-        
-        // 路径：WBNB -> USDT
-        address[] memory path = new address[](2);
-        path[0] = wbnb;
-        path[1] = usdtAddress;
-        
-        try IDexRouter(router).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
-            if (amounts.length == 2 && amounts[1] > 0) {
-                // amounts[1] 是 USDT 数量（6位精度）
-                // 转换为 USD 价格（18位精度）
-                return amounts[1] * 10**12;
-            }
-        } catch {}
-        
-        return 0;
+        if (router == address(0)) return 0;
+        IAuthorizer auth = IAuthorizer(authorizer);
+        return PriceLibrary.getETHPriceFromRouter(router, auth.getWBNB(), auth.getUSDT());
     }
 
     /**

@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "./NFTDataType.sol";
 import "./NFTInterface.sol";
 import "./NFTLib.sol";
+import "./PriceLibrary.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
@@ -913,37 +914,14 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @return 代币价格（USD，精度18位），获取失败返回0
      */
     function _getPriceFromManualPair(address pair) internal view returns (uint256) {
-        if (pair == address(0) || tokenContract == address(0)) {
-            return 0;
-        }
-        
         IAuthorizer auth = IAuthorizer(authorizer);
-        address wbnb = auth.getWBNB();
-        address usdt = auth.getUSDT();
-        
-        if (wbnb == address(0) || usdt == address(0)) {
-            return 0;
-        }
-        
-        // 直接从Pair获取储备计算价格
-        try IPancakeSwapPair(pair).getReserves() returns (uint112 reserve0, uint112 reserve1, uint32) {
-            address token0 = IPancakeSwapPair(pair).token0();
-            uint256 tokenReserve = token0 == tokenContract ? uint256(reserve0) : uint256(reserve1);
-            uint256 wbnbReserve = token0 == tokenContract ? uint256(reserve1) : uint256(reserve0);
-            
-            if (tokenReserve > 0 && wbnbReserve > 0) {
-                // 获取WBNB-USDT价格
-                uint256 usdtPrice = _getWbnbUsdtPrice();
-                if (usdtPrice > 0) {
-                    // 计算：1 token = (wbnbReserve / tokenReserve) * usdtPrice USD
-                    uint256 wbnbPerToken = (wbnbReserve * 1e18) / tokenReserve;
-                    uint256 tokenPrice = (wbnbPerToken * usdtPrice) / 1e18;
-                    return tokenPrice * 10**12;
-                }
-            }
-        } catch {}
-        
-        return 0;
+        return PriceLibrary.getPriceFromPairs(
+            pair,
+            wbnbUsdtPair,
+            tokenContract,
+            auth.getWBNB(),
+            auth.getUSDT()
+        );
     }
     
     /**
@@ -953,39 +931,17 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     function _getWbnbUsdtPrice() internal view returns (uint256) {
         IAuthorizer auth = IAuthorizer(authorizer);
-        address usdt = auth.getUSDT();
-        address wbnb = auth.getWBNB();
-        
-        if (usdt == address(0) || wbnb == address(0)) {
-            return 0;
-        }
         
         // 优先使用手动设置的WBNB-USDT Pair
-        if (wbnbUsdtPair != address(0)) {
-            try IPancakeSwapPair(wbnbUsdtPair).getReserves() returns (uint112 reserve0, uint112 reserve1, uint32) {
-                address token0 = IPancakeSwapPair(wbnbUsdtPair).token0();
-                uint256 wbnbReserve = token0 == wbnb ? uint256(reserve0) : uint256(reserve1);
-                uint256 usdtReserve = token0 == wbnb ? uint256(reserve1) : uint256(reserve0);
-                
-                if (wbnbReserve > 0 && usdtReserve > 0) {
-                    // usdtReserve 是6位精度
-                    return (usdtReserve * 1e18) / wbnbReserve;
-                }
-            } catch {}
+        uint256 price = PriceLibrary.getWbnbUsdtPriceFromPair(wbnbUsdtPair, auth.getWBNB(), auth.getUSDT());
+        if (price > 0) {
+            return price;
         }
         
         // 备用：通过Router获取
         address flapSwapRouter = auth.getFlapSwapRouter();
         if (flapSwapRouter != address(0)) {
-            address[] memory path = new address[](2);
-            path[0] = wbnb;
-            path[1] = usdt;
-            
-            try IDexRouter(flapSwapRouter).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
-                if (amounts.length == 2 && amounts[1] > 0) {
-                    return amounts[1] * 10**12;
-                }
-            } catch {}
+            return PriceLibrary.getETHPriceFromRouter(flapSwapRouter, auth.getWBNB(), auth.getUSDT());
         }
         
         return 0;
@@ -993,7 +949,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     
     /**
      * @dev 从特定DEX Router获取代币价格
-     * 通过代币->WBNB->USDT路径获取价格，优先从Pair获取
      * @param router DEX路由地址
      * @return 代币价格（USD，精度18位），获取失败返回0
      */
@@ -1003,39 +958,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         }
         
         IAuthorizer auth = IAuthorizer(authorizer);
-        address usdtAddress = auth.getUSDT();
-        address wbnbAddress = auth.getWBNB();
-        
-        if (usdtAddress == address(0) || wbnbAddress == address(0)) {
-            return 0;
-        }
-        
-        // 路径：代币 -> WBNB -> USDT
-        address[] memory path = new address[](3);
-        path[0] = tokenContract;
-        path[1] = wbnbAddress;
-        path[2] = usdtAddress;
-        
-        try IDexRouter(router).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
-            if (amounts.length == 3 && amounts[2] > 0) {
-                // amounts[2] 是 USDT 数量（6位精度）
-                // 转换为 USD 价格（18位精度）
-                return amounts[2] * 10**12;
-            }
-        } catch {}
-        
-        // 备用：尝试直接路径 代币 -> USDT
-        address[] memory directPath = new address[](2);
-        directPath[0] = tokenContract;
-        directPath[1] = usdtAddress;
-        
-        try IDexRouter(router).getAmountsOut(10**18, directPath) returns (uint256[] memory amounts) {
-            if (amounts.length == 2 && amounts[1] > 0) {
-                return amounts[1] * 10**12;
-            }
-        } catch {}
-        
-        return 0;
+        return PriceLibrary.getPriceFromRouter(router, tokenContract, auth.getWBNB(), auth.getUSDT());
     }
     
     /**
