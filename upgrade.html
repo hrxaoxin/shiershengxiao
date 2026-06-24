@@ -403,16 +403,17 @@
                 document.getElementById('tokenCost3').textContent = cost3;
                 document.getElementById('tokenCost4').textContent = cost4;
                 
-                // 更新USD价值升级费用显示
-                const usd1 = (parseInt(usdCost1) / 10**18).toLocaleString();
-                const usd2 = (parseInt(usdCost2) / 10**18).toLocaleString();
-                const usd3 = (parseInt(usdCost3) / 10**18).toLocaleString();
-                const usd4 = (parseInt(usdCost4) / 10**18).toLocaleString();
+                // 更新USD价值升级费用显示（支持小数点，当合约返回0时使用默认值）
+                const defaultUsdCosts = [0.01, 0.04, 0.12, 0.48]; // 默认USD费用（用户已修改）
+                const usd1 = parseInt(usdCost1) > 0 ? (parseInt(usdCost1) / 10**18).toFixed(4) : defaultUsdCosts[0].toFixed(4);
+                const usd2 = parseInt(usdCost2) > 0 ? (parseInt(usdCost2) / 10**18).toFixed(4) : defaultUsdCosts[1].toFixed(4);
+                const usd3 = parseInt(usdCost3) > 0 ? (parseInt(usdCost3) / 10**18).toFixed(4) : defaultUsdCosts[2].toFixed(4);
+                const usd4 = parseInt(usdCost4) > 0 ? (parseInt(usdCost4) / 10**18).toFixed(4) : defaultUsdCosts[3].toFixed(4);
                 
-                document.getElementById('usdCost1').textContent = usd1;
-                document.getElementById('usdCost2').textContent = usd2;
-                document.getElementById('usdCost3').textContent = usd3;
-                document.getElementById('usdCost4').textContent = usd4;
+                document.getElementById('usdCost1').textContent = parseFloat(usd1).toString();
+                document.getElementById('usdCost2').textContent = parseFloat(usd2).toString();
+                document.getElementById('usdCost3').textContent = parseFloat(usd3).toString();
+                document.getElementById('usdCost4').textContent = parseFloat(usd4).toString();
                 
                 console.log('Upgrade costs loaded from contract:', { cost1, cost2, cost3, cost4, usd1, usd2, usd3, usd4 });
             } catch (error) {
@@ -558,17 +559,11 @@
                 requiredUSDDisplay = requiredUSD + ' USDT';
                 
                 try {
-                    const priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
-                    let price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
-                    console.log('selectNFT - raw price from oracle:', price.toString());
-                    
-                    // 修复：PriceOracle合约中返回的价格错误地乘以了10^12
-                    // amounts[2]已经是18位精度的USDT，再乘以10^12会导致价格被放大10^12倍
-                    // 需要除以10^12来得到正确的18位精度价格
-                    price = price / 10n**12n;
-                    console.log('selectNFT - corrected price:', price.toString());
-                    
-                    if (price > 0n) {
+                const priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
+                const price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
+                console.log('selectNFT - price from oracle:', price.toString());
+                
+                if (price > 0n) {
                         // 公式: tokenAmount(18位精度) = usdAmountWei(18位精度) * 1e18 / price(18位精度)
                         // requiredUSDWei 是18位精度的USDT数量，price 是18位精度的代币价格(每个代币价值多少USDT wei)
                         const tokenAmount = BigInt(requiredUSDWei) * 10n**18n / price;
@@ -951,6 +946,7 @@
                 }
                 if (contractPriceOracle.toLowerCase() !== expectedPriceOracle.toLowerCase()) {
                     console.warn('NFTUpdate.priceOracle mismatch:', contractPriceOracle, 'vs expected:', expectedPriceOracle);
+                    ZODIAC_UI.showToast('警告：合约价格预言机地址与配置不一致，可能影响计算准确性', 'warning');
                 }
             } catch (e) {
                 console.error('检查priceOracle地址失败:', e);
@@ -970,18 +966,12 @@
             
             try {
                 priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
-                let rawPrice = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
-                console.log('Raw price from oracle:', rawPrice.toString());
-                
-                // 修复：PriceOracle合约中返回的价格错误地乘以了10^12
-                // amounts[2]已经是18位精度的USDT，再乘以10^12会导致价格被放大10^12倍
-                // 需要除以10^12来得到正确的18位精度价格
-                price = rawPrice / 10n**12n;
-                console.log('Corrected price:', price.toString());
+                price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
+                console.log('Price from oracle:', price.toString());
                 
                 // 检查价格是否有效（合约要求 price >= 10^10）
                 const MIN_PRICE = 10n**10n;
-                if (rawPrice <= 0n) {
+                if (price <= 0n) {
                     ZODIAC_UI.showToast('价格数据无效（返回0），请联系管理员更新价格', 'error');
                     return;
                 }
@@ -1122,20 +1112,24 @@
             const levelNum = parseInt(level, 10);
             console.log('getUSDValue called with level:', level, 'levelNum:', levelNum);
             
-            // 始终使用硬编码值（wei格式），避免合约调用错误
+            // 使用用户修改后的USD费用（带小数点）
+            // 0.01 USDT = 10000000000000000 wei
+            // 0.04 USDT = 40000000000000000 wei
+            // 0.12 USDT = 120000000000000000 wei
+            // 0.48 USDT = 480000000000000000 wei
             switch (levelNum) {
                 case 1: 
-                    console.log('Returning 1 USDT (1e18 wei)');
-                    return '1000000000000000000';  // 1 USDT
+                    console.log('Returning 0.01 USDT (1e16 wei)');
+                    return '10000000000000000';  // 0.01 USDT
                 case 2: 
-                    console.log('Returning 4 USDT (4e18 wei)');
-                    return '4000000000000000000';  // 4 USDT
+                    console.log('Returning 0.04 USDT (4e16 wei)');
+                    return '40000000000000000';  // 0.04 USDT
                 case 3: 
-                    console.log('Returning 12 USDT (12e18 wei)');
-                    return '12000000000000000000'; // 12 USDT
+                    console.log('Returning 0.12 USDT (1.2e17 wei)');
+                    return '120000000000000000'; // 0.12 USDT
                 case 4: 
-                    console.log('Returning 48 USDT (48e18 wei)');
-                    return '48000000000000000000'; // 48 USDT
+                    console.log('Returning 0.48 USDT (4.8e17 wei)');
+                    return '480000000000000000'; // 0.48 USDT
                 default: 
                     console.log('Returning 0 for level:', levelNum);
                     return '0';
