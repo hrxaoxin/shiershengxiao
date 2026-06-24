@@ -640,7 +640,7 @@
                 ${level < 5 ? `
                 <div id="upgradeCostPreview" class="p-4 bg-blue-50 rounded-lg">
                     <div class="text-sm text-blue-600 font-medium mb-2">📈 升级费用预览</div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-3 gap-4">
                         <div>
                             <span class="text-xs text-gray-500">使用NFT升级</span>
                             <p class="text-lg font-bold text-gray-800">${requiredNFTs} 张相同类型NFT</p>
@@ -650,6 +650,11 @@
                             <span class="text-xs text-gray-500">使用代币升级</span>
                             <p class="text-lg font-bold text-gray-800">${requiredTokens.toLocaleString()} Token</p>
                             <p class="text-xs text-gray-400 mt-1">代币将被销毁</p>
+                        </div>
+                        <div>
+                            <span class="text-xs text-gray-500">使用USDT价值升级</span>
+                            <p class="text-lg font-bold text-gray-800">${(level == 1 ? '1' : level == 2 ? '4' : level == 3 ? '12' : level == 4 ? '48' : '0')} USDT</p>
+                            <p class="text-xs text-gray-400 mt-1">基于实时价格</p>
                         </div>
                     </div>
                     <div class="mt-3 p-3 bg-yellow-50 rounded-lg">
@@ -852,7 +857,7 @@
         async function handleUpgradeWithUSDValue() {
             if (!selectedNft) return;
             if (parseInt(selectedNft.level) >= 5) return;
-            if (!nftUpdateContract || !account) {
+            if (!nftUpdateContract || !account || !tokenContract) {
                 ZODIAC_UI.showToast('合约未初始化', 'error');
                 return;
             }
@@ -872,21 +877,42 @@
             const requiredUSD = await getUSDValue(selectedNft.level);
             const nftId = parseInt(selectedNft.id, 10);
             
-            // 检查价格有效性
+            // 获取当前代币价格并计算所需代币数量
+            let priceOracleContract;
+            let price = 0;
+            let requiredTokens = 0;
             try {
-                const priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
-                const price = await priceOracleContract.methods.getTokenPriceUSD().call();
-                if (parseInt(price) <= 0) {
+                priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
+                price = await priceOracleContract.methods.getTokenPriceUSD().call();
+                price = parseInt(price);
+                
+                if (price <= 0) {
                     ZODIAC_UI.showToast('价格数据过期，请稍后重试', 'error');
                     return;
                 }
+                
+                // 计算所需代币数量: tokenAmount = usdAmount * 1e18 / tokenPriceUSD
+                requiredTokens = Math.ceil((requiredUSD * 1e18) / price);
             } catch (e) {
-                console.warn('检查价格有效性失败:', e);
+                console.error('获取代币价格失败:', e);
+                ZODIAC_UI.showToast('获取代币价格失败，请稍后重试', 'error');
+                return;
+            }
+
+            // 检查用户代币余额
+            try {
+                const balance = await tokenContract.methods.balanceOf(account).call();
+                if (BigInt(balance) < BigInt(requiredTokens)) {
+                    ZODIAC_UI.showToast('代币余额不足，需要 ' + (requiredTokens / 1e18).toFixed(4) + ' Token', 'error');
+                    return;
+                }
+            } catch (e) {
+                console.error('检查代币余额失败:', e);
             }
 
             const confirmed = await ZODIAC_UI.showConfirmModal(
                 '升级确认',
-                '确认使用USDT价值升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗价值 ' + requiredUSD + ' USDT的代币'
+                '确认使用USDT价值升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗价值 ' + requiredUSD + ' USDT的代币（约 ' + (requiredTokens / 1e18).toFixed(4) + ' Token）'
             );
 
             if (!confirmed) return;
@@ -894,22 +920,19 @@
             try {
                 ZODIAC_UI.showLoading('检查授权...');
                 
-                // 检查代币授权（USDT价值升级也需要代币授权）
-                if (tokenContract) {
-                    const allowance = await tokenContract.methods.allowance(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
-                    const maxAllowance = '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff';
-                    if (BigInt(allowance) < BigInt(maxAllowance)) {
-                        ZODIAC_UI.showLoading('请求授权...');
-                        await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, maxAllowance).send({ from: account, gas: 100000 });
-                    }
+                // 检查代币授权
+                const allowance = await tokenContract.methods.allowance(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
+                if (BigInt(allowance) < BigInt(requiredTokens)) {
+                    ZODIAC_UI.showLoading('请求授权...');
+                    await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff').send({ from: account, gas: 100000 });
                 }
                 
                 ZODIAC_UI.showLoading('升级中，请确认钱包交易...');
                 
-                // 直接调用合约
+                // 调用合约升级
                 const result = await nftUpdateContract.methods.upgradeWithUSDValue(nftId).send({ 
                     from: account, 
-                    gas: 1500000 
+                    gas: 2000000 
                 });
                 
                 ZODIAC_UI.hideLoading();
@@ -925,6 +948,8 @@
                 let errorMsg = error.message || error.toString();
                 if (errorMsg.includes('User denied') || errorMsg.includes('user rejected')) {
                     errorMsg = '用户取消了交易';
+                } else if (errorMsg.includes('reverted')) {
+                    errorMsg = '交易失败，请检查代币余额和授权';
                 }
                 ZODIAC_UI.showToast('升级失败: ' + errorMsg, 'error');
             }
