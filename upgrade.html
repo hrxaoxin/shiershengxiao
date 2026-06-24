@@ -874,8 +874,9 @@
             
             // 检查价格有效性
             try {
-                const isPriceValid = await window.ZODIAC_WEB3.isTokenPriceValid();
-                if (!isPriceValid) {
+                const priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
+                const price = await priceOracleContract.methods.getTokenPriceUSD().call();
+                if (parseInt(price) <= 0) {
                     ZODIAC_UI.showToast('价格数据过期，请稍后重试', 'error');
                     return;
                 }
