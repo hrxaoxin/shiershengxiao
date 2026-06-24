@@ -901,12 +901,33 @@
         }
 
         async function handleUpgradeWithUSDValue() {
-            if (!selectedNft) return;
-            if (parseInt(selectedNft.level) >= 5) return;
+            console.log('handleUpgradeWithUSDValue called');
+            ZODIAC_UI.showToast('正在处理USDT价值升阶...', 'info');
+            
+            console.log('selectedNft:', selectedNft);
+            
+            if (!selectedNft) {
+                console.log('handleUpgradeWithUSDValue - selectedNft is null');
+                ZODIAC_UI.showToast('请先选择一个NFT', 'error');
+                return;
+            }
+            
+            if (parseInt(selectedNft.level) >= 5) {
+                console.log('handleUpgradeWithUSDValue - level >= 5');
+                return;
+            }
+            
             if (!nftUpdateContract || !account || !tokenContract) {
+                console.log('handleUpgradeWithUSDValue - contracts not initialized:', {
+                    nftUpdateContract: !!nftUpdateContract,
+                    account: !!account,
+                    tokenContract: !!tokenContract
+                });
                 ZODIAC_UI.showToast('合约未初始化', 'error');
                 return;
             }
+            
+            console.log('handleUpgradeWithUSDValue - proceeding with upgrade');
             
             // 检查合约是否暂停
             try {
@@ -1000,14 +1021,21 @@
             // 检查用户代币余额
             try {
                 const balance = BigInt(await tokenContract.methods.balanceOf(account).call());
+                const balanceDisplay = (Number(balance) / 1e18).toFixed(4);
+                console.log('User token balance:', balanceDisplay, 'Required:', requiredTokensDisplay);
+                
                 if (balance < requiredTokens) {
-                    ZODIAC_UI.showToast('代币余额不足，需要 ' + requiredTokensDisplay + ' Token', 'error');
+                    ZODIAC_UI.showToast(`代币余额不足！当前: ${balanceDisplay} Token，需要: ${requiredTokensDisplay} Token`, 'error');
                     return;
                 }
             } catch (e) {
                 console.error('检查代币余额失败:', e);
+                ZODIAC_UI.showToast('检查代币余额失败，请重试', 'error');
+                return;
             }
 
+            console.log('Showing confirm modal with:', { nftId, level: selectedNft.level, requiredUSD, requiredTokensDisplay });
+            
             const confirmed = await ZODIAC_UI.showConfirmModal(
                 '升级确认',
                 '确认使用USDT价值升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗价值 ' + requiredUSD + ' USDT的代币（约 ' + requiredTokensDisplay + ' Token）'
