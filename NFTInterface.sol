@@ -805,13 +805,8 @@ interface IRewardManager {
  */
 interface IPriceOracle {
     function getTokenPriceUSD() external view returns (uint256);
-    function getTokenPrice() external view returns (uint256);
-    function isTokenPriceValid() external view returns (bool);
-    function updatePrices(uint256 _tokenPriceUSD, uint256 _ethPriceUSD) external;
-    function proposeTokenPrice(uint256 _newPrice) external;
-    function lastPriceUpdateTime() external view returns (uint256);
-    function getAllDEXPrices() external view returns (uint256[] memory prices, uint256 lowestPrice, uint8 bestDEX);
-    function getEffectiveTokenPrice() external view returns (uint256);
+    function getPriceInUSD(uint256 tokenAmount) external view returns (uint256);
+    function getTokensForUSD(uint256 usdAmount) external view returns (uint256);
 }
 
 /**

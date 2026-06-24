@@ -118,7 +118,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     address public metadataContract;
     address public dividendManager;
     address public priceOracle;
-    address public pancakeSwapPair;
     
     /** @dev 各级别升级费用（代币数量，含精度18位） */
     uint256 public level1UpgradeCost = 10000 * 10**18;
@@ -185,13 +184,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         priceOracle = auth.getPriceOracle();
     }
 
-    /**
-     * @dev 设置PancakeSwap交易对地址
-     * @param pair PancakeSwap交易对地址
-     */
-    function setPancakeSwapPair(address pair) external onlyOwner {
-        pancakeSwapPair = pair;
-    }
     
     /**
      * @dev 升级授权函数
@@ -655,24 +647,12 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     function _getTokenPriceInternal() internal view returns (uint256) {
         require(priceOracle != address(0), "NFTUpdate: Price oracle not set");
-        return IPriceOracle(priceOracle).getEffectiveTokenPrice();
+        return IPriceOracle(priceOracle).getTokenPriceUSD();
     }
 
     function _emitUSDValueUpgraded(uint256 tokenId, NFTDataTypes.ZodiacType zodiacType, uint8 lv, uint8 newLv, uint256 usdValue, uint256 cost, uint256 price) internal {
         emit USDValueUpgraded(tokenId, zodiacType, lv, newLv, usdValue, cost, price, msg.sender, uint64(block.timestamp));
     }
-    
-    /**
-     * @dev 公开函数：获取所有DEX的价格（供前端展示）
-     * @return prices 价格数组（索引0=FlapSwap, 1=PancakeSwap）
-     * @return lowestPrice 最低价格
-     * @return bestDEX 最佳DEX索引
-     */
-    function getAllDEXPrices() external view returns (uint256[] memory prices, uint256 lowestPrice, uint8 bestDEX) {
-        require(priceOracle != address(0), "NFTUpdate: Price oracle not set");
-        return IPriceOracle(priceOracle).getAllDEXPrices();
-    }
-
     /**
      * @dev NFT销毁事件
      * @param cardId NFT ID
