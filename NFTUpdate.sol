@@ -4,12 +4,11 @@ pragma solidity ^0.8.20;
 import "./NFTDataType.sol";
 import "./NFTInterface.sol";
 import "./NFTLib.sol";
-import "./PriceLibrary.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title NFTUpdate
@@ -121,35 +120,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     address public priceOracle;
     address public pancakeSwapPair;
     
-    /** @dev 手动设置的Pair地址（绕过Router直接从Pair获取价格）
-     * flapSwapPair_WBNB: FlapSwap的代币-WBNB Pair地址
-     * pancakeSwapPair_WBNB: PancakeSwap的代币-WBNB Pair地址
-     * uniswapPair_WBNB: Uniswap的代币-WBNB Pair地址
-     * wbnbUsdtPair: WBNB-USDT Pair地址（用于计算代币-USDT价格）
-     */
-    address public flapSwapPair_WBNB;
-    address public pancakeSwapPair_WBNB;
-    address public uniswapPair_WBNB;
-    address public wbnbUsdtPair;
-
-    /** @dev 最小PancakeSwap流动性（防止价格操纵） */
-    uint256 public minPancakeSwapLiquidity;
-
-    /** @dev 价格过期时间（秒），默认1小时 */
-    uint256 public priceExpirySeconds = 3600;
-    /** @dev 价格波动保护阈值（千分比，默认5000 = 50%） */
-    uint256 public priceDeviationThreshold = 5000;
-    /** @dev 上次价格 */
-    uint256 public lastPrice;
-    /** @dev 上次价格更新时间 */
-    uint256 public lastPriceUpdateTime;
-    /** @dev 上次价格更新时的区块号（防止同一区块内价格操纵） */
-    uint256 public lastPriceUpdateBlock;
-    /** @dev 价格更新最小区块间隔（默认1个区块） */
-    uint256 public minPriceUpdateBlocks = 1;
-    /** @dev 价格更新最小时间间隔（秒）- 防止快速出块链上的时间窗口攻击 */
-    uint256 public minPriceUpdateSeconds = 60;
-
     /** @dev 各级别升级费用（代币数量，含精度18位） */
     uint256 public level1UpgradeCost = 10000 * 10**18;
     uint256 public level2UpgradeCost = 40000 * 10**18;
@@ -190,16 +160,11 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         _syncContractAddresses();
         
         // 初始化带默认值的参数
-        priceExpirySeconds = 3600;
-        priceDeviationThreshold = 5000;
-        minPriceUpdateBlocks = 1;
-        minPriceUpdateSeconds = 60;
         level1UpgradeCost = 10000 * 10**18;
         level2UpgradeCost = 40000 * 10**18;
         level3UpgradeCost = 120000 * 10**18;
         level4UpgradeCost = 480000 * 10**18;
         usdUpgradeHidden = true;
-        minPancakeSwapLiquidity = 10**15;
         
         // 初始化 USD 升级费用
         level1USDUpgradeCost = 1e18;      // 1 USDT
@@ -229,52 +194,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
     
     /**
-     * @dev 设置FlapSwap的代币-WBNB Pair地址
-     * @param pair Pair地址
-     */
-    function setFlapSwapPair(address pair) external onlyOwner {
-        flapSwapPair_WBNB = pair;
-    }
-    
-    /**
-     * @dev 设置PancakeSwap的代币-WBNB Pair地址
-     * @param pair Pair地址
-     */
-    function setPancakeSwapPairWBNB(address pair) external onlyOwner {
-        pancakeSwapPair_WBNB = pair;
-    }
-    
-    /**
-     * @dev 设置Uniswap的代币-WBNB Pair地址
-     * @param pair Pair地址
-     */
-    function setUniswapPair(address pair) external onlyOwner {
-        uniswapPair_WBNB = pair;
-    }
-    
-    /**
-     * @dev 设置WBNB-USDT Pair地址
-     * @param pair Pair地址
-     */
-    function setWbnbUsdtPair(address pair) external onlyOwner {
-        wbnbUsdtPair = pair;
-    }
-    
-    /**
-     * @dev 批量设置所有Pair地址
-     * @param _flapSwapPair FlapSwap的代币-WBNB Pair地址
-     * @param _pancakeSwapPair PancakeSwap的代币-WBNB Pair地址
-     * @param _uniswapPair Uniswap的代币-WBNB Pair地址
-     * @param _wbnbUsdtPair WBNB-USDT Pair地址
-     */
-    function setAllPairs(address _flapSwapPair, address _pancakeSwapPair, address _uniswapPair, address _wbnbUsdtPair) external onlyOwner {
-        flapSwapPair_WBNB = _flapSwapPair;
-        pancakeSwapPair_WBNB = _pancakeSwapPair;
-        uniswapPair_WBNB = _uniswapPair;
-        wbnbUsdtPair = _wbnbUsdtPair;
-    }
-    
-    /**
      * @dev 升级授权函数
      */
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -299,33 +218,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "NFTUpdate: Invalid authorizer address");
         authorizer = _authorizerAddress;
-    }
-
-    /**
-     * @dev 设置价格过期时间
-     * @param seconds_ 过期时间（秒）
-     */
-    function setPriceExpirySeconds(uint256 seconds_) external onlyOwner {
-        require(seconds_ > 0, "NFTUpdate: expiry must be > 0");
-        priceExpirySeconds = seconds_;
-    }
-
-    /**
-     * @dev 设置价格波动保护阈值（千分比）
-     * @param threshold 阈值（0-10000）
-     */
-    function setPriceDeviationThreshold(uint256 threshold) external onlyOwner {
-        require(threshold <= 10000, "NFTUpdate: threshold <= 10000");
-        priceDeviationThreshold = threshold;
-    }
-
-    /**
-     * @dev 重置价格缓存
-     */
-    function resetPriceCache() external onlyOwner {
-        lastPrice = 0;
-        lastPriceUpdateTime = 0;
-        lastPriceUpdateBlock = 0;
     }
 
     /**
@@ -478,57 +370,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         ];
     }
 
-    /**
-     * @dev 设置最小PancakeSwap流动性要求
-     * @param minLiq 最小流动性数量
-     */
-    function setMinPancakeSwapLiquidity(uint256 minLiq) external onlyOwner {
-        minPancakeSwapLiquidity = minLiq;
-    }
-
-    /**
-     * @dev 从PancakeSwap获取代币价格（USD）
-     * @return uint256 代币价格（精度18位）
-     */
-    function getTokenPriceFromPancakeSwap() public view returns (uint256) {
-        require(pancakeSwapPair != address(0), "E24: PancakeSwap pair not set");
-        
-        IPancakeSwapPair pair = IPancakeSwapPair(pancakeSwapPair);
-        (uint112 reserve0, uint112 reserve1, ) = pair.getReserves();
-        // 修复：添加最小流动性检查，防止低流动性 pair 被操纵价格
-        require(reserve0 > 0 && reserve1 > 0, "E25: Insufficient liquidity");
-        
-        address token0 = pair.token0();
-        address token1 = pair.token1();
-
-        // 修复：校验 pair 确实包含 tokenContract，防止设置假 pair 导致价格异常
-        require(token0 == tokenContract || token1 == tokenContract, "E26: Token not in pair");
-        
-        uint8 decimals0 = 18;
-        uint8 decimals1 = 18;
-        
-        if (token0 == tokenContract) {
-            // 修复：对代币侧（本项目代币）的流动性进行下限校验
-            require(uint256(reserve0) >= minPancakeSwapLiquidity, "E25: Token side liquidity too low");
-            try IBEP20(token1).decimals() returns (uint8 d) {
-                decimals1 = d;
-            } catch {}
-            
-            uint256 price = (uint256(reserve1) * 10**18) / uint256(reserve0);
-            return _adjustPriceDecimals(price, decimals1);
-        } else {
-            // token1 == tokenContract
-            // 修复：对代币侧（本项目代币）的流动性进行下限校验
-            require(uint256(reserve1) >= minPancakeSwapLiquidity, "E25: Token side liquidity too low");
-            try IBEP20(token0).decimals() returns (uint8 d) {
-                decimals0 = d;
-            } catch {}
-            
-            uint256 price = (uint256(reserve0) * 10**18) / uint256(reserve1);
-            return _adjustPriceDecimals(price, decimals0);
-        }
-    }
-    
     /**
      * @dev 调整价格的小数位数（内部函数）
      * @param price 原始价格
@@ -787,7 +628,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 使用USD价值升级（内部函数，减少栈深度）
      */
     function _upgradeWithUSDValueInternal(uint256 tokenId, uint8 lv, INFTDataInterface m, INFTMint nft) internal returns (uint8) {
-        // 使用可配置的USD升级费用
         uint256 usdValue;
         if (lv == 1) usdValue = level1USDUpgradeCost;
         else if (lv == 2) usdValue = level2USDUpgradeCost;
@@ -795,10 +635,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         else if (lv == 4) usdValue = level4USDUpgradeCost;
         else revert("E18: Invalid level");
         
-        // 修复：检查USD费用是否有效（不能为0）
         require(usdValue > 0, "E22: USD upgrade cost not set");
         
-        uint256 price = _getTokenPrice();
+        uint256 price = _getTokenPriceInternal();
         require(price > 0, "E20: Price oracle returned zero");
         require(price >= 10**10, "E20: Price too low");
         
@@ -806,159 +645,21 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(cost > 0, "E21: Invalid cost");
         require(cost <= 10**30, "E21: Cost exceeds maximum");
         
-        // 添加余额和授权检查
-        IERC20 t = IERC20(tokenContract);
-        uint256 balance = t.balanceOf(msg.sender);
-        require(balance >= cost, "E8: Insufficient balance");
-        
-        uint256 allowance = t.allowance(msg.sender, address(this));
-        require(allowance >= cost, "E8: Insufficient allowance");
-        
-        t.safeTransferFrom(msg.sender, BLACK_HOLE, cost);
+        IERC20(tokenContract).safeTransferFrom(msg.sender, BLACK_HOLE, cost);
         
         NFTDataTypes.ZodiacType zodiacType = NFTDataTypes.ZodiacType(m.tokenType(tokenId));
         uint8 newLv = _completeUpgrade(tokenId, lv, zodiacType, m, nft);
-        emit USDValueUpgraded(tokenId, zodiacType, lv, newLv, usdValue, cost, price, msg.sender, uint64(block.timestamp));
+        _emitUSDValueUpgraded(tokenId, zodiacType, lv, newLv, usdValue, cost, price);
         return newLv;
     }
-    
-    /**
-     * @dev 获取代币价格（自动检查所有DEX，选择最低价格）
-     * 价格获取优先级：
-     * 1. PriceOracle（如果有效且非零）
-     * 2. 自动扫描所有DEX（FlapSwap、PancakeSwap、Uniswap），选择最低价格
-     * @return uint256 代币价格（精度18位）
-     */
-    function _getTokenPrice() internal view returns (uint256) {
-        uint256 lowestPrice = 0;
-        
-        // 优先从PriceOracle获取价格（支持多DEX，包括FlapSwap内盘）
-        if (priceOracle != address(0)) {
-            try IPriceOracle(priceOracle).getTokenPrice() returns (uint256 price) {
-                if (price > 0) {
-                    // 检查价格是否有效（未过期）
-                    try IPriceOracle(priceOracle).isTokenPriceValid() returns (bool isValid) {
-                        if (isValid) {
-                            lowestPrice = price;
-                        }
-                    } catch {
-                        // 如果isTokenPriceValid调用失败，直接使用价格（兼容旧版本）
-                        lowestPrice = price;
-                    }
-                }
-            } catch {}
-        }
-        
-        // 自动扫描所有DEX，获取最低价格
-        uint256[] memory dexPrices = _getAllDEXPrices();
-        for (uint256 i = 0; i < dexPrices.length; i++) {
-            uint256 dexPrice = dexPrices[i];
-            if (dexPrice > 0) {
-                if (lowestPrice == 0 || dexPrice < lowestPrice) {
-                    lowestPrice = dexPrice;
-                }
-            }
-        }
-        
-        return lowestPrice;
+
+    function _getTokenPriceInternal() internal view returns (uint256) {
+        require(priceOracle != address(0), "NFTUpdate: Price oracle not set");
+        return IPriceOracle(priceOracle).getEffectiveTokenPrice();
     }
-    
-    /**
-     * @dev 从所有DEX获取价格数组
-     * @return prices 价格数组（索引0=FlapSwap, 1=PancakeSwap, 2=Uniswap）
-     */
-    function _getAllDEXPrices() internal view returns (uint256[] memory) {
-        uint256[] memory prices = new uint256[](3);
-        
-        IAuthorizer auth = IAuthorizer(authorizer);
-        
-        // FlapSwap (dexType = 0) - 优先使用手动设置的Pair
-        if (flapSwapPair_WBNB != address(0)) {
-            prices[0] = _getPriceFromManualPair(flapSwapPair_WBNB);
-        }
-        if (prices[0] == 0) {
-            address flapSwapRouter = auth.getFlapSwapRouter();
-            if (flapSwapRouter != address(0)) {
-                prices[0] = _getPriceFromRouter(flapSwapRouter);
-            }
-        }
-        
-        // PancakeSwap (dexType = 1) - 优先使用手动设置的Pair
-        if (pancakeSwapPair_WBNB != address(0)) {
-            prices[1] = _getPriceFromManualPair(pancakeSwapPair_WBNB);
-        }
-        if (prices[1] == 0) {
-            address pancakeSwapRouter = auth.getPancakeSwapRouter();
-            if (pancakeSwapRouter != address(0)) {
-                prices[1] = _getPriceFromRouter(pancakeSwapRouter);
-            }
-        }
-        
-        // Uniswap (dexType = 2) - 优先使用手动设置的Pair
-        if (uniswapPair_WBNB != address(0)) {
-            prices[2] = _getPriceFromManualPair(uniswapPair_WBNB);
-        }
-        if (prices[2] == 0) {
-            address uniswapRouter = auth.getUniswapRouter();
-            if (uniswapRouter != address(0)) {
-                prices[2] = _getPriceFromRouter(uniswapRouter);
-            }
-        }
-        
-        return prices;
-    }
-    
-    /**
-     * @dev 从手动设置的Pair地址获取代币价格
-     * @param pair Pair地址
-     * @return 代币价格（USD，精度18位），获取失败返回0
-     */
-    function _getPriceFromManualPair(address pair) internal view returns (uint256) {
-        IAuthorizer auth = IAuthorizer(authorizer);
-        return PriceLibrary.getPriceFromPairs(
-            pair,
-            wbnbUsdtPair,
-            tokenContract,
-            auth.getWBNB(),
-            auth.getUSDT()
-        );
-    }
-    
-    /**
-     * @dev 获取WBNB-USDT价格
-     * 优先使用手动设置的Pair
-     * @return WBNB价格（USD，精度18位）
-     */
-    function _getWbnbUsdtPrice() internal view returns (uint256) {
-        IAuthorizer auth = IAuthorizer(authorizer);
-        
-        // 优先使用手动设置的WBNB-USDT Pair
-        uint256 price = PriceLibrary.getWbnbUsdtPriceFromPair(wbnbUsdtPair, auth.getWBNB(), auth.getUSDT());
-        if (price > 0) {
-            return price;
-        }
-        
-        // 备用：通过Router获取
-        address flapSwapRouter = auth.getFlapSwapRouter();
-        if (flapSwapRouter != address(0)) {
-            return PriceLibrary.getETHPriceFromRouter(flapSwapRouter, auth.getWBNB(), auth.getUSDT());
-        }
-        
-        return 0;
-    }
-    
-    /**
-     * @dev 从特定DEX Router获取代币价格
-     * @param router DEX路由地址
-     * @return 代币价格（USD，精度18位），获取失败返回0
-     */
-    function _getPriceFromRouter(address router) internal view returns (uint256) {
-        if (router == address(0) || tokenContract == address(0)) {
-            return 0;
-        }
-        
-        IAuthorizer auth = IAuthorizer(authorizer);
-        return PriceLibrary.getPriceFromRouter(router, tokenContract, auth.getWBNB(), auth.getUSDT());
+
+    function _emitUSDValueUpgraded(uint256 tokenId, NFTDataTypes.ZodiacType zodiacType, uint8 lv, uint8 newLv, uint256 usdValue, uint256 cost, uint256 price) internal {
+        emit USDValueUpgraded(tokenId, zodiacType, lv, newLv, usdValue, cost, price, msg.sender, uint64(block.timestamp));
     }
     
     /**
@@ -968,28 +669,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @return bestDEX 最佳DEX索引
      */
     function getAllDEXPrices() external view returns (uint256[] memory prices, uint256 lowestPrice, uint8 bestDEX) {
-        prices = _getAllDEXPrices();
-        lowestPrice = 0;
-        bestDEX = 0;
-        
-        for (uint8 i = 0; i < 3; i++) {
-            if (prices[i] > 0) {
-                if (lowestPrice == 0 || prices[i] < lowestPrice) {
-                    lowestPrice = prices[i];
-                    bestDEX = i;
-                }
-            }
-        }
-        
-        // 也检查PriceOracle
-        if (priceOracle != address(0)) {
-            try IPriceOracle(priceOracle).getTokenPrice() returns (uint256 oraclePrice) {
-                if (oraclePrice > 0 && oraclePrice < lowestPrice) {
-                    lowestPrice = oraclePrice;
-                    bestDEX = 255; // 特殊值表示来自PriceOracle
-                }
-            } catch {}
-        }
+        require(priceOracle != address(0), "NFTUpdate: Price oracle not set");
+        return IPriceOracle(priceOracle).getAllDEXPrices();
     }
 
     /**

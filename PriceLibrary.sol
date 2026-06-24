@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./NFTInterface.sol";
 
 /**
  * @title PriceLibrary
@@ -95,7 +96,7 @@ library PriceLibrary {
      * @return reserve0 储备0
      * @return reserve1 储备1
      */
-    function getReserves(address pair) internal view returns (uint112, uint112, ) {
+    function getReserves(address pair) internal view returns (uint112, uint112, uint32) {
         try IPancakeSwapPair(pair).getReserves() returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast) {
             return (reserve0, reserve1, blockTimestampLast);
         } catch {
@@ -171,20 +172,4 @@ library PriceLibrary {
         
         return 0;
     }
-}
-
-/**
- * @dev PancakeSwap Pair接口
- */
-interface IPancakeSwapPair {
-    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
-    function token0() external view returns (address);
-}
-
-/**
- * @dev DEX Router接口
- */
-interface IDexRouter {
-    function factory() external view returns (address);
-    function getAmountsOut(uint256 amountIn, address[] memory path) external view returns (uint256[] memory amounts);
 }

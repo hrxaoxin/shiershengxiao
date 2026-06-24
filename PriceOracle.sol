@@ -943,6 +943,77 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
+     * @dev 获取所有DEX的价格（供前端展示）
+     * @return prices 价格数组（索引0=FlapSwap, 1=PancakeSwap, 2=Uniswap）
+     * @return lowestPrice 最低价格
+     * @return bestDEX 最佳DEX索引（255表示来自PriceOracle）
+     */
+    function getAllDEXPrices() external view returns (uint256[] memory prices, uint256 lowestPrice, uint8 bestDEX) {
+        prices = new uint256[](3);
+        lowestPrice = 0;
+        bestDEX = 0;
+
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address flapSwapRouter = auth.getFlapSwapRouter();
+        address pancakeSwapRouter = auth.getPancakeSwapRouter();
+        address uniswapRouter = auth.getUniswapRouter();
+
+        // FlapSwap
+        uint256 flapPrice = _getPriceFromManualPairs(0);
+        if (flapPrice == 0 && flapSwapRouter != address(0)) {
+            flapPrice = _fetchTokenPrice(flapSwapRouter);
+        }
+        prices[0] = flapPrice;
+
+        // PancakeSwap
+        uint256 pancakePrice = _getPriceFromManualPairs(1);
+        if (pancakePrice == 0 && pancakeSwapRouter != address(0)) {
+            pancakePrice = _fetchTokenPrice(pancakeSwapRouter);
+        }
+        prices[1] = pancakePrice;
+
+        // Uniswap
+        uint256 uniPrice = _getPriceFromManualPairs(2);
+        if (uniPrice == 0 && uniswapRouter != address(0)) {
+            uniPrice = _fetchTokenPrice(uniswapRouter);
+        }
+        prices[2] = uniPrice;
+
+        // 找到最低价格
+        for (uint8 i = 0; i < 3; i++) {
+            if (prices[i] > 0) {
+                if (lowestPrice == 0 || prices[i] < lowestPrice) {
+                    lowestPrice = prices[i];
+                    bestDEX = i;
+                }
+            }
+        }
+
+        // 检查PriceOracle当前价格
+        if (tokenPriceUSD > 0 && isTokenPriceValid()) {
+            if (lowestPrice == 0 || tokenPriceUSD < lowestPrice) {
+                lowestPrice = tokenPriceUSD;
+                bestDEX = 255;
+            }
+        }
+    }
+
+    /**
+     * @dev 获取当前有效代币价格（自动选择最佳来源）
+     * @return 代币价格（USD，精度18位）
+     */
+    function getEffectiveTokenPrice() external view returns (uint256) {
+        // 优先使用PriceOracle的有效价格
+        if (tokenPriceUSD > 0 && isTokenPriceValid()) {
+            return tokenPriceUSD;
+        }
+
+        // 从所有DEX获取价格并返回最低价格
+        (uint256[] memory prices, uint256 lowestPrice, ) = this.getAllDEXPrices();
+        return lowestPrice;
+    }
+
+    /**
      * @dev 验证代币和ETH价格是否都有效（未过期且非零）
      * @return bool 价格是否都有效
      */

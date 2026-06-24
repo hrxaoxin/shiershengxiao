@@ -150,12 +150,12 @@ window.ZODIAC_CONFIG = (function() {
         dividendManagerLP: getEnvContractAddress('dividendManagerLP', '0xF82353e671E910331aC604FA36499Df40041C040'),
         weightManager: getEnvContractAddress('weightManager', '0x5Be08747416E6aD188217af1C077aC0cC81dFeeF'),
         poolManager: getEnvContractAddress('poolManager', '0x1ECc5730C39C29636043277a85aeDCBe165463aa'),
-        priceOracle: getEnvContractAddress('priceOracle', '0x3AE4E32ceb219F7a37d51A6D4cE9eb9710F91593'),
+        priceOracle: getEnvContractAddress('priceOracle', '0x2444ef0de9553296ce84Fc70b87FAa110Fec5AF1'),
         tokenBurner: getEnvContractAddress('tokenBurner', '0x78702588a9F88Ec844ad91C2FAb9632c797139D3'),
         nftMintCore: getEnvContractAddress('nftMintCore', '0x3648Dd17DD1170FEC42D2BE05CA86E98D5D97d3c'),
         nftMint: getEnvContractAddress('nftMint', '0x3648Dd17DD1170FEC42D2BE05CA86E98D5D97d3c'),
         nftMintMetadata: getEnvContractAddress('nftMintMetadata', '0xf03215F849a0a665f5eCa46c2904553a42b4b1c6'),
-        nftUpdate: getEnvContractAddress('nftUpdate', '0x0F617Cdb57E10DA596cA8D125C1fEE804C044BA0'),
+        nftUpdate: getEnvContractAddress('nftUpdate', '0xF9907814E2289c5E7ecc666c1E4c3A6b51d78F86'),
         nftData: getEnvContractAddress('nftData', '0x5f61e3Eba2beECE1A34572bEac7F1748FAb5a0e8'),
         nftTrading: getEnvContractAddress('nftTrading', '0x01023a601053fFDEE23546A132F8cd09AAf1deA6'),
         nftBuyback: getEnvContractAddress('nftBuyback', '0x97d71e490ab4960F4692E52164533a98a4094291'),
@@ -4237,19 +4237,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "getTokenPriceFromPancakeSwap",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -4265,45 +4252,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "initialize",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "lastPrice",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "lastPriceUpdateBlock",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "lastPriceUpdateTime",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -4425,45 +4373,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "minPancakeSwapLiquidity",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "minPriceUpdateBlocks",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "minPriceUpdateSeconds",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "nftContract",
 		"outputs": [
 			{
@@ -4555,32 +4464,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "priceDeviationThreshold",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "priceExpirySeconds",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "priceOracle",
 		"outputs": [
 			{
@@ -4608,13 +4491,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "renounceOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "resetPriceCache",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -4765,51 +4641,12 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "minLiq",
-				"type": "uint256"
-			}
-		],
-		"name": "setMinPancakeSwapLiquidity",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "address",
 				"name": "pair",
 				"type": "address"
 			}
 		],
 		"name": "setPancakeSwapPair",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "threshold",
-				"type": "uint256"
-			}
-		],
-		"name": "setPriceDeviationThreshold",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "seconds_",
-				"type": "uint256"
-			}
-		],
-		"name": "setPriceExpirySeconds",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -22026,6 +21863,25 @@ window.ZODIAC_CONFIG = (function() {
 		"anonymous": false,
 		"inputs": [
 			{
+				"indexed": true,
+				"internalType": "uint8",
+				"name": "dexType",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "pairAddress",
+				"type": "address"
+			}
+		],
+		"name": "PairAddressSet",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
 				"indexed": false,
 				"internalType": "address",
 				"name": "account",
@@ -22407,14 +22263,26 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "executePendingETHPrice",
-		"outputs": [],
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
 		"inputs": [],
 		"name": "executePendingTokenPrice",
-		"outputs": [],
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
@@ -22424,12 +22292,12 @@ window.ZODIAC_CONFIG = (function() {
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "avgTokenPrice",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "avgETHPrice",
 				"type": "uint256"
 			}
 		],
@@ -22442,12 +22310,12 @@ window.ZODIAC_CONFIG = (function() {
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "tokenPrice",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "ethPrice",
 				"type": "uint256"
 			}
 		],
@@ -22456,7 +22324,56 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "flapSwapPair_WBNB",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getAllDEXPrices",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "prices",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "uint256",
+				"name": "lowestPrice",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint8",
+				"name": "bestDEX",
+				"type": "uint8"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "getETHPrice",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getEffectiveTokenPrice",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -22764,6 +22681,19 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "pancakeSwapPair_WBNB",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "string",
@@ -22977,6 +22907,34 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
+				"name": "_flapSwapPair",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_pancakeSwapPair",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_uniswapPair",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_wbnbUsdtPair",
+				"type": "address"
+			}
+		],
+		"name": "setAllPairs",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
@@ -22995,6 +22953,32 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setAutoPriceEnabled",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "pair",
+				"type": "address"
+			}
+		],
+		"name": "setFlapSwapPair",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "pair",
+				"type": "address"
+			}
+		],
+		"name": "setPancakeSwapPair",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -23039,6 +23023,32 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "pair",
+				"type": "address"
+			}
+		],
+		"name": "setUniswapPair",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "pair",
+				"type": "address"
+			}
+		],
+		"name": "setWbnbUsdtPair",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "tokenPriceUSD",
 		"outputs": [
@@ -23075,6 +23085,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "transferOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "uniswapPair_WBNB",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -23157,6 +23180,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "upgradeToAndCall",
 		"outputs": [],
 		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "wbnbUsdtPair",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
