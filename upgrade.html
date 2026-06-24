@@ -546,6 +546,34 @@
             const requiredTokens = level < 5 ? await getRequiredTokens(level) : 0;
             const requiredNFTs = level < 5 ? parseInt(level, 10) : 0;
             
+            // 计算USDT价值升级所需的代币数量
+            let usdValueText = '';
+            let requiredUSDDisplay = '';
+            if (level < 5) {
+                const requiredUSDWei = await getUSDValue(level);
+                const requiredUSD = parseFloat(requiredUSDWei) / 1e18;
+                requiredUSDDisplay = requiredUSD + ' USDT';
+                
+                try {
+                    const priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
+                    const price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
+                    if (price > 0n) {
+                        // 公式: tokenAmount(18位精度) = usdAmountWei(18位精度) * 1e18 / price(18位精度)
+                        const tokenAmount = BigInt(requiredUSDWei) * 10n**18n / price;
+                        const tokenAmountDisplay = (Number(tokenAmount) / 1e18).toFixed(4);
+                        usdValueText = `约 ${tokenAmountDisplay} Token`;
+                    } else {
+                        usdValueText = '价格获取中...';
+                    }
+                } catch (e) {
+                    console.error('获取代币价格失败:', e);
+                    usdValueText = '价格获取失败';
+                }
+            } else {
+                requiredUSDDisplay = '0 USDT';
+                usdValueText = '已达最高等级';
+            }
+            
             let nftInfo = {};
             let isRare = false;
             let growth = 0;
@@ -653,8 +681,8 @@
                         </div>
                         <div>
                             <span class="text-xs text-gray-500">使用USDT价值升级</span>
-                            <p class="text-lg font-bold text-gray-800">${(level == 1 ? '1' : level == 2 ? '4' : level == 3 ? '12' : level == 4 ? '48' : '0')} USDT</p>
-                            <p class="text-xs text-gray-400 mt-1">基于实时价格</p>
+                            <p class="text-lg font-bold text-gray-800">${requiredUSDDisplay}</p>
+                            <p class="text-xs text-gray-400 mt-1">${usdValueText}</p>
                         </div>
                     </div>
                     <div class="mt-3 p-3 bg-yellow-50 rounded-lg">
@@ -874,25 +902,29 @@
                 console.error('检查合约暂停状态失败:', e);
             }
 
-            const requiredUSD = await getUSDValue(selectedNft.level);
+            const requiredUSDWei = await getUSDValue(selectedNft.level);
+            const requiredUSD = parseFloat(requiredUSDWei) / 1e18;
             const nftId = parseInt(selectedNft.id, 10);
             
             // 获取当前代币价格并计算所需代币数量
             let priceOracleContract;
-            let price = 0;
-            let requiredTokens = 0;
+            let price = 0n;
+            let requiredTokens = 0n;
+            let requiredTokensDisplay = '0';
             try {
                 priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
-                price = await priceOracleContract.methods.getTokenPriceUSD().call();
-                price = parseInt(price);
+                price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
                 
-                if (price <= 0) {
+                if (price <= 0n) {
                     ZODIAC_UI.showToast('价格数据过期，请稍后重试', 'error');
                     return;
                 }
                 
-                // 计算所需代币数量: tokenAmount = usdAmount * 1e18 / tokenPriceUSD
-                requiredTokens = Math.ceil((requiredUSD * 1e18) / price);
+                // 计算所需代币数量: tokenAmount = usdAmountWei / tokenPriceUSD
+                // requiredUSDWei 是18位精度的USDT数量，price 是18位精度的代币价格
+                // 两者都是18位精度，相除后得到18位精度的代币数量
+                requiredTokens = BigInt(requiredUSDWei) * 10n**18n / price;
+                requiredTokensDisplay = (Number(requiredTokens) / 1e18).toFixed(4);
             } catch (e) {
                 console.error('获取代币价格失败:', e);
                 ZODIAC_UI.showToast('获取代币价格失败，请稍后重试', 'error');
@@ -901,9 +933,9 @@
 
             // 检查用户代币余额
             try {
-                const balance = await tokenContract.methods.balanceOf(account).call();
-                if (BigInt(balance) < BigInt(requiredTokens)) {
-                    ZODIAC_UI.showToast('代币余额不足，需要 ' + (requiredTokens / 1e18).toFixed(4) + ' Token', 'error');
+                const balance = BigInt(await tokenContract.methods.balanceOf(account).call());
+                if (balance < requiredTokens) {
+                    ZODIAC_UI.showToast('代币余额不足，需要 ' + requiredTokensDisplay + ' Token', 'error');
                     return;
                 }
             } catch (e) {
@@ -912,7 +944,7 @@
 
             const confirmed = await ZODIAC_UI.showConfirmModal(
                 '升级确认',
-                '确认使用USDT价值升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗价值 ' + requiredUSD + ' USDT的代币（约 ' + (requiredTokens / 1e18).toFixed(4) + ' Token）'
+                '确认使用USDT价值升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗价值 ' + requiredUSD + ' USDT的代币（约 ' + requiredTokensDisplay + ' Token）'
             );
 
             if (!confirmed) return;
@@ -921,8 +953,8 @@
                 ZODIAC_UI.showLoading('检查授权...');
                 
                 // 检查代币授权
-                const allowance = await tokenContract.methods.allowance(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
-                if (BigInt(allowance) < BigInt(requiredTokens)) {
+                const allowance = BigInt(await tokenContract.methods.allowance(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call());
+                if (allowance < requiredTokens) {
                     ZODIAC_UI.showLoading('请求授权...');
                     await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff').send({ from: account, gas: 100000 });
                 }
@@ -994,13 +1026,13 @@
 
         async function getUSDValue(level) {
             if (!nftUpdateContract) {
-                // 回退到硬编码值
+                // 回退到硬编码值（wei格式）
                 switch (level) {
-                    case 1: return 1;
-                    case 2: return 4;
-                    case 3: return 12;
-                    case 4: return 48;
-                    default: return 0;
+                    case 1: return '1000000000000000000';  // 1 USDT
+                    case 2: return '4000000000000000000';  // 4 USDT
+                    case 3: return '12000000000000000000'; // 12 USDT
+                    case 4: return '48000000000000000000'; // 48 USDT
+                    default: return '0';
                 }
             }
             try {
@@ -1013,16 +1045,16 @@
                     : level == 4
                     ? await nftUpdateContract.methods.level4USDUpgradeCost().call()
                     : '0';
-                return parseInt(costWei) / 10**18;
+                return costWei.toString();
             } catch (e) {
                 console.error('Failed to get USD upgrade cost from contract:', e);
-                // 回退到硬编码值
+                // 回退到硬编码值（wei格式）
                 switch (level) {
-                    case 1: return 1;
-                    case 2: return 4;
-                    case 3: return 12;
-                    case 4: return 48;
-                    default: return 0;
+                    case 1: return '1000000000000000000';  // 1 USDT
+                    case 2: return '4000000000000000000';  // 4 USDT
+                    case 3: return '12000000000000000000'; // 12 USDT
+                    case 4: return '48000000000000000000'; // 48 USDT
+                    default: return '0';
                 }
             }
         }
