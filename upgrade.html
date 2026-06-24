@@ -355,6 +355,9 @@
         }
 
         let nftUpdateContract;
+        // 缓存最近一次成功的代币价格，避免重复调用预言机
+        let cachedTokenPrice = null;
+        let cachedTokenPriceTime = 0;
 
         async function initContracts() {
             const [nft, token, nftUpdate] = await Promise.all([
@@ -405,7 +408,7 @@
                 document.getElementById('tokenCost4').textContent = cost4;
                 
                 // 更新USD价值升级费用显示（支持小数点，当合约返回0时使用默认值）
-                const defaultUsdCosts = [0.01, 0.04, 0.12, 0.48]; // 默认USD费用（用户已修改）
+                const defaultUsdCosts = [0.01, 0.1, 12, 48]; // 默认USD费用（与合约当前配置一致）
                 const usd1 = parseInt(usdCost1) > 0 ? (parseInt(usdCost1) / 10**18).toFixed(4) : defaultUsdCosts[0].toFixed(4);
                 const usd2 = parseInt(usdCost2) > 0 ? (parseInt(usdCost2) / 10**18).toFixed(4) : defaultUsdCosts[1].toFixed(4);
                 const usd3 = parseInt(usdCost3) > 0 ? (parseInt(usdCost3) / 10**18).toFixed(4) : defaultUsdCosts[2].toFixed(4);
@@ -555,9 +558,10 @@
             let requiredUSDDisplay = '';
             if (levelNum < 5) {
                 const requiredUSDWei = await getUSDValue(levelNum);
-                // 取余前先确保字符串转换，防止 web3.js BN 对象导致 BigInt 错误
+                // 确保字符串转换，防止 web3.js BN 对象导致 BigInt 错误
                 const usdWeiBigInt = BigInt(String(requiredUSDWei));
-                const requiredUSD = Number(usdWeiBigInt / 10n**18n);
+                // 使用浮点除法（非BigInt除法），因为USDT值可能小于1，BigInt整数除法会截断为0
+                const requiredUSD = Number(usdWeiBigInt) / 1e18;
                 console.log('selectNFT - level:', levelNum, 'requiredUSDWei:', requiredUSDWei, 'requiredUSD:', requiredUSD);
                requiredUSDDisplay = requiredUSD.toFixed(4) + ' USDT';
                 
@@ -572,6 +576,11 @@
                     const priceOracleContract = new window.web3.eth.Contract(ZODIAC_CONFIG.ABIS.priceOracleABI, priceOracleAddr);
                     const price = BigInt(String(await priceOracleContract.methods.getTokenPriceUSD().call({ gas: 3000000 })));
                     console.log('selectNFT - price from oracle:', price.toString());
+                    // 缓存价格，后续升阶操作可复用（有效期60秒）
+                    if (price > 0n) {
+                        cachedTokenPrice = price;
+                        cachedTokenPriceTime = Date.now();
+                    }
                 
                     if (price > 0n) {
                         // 公式: tokenAmount(18位精度) = usdAmountWei(18位精度) * 1e18 / price(18位精度)
@@ -961,121 +970,78 @@
             console.log('handleUpgradeWithUSDValue - requiredUSDWei:', requiredUSDWei);
             // 确保字符串转换，防止 web3.js BN 对象导致 BigInt 报错
             const usdWeiBigInt = BigInt(String(requiredUSDWei));
-            const requiredUSD = Number(usdWeiBigInt / 10n**18n);
+            // 使用浮点除法（非BigInt除法），因为USDT值可能小于1，BigInt整数除法会截断为0
+            const requiredUSD = Number(usdWeiBigInt) / 1e18;
             console.log('handleUpgradeWithUSDValue - requiredUSD:', requiredUSD);
             
             const nftId = parseInt(selectedNft.id, 10);
             console.log('handleUpgradeWithUSDValue - nftId:', nftId);
             
             // 获取当前代币价格并计算所需代币数量
-            let priceOracleContract;
             let price = 0n;
             let requiredTokens = 0n;
             let requiredTokensDisplay = '0';
             const priceOracleAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.priceOracle;
             
-            try {
-                // 直接使用配置创建合约实例，避免依赖 ZODIAC_WEB3
-                if (!priceOracleAddr || priceOracleAddr === '0x0000000000000000000000000000000000000000') {
-                    ZODIAC_UI.showToast('价格预言机地址未配置，请联系管理员', 'error');
-                    return;
-                }
-                
-                if (!window.web3) {
-                    ZODIAC_UI.showToast('Web3未初始化，请刷新页面重试', 'error');
-                    return;
-                }
-                
-                priceOracleContract = new window.web3.eth.Contract(ZODIAC_CONFIG.ABIS.priceOracleABI, priceOracleAddr);
-                price = BigInt(String(await priceOracleContract.methods.getTokenPriceUSD().call({ gas: 3000000 })));
-                console.log('Price from oracle:', price.toString());
-                
-                // 检查价格是否有效（合约要求 price >= 10^10）
-                const MIN_PRICE = 10n**10n;
-                if (price <= 0n) {
-                    ZODIAC_UI.showToast('价格数据无效（返回0），请联系管理员更新价格', 'error');
-                    return;
-                }
-                if (price < MIN_PRICE) {
-                    ZODIAC_UI.showToast('价格数据过低，无法进行升级', 'error');
-                    return;
-                }
-                
-                // 计算所需代币数量: tokenAmount = usdAmountWei * 1e18 / tokenPriceUSD
-                // requiredUSDWei 是18位精度的USDT数量，price 是18位精度的代币价格(每个代币价值多少USDT wei)
-                // 公式: 代币数量 = 目标USDT价值 / 代币价格
-                requiredTokens = usdWeiBigInt * 10n**18n / price;
-                requiredTokensDisplay = (Number(requiredTokens) / 1e18).toFixed(4);
-                console.log('Calculated required tokens:', requiredTokensDisplay);
-                
-                if (requiredTokens <= 0n) {
-                    ZODIAC_UI.showToast('计算的代币数量无效，请联系管理员', 'error');
-                    return;
-                }
-                
-                // 检查计算结果是否合理（防止溢出或异常大的数值）
-                const MAX_TOKENS = BigInt('1000000000000000000000000000'); // 10^27
-                if (requiredTokens > MAX_TOKENS) {
-                    ZODIAC_UI.showToast('计算的代币数量异常，请联系管理员', 'error');
-                    return;
-                }
-            } catch (e) {
-                console.error('获取代币价格或计算数量失败:', e);
-                
-                // 尝试使用不同 gas 重试一次（某些 RPC 节点对 eth_call 的 gas 估算不稳定）
+            // 辅助函数：验证并计算价格 → 代币数量
+            const applyPrice = (rawPrice) => {
+                const p = BigInt(String(rawPrice));
+                if (p <= 0n) throw new Error('价格为零');
+                if (p < 10n**10n) throw new Error('价格过低');
+                const tokens = usdWeiBigInt * 10n**18n / p;
+                if (tokens <= 0n) throw new Error('代币数量无效');
+                if (tokens > BigInt('1000000000000000000000000000')) throw new Error('代币数量异常');
+                return { price: p, requiredTokens: tokens };
+            };
+            
+            // 策略1：优先使用缓存价格（60秒内有效）
+            const CACHE_TTL = 60000;
+            if (cachedTokenPrice && (Date.now() - cachedTokenPriceTime) < CACHE_TTL) {
                 try {
-                    console.log('Retrying with higher gas limit...');
-                    priceOracleContract = new window.web3.eth.Contract(ZODIAC_CONFIG.ABIS.priceOracleABI, priceOracleAddr);
-                    price = BigInt(String(await priceOracleContract.methods.getTokenPriceUSD().call({ gas: 6000000 })));
-                    console.log('Price from oracle (retry):', price.toString());
-                    
-                    // 重试成功后，继续执行验证逻辑
-                    const MIN_PRICE = 10n**10n;
-                    if (price <= 0n) {
-                        ZODIAC_UI.showToast('代币价格暂时为0，请联系管理员更新价格数据后重试', 'error');
-                        return;
-                    }
-                    if (price < MIN_PRICE) {
-                        ZODIAC_UI.showToast('代币价格过低，暂时无法使用此方式进行升级', 'error');
-                        return;
-                    }
-                    
-                    requiredTokens = usdWeiBigInt * 10n**18n / price;
+                    const result = applyPrice(cachedTokenPrice);
+                    price = result.price;
+                    requiredTokens = result.requiredTokens;
                     requiredTokensDisplay = (Number(requiredTokens) / 1e18).toFixed(4);
-                    console.log('Calculated required tokens (retry):', requiredTokensDisplay);
-                    
-                    if (requiredTokens <= 0n) {
-                        ZODIAC_UI.showToast('计算的代币数量无效，请联系管理员', 'error');
-                        return;
-                    }
-                    const MAX_TOKENS = BigInt('1000000000000000000000000000');
-                    if (requiredTokens > MAX_TOKENS) {
-                        ZODIAC_UI.showToast('计算的代币数量异常，请联系管理员', 'error');
-                        return;
-                    }
-                } catch (retryError) {
-                    console.error('重试获取价格仍然失败:', retryError);
-                    // 回退方案：使用固定比例（1 USDT = 10000 Token）估算所需代币
-                    // 该比例与合约中 level1UpgradeCost/value 的固定汇率一致
+                    console.log('Using cached price:', price.toString(), 'required tokens:', requiredTokensDisplay);
+                } catch (e) {
+                    console.warn('Cached price invalid, will fetch fresh:', e.message);
+                }
+            }
+            
+            // 策略2：从预言机获取（带重试）
+            if (price <= 0n) {
+                let oracleSucceeded = false;
+                const gasOptions = [3000000, 6000000, 9000000];
+                
+                for (const gasLimit of gasOptions) {
                     try {
-                        const fallbackRate = 10n**14n; // 0.0001 USDT per token = 10^14 wei (18 decimals)
-                        requiredTokens = usdWeiBigInt * 10n**18n / fallbackRate;
-                        requiredTokensDisplay = (Number(requiredTokens) / 1e18).toFixed(4);
-                        console.log('Fallback: using fixed rate 1 USDT = 10000 Token, required:', requiredTokensDisplay);
-                        
-                        ZODIAC_UI.showToast('⚠ 实时价格获取失败，已使用固定汇率估算（可能与链上实际计算结果有差异）', 'warning');
-                        
-                        // 继续执行后续流程（不 return，让用户决定是否继续）
-                        // 注意：链上合约仍会使用实时价格，如差异较大交易可能失败
-                    } catch (fallbackError) {
-                        console.error('回退计算也失败:', fallbackError);
-                        if (e.message && e.message.includes('reverted')) {
-                            ZODIAC_UI.showToast('价格预言机调用失败，可能合约数据未初始化，请联系管理员', 'error');
-                        } else {
-                            ZODIAC_UI.showToast('获取代币价格失败，请稍后重试。如持续出现请刷新页面或联系管理员', 'error');
+                        if (!priceOracleAddr || priceOracleAddr === '0x0000000000000000000000000000000000000000') {
+                            throw new Error('价格预言机地址未配置');
                         }
-                        return;
+                        if (!window.web3) throw new Error('Web3未初始化');
+                        
+                        const oracleContract = new window.web3.eth.Contract(ZODIAC_CONFIG.ABIS.priceOracleABI, priceOracleAddr);
+                        const rawPrice = await oracleContract.methods.getTokenPriceUSD().call({ gas: gasLimit });
+                        console.log(`Oracle price (gas=${gasLimit}):`, rawPrice);
+                        
+                        const result = applyPrice(rawPrice);
+                        price = result.price;
+                        requiredTokens = result.requiredTokens;
+                        requiredTokensDisplay = (Number(requiredTokens) / 1e18).toFixed(4);
+                        // 更新缓存
+                        cachedTokenPrice = price;
+                        cachedTokenPriceTime = Date.now();
+                        console.log('Oracle price OK:', price.toString(), 'required tokens:', requiredTokensDisplay);
+                        oracleSucceeded = true;
+                        break;
+                    } catch (e) {
+                        console.warn(`Oracle attempt with gas=${gasLimit} failed:`, e.message);
                     }
+                }
+                
+                if (!oracleSucceeded) {
+                    ZODIAC_UI.showToast('无法获取代币实时价格，请稍后重试。如持续出现请刷新页面或联系管理员', 'error');
+                    return;
                 }
             }
 
@@ -1183,8 +1149,8 @@
     const levelNum = parseInt(level, 10);
     console.log('getUSDValue called with level:', levelNum);
     
-    // 回退默认值（18位精度）：1, 4, 12, 48 USDT
-    const defaultUsdValues = ['1000000000000000000', '4000000000000000000', '12000000000000000000', '48000000000000000000'];
+    // 回退默认值（18位精度）：与合约当前配置一致 0.01, 0.1, 12, 48 USDT
+    const defaultUsdValues = ['10000000000000000', '100000000000000000', '12000000000000000000', '48000000000000000000'];
     
     if (!nftUpdateContract) {
         return defaultUsdValues[levelNum - 1] || '0';
