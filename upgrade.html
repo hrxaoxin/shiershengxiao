@@ -568,7 +568,7 @@
                     usdValueText = '⚠ Web3未初始化';
                 } else {
                     const priceOracleContract = new window.web3.eth.Contract(ZODIAC_CONFIG.ABIS.priceOracleABI, priceOracleAddr);
-                    const price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
+                    const price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call({ gas: 3000000 }));
                     console.log('selectNFT - price from oracle:', price.toString());
                 
                     if (price > 0n) {
@@ -969,10 +969,10 @@
             let price = 0n;
             let requiredTokens = 0n;
             let requiredTokensDisplay = '0';
+            const priceOracleAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.priceOracle;
             
             try {
                 // 直接使用配置创建合约实例，避免依赖 ZODIAC_WEB3
-                const priceOracleAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.priceOracle;
                 if (!priceOracleAddr || priceOracleAddr === '0x0000000000000000000000000000000000000000') {
                     ZODIAC_UI.showToast('价格预言机地址未配置，请联系管理员', 'error');
                     return;
@@ -984,7 +984,7 @@
                 }
                 
                 priceOracleContract = new window.web3.eth.Contract(ZODIAC_CONFIG.ABIS.priceOracleABI, priceOracleAddr);
-                price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
+                price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call({ gas: 3000000 }));
                 console.log('Price from oracle:', price.toString());
                 
                 // 检查价格是否有效（合约要求 price >= 10^10）
@@ -1018,12 +1018,62 @@
                 }
             } catch (e) {
                 console.error('获取代币价格或计算数量失败:', e);
-                if (e.message && e.message.includes('reverted')) {
-                    ZODIAC_UI.showToast('合约调用失败，请检查网络连接', 'error');
-                } else {
-                    ZODIAC_UI.showToast('获取代币价格失败，请稍后重试', 'error');
+                
+                // 尝试使用不同 gas 重试一次（某些 RPC 节点对 eth_call 的 gas 估算不稳定）
+                try {
+                    console.log('Retrying with higher gas limit...');
+                    priceOracleContract = new window.web3.eth.Contract(ZODIAC_CONFIG.ABIS.priceOracleABI, priceOracleAddr);
+                    price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call({ gas: 6000000 }));
+                    console.log('Price from oracle (retry):', price.toString());
+                    
+                    // 重试成功后，继续执行验证逻辑
+                    const MIN_PRICE = 10n**10n;
+                    if (price <= 0n) {
+                        ZODIAC_UI.showToast('代币价格暂时为0，请联系管理员更新价格数据后重试', 'error');
+                        return;
+                    }
+                    if (price < MIN_PRICE) {
+                        ZODIAC_UI.showToast('代币价格过低，暂时无法使用此方式进行升级', 'error');
+                        return;
+                    }
+                    
+                    requiredTokens = BigInt(requiredUSDWei) * 10n**18n / price;
+                    requiredTokensDisplay = (Number(requiredTokens) / 1e18).toFixed(4);
+                    console.log('Calculated required tokens (retry):', requiredTokensDisplay);
+                    
+                    if (requiredTokens <= 0n) {
+                        ZODIAC_UI.showToast('计算的代币数量无效，请联系管理员', 'error');
+                        return;
+                    }
+                    const MAX_TOKENS = BigInt('1000000000000000000000000000');
+                    if (requiredTokens > MAX_TOKENS) {
+                        ZODIAC_UI.showToast('计算的代币数量异常，请联系管理员', 'error');
+                        return;
+                    }
+                } catch (retryError) {
+                    console.error('重试获取价格仍然失败:', retryError);
+                    // 回退方案：使用固定比例（1 USDT = 10000 Token）估算所需代币
+                    // 该比例与合约中 level1UpgradeCost/value 的固定汇率一致
+                    try {
+                        const fallbackRate = 10n**14n; // 0.0001 USDT per token = 10^14 wei (18 decimals)
+                        requiredTokens = BigInt(requiredUSDWei) * 10n**18n / fallbackRate;
+                        requiredTokensDisplay = (Number(requiredTokens) / 1e18).toFixed(4);
+                        console.log('Fallback: using fixed rate 1 USDT = 10000 Token, required:', requiredTokensDisplay);
+                        
+                        ZODIAC_UI.showToast('⚠ 实时价格获取失败，已使用固定汇率估算（可能与链上实际计算结果有差异）', 'warning');
+                        
+                        // 继续执行后续流程（不 return，让用户决定是否继续）
+                        // 注意：链上合约仍会使用实时价格，如差异较大交易可能失败
+                    } catch (fallbackError) {
+                        console.error('回退计算也失败:', fallbackError);
+                        if (e.message && e.message.includes('reverted')) {
+                            ZODIAC_UI.showToast('价格预言机调用失败，可能合约数据未初始化，请联系管理员', 'error');
+                        } else {
+                            ZODIAC_UI.showToast('获取代币价格失败，请稍后重试。如持续出现请刷新页面或联系管理员', 'error');
+                        }
+                        return;
+                    }
                 }
-                return;
             }
 
             // 检查用户代币余额
