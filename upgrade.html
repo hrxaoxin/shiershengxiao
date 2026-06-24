@@ -1126,32 +1126,32 @@
         }
 
         async function getUSDValue(level) {
-            const levelNum = parseInt(level, 10);
-            console.log('getUSDValue called with level:', level, 'levelNum:', levelNum);
-            
-            // 使用用户修改后的USD费用（带小数点）
-            // 0.01 USDT = 10000000000000000 wei
-            // 0.04 USDT = 40000000000000000 wei
-            // 0.12 USDT = 120000000000000000 wei
-            // 0.48 USDT = 480000000000000000 wei
-            switch (levelNum) {
-                case 1: 
-                    console.log('Returning 0.01 USDT (1e16 wei)');
-                    return '10000000000000000';  // 0.01 USDT
-                case 2: 
-                    console.log('Returning 0.04 USDT (4e16 wei)');
-                    return '40000000000000000';  // 0.04 USDT
-                case 3: 
-                    console.log('Returning 0.12 USDT (1.2e17 wei)');
-                    return '120000000000000000'; // 0.12 USDT
-                case 4: 
-                    console.log('Returning 0.48 USDT (4.8e17 wei)');
-                    return '480000000000000000'; // 0.48 USDT
-                default: 
-                    console.log('Returning 0 for level:', levelNum);
-                    return '0';
-            }
-        }
+    const levelNum = parseInt(level, 10);
+    console.log('getUSDValue called with level:', levelNum);
+    
+    if (!nftUpdateContract) {
+        // 回退硬编码（保持与合约默认一致）
+        const defaults = ['1000000000000000000', '4000000000000000000', '12000000000000000000', '48000000000000000000'];
+        return defaults[levelNum - 1] || '0';
+    }
+    
+    try {
+        let usdCost;
+        if (levelNum === 1) usdCost = await nftUpdateContract.methods.level1USDUpgradeCost().call();
+        else if (levelNum === 2) usdCost = await nftUpdateContract.methods.level2USDUpgradeCost().call();
+        else if (levelNum === 3) usdCost = await nftUpdateContract.methods.level3USDUpgradeCost().call();
+        else if (levelNum === 4) usdCost = await nftUpdateContract.methods.level4USDUpgradeCost().call();
+        else return '0';
+        
+        console.log(`Contract USD cost for level ${levelNum}:`, usdCost);
+        return usdCost;
+    } catch (e) {
+        console.error('Failed to get USD cost from contract:', e);
+        // 回退
+        const defaults = ['1000000000000000000', ]; // 1/4/12/48 USDT
+        return defaults[levelNum - 1] || '0';
+    }
+}
 
         function getStars(level) {
             return window.ZODIAC_UTILS.getStars(parseInt(level, 10));
