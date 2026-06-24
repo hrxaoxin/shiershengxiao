@@ -559,11 +559,14 @@
                requiredUSDDisplay = requiredUSD.toFixed(4) + ' USDT';
                 
                 try {
-                const priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
-                const price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
-                console.log('selectNFT - price from oracle:', price.toString());
+                if (!window.ZODIAC_WEB3 || !window.ZODIAC_WEB3.getContract) {
+                    usdValueText = '⚠ Web3服务未初始化';
+                } else {
+                    const priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
+                    const price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
+                    console.log('selectNFT - price from oracle:', price.toString());
                 
-                if (price > 0n) {
+                    if (price > 0n) {
                         // 公式: tokenAmount(18位精度) = usdAmountWei(18位精度) * 1e18 / price(18位精度)
                         // requiredUSDWei 是18位精度的USDT数量，price 是18位精度的代币价格(每个代币价值多少USDT wei)
                         const tokenAmount = BigInt(requiredUSDWei) * 10n**18n / price;
@@ -578,10 +581,11 @@
                     } else {
                         usdValueText = '⚠ 价格数据无效';
                     }
-                } catch (e) {
-                    console.error('获取代币价格失败:', e);
-                    usdValueText = '⚠ 价格获取失败';
                 }
+            } catch (e) {
+                console.error('获取代币价格失败:', e);
+                usdValueText = '⚠ 价格获取失败';
+            }
             } else {
                 requiredUSDDisplay = '0 USDT';
                 usdValueText = '已达最高等级';
@@ -946,6 +950,12 @@
             const expectedPriceOracle = ZODIAC_CONFIG.CONTRACT_ADDRESSES.priceOracle;
             if (!expectedPriceOracle || expectedPriceOracle === '0x0000000000000000000000000000000000000000') {
                 ZODIAC_UI.showToast('价格预言机地址未配置，请联系管理员', 'error');
+                return;
+            }
+            
+            // 检查ZODIAC_WEB3是否可用
+            if (!window.ZODIAC_WEB3 || !window.ZODIAC_WEB3.getContract) {
+                ZODIAC_UI.showToast('Web3服务未初始化，请刷新页面重试', 'error');
                 return;
             }
 
