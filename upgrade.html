@@ -334,6 +334,7 @@
             if (connected) {
                 account = window.ZODIAC_WEB3.getAccount();
                 web3 = window.ZODIAC_WEB3.getWeb3();
+                window.web3 = web3; // 同步到 window 对象，供其他函数使用
                 updateWalletButton();
                 await initContracts();
                 await loadUserNFTs();
@@ -1129,10 +1130,11 @@
     const levelNum = parseInt(level, 10);
     console.log('getUSDValue called with level:', levelNum);
     
+    // 回退默认值（18位精度）：1, 4, 12, 48 USDT
+    const defaultUsdValues = ['1000000000000000000', '4000000000000000000', '12000000000000000000', '48000000000000000000'];
+    
     if (!nftUpdateContract) {
-        // 回退硬编码（保持与合约默认一致）
-        const defaults = ['1000000000000000000', '4000000000000000000', '12000000000000000000', '48000000000000000000'];
-        return defaults[levelNum - 1] || '0';
+        return defaultUsdValues[levelNum - 1] || '0';
     }
     
     try {
@@ -1147,9 +1149,8 @@
         return usdCost;
     } catch (e) {
         console.error('Failed to get USD cost from contract:', e);
-        // 回退
-        const defaults = ['1000000000000000000', ]; // 1/4/12/48 USDT
-        return defaults[levelNum - 1] || '0';
+        // 回退默认值
+        return defaultUsdValues[levelNum - 1] || '0';
     }
 }
 
