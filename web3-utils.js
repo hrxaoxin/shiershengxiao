@@ -1971,8 +1971,8 @@ window.ZODIAC_WEB3 = (function() {
     async function isTokenPriceValid() {
         try {
             const contract = await getContract('priceOracle');
-            const isValid = await contract.methods.isTokenPriceValid().call();
-            return isValid;
+            const price = await contract.methods.getTokenPriceUSD().call();
+            return parseInt(price) > 0;
         } catch (e) {
             console.error('[ZODIAC_WEB3] isTokenPriceValid failed:', e);
             return false;
