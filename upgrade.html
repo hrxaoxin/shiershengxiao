@@ -559,8 +559,14 @@
                 
                 try {
                     const priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
-                    const price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
-                    console.log('selectNFT - price from oracle:', price.toString());
+                    let price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
+                    console.log('selectNFT - raw price from oracle:', price.toString());
+                    
+                    // 修复：PriceOracle合约中返回的价格错误地乘以了10^12
+                    // amounts[2]已经是18位精度的USDT，再乘以10^12会导致价格被放大10^12倍
+                    // 需要除以10^12来得到正确的18位精度价格
+                    price = price / 10n**12n;
+                    console.log('selectNFT - corrected price:', price.toString());
                     
                     if (price > 0n) {
                         // 公式: tokenAmount(18位精度) = usdAmountWei(18位精度) * 1e18 / price(18位精度)
@@ -943,12 +949,18 @@
             
             try {
                 priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
-                price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
-                console.log('Price from oracle:', price.toString());
+                let rawPrice = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
+                console.log('Raw price from oracle:', rawPrice.toString());
+                
+                // 修复：PriceOracle合约中返回的价格错误地乘以了10^12
+                // amounts[2]已经是18位精度的USDT，再乘以10^12会导致价格被放大10^12倍
+                // 需要除以10^12来得到正确的18位精度价格
+                price = rawPrice / 10n**12n;
+                console.log('Corrected price:', price.toString());
                 
                 // 检查价格是否有效（合约要求 price >= 10^10）
                 const MIN_PRICE = 10n**10n;
-                if (price <= 0n) {
+                if (rawPrice <= 0n) {
                     ZODIAC_UI.showToast('价格数据无效（返回0），请联系管理员更新价格', 'error');
                     return;
                 }
