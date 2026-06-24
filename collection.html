@@ -498,14 +498,7 @@
                     return;
                 }
 
-                const balance = await nftContract.methods.balanceOf(account).call();
-                const promises = [];
-                
-                for (let i = 0; i < Number(balance); i++) {
-                    promises.push(nftContract.methods.tokenOfOwnerByIndex(account, i).call());
-                }
-                
-                const tokenIds = await Promise.all(promises);
+                const tokenIds = await nftContract.methods.getTokenIdsByOwner(account).call();
                 
                 const tokenInfoPromises = tokenIds.map(tokenId => {
                     return Promise.all([

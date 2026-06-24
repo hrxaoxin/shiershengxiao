@@ -657,9 +657,8 @@
                 breedableNFTs = [];
                 const account = getAccount();
 
-                const balance = await nftContract.methods.balanceOf(account).call();
-                for (let i = 0; i < balance; i++) {
-                    const tokenId = await nftContract.methods.tokenOfOwnerByIndex(account, i).call();
+                const tokenIds = await nftContract.methods.getTokenIdsByOwner(account).call();
+                for (const tokenId of tokenIds) {
                     const tokenType = await nftContract.methods.tokenType(tokenId).call();
                     const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
                     const gender = tokenType % 2;

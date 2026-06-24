@@ -624,18 +624,17 @@
 
             try {
                 userNfts = [];
-                const balance = parseInt(await nftMintContract.methods.balanceOf(account).call(), 10);
+                const tokenIds = await nftMintContract.methods.getTokenIdsByOwner(account).call();
                 
-                for (let i = 0; i < balance; i++) {
+                for (const tokenId of tokenIds) {
                     try {
-                        const tokenId = parseInt(await nftMintContract.methods.tokenOfOwnerByIndex(account, i).call(), 10);
                         const type = parseInt(await nftMintContract.methods.tokenType(tokenId).call(), 10);
                         const level = parseInt(await nftMintContract.methods.tokenLevel(tokenId).call(), 10);
                         const mintTime = parseInt(await nftDataContract.methods.getNFTMintTime(tokenId).call(), 10);
                         
-                        userNfts.push({ tokenId, type, level, mintTime });
+                        userNfts.push({ tokenId: parseInt(tokenId, 10), type, level, mintTime });
                     } catch (e) {
-                        console.warn(`获取NFT ${i} 详情失败:`, e);
+                        console.warn(`获取NFT ${tokenId} 详情失败:`, e);
                     }
                 }
 

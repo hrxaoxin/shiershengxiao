@@ -1068,11 +1068,10 @@
 
         async function loadMyNfts() {
             try {
-                const balance = await nftContract.methods.balanceOf(accounts[0]).call();
+                const tokenIds = await nftContract.methods.getTokenIdsByOwner(accounts[0]).call();
                 myNfts = [];
                 
-                for (let i = 0; i < balance; i++) {
-                    const tokenId = await nftContract.methods.tokenOfOwnerByIndex(accounts[0], i).call();
+                for (const tokenId of tokenIds) {
                     const tokenInfo = await nftContract.methods.getNFTData(tokenId).call();
                     const tokenType = tokenInfo.tokenType_;
                     const level = tokenInfo.level;

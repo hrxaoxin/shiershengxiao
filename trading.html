@@ -1317,18 +1317,12 @@
             userNftGrid.innerHTML = '<div class="col-span-full text-center py-8"><i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i><p class="text-gray-600">加载用户NFT中...</p></div>';
 
             try {
-                const balance = parseInt(await nftMintContract.methods.balanceOf(account).call(), 10);
+                const tokenIds = await nftMintContract.methods.getTokenIdsByOwner(account).call();
                 
-                if (balance === 0) {
+                if (!tokenIds || tokenIds.length === 0) {
                     userNftGrid.innerHTML = '<div class="col-span-full text-center py-8"><p class="text-gray-600">暂无可上架的NFT</p></div>';
                     return;
                 }
-
-                const tokenIds = await Promise.all(
-                    Array.from({ length: balance }, (_, i) => 
-                        nftMintContract.methods.tokenOfOwnerByIndex(account, i).call()
-                    )
-                );
 
                 const nftPromises = tokenIds.map(tokenId => {
                     const tid = parseInt(tokenId, 10);

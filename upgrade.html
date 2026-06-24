@@ -455,15 +455,15 @@
                     return;
                 }
 
-                const balance = parseInt(await nftContract.methods.balanceOf(account).call(), 10);
+                const tokenIds = await nftContract.methods.getTokenIdsByOwner(account).call();
                 
-                if (balance === 0) {
+                if (!tokenIds || tokenIds.length === 0) {
                     nftGrid.innerHTML = '<div class="col-span-full text-center py-12">你还没有NFT，去铸造页面创建一个吧！</div>';
                     ZODIAC_UI.hideLoading();
                     return;
                 }
 
-                const userNFTs = await loadNFTsParallel(balance);
+                const userNFTs = await loadNFTsParallel(tokenIds);
                 renderNFTs(userNFTs);
             } catch (error) {
                 console.error('加载NFT失败:', error);
@@ -473,16 +473,16 @@
             ZODIAC_UI.hideLoading();
         }
 
-        async function loadNFTsParallel(balance) {
+        async function loadNFTsParallel(tokenIds) {
             const BATCH_SIZE = 10;
             const batches = [];
             
-            for (let i = 0; i < balance; i += BATCH_SIZE) {
-                const end = Math.min(i + BATCH_SIZE, balance);
+            for (let i = 0; i < tokenIds.length; i += BATCH_SIZE) {
+                const end = Math.min(i + BATCH_SIZE, tokenIds.length);
                 const batchPromises = [];
                 
                 for (let j = i; j < end; j++) {
-                    batchPromises.push(loadSingleNFT(j));
+                    batchPromises.push(loadSingleNFT(tokenIds[j]));
                 }
                 
                 batches.push(Promise.all(batchPromises));
@@ -492,9 +492,7 @@
             return results.flat();
         }
 
-        async function loadSingleNFT(index) {
-            const tokenId = await nftContract.methods.tokenOfOwnerByIndex(account, index).call();
-            
+        async function loadSingleNFT(tokenId) {
             const [tokenType, tokenLevel, tokenGrowth] = await Promise.all([
                 nftContract.methods.tokenType(tokenId).call(),
                 nftContract.methods.tokenLevel(tokenId).call(),
