@@ -1967,6 +1967,17 @@ window.ZODIAC_WEB3 = (function() {
             throw e;
         }
     }
+    
+    async function isTokenPriceValid() {
+        try {
+            const contract = await getContract('priceOracle');
+            const isValid = await contract.methods.isTokenPriceValid().call();
+            return isValid;
+        } catch (e) {
+            console.error('[ZODIAC_WEB3] isTokenPriceValid failed:', e);
+            return false;
+        }
+    }
 
     async function getPriceOracleActiveDEX() {
         try {
@@ -2202,6 +2213,7 @@ window.ZODIAC_WEB3 = (function() {
         fetchPriceFromDEX,
         fetchPriceFromAllDEX,
         getPriceOracleActiveDEX,
+        isTokenPriceValid,
 
         // Buyback
         sellNFTWithGrowthPrice,

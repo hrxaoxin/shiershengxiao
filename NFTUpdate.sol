@@ -119,6 +119,17 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     address public dividendManager;
     address public priceOracle;
     address public pancakeSwapPair;
+    
+    /** @dev 手动设置的Pair地址（绕过Router直接从Pair获取价格）
+     * flapSwapPair_WBNB: FlapSwap的代币-WBNB Pair地址
+     * pancakeSwapPair_WBNB: PancakeSwap的代币-WBNB Pair地址
+     * uniswapPair_WBNB: Uniswap的代币-WBNB Pair地址
+     * wbnbUsdtPair: WBNB-USDT Pair地址（用于计算代币-USDT价格）
+     */
+    address public flapSwapPair_WBNB;
+    address public pancakeSwapPair_WBNB;
+    address public uniswapPair_WBNB;
+    address public wbnbUsdtPair;
 
     /** @dev 最小PancakeSwap流动性（防止价格操纵） */
     uint256 public minPancakeSwapLiquidity;
@@ -188,6 +199,12 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         level4UpgradeCost = 480000 * 10**18;
         usdUpgradeHidden = true;
         minPancakeSwapLiquidity = 10**15;
+        
+        // 初始化 USD 升级费用
+        level1USDUpgradeCost = 1e18;      // 1 USDT
+        level2USDUpgradeCost = 4e18;      // 4 USDT
+        level3USDUpgradeCost = 12e18;     // 12 USDT
+        level4USDUpgradeCost = 48e18;     // 48 USDT
     }
 
     /**
@@ -209,7 +226,53 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     function setPancakeSwapPair(address pair) external onlyOwner {
         pancakeSwapPair = pair;
     }
-
+    
+    /**
+     * @dev 设置FlapSwap的代币-WBNB Pair地址
+     * @param pair Pair地址
+     */
+    function setFlapSwapPair(address pair) external onlyOwner {
+        flapSwapPair_WBNB = pair;
+    }
+    
+    /**
+     * @dev 设置PancakeSwap的代币-WBNB Pair地址
+     * @param pair Pair地址
+     */
+    function setPancakeSwapPairWBNB(address pair) external onlyOwner {
+        pancakeSwapPair_WBNB = pair;
+    }
+    
+    /**
+     * @dev 设置Uniswap的代币-WBNB Pair地址
+     * @param pair Pair地址
+     */
+    function setUniswapPair(address pair) external onlyOwner {
+        uniswapPair_WBNB = pair;
+    }
+    
+    /**
+     * @dev 设置WBNB-USDT Pair地址
+     * @param pair Pair地址
+     */
+    function setWbnbUsdtPair(address pair) external onlyOwner {
+        wbnbUsdtPair = pair;
+    }
+    
+    /**
+     * @dev 批量设置所有Pair地址
+     * @param _flapSwapPair FlapSwap的代币-WBNB Pair地址
+     * @param _pancakeSwapPair PancakeSwap的代币-WBNB Pair地址
+     * @param _uniswapPair Uniswap的代币-WBNB Pair地址
+     * @param _wbnbUsdtPair WBNB-USDT Pair地址
+     */
+    function setAllPairs(address _flapSwapPair, address _pancakeSwapPair, address _uniswapPair, address _wbnbUsdtPair) external onlyOwner {
+        flapSwapPair_WBNB = _flapSwapPair;
+        pancakeSwapPair_WBNB = _pancakeSwapPair;
+        uniswapPair_WBNB = _uniswapPair;
+        wbnbUsdtPair = _wbnbUsdtPair;
+    }
+    
     /**
      * @dev 升级授权函数
      */
@@ -731,6 +794,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         else if (lv == 4) usdValue = level4USDUpgradeCost;
         else revert("E18: Invalid level");
         
+        // 修复：检查USD费用是否有效（不能为0）
+        require(usdValue > 0, "E22: USD upgrade cost not set");
+        
         uint256 price = _getTokenPrice();
         require(price > 0, "E20: Price oracle returned zero");
         require(price >= 10**10, "E20: Price too low");
@@ -805,30 +871,129 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         
         IAuthorizer auth = IAuthorizer(authorizer);
         
-        // FlapSwap (dexType = 0)
-        address flapSwapRouter = auth.getFlapSwapRouter();
-        if (flapSwapRouter != address(0)) {
-            prices[0] = _getPriceFromRouter(flapSwapRouter);
+        // FlapSwap (dexType = 0) - 优先使用手动设置的Pair
+        if (flapSwapPair_WBNB != address(0)) {
+            prices[0] = _getPriceFromManualPair(flapSwapPair_WBNB);
+        }
+        if (prices[0] == 0) {
+            address flapSwapRouter = auth.getFlapSwapRouter();
+            if (flapSwapRouter != address(0)) {
+                prices[0] = _getPriceFromRouter(flapSwapRouter);
+            }
         }
         
-        // PancakeSwap (dexType = 1)
-        address pancakeSwapRouter = auth.getPancakeSwapRouter();
-        if (pancakeSwapRouter != address(0)) {
-            prices[1] = _getPriceFromRouter(pancakeSwapRouter);
+        // PancakeSwap (dexType = 1) - 优先使用手动设置的Pair
+        if (pancakeSwapPair_WBNB != address(0)) {
+            prices[1] = _getPriceFromManualPair(pancakeSwapPair_WBNB);
+        }
+        if (prices[1] == 0) {
+            address pancakeSwapRouter = auth.getPancakeSwapRouter();
+            if (pancakeSwapRouter != address(0)) {
+                prices[1] = _getPriceFromRouter(pancakeSwapRouter);
+            }
         }
         
-        // Uniswap (dexType = 2)
-        address uniswapRouter = auth.getUniswapRouter();
-        if (uniswapRouter != address(0)) {
-            prices[2] = _getPriceFromRouter(uniswapRouter);
+        // Uniswap (dexType = 2) - 优先使用手动设置的Pair
+        if (uniswapPair_WBNB != address(0)) {
+            prices[2] = _getPriceFromManualPair(uniswapPair_WBNB);
+        }
+        if (prices[2] == 0) {
+            address uniswapRouter = auth.getUniswapRouter();
+            if (uniswapRouter != address(0)) {
+                prices[2] = _getPriceFromRouter(uniswapRouter);
+            }
         }
         
         return prices;
     }
     
     /**
+     * @dev 从手动设置的Pair地址获取代币价格
+     * @param pair Pair地址
+     * @return 代币价格（USD，精度18位），获取失败返回0
+     */
+    function _getPriceFromManualPair(address pair) internal view returns (uint256) {
+        if (pair == address(0) || tokenContract == address(0)) {
+            return 0;
+        }
+        
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address wbnb = auth.getWBNB();
+        address usdt = auth.getUSDT();
+        
+        if (wbnb == address(0) || usdt == address(0)) {
+            return 0;
+        }
+        
+        // 直接从Pair获取储备计算价格
+        try IPancakeSwapPair(pair).getReserves() returns (uint112 reserve0, uint112 reserve1, uint32) {
+            address token0 = IPancakeSwapPair(pair).token0();
+            uint256 tokenReserve = token0 == tokenContract ? uint256(reserve0) : uint256(reserve1);
+            uint256 wbnbReserve = token0 == tokenContract ? uint256(reserve1) : uint256(reserve0);
+            
+            if (tokenReserve > 0 && wbnbReserve > 0) {
+                // 获取WBNB-USDT价格
+                uint256 usdtPrice = _getWbnbUsdtPrice();
+                if (usdtPrice > 0) {
+                    // 计算：1 token = (wbnbReserve / tokenReserve) * usdtPrice USD
+                    uint256 wbnbPerToken = (wbnbReserve * 1e18) / tokenReserve;
+                    uint256 tokenPrice = (wbnbPerToken * usdtPrice) / 1e18;
+                    return tokenPrice * 10**12;
+                }
+            }
+        } catch {}
+        
+        return 0;
+    }
+    
+    /**
+     * @dev 获取WBNB-USDT价格
+     * 优先使用手动设置的Pair
+     * @return WBNB价格（USD，精度18位）
+     */
+    function _getWbnbUsdtPrice() internal view returns (uint256) {
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address usdt = auth.getUSDT();
+        address wbnb = auth.getWBNB();
+        
+        if (usdt == address(0) || wbnb == address(0)) {
+            return 0;
+        }
+        
+        // 优先使用手动设置的WBNB-USDT Pair
+        if (wbnbUsdtPair != address(0)) {
+            try IPancakeSwapPair(wbnbUsdtPair).getReserves() returns (uint112 reserve0, uint112 reserve1, uint32) {
+                address token0 = IPancakeSwapPair(wbnbUsdtPair).token0();
+                uint256 wbnbReserve = token0 == wbnb ? uint256(reserve0) : uint256(reserve1);
+                uint256 usdtReserve = token0 == wbnb ? uint256(reserve1) : uint256(reserve0);
+                
+                if (wbnbReserve > 0 && usdtReserve > 0) {
+                    // usdtReserve 是6位精度
+                    return (usdtReserve * 1e18) / wbnbReserve;
+                }
+            } catch {}
+        }
+        
+        // 备用：通过Router获取
+        address flapSwapRouter = auth.getFlapSwapRouter();
+        if (flapSwapRouter != address(0)) {
+            address[] memory path = new address[](2);
+            path[0] = wbnb;
+            path[1] = usdt;
+            
+            try IDexRouter(flapSwapRouter).getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
+                if (amounts.length == 2 && amounts[1] > 0) {
+                    return amounts[1] * 10**12;
+                }
+            } catch {}
+        }
+        
+        return 0;
+    }
+    
+    /**
      * @dev 从特定DEX Router获取代币价格
-     * 通过代币->WBNB->USDT路径获取价格
+     * 通过代币->WBNB->USDT路径获取价格，优先从Pair获取
      * @param router DEX路由地址
      * @return 代币价格（USD，精度18位），获取失败返回0
      */
