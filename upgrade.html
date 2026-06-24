@@ -554,19 +554,15 @@
             let requiredUSDDisplay = '';
             if (levelNum < 5) {
                 const requiredUSDWei = await getUSDValue(levelNum);
-                const requiredUSD = Number(BigInt(requiredUSDWei) / 10n**18n);
+                const requiredUSD = Number(BigInt(requiredUSDWei)) / 1e18;
                 console.log('selectNFT - level:', levelNum, 'requiredUSDWei:', requiredUSDWei, 'requiredUSD:', requiredUSD);
                requiredUSDDisplay = requiredUSD.toFixed(4) + ' USDT';
                 
                 try {
-                // 直接使用配置创建合约实例，避免依赖 ZODIAC_WEB3
-                const priceOracleAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.priceOracle;
-                if (!priceOracleAddr || priceOracleAddr === '0x0000000000000000000000000000000000000000') {
+                const priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
+                if (!priceOracleContract) {
                     usdValueText = '⚠ 价格预言机未配置';
-                } else if (!window.web3) {
-                    usdValueText = '⚠ Web3未初始化';
                 } else {
-                    const priceOracleContract = new window.web3.eth.Contract(ZODIAC_CONFIG.ABIS.priceOracleABI, priceOracleAddr);
                     const price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
                     console.log('selectNFT - price from oracle:', price.toString());
                 
@@ -957,7 +953,7 @@
             const requiredUSDWei = await getUSDValue(levelNum);
             console.log('handleUpgradeWithUSDValue - requiredUSDWei:', requiredUSDWei);
             
-            const requiredUSD = Number(BigInt(requiredUSDWei) / 10n**18n);
+            const requiredUSD = Number(BigInt(requiredUSDWei)) / 1e18;
             console.log('handleUpgradeWithUSDValue - requiredUSD:', requiredUSD);
             
             const nftId = parseInt(selectedNft.id, 10);
@@ -970,19 +966,12 @@
             let requiredTokensDisplay = '0';
             
             try {
-                // 直接使用配置创建合约实例，避免依赖 ZODIAC_WEB3
-                const priceOracleAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.priceOracle;
-                if (!priceOracleAddr || priceOracleAddr === '0x0000000000000000000000000000000000000000') {
+                priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
+                if (!priceOracleContract) {
                     ZODIAC_UI.showToast('价格预言机地址未配置，请联系管理员', 'error');
                     return;
                 }
                 
-                if (!window.web3) {
-                    ZODIAC_UI.showToast('Web3未初始化，请刷新页面重试', 'error');
-                    return;
-                }
-                
-                priceOracleContract = new window.web3.eth.Contract(ZODIAC_CONFIG.ABIS.priceOracleABI, priceOracleAddr);
                 price = BigInt(await priceOracleContract.methods.getTokenPriceUSD().call());
                 console.log('Price from oracle:', price.toString());
                 
