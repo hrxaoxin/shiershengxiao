@@ -556,7 +556,7 @@
                 const requiredUSDWei = await getUSDValue(levelNum);
                 const requiredUSD = Number(BigInt(requiredUSDWei) / 10n**18n);
                 console.log('selectNFT - level:', levelNum, 'requiredUSDWei:', requiredUSDWei, 'requiredUSD:', requiredUSD);
-               const requiredUSDDisplay = requiredUSD.toFixed(4) + ' USDT';
+               requiredUSDDisplay = requiredUSD.toFixed(4) + ' USDT';
                 
                 try {
                 const priceOracleContract = await window.ZODIAC_WEB3.getContract('priceOracle');
@@ -959,10 +959,17 @@
             }
 
             const levelNum = parseInt(selectedNft.level, 10);
+            console.log('handleUpgradeWithUSDValue - selectedNft:', selectedNft);
+            console.log('handleUpgradeWithUSDValue - levelNum:', levelNum);
+            
             const requiredUSDWei = await getUSDValue(levelNum);
+            console.log('handleUpgradeWithUSDValue - requiredUSDWei:', requiredUSDWei);
+            
             const requiredUSD = Number(BigInt(requiredUSDWei) / 10n**18n);
-            console.log('handleUpgradeWithUSDValue - level:', levelNum, 'selectedNft.level:', selectedNft.level, 'requiredUSDWei:', requiredUSDWei, 'requiredUSD:', requiredUSD);
+            console.log('handleUpgradeWithUSDValue - requiredUSD:', requiredUSD);
+            
             const nftId = parseInt(selectedNft.id, 10);
+            console.log('handleUpgradeWithUSDValue - nftId:', nftId);
             
             // 获取当前代币价格并计算所需代币数量
             let priceOracleContract;
