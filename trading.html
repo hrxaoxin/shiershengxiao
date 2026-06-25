@@ -1065,10 +1065,6 @@
                 ZODIAC_UI.showToast('请输入有效的价格', 'warning');
                 return;
             }
-            if (priceNum > 1000) {
-                ZODIAC_UI.showToast('价格不能超过1000代币', 'warning');
-                return;
-            }
 
             console.log('[TRADING] calling checkNFT...');
             const isValid = await checkNFT(tokenId);
@@ -1151,8 +1147,6 @@
                     errorMsg += ': ' + error.message;
                     if (error.message.includes('NFTTrading: Invalid price')) {
                         errorMsg = '价格无效，请输入大于0的价格';
-                    } else if (error.message.includes('NFTTrading: Price too high')) {
-                        errorMsg = '价格过高，不能超过1000代币';
                     } else if (error.message.includes('NFTTrading: Not token owner')) {
                         errorMsg = '您不是此NFT的所有者';
                     } else if (error.message.includes('NFTTrading: Already listed')) {
