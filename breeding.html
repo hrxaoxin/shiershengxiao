@@ -549,6 +549,7 @@
         async function refreshAllData() {
             try {
                 await initContracts();
+                await updateWalletStatus();
                 await loadBreedingConstants();
                 await loadNFTs();
                 await loadMarketOrders();
@@ -631,9 +632,13 @@
             tokenContract = null;
             try {
                 nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
+                console.log('nftContract initialized:', !!nftContract);
                 breedingCoreContract = await window.ZODIAC_WEB3.getContract('breedingCore');
+                console.log('breedingCoreContract initialized:', !!breedingCoreContract);
                 breedingMarketContract = await window.ZODIAC_WEB3.getContract('breedingMarket');
+                console.log('breedingMarketContract initialized:', !!breedingMarketContract);
                 tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
+                console.log('tokenContract initialized:', !!tokenContract);
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
                 ZODIAC_UI.showToast('合约初始化失败，请刷新重试', 'error');
@@ -662,18 +667,19 @@
                     return;
                 }
                 
+                const web3 = window.ZODIAC_WEB3.getWeb3();
                 selfBreedingCooldown = parseInt(await breedingCoreContract.methods.selfBreedingCooldown().call(), 10);
                 marketBreedingCooldown = parseInt(await breedingCoreContract.methods.marketBreedingCooldown().call(), 10);
                 
                 const selfFeeWei = await breedingCoreContract.methods.selfBreedingFee().call();
                 const marketFeeWei = await breedingCoreContract.methods.marketBreedingFee().call();
-                const selfFee = (parseInt(selfFeeWei) / 10**18).toFixed(0);
-                const marketFee = (parseInt(marketFeeWei) / 10**18).toFixed(0);
+                const selfFee = web3.utils.fromWei(selfFeeWei, 'ether');
+                const marketFee = web3.utils.fromWei(marketFeeWei, 'ether');
                 
                 document.getElementById('selfBreedingCooldown').textContent = formatDuration(selfBreedingCooldown);
                 document.getElementById('marketBreedingCooldown').textContent = formatDuration(marketBreedingCooldown);
-                document.getElementById('selfBreedingFee').textContent = selfFee;
-                document.getElementById('marketBreedingFee').textContent = marketFee;
+                document.getElementById('selfBreedingFee').textContent = parseFloat(selfFee).toFixed(4);
+                document.getElementById('marketBreedingFee').textContent = parseFloat(marketFee).toFixed(4);
                 console.log('孕育常量加载成功:', { selfBreedingCooldown, marketBreedingCooldown, selfFee, marketFee });
             } catch (error) {
                 console.error('加载孕育常量失败:', error);
@@ -691,36 +697,36 @@
                 const account = getAccount();
 
                 const tokenIds = await nftContract.methods.getTokenIdsByOwner(account).call();
-                for (const tokenId of tokenIds) {
-                    const tokenType = await nftContract.methods.tokenType(tokenId).call();
-                    const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
-                    const gender = tokenType % 2;
+                
+                const nftPromises = tokenIds.map(tokenId => {
+                    return Promise.all([
+                        nftContract.methods.tokenType(tokenId).call(),
+                        nftContract.methods.tokenLevel(tokenId).call(),
+                        breedingCoreContract ? breedingCoreContract.methods.isInCooldown(tokenId).call().catch(() => false) : Promise.resolve(false),
+                        breedingCoreContract ? breedingCoreContract.methods.getCooldownEndTime(tokenId).call().catch(() => null) : Promise.resolve(null)
+                    ]).then(([tokenType, tokenLevel, isOnCooldown, cooldownEndTime]) => ({
+                        id: tokenId ? tokenId.toString() : '0',
+                        type: tokenType ? tokenType.toString() : '0',
+                        level: tokenLevel ? tokenLevel.toString() : '0',
+                        gender: tokenType % 2,
+                        image: getNFTImage(tokenType),
+                        name: getNFTName(tokenType),
+                        isOnCooldown: isOnCooldown,
+                        cooldownEndTime: cooldownEndTime
+                    })).catch(e => {
+                        console.warn(`获取NFT ${tokenId} 详情失败:`, e);
+                        return null;
+                    });
+                });
 
-                    let cooldownEndTime = null;
-                    let isOnCooldown = false;
-                    try {
-                        isOnCooldown = await breedingCoreContract.methods.isInCooldown(tokenId).call();
-                        if (isOnCooldown) {
-                            cooldownEndTime = await breedingCoreContract.methods.getCooldownEndTime(tokenId).call();
-                        }
-                    } catch (error) {
-                        console.warn('检查NFT冷却期失败:', error);
-                    }
+                const results = await Promise.all(nftPromises);
+                const allNfts = results.filter(nft => nft !== null);
 
-                    if (isNFTLevelEligible(tokenLevel)) {
-                        const nftData = {
-                            id: tokenId ? tokenId.toString() : '0',
-                            type: tokenType ? tokenType.toString() : '0',
-                            level: tokenLevel ? tokenLevel.toString() : '0',
-                            gender: gender,
-                            image: getNFTImage(tokenType),
-                            name: getNFTName(tokenType),
-                            isOnCooldown: isOnCooldown,
-                            cooldownEndTime: cooldownEndTime
-                        };
+                for (const nftData of allNfts) {
+                    if (isNFTLevelEligible(nftData.level)) {
                         breedableNFTs.push(nftData);
-                        if (!isOnCooldown) {
-                            if (gender === 1) {
+                        if (!nftData.isOnCooldown) {
+                            if (nftData.gender === 1) {
                                 maleNFTs.push(nftData);
                             } else {
                                 femaleNFTs.push(nftData);

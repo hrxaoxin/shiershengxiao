@@ -503,6 +503,12 @@
             }
         }
 
+        function formatPrice(priceWei) {
+            if (!priceWei) return '0.0000';
+            const price = web3.utils.fromWei(priceWei, 'ether');
+            return parseFloat(price).toFixed(4);
+        }
+
         async function updateWalletStatus() {
             if (!account) return;
 
@@ -549,7 +555,7 @@
                 }
 
                 // 更新固定价回购状态
-                document.getElementById('fixedBuybackPrice').textContent = web3.utils.fromWei(fixedPrice, 'ether') + ' 代币';
+                document.getElementById('fixedBuybackPrice').textContent = formatPrice(fixedPrice) + ' 代币';
                 
                 const fixedStatusEl = document.getElementById('autoBuybackStatus');
                 if (fixedBuybackOpen) {
@@ -596,7 +602,7 @@
 
                 document.getElementById('balanceRatioBalance').textContent = web3.utils.fromWei(balance, 'ether');
                 document.getElementById('balanceRatioTotalSupply').textContent = totalSupply;
-                document.getElementById('balanceRatioPrice').textContent = web3.utils.fromWei(pricePerNFT, 'ether') + ' 代币';
+                document.getElementById('balanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
             } catch (error) {
                 console.error('加载余额比例价格失败:', error);
             }
@@ -741,9 +747,9 @@
 
             if (growthBuybackOpen) {
                 const growthPrice = await calculateGrowthPrice(tokenId);
-                document.getElementById('basePrice').textContent = web3.utils.fromWei(growthPrice.basePrice, 'ether');
+                document.getElementById('basePrice').textContent = formatPrice(growthPrice.basePrice);
                 document.getElementById('holdingBonus').textContent = '+' + growthPrice.bonusPercent + '%';
-                document.getElementById('finalGrowthPrice').textContent = web3.utils.fromWei(growthPrice.finalPrice, 'ether');
+                document.getElementById('finalGrowthPrice').textContent = formatPrice(growthPrice.finalPrice);
 
                 const bonusProgress = Math.min(growthPrice.bonusPercent, 100);
                 document.getElementById('bonusProgressText').textContent = bonusProgress + '%';
@@ -753,12 +759,12 @@
             }
 
             if (fixedBuybackOpen) {
-                document.getElementById('finalFixedPrice').textContent = web3.utils.fromWei(fixedPrice, 'ether') + ' 代币';
+                document.getElementById('finalFixedPrice').textContent = formatPrice(fixedPrice) + ' 代币';
                 document.getElementById('sellWithFixedBtn').disabled = false;
             }
 
             if (balanceRatioBuybackOpen) {
-                document.getElementById('finalBalanceRatioPrice').textContent = web3.utils.fromWei(balanceRatioPrice, 'ether') + ' 代币';
+                document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(balanceRatioPrice) + ' 代币';
                 document.getElementById('sellWithBalanceRatioBtn').disabled = false;
             }
 
@@ -939,7 +945,7 @@
 
         async function checkApproval() {
             if (!account || !nftMintContract) return false;
-            const approval = await nftMintContract.methods.isApprovedForAll(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.buyback).call();
+            const approval = await nftMintContract.methods.isApprovedForAll(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftBuyback).call();
             return approval;
         }
 
@@ -954,7 +960,7 @@
             if (!confirm) return;
 
             try {
-                await ZODIAC_WEB3.setNFTApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.buyback, true);
+                await ZODIAC_WEB3.setNFTApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftBuyback, true);
                 ZODIAC_UI.showToast('授权成功！', 'success');
             } catch (error) {
                 ZODIAC_UI.showToast('授权失败: ' + (error.message || '未知错误'), 'error');
