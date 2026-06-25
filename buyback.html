@@ -451,6 +451,7 @@
         let balanceRatioBuybackOpen = false;
         let fixedPrice = '0';
         let balanceRatioPrice = '0';
+        let holdingDaysRefreshInterval = null;
 
         document.addEventListener('DOMContentLoaded', async function() {
             ZODIAC_COMPONENTS.injectNavigation('buyback');
@@ -730,6 +731,11 @@
         }
 
         async function selectUnifiedNft(tokenId, type, level, mintTime) {
+            if (holdingDaysRefreshInterval) {
+                clearInterval(holdingDaysRefreshInterval);
+                holdingDaysRefreshInterval = null;
+            }
+
             const nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
             const imagePath = nftInfo.imagePath;
 
@@ -741,6 +747,31 @@
             document.getElementById('unifiedSelectedNftId').textContent = `NFT #${tokenId}`;
             document.getElementById('unifiedSelectedNftLevel').textContent = `等级 ${level} · ${nftInfo.isRare ? '稀有' : '普通'}`;
 
+            await updateHoldingDaysAndPrice(tokenId, mintTime);
+
+            if (fixedBuybackOpen) {
+                document.getElementById('finalFixedPrice').textContent = formatPrice(fixedPrice) + ' 代币';
+                document.getElementById('sellWithFixedBtn').disabled = false;
+            }
+
+            if (balanceRatioBuybackOpen) {
+                document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(balanceRatioPrice) + ' 代币';
+                document.getElementById('sellWithBalanceRatioBtn').disabled = false;
+            }
+
+            holdingDaysRefreshInterval = setInterval(() => {
+                updateHoldingDaysAndPrice(tokenId, mintTime);
+            }, 60000);
+
+            displayUnifiedNfts(currentFilter === 'all' ? userNfts : userNfts.filter(nft => {
+                const typeId = parseInt(nft.type, 10);
+                const itemAttrIndex = Math.floor(typeId / 24);
+                const attrIndexes = { water: 0, wind: 1, fire: 2, dark: 3, light: 4 };
+                return itemAttrIndex === attrIndexes[currentFilter];
+            }));
+        }
+
+        async function updateHoldingDaysAndPrice(tokenId, mintTime) {
             const now = Math.floor(Date.now() / 1000);
             const holdingDays = Math.floor((now - mintTime) / 86400);
             document.getElementById('holdingDays').textContent = holdingDays + ' 天';
@@ -757,26 +788,13 @@
                 document.getElementById('bonusHint').textContent = `持有${growthPrice.daysToMax}天可达最高回购价`;
                 document.getElementById('sellWithGrowthBtn').disabled = false;
             }
-
-            if (fixedBuybackOpen) {
-                document.getElementById('finalFixedPrice').textContent = formatPrice(fixedPrice) + ' 代币';
-                document.getElementById('sellWithFixedBtn').disabled = false;
-            }
-
-            if (balanceRatioBuybackOpen) {
-                document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(balanceRatioPrice) + ' 代币';
-                document.getElementById('sellWithBalanceRatioBtn').disabled = false;
-            }
-
-            displayUnifiedNfts(currentFilter === 'all' ? userNfts : userNfts.filter(nft => {
-                const typeId = parseInt(nft.type, 10);
-                const itemAttrIndex = Math.floor(typeId / 24);
-                const attrIndexes = { water: 0, wind: 1, fire: 2, dark: 3, light: 4 };
-                return itemAttrIndex === attrIndexes[currentFilter];
-            }));
         }
 
         function clearUnifiedSelection() {
+            if (holdingDaysRefreshInterval) {
+                clearInterval(holdingDaysRefreshInterval);
+                holdingDaysRefreshInterval = null;
+            }
             selectedNft = null;
             document.getElementById('unifiedSelectedNftInfo').classList.add('hidden');
             document.getElementById('sellWithGrowthBtn').disabled = true;

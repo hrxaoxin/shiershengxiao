@@ -334,8 +334,17 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 discount,
         uint256 basePrice
     ) private view returns (uint256) {
+        if (mintTime >= block.timestamp) {
+            return basePrice;
+        }
         uint256 holdingDays = (block.timestamp - mintTime) / 1 days;
         uint256 daysToBreakEven = getDaysToBreakEven(level);
+        if (daysToBreakEven == 0) {
+            return basePrice;
+        }
+        if (maxBuybackMultiplier <= 100 || discount >= 100) {
+            return basePrice;
+        }
         uint256 maxBonusDays = ((maxBuybackMultiplier - 100) * daysToBreakEven) / (100 - discount);
         uint256 bonusDays = holdingDays > maxBonusDays ? maxBonusDays : holdingDays;
         
@@ -438,6 +447,9 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 basePrice,
         uint256 daysToBreakEven
     ) internal view returns (uint256, uint256, uint256, uint256) {
+        if (mintTime >= block.timestamp || daysToBreakEven == 0 || maxBuybackMultiplier <= 100 || discount >= 100) {
+            return (basePrice, 0, basePrice, daysToBreakEven);
+        }
         uint256 bonusDays = ((block.timestamp - mintTime) / 1 days);
         {
             uint256 maxBonusDays = ((maxBuybackMultiplier - 100) * daysToBreakEven) / (100 - discount);
@@ -451,7 +463,12 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             bonusPercent = maxBuybackMultiplier - 100;
         }
 
-        uint256 finalPrice = basePrice + ((basePrice * bonusDays) / daysToBreakEven);
+        uint256 finalPrice = basePrice;
+        if (bonusDays > 0 && daysToBreakEven > 0) {
+            if (basePrice <= type(uint256).max / bonusDays) {
+                finalPrice = basePrice + ((basePrice * bonusDays) / daysToBreakEven);
+            }
+        }
         
         {
             uint256 maxPrice = (totalCost * maxBuybackMultiplier) / 100;

@@ -657,44 +657,64 @@
         }
 
         async function updateWalletStatus() {
-            if (!account || !tokenContract) return;
+            if (!account) return;
 
             try {
-                const web3 = window.ZODIAC_WEB3.getWeb3();
-                const balance = await tokenContract.methods.balanceOf(account).call();
-                const balanceInTokens = web3.utils.fromWei(balance, 'ether');
-                const balanceFormatted = parseFloat(balanceInTokens).toFixed(4);
-                document.getElementById('tokenBalance').textContent = balanceFormatted;
+                if (tokenContract) {
+                    const web3 = window.ZODIAC_WEB3.getWeb3();
+                    const balance = await tokenContract.methods.balanceOf(account).call();
+                    const balanceInTokens = web3.utils.fromWei(balance, 'ether');
+                    const balanceFormatted = parseFloat(balanceInTokens).toFixed(4);
+                    document.getElementById('tokenBalance').textContent = balanceFormatted;
+                    return;
+                }
             } catch (error) {
                 console.error('更新代币余额失败:', error);
-                document.getElementById('tokenBalance').textContent = '0';
             }
+            document.getElementById('tokenBalance').textContent = '0';
         }
 
         async function loadBreedingConstants() {
             try {
-                if (!breedingCoreContract) {
-                    console.warn('breedingCoreContract is null, skipping loadBreedingConstants');
-                    return;
+                const web3 = window.ZODIAC_WEB3.getWeb3();
+                
+                if (breedingCoreContract) {
+                    try {
+                        const selfCooldown = await breedingCoreContract.methods.selfBreedingCooldown().call();
+                        selfBreedingCooldown = parseInt(selfCooldown, 10);
+                        document.getElementById('selfBreedingCooldown').textContent = formatDuration(selfBreedingCooldown);
+                    } catch (e) {
+                        console.warn('读取自我孕育冷却时间失败:', e);
+                    }
+                    
+                    try {
+                        const marketCooldown = await breedingCoreContract.methods.marketBreedingCooldown().call();
+                        marketBreedingCooldown = parseInt(marketCooldown, 10);
+                        document.getElementById('marketBreedingCooldown').textContent = formatDuration(marketBreedingCooldown);
+                    } catch (e) {
+                        console.warn('读取市场孕育冷却时间失败:', e);
+                    }
+                    
+                    try {
+                        const selfFeeWei = await breedingCoreContract.methods.selfBreedingFee().call();
+                        const selfFee = web3.utils.fromWei(selfFeeWei, 'ether');
+                        document.getElementById('selfBreedingFee').textContent = parseFloat(selfFee).toFixed(4);
+                    } catch (e) {
+                        console.warn('读取自我孕育费用失败:', e);
+                    }
+                    
+                    try {
+                        const marketFeeWei = await breedingCoreContract.methods.marketBreedingFee().call();
+                        const marketFee = web3.utils.fromWei(marketFeeWei, 'ether');
+                        document.getElementById('marketBreedingFee').textContent = parseFloat(marketFee).toFixed(4);
+                    } catch (e) {
+                        console.warn('读取市场孕育费用失败:', e);
+                    }
                 }
                 
-                const web3 = window.ZODIAC_WEB3.getWeb3();
-                selfBreedingCooldown = parseInt(await breedingCoreContract.methods.selfBreedingCooldown().call(), 10);
-                marketBreedingCooldown = parseInt(await breedingCoreContract.methods.marketBreedingCooldown().call(), 10);
-                
-                const selfFeeWei = await breedingCoreContract.methods.selfBreedingFee().call();
-                const marketFeeWei = await breedingCoreContract.methods.marketBreedingFee().call();
-                const selfFee = web3.utils.fromWei(selfFeeWei, 'ether');
-                const marketFee = web3.utils.fromWei(marketFeeWei, 'ether');
-                
-                document.getElementById('selfBreedingCooldown').textContent = formatDuration(selfBreedingCooldown);
-                document.getElementById('marketBreedingCooldown').textContent = formatDuration(marketBreedingCooldown);
-                document.getElementById('selfBreedingFee').textContent = parseFloat(selfFee).toFixed(4);
-                document.getElementById('marketBreedingFee').textContent = parseFloat(marketFee).toFixed(4);
-                console.log('孕育常量加载成功:', { selfBreedingCooldown, marketBreedingCooldown, selfFee, marketFee });
+                console.log('孕育常量加载完成');
             } catch (error) {
                 console.error('加载孕育常量失败:', error);
-                ZODIAC_UI.showToast('加载孕育配置失败: ' + (error.message || '未知错误'), 'error');
             }
         }
 

@@ -111,20 +111,32 @@ library BreedingLib {
     ) internal {
         address nftDataContract = IAuthorizer(authorizer).getNFTData();
         if (nftDataContract != address(0)) {
-            INFTDataInterface(nftDataContract).removeUserNFT(from, tokenId);
-            INFTDataInterface(nftDataContract).addUserNFT(to, tokenId);
+            try INFTDataInterface(nftDataContract).removeUserNFT(from, tokenId) {
+            } catch {
+            }
+            try INFTDataInterface(nftDataContract).addUserNFT(to, tokenId) {
+            } catch {
+            }
         }
         
         address dividendManager = IAuthorizer(authorizer).getDividendManager();
         if (dividendManager != address(0)) {
-            IDividendManager(dividendManager).syncUserWeight(from);
-            IDividendManager(dividendManager).syncUserWeight(to);
+            try IDividendManager(dividendManager).syncUserWeight(from) {
+            } catch {
+            }
+            try IDividendManager(dividendManager).syncUserWeight(to) {
+            } catch {
+            }
         }
         
         address weightManager = IAuthorizer(authorizer).getWeightManager();
         if (weightManager != address(0)) {
-            IWeightManager(weightManager).syncUserWeight(from);
-            IWeightManager(weightManager).syncUserWeight(to);
+            try IWeightManager(weightManager).syncUserWeight(from) {
+            } catch {
+            }
+            try IWeightManager(weightManager).syncUserWeight(to) {
+            } catch {
+            }
         }
     }
 }

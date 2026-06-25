@@ -1034,56 +1034,79 @@
     <script>
         async function loadTokenStakingInfo() {
             if (!tokenStakingContract) {
-                ZODIAC_UI.showToast('代币质押合约未配置', 'warning');
+                console.warn('代币质押合约未配置');
+                updateTokenStakeButton();
                 return;
             }
 
             try {
-                const balance = await tokenContract.methods.balanceOf(account).call();
-                const balanceStr = web3.utils.fromWei(balance, 'ether').substring(0, 10);
-                document.getElementById('tokenBalance').textContent = balanceStr;
-                document.getElementById('tokenStakeAmount').max = parseFloat(balanceStr);
+                let hasBalance = false;
+                try {
+                    if (tokenContract && account) {
+                        const balance = await tokenContract.methods.balanceOf(account).call();
+                        const balanceStr = web3.utils.fromWei(balance, 'ether').substring(0, 10);
+                        document.getElementById('tokenBalance').textContent = balanceStr;
+                        document.getElementById('tokenStakeAmount').max = parseFloat(balanceStr);
+                        hasBalance = parseFloat(balanceStr) > 0;
+                    }
+                } catch (e) {
+                    console.warn('读取代币余额失败:', e);
+                    document.getElementById('tokenBalance').textContent = '0';
+                }
 
-                const stakeInfo = await tokenStakingContract.methods.getUserStake(account).call();
-                
-                const parsedStakeInfo = parseStakeInfo(stakeInfo);
-                
-                document.getElementById('myTokenStakeAmount').textContent = web3.utils.fromWei(parsedStakeInfo.amount, 'ether').substring(0, 10);
-                
-                // 获取LP奖励
-                const lpRewards = await tokenStakingLPContract.methods.getPendingLPReward(account).call();
-                const claimableLP = web3.utils.fromWei(lpRewards, 'ether').substring(0, 10);
-                
+                let stakedAmount = '0';
+                let stakedAt = 0;
+                try {
+                    const stakeInfo = await tokenStakingContract.methods.getUserStake(account).call();
+                    const parsedStakeInfo = parseStakeInfo(stakeInfo);
+                    stakedAmount = parsedStakeInfo.amount;
+                    stakedAt = parsedStakeInfo.stakedAt;
+                    document.getElementById('myTokenStakeAmount').textContent = web3.utils.fromWei(parsedStakeInfo.amount, 'ether').substring(0, 10);
+                } catch (e) {
+                    console.warn('读取质押信息失败:', e);
+                    document.getElementById('myTokenStakeAmount').textContent = '0';
+                }
+
+                let claimableLP = '0';
+                try {
+                    if (tokenStakingLPContract && account) {
+                        const lpRewards = await tokenStakingLPContract.methods.getPendingLPReward(account).call();
+                        claimableLP = web3.utils.fromWei(lpRewards, 'ether').substring(0, 10);
+                    }
+                } catch (e) {
+                    console.warn('读取LP奖励失败:', e);
+                    claimableLP = '0';
+                }
                 document.getElementById('tokenRewardsAmount').textContent = claimableLP + ' LP';
 
-                if (parsedStakeInfo.amount > 0) {
-                    if (parsedStakeInfo.stakedAt > 0) {
-                        const date = new Date(parsedStakeInfo.stakedAt * 1000);
-                        document.getElementById('tokenStakedAt').textContent = date.toLocaleString('zh-CN');
-                    } else {
-                        document.getElementById('tokenStakedAt').textContent = '-';
-                    }
+                if (stakedAt > 0) {
+                    const date = new Date(stakedAt * 1000);
+                    document.getElementById('tokenStakedAt').textContent = date.toLocaleString('zh-CN');
                 } else {
                     document.getElementById('tokenStakedAt').textContent = '-';
                 }
 
-                // 读取合约LP余额
-                let lpBalance = '0';
                 try {
-                    const lpBalanceWei = await tokenStakingLPContract.methods.lpRewardPoolBalance().call();
-                    lpBalance = web3.utils.fromWei(lpBalanceWei, 'ether').substring(0, 10);
+                    let lpBalance = '0';
+                    if (tokenStakingLPContract) {
+                        const lpBalanceWei = await tokenStakingLPContract.methods.lpRewardPoolBalance().call();
+                        lpBalance = web3.utils.fromWei(lpBalanceWei, 'ether').substring(0, 10);
+                    }
+                    document.getElementById('tokenStakingBNBBalance').textContent = lpBalance + ' LP';
                 } catch (e) {
-                    // 余额读取失败
+                    document.getElementById('tokenStakingBNBBalance').textContent = '0 LP';
                 }
-                document.getElementById('tokenStakingBNBBalance').textContent = lpBalance + ' LP';
 
-                const totalStakedAll = await tokenStakingContract.methods.getTotalStaked().call();
-                document.getElementById('totalStakedTokens').textContent = web3.utils.fromWei(totalStakedAll, 'ether').substring(0, 10);
+                try {
+                    const totalStakedAll = await tokenStakingContract.methods.getTotalStaked().call();
+                    document.getElementById('totalStakedTokens').textContent = web3.utils.fromWei(totalStakedAll, 'ether').substring(0, 10);
+                } catch (e) {
+                    document.getElementById('totalStakedTokens').textContent = '0';
+                }
 
                 document.getElementById('currentReleaseRatio').textContent = '由LP合约管理';
                 document.getElementById('dailyReleaseRatioDisplay').textContent = '--';
                 
-                // 读取最低质押时长
                 try {
                     const minDuration = await tokenStakingContract.methods.MIN_STAKING_DURATION().call();
                     const minDurationMinutes = Math.floor(parseInt(minDuration, 10) / 60);
@@ -1092,12 +1115,12 @@
                     document.getElementById('tokenMinDuration').textContent = '30';
                 }
 
-                document.getElementById('tokenStakeBtn').disabled = false;
-                document.getElementById('tokenUnstakeBtn').disabled = parsedStakeInfo.amount == 0;
-                document.getElementById('claimTokenRewardsBtn').disabled = parseFloat(claimableLP) <= 0;
+                document.getElementById('tokenStakeBtn').disabled = !hasBalance;
+                document.getElementById('tokenUnstakeBtn').disabled = !(stakedAmount && parseInt(stakedAmount, 10) > 0);
+                document.getElementById('claimTokenRewardsBtn').disabled = !(parseFloat(claimableLP) > 0);
             } catch (error) {
                 console.error('加载代币质押信息失败:', error);
-                ZODIAC_UI.showToast('加载代币质押信息失败: ' + error.message, 'error');
+                document.getElementById('tokenStakeBtn').disabled = false;
             }
         }
 

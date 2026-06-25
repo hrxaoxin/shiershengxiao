@@ -158,10 +158,10 @@ window.ZODIAC_CONFIG = (function() {
         nftUpdate: getEnvContractAddress('nftUpdate', '0x3e43f680218923eb03137d5307418Cb5bD71AF53'),
         nftData: getEnvContractAddress('nftData', '0x5f61e3Eba2beECE1A34572bEac7F1748FAb5a0e8'),
         nftTrading: getEnvContractAddress('nftTrading', '0x01023a601053fFDEE23546A132F8cd09AAf1deA6'),
-        nftBuyback: getEnvContractAddress('nftBuyback', '0x97d71e490ab4960F4692E52164533a98a4094291'),
+        nftBuyback: getEnvContractAddress('nftBuyback', '0x66c5EBE6680eD749a0e1258A8eEdE1305d519e3C'),
         breedingCore: getEnvContractAddress('breedingCore', '0xc31805140f8f3b0C6E0fD7a722479633c6AFa87d'),
         breedingMarket: getEnvContractAddress('breedingMarket', '0x8Fd236941d2A279c5f1A61f3FDFF8A2B23529C2A'),
-        staking: getEnvContractAddress('staking', '0xa881d09dA4bb9C3E56E9668c55Da60AA59601A85'),
+        staking: getEnvContractAddress('staking', '0xbE5284B630C64f7302B17A78A8aE40Bd8089e5A6'),
         stakingLP: getEnvContractAddress('stakingLP', '0x092461A4a05ec63713A86814c1eD08AA49f2665A'),
         tokenStaking: getEnvContractAddress('tokenStaking', '0x7B77DE8A352A8A1fd04dc20e8e5713C02Fd864E1'),
         tokenStakingLP: getEnvContractAddress('tokenStakingLP', '0x75AC28299B81F6A266EED88DA1F42ABE62c79070'),
@@ -8763,6 +8763,38 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"indexed": false,
+				"internalType": "uint256",
+				"name": "bnbAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "BNBConversionFailed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "bnbAmount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tokenAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "BNBConverted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
 				"internalType": "bool",
 				"name": "open",
 				"type": "bool"
@@ -8806,7 +8838,57 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			}
 		],
+		"name": "EmergencyBNBWithdrawn",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
 		"name": "EmergencyTokensWithdrawn",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "EmergencyWBNBWithdrawn",
 		"type": "event"
 	},
 	{
@@ -9031,7 +9113,7 @@ window.ZODIAC_CONFIG = (function() {
 		"outputs": [
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "fixedBuybackOpen",
 				"type": "bool"
 			}
 		],
@@ -9135,7 +9217,33 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			}
 		],
+		"name": "emergencyWithdrawBNB",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
 		"name": "emergencyWithdrawTokens",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "emergencyWithdrawWBNB",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -9356,6 +9464,19 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "recordIncomingBNB",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
