@@ -629,7 +629,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(price > 0, "E20: Price oracle returned zero");
         require(price >= 10**10, "E20: Price too low");
         
-        uint256 cost = (usdValue * 1e36) / price;
+        uint256 cost = (usdValue * 1e18) / price;
         require(cost > 0, "E21: Invalid cost");
         require(cost <= 10**30, "E21: Cost exceeds maximum");
         

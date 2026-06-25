@@ -564,28 +564,23 @@
         async function fetchTokenPrice(oracleAddr) {
             if (!window.web3) throw new Error('Web3未初始化');
 
-            // 策略1：尝试调用 PriceOracle 合约
+            // 策略1：尝试调用 PriceOracle 合约（使用 Contract 方式，更可靠）
             if (oracleAddr && oracleAddr !== '0x0000000000000000000000000000000000000000') {
                 try {
-                    // getTokenPriceUSD() 的函数选择器: keccak256("getTokenPriceUSD()").slice(0,10) = 0xe48f1d28
-                    const funcSig = '0xe48f1d28';
-                    const gasOptions = [null, 3000000, 6000000];
-                    for (const gasLimit of gasOptions) {
+                    console.log('fetchTokenPrice: trying oracle contract at', oracleAddr);
+                    const oracleABI = [{"inputs":[],"name":"getTokenPriceUSD","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}];
+                    const oracleContract = new window.web3.eth.Contract(oracleABI, oracleAddr);
+                    const priceStr = await oracleContract.methods.getTokenPriceUSD().call({ gas: 6000000 });
+                    const oraclePrice = BigInt(String(priceStr));
+                    console.log('fetchTokenPrice: oracle returned raw price =', oraclePrice.toString());
+                    
+                    if (oraclePrice > 0n) {
                         try {
-                            const callParams = { to: oracleAddr, data: funcSig };
-                            if (gasLimit !== null) callParams.gas = gasLimit;
-                            const raw = await window.web3.eth.call(callParams);
-                            if (!raw || raw === '0x' || raw === '0x0') continue;
-
-                            // 合约返回值：PriceOracle.sol 已经将价格转换为18位精度
-                            const hex = raw.replace(/^0x/i, '');
-                            const oraclePrice = BigInt('0x' + (hex.length > 64 ? hex.slice(-64) : hex.padStart(64, '0')));
-                            if (oraclePrice <= 0n) continue;
                             const validated = validatePriceRange(oraclePrice);
-                            console.log('fetchTokenPrice: oracle OK', 'price=' + validated.toString());
+                            console.log('fetchTokenPrice: oracle OK, price=' + validated.toString());
                             return validated;
-                        } catch (e) {
-                            console.warn(`fetchTokenPrice oracle gas=${gasLimit} failed:`, e.message);
+                        } catch (validateErr) {
+                            console.warn('fetchTokenPrice: oracle price validation failed:', validateErr.message);
                         }
                     }
                 } catch (e) {
@@ -599,17 +594,16 @@
                 try {
                     const flap = await fetchTokenPriceFromFlapPortal(tokenAddr);
                     let usdtPrice;
-                    if (flap.quoteToken.toLowerCase() === USDT_ADDR.toLowerCase()) {
-                        // 已经是 USDT
+                    const quoteToken = flap.quoteToken ? flap.quoteToken.toLowerCase() : '';
+                    if (quoteToken === USDT_ADDR.toLowerCase()) {
                         usdtPrice = normalizePriceTo18Decimals(flap.priceRaw, flap.priceDecimals);
-                    } else if (flap.quoteToken.toLowerCase() === WBNB_ADDR.toLowerCase()) {
-                        // Flap Portal 的 price 是"1 token = X WBNB"（18位），需要 × WBNB/USDT 折算
+                    } else if (quoteToken === WBNB_ADDR.toLowerCase()) {
                         const usdtFromWbnb = await quoteTokenToUSDTPrice(WBNB_ADDR, 10n ** 18n);
                         const wbnbToUsdt18 = normalizePriceTo18Decimals(usdtFromWbnb.priceRaw, usdtFromWbnb.priceDecimals);
-                        // token→USDT(18位) = (1 token 兑出 WBNB 数) * (1 WBNB 兑出 USDT 数)
                         usdtPrice = flap.priceRaw * wbnbToUsdt18 / 10n ** 18n;
                     } else {
-                        throw new Error('Flap Portal quoteToken 不支持: ' + flap.quoteToken);
+                        console.warn('fetchTokenPrice: Flap Portal quoteToken 不支持，默认按18位USDT处理:', flap.quoteToken);
+                        usdtPrice = normalizePriceTo18Decimals(flap.priceRaw, flap.priceDecimals);
                     }
                     const validated = validatePriceRange(usdtPrice);
                     console.log('fetchTokenPrice: flap portal OK', validated.toString());
@@ -620,14 +614,16 @@
             }
 
             // 策略3：直接调用 PancakeRouter 计算价格（最不准确，因 Pancake 流动性可能极薄）
-            try {
-                const router = await fetchTokenPriceFromRouter(tokenAddr);
-                const usdtPrice = normalizePriceTo18Decimals(router.priceRaw, router.priceDecimals);
-                const validated = validatePriceRange(usdtPrice);
-                console.log('fetchTokenPrice: pancake router OK', validated.toString());
-                return validated;
-            } catch (e) {
-                console.error('fetchTokenPrice: pancake router failed:', e.message);
+            if (tokenAddr && tokenAddr !== '0x0000000000000000000000000000000000000000') {
+                try {
+                    const router = await fetchTokenPriceFromRouter(tokenAddr);
+                    const usdtPrice = normalizePriceTo18Decimals(router.priceRaw, router.priceDecimals);
+                    const validated = validatePriceRange(usdtPrice);
+                    console.log('fetchTokenPrice: pancake router OK', validated.toString());
+                    return validated;
+                } catch (e) {
+                    console.error('fetchTokenPrice: pancake router failed:', e.message);
+                }
             }
 
             throw new Error('获取价格失败：所有来源均不可用');
@@ -856,9 +852,9 @@
                     }
                 
                     if (price > 0n) {
-                        // 公式: tokenAmount(18位精度) = usdAmountWei(18位精度) * 1e36 / price(18位精度)
+                        // 公式: tokenAmount(18位精度) = usdAmountWei(18位精度) * 1e18 / price(18位精度)
                         // price 是18位精度的 USDT/Token 价格，需要除以1e18得到真实价格
-                        const tokenAmount = usdWeiBigInt * 10n**36n / price;
+                        const tokenAmount = usdWeiBigInt * 10n**18n / price;
                         console.log('selectNFT - calculated tokenAmount:', tokenAmount.toString());
                         
                         if (tokenAmount > 0n) {
@@ -1258,13 +1254,13 @@
             
             // 辅助函数：验证并计算价格 → 代币数量
             // price 是18位精度的 USDT/Token 价格，需要除以1e18得到真实价格
-            // 公式: tokenAmount(18位) = usdValue(18位) * 1e36 / price(18位)
+            // 公式: tokenAmount(18位) = usdValue(18位) * 1e18 / price(18位)
             const applyPrice = (rawPrice) => {
                 const p = typeof rawPrice === 'bigint' ? rawPrice : BigInt(String(rawPrice));
                 if (p <= 0n) throw new Error('价格为零');
                 if (p < 10n**10n) throw new Error('价格过低（疑似单位错误）');
                 if (p > 10n**24n) throw new Error('价格过高（疑似单位错误）');
-                const tokens = usdWeiBigInt * 10n**36n / p;
+                const tokens = usdWeiBigInt * 10n**18n / p;
                 if (tokens <= 0n) throw new Error('代币数量无效');
                 if (tokens > 10n**30n) throw new Error('代币数量异常（超出合约上限）');
                 return { price: p, requiredTokens: tokens };
