@@ -358,6 +358,7 @@
         };
         
         let nftContract, breedingCoreContract, breedingMarketContract, tokenContract;
+        let account = null;
         let currentTab = 'self';
         let selectedMaleNFT = null;
         let selectedFemaleNFT = null;
@@ -529,9 +530,10 @@
             }
         }
 
-        function handleAccountsChanged(account) {
-            if (account) {
-                updateWalletDisplay(account);
+        function handleAccountsChanged(acc) {
+            if (acc) {
+                account = acc;
+                updateWalletDisplay(acc);
                 refreshAllData();
             }
         }
@@ -563,6 +565,7 @@
             ZODIAC_UI.initWalletButton('connectWalletBtn', 'walletAddress', null);
             ZODIAC_UI.initWalletButton('mobileConnectBtn', 'walletBtn', null);
             ZODIAC_UI.on('walletConnected', async () => {
+                account = getAccount();
                 try {
                     await initContracts();
                 } catch (e) {
@@ -598,7 +601,7 @@
             try {
                 const connected = await window.ZODIAC_WEB3.initWeb3();
                 if (connected) {
-                    const account = getAccount();
+                    account = getAccount();
                     document.getElementById('walletBtn').textContent = account.slice(0, 6) + '...' + account.slice(-4);
                     document.getElementById('walletAddress').textContent = account.slice(0, 6) + '...' + account.slice(-4);
                     document.getElementById('connectWalletBtn').style.display = 'none';

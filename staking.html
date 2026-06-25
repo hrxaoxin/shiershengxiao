@@ -946,35 +946,7 @@
                 
                 const tokenIdsNum = selectedNFTs.map(id => parseInt(id, 10));
                 
-                const batchSize = 10;
-                for (let i = 0; i < tokenIdsNum.length; i += batchSize) {
-                    const batch = tokenIdsNum.slice(i, i + batchSize);
-                    
-                    for (const tokenId of batch) {
-                        const isStaked = await checkAlreadyStaked(tokenId);
-                        if (isStaked) {
-                            console.warn(`NFT ${tokenId} 已被质押，跳过`);
-                            continue;
-                        }
-                        
-                        const stakeInfo = await stakingContract.methods.getStakingInfo(tokenId).call();
-                        if (stakeInfo.owner !== '0x0000000000000000000000000000000000000000') {
-                            continue;
-                        }
-                        
-                        let approveGas;
-                        try {
-                            approveGas = await ZODIAC_WEB3.estimateGas(nftContract, 'approve', [stakingAddress, tokenId], account);
-                        } catch (gasError) {
-                            console.warn('Gas estimation failed, using default:', gasError.message);
-                            approveGas = 100000;
-                        }
-                        await nftContract.methods.approve(stakingAddress, tokenId).send({
-                            from: account,
-                            gas: approveGas
-                        });
-                    }
-                }
+                await ZODIAC_WEB3.setNFTApprovalForAll(stakingAddress, true);
 
                 await ZODIAC_WEB3.stake(tokenIdsNum);
 
@@ -1122,7 +1094,7 @@
 
                 document.getElementById('tokenStakeBtn').disabled = false;
                 document.getElementById('tokenUnstakeBtn').disabled = parsedStakeInfo.amount == 0;
-                document.getElementById('claimTokenRewardsBtn').disabled = parseFloat(claimableTokens) <= 0;
+                document.getElementById('claimTokenRewardsBtn').disabled = parseFloat(claimableLP) <= 0;
             } catch (error) {
                 console.error('加载代币质押信息失败:', error);
                 ZODIAC_UI.showToast('加载代币质押信息失败: ' + error.message, 'error');
