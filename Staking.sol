@@ -288,7 +288,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             userStakedNFTs[msg.sender].push(tokenId);
             tokenIdToUserIndex[tokenId] = newIndex;
             totalStakedNFTs++;
-            uint256 weight = StakingLib.calculateNFTWeight(isRareToken, tokenLevel);
+            uint256 weight = _getNFTWeight(tokenLevel, isRareToken);
             totalWeightedNFTs += weight;
             // 更新用户级别累计跟踪
             userStakedWeight[msg.sender] += weight;
@@ -323,7 +323,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             require(block.timestamp >= info.stakeTime + minStakingDuration, "Staking: Lock period");
 
             bool wasRare = info.isRare;
-            uint256 weight = StakingLib.calculateNFTWeight(wasRare, info.level);
+            uint256 weight = _getNFTWeight(info.level, wasRare);
             delete stakingInfo[tokenId];
             _removeFromUserStakedNFTs(msg.sender, tokenId);
             totalStakedNFTs--;
@@ -415,12 +415,30 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     // --- 内部核心逻辑 ---
 
     /**
+     * @dev 从NFTData合约获取指定等级和稀有度的NFT权重
+     * @param level NFT等级
+     * @param isRare 是否稀有
+     * @return 权重值
+     */
+    function _getNFTWeight(uint8 level, bool isRare) internal view returns (uint256) {
+        address nftDataAddr = IAuthorizer(authorizer).getNFTData();
+        if (nftDataAddr == address(0)) {
+            return StakingLib.calculateNFTWeight(isRare, level);
+        }
+        try INFTData(nftDataAddr).getWeightByLevel(level, isRare) returns (uint256 w) {
+            return w > 0 ? w : StakingLib.calculateNFTWeight(isRare, level);
+        } catch {
+            return StakingLib.calculateNFTWeight(isRare, level);
+        }
+    }
+
+    /**
      * @dev 计算单个NFT待领取奖励（内部函数）
      * @param info 质押信息结构体指针
      * @return 待领取奖励金额
      */
     function _calculatePendingForNFT(StakingInfo storage info) internal view returns (uint256) {
-        uint256 weight = StakingLib.calculateNFTWeight(info.isRare, info.level);
+        uint256 weight = _getNFTWeight(info.level, info.isRare);
         // 奖励 = (当前全局值 - 上次快照) * 权重 / 精度
         if (globalRewardPerWeight <= info.accumulatedReward) return 0;
         
@@ -532,16 +550,74 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @dev 获取普通NFT所有等级权重（用于前端显示）
      * @return weights 等级1-5的权重数组
      */
-    function normalNFTWeight() external pure returns (uint256[5] memory weights) {
-        weights = StakingLib.getNormalNFTWeights();
+    function normalNFTWeight() external view returns (uint256[5] memory weights) {
+        address nftDataAddr = IAuthorizer(authorizer).getNFTData();
+        if (nftDataAddr == address(0)) {
+            weights = StakingLib.getNormalNFTWeights();
+            return weights;
+        }
+        try INFTData(nftDataAddr).getWeightByLevel(1, false) returns (uint256 w1) {
+            weights[0] = w1;
+        } catch {
+            weights[0] = 1;
+        }
+        try INFTData(nftDataAddr).getWeightByLevel(2, false) returns (uint256 w2) {
+            weights[1] = w2;
+        } catch {
+            weights[1] = 2;
+        }
+        try INFTData(nftDataAddr).getWeightByLevel(3, false) returns (uint256 w3) {
+            weights[2] = w3;
+        } catch {
+            weights[2] = 6;
+        }
+        try INFTData(nftDataAddr).getWeightByLevel(4, false) returns (uint256 w4) {
+            weights[3] = w4;
+        } catch {
+            weights[3] = 18;
+        }
+        try INFTData(nftDataAddr).getWeightByLevel(5, false) returns (uint256 w5) {
+            weights[4] = w5;
+        } catch {
+            weights[4] = 66;
+        }
     }
 
     /**
      * @dev 获取稀有NFT所有等级权重（用于前端显示）
      * @return weights 等级1-5的权重数组
      */
-    function rareNFTWeight() external pure returns (uint256[5] memory weights) {
-        weights = StakingLib.getRareNFTWeights();
+    function rareNFTWeight() external view returns (uint256[5] memory weights) {
+        address nftDataAddr = IAuthorizer(authorizer).getNFTData();
+        if (nftDataAddr == address(0)) {
+            weights = StakingLib.getRareNFTWeights();
+            return weights;
+        }
+        try INFTData(nftDataAddr).getWeightByLevel(1, true) returns (uint256 w1) {
+            weights[0] = w1;
+        } catch {
+            weights[0] = 10;
+        }
+        try INFTData(nftDataAddr).getWeightByLevel(2, true) returns (uint256 w2) {
+            weights[1] = w2;
+        } catch {
+            weights[1] = 12;
+        }
+        try INFTData(nftDataAddr).getWeightByLevel(3, true) returns (uint256 w3) {
+            weights[2] = w3;
+        } catch {
+            weights[2] = 16;
+        }
+        try INFTData(nftDataAddr).getWeightByLevel(4, true) returns (uint256 w4) {
+            weights[3] = w4;
+        } catch {
+            weights[3] = 28;
+        }
+        try INFTData(nftDataAddr).getWeightByLevel(5, true) returns (uint256 w5) {
+            weights[4] = w5;
+        } catch {
+            weights[4] = 76;
+        }
     }
 
     /**

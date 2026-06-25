@@ -590,11 +590,16 @@
             }
         }
 
-        async function loadBalanceRatioPrice() {
+        async function loadBalanceRatioPrice(tokenId) {
             if (!buybackContract) return;
 
             try {
-                const result = await buybackContract.methods.calculateBalanceRatioPrice().call();
+                let result;
+                if (tokenId) {
+                    result = await buybackContract.methods.calculateBalanceRatioPrice(tokenId).call();
+                } else {
+                    result = await buybackContract.methods.calculateBalanceRatioPrice(0).call();
+                }
                 const pricePerNFT = result.pricePerNFT || result['0'];
                 const balance = result.balance || result['1'];
                 const totalSupply = result.totalSupply || result['2'];
@@ -755,6 +760,7 @@
             }
 
             if (balanceRatioBuybackOpen) {
+                await loadBalanceRatioPrice(tokenId);
                 document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(balanceRatioPrice) + ' 代币';
                 document.getElementById('sellWithBalanceRatioBtn').disabled = false;
             }
@@ -816,10 +822,23 @@
 
             try {
                 const result = await buybackContract.methods.calculateBuybackPrice(tokenId).call();
-                const basePrice = result.basePrice || result['0'];
-                const bonusPercent = parseInt(result.bonusPercent || result['1'], 10);
-                const finalPrice = result.finalPrice || result['2'];
-                const daysToMax = parseInt(result.daysToMax || result['3'], 10);
+                
+                let basePrice = '0';
+                let bonusPercent = 0;
+                let finalPrice = '0';
+                let daysToMax = 90;
+                
+                if (Array.isArray(result)) {
+                    basePrice = result[0];
+                    bonusPercent = parseInt(result[1], 10);
+                    finalPrice = result[2];
+                    daysToMax = parseInt(result[3], 10);
+                } else {
+                    basePrice = result.basePrice || result['0'] || '0';
+                    bonusPercent = parseInt(result.bonusPercent || result['1'] || '0', 10);
+                    finalPrice = result.finalPrice || result['2'] || '0';
+                    daysToMax = parseInt(result.daysToMax || result['3'] || '90', 10);
+                }
                 
                 return { basePrice, bonusPercent, finalPrice, daysToMax };
             } catch (error) {
@@ -993,7 +1012,21 @@
                 const rarityText = isRare ? '稀有' : '普通';
                 
                 const level = parseInt(nftLevel, 10);
-                const weight = level * (isRare ? 2 : 1);
+                
+                // 从合约获取权重
+                let weight = level * (isRare ? 2 : 1);
+                try {
+                    const nftDataContract = await window.ZODIAC_WEB3.getContract('nftData', false);
+                    if (nftDataContract) {
+                        const realWeight = await nftDataContract.methods.getWeightByLevel(level, isRare).call();
+                        if (realWeight && realWeight > 0) {
+                            weight = parseInt(realWeight, 10);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('获取NFT权重失败，使用简化计算:', e.message);
+                }
+                
                 const canBreed = level >= 5;
                 const canBattle = level >= 1;
                 const canStake = level >= 1;

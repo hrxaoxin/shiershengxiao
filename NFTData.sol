@@ -167,6 +167,18 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     uint8 public constant MAX_LEVEL = 5;
     /** @dev 最小等级限制 */
     uint8 public constant MIN_LEVEL = 1;
+    
+    /**
+     * @dev 普通NFT权重配置（按等级索引，等级1对应索引0）
+     */
+    uint256[5] public normalWeights;
+    
+    /**
+     * @dev 稀有NFT权重配置（按等级索引，等级1对应索引0）
+     */
+    uint256[5] public rareWeights;
+    
+    event WeightsUpdated(uint256[5] normalWeights, uint256[5] rareWeights, uint256 timestamp);
 
     /**
      * @dev 初始化函数
@@ -177,6 +189,18 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         authorizer = _authorizerAddress;
+        
+        normalWeights[0] = 1;
+        normalWeights[1] = 2;
+        normalWeights[2] = 6;
+        normalWeights[3] = 18;
+        normalWeights[4] = 66;
+        
+        rareWeights[0] = 10;
+        rareWeights[1] = 12;
+        rareWeights[2] = 16;
+        rareWeights[3] = 28;
+        rareWeights[4] = 76;
     }
 
     /**
@@ -191,6 +215,53 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
         require(_authorizerAddress != address(0), "NFTData: Invalid authorizer address");
         authorizer = _authorizerAddress;
+    }
+    
+    /**
+     * @dev 设置单个等级的普通NFT权重
+     * @param level 等级（1-5）
+     * @param weight 权重值
+     */
+    function setNormalWeight(uint8 level, uint256 weight) external onlyOwner {
+        require(level >= MIN_LEVEL && level <= MAX_LEVEL, "NFTData: Invalid level");
+        normalWeights[level - 1] = weight;
+        emit WeightsUpdated(normalWeights, rareWeights, block.timestamp);
+    }
+    
+    /**
+     * @dev 设置单个等级的稀有NFT权重
+     * @param level 等级（1-5）
+     * @param weight 权重值
+     */
+    function setRareWeight(uint8 level, uint256 weight) external onlyOwner {
+        require(level >= MIN_LEVEL && level <= MAX_LEVEL, "NFTData: Invalid level");
+        rareWeights[level - 1] = weight;
+        emit WeightsUpdated(normalWeights, rareWeights, block.timestamp);
+    }
+    
+    /**
+     * @dev 批量设置所有等级的权重
+     * @param _normalWeights 普通NFT权重数组（长度5，对应等级1-5）
+     * @param _rareWeights 稀有NFT权重数组（长度5，对应等级1-5）
+     */
+    function setAllWeights(uint256[5] calldata _normalWeights, uint256[5] calldata _rareWeights) external onlyOwner {
+        for (uint8 i = 0; i < 5; i++) {
+            normalWeights[i] = _normalWeights[i];
+            rareWeights[i] = _rareWeights[i];
+        }
+        emit WeightsUpdated(normalWeights, rareWeights, block.timestamp);
+    }
+    
+    /**
+     * @dev 获取指定等级和稀有度的权重
+     * @param level 等级（1-5）
+     * @param isRare 是否稀有
+     * @return 权重值
+     */
+    function getWeightByLevel(uint8 level, bool isRare) public view returns (uint256) {
+        if (level < MIN_LEVEL) level = MIN_LEVEL;
+        if (level > MAX_LEVEL) level = MAX_LEVEL;
+        return isRare ? rareWeights[level - 1] : normalWeights[level - 1];
     }
 
     /**
@@ -569,15 +640,18 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             struct_NFTInfo storage info = _nftInfo[tokenId];
             
             bool isRare = info.zodiacType >= RARE_TYPE_START;
-            
-            if (info.level == 1) totalWeight += isRare ? 10 : 1;
-            else if (info.level == 2) totalWeight += isRare ? 12 : 2;
-            else if (info.level == 3) totalWeight += isRare ? 16 : 6;
-            else if (info.level == 4) totalWeight += isRare ? 28 : 18;
-            else if (info.level == 5) totalWeight += isRare ? 76 : 66;
+            totalWeight += getWeightByLevel(info.level, isRare);
         }
 
         return totalWeight;
+    }
+    
+    function calcNFTWeight(uint256 tokenId) external view returns (uint256) {
+        struct_NFTInfo storage info = _nftInfo[tokenId];
+        
+        bool isRare = info.zodiacType >= RARE_TYPE_START;
+        
+        return getWeightByLevel(info.level, isRare);
     }
     
     /**

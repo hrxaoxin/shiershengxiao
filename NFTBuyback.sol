@@ -547,9 +547,10 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return 合约代币余额
      * @return NFT总供应量
      */
-    function calculateBalanceRatioPrice() public view returns (uint256, uint256, uint256) {
+    function calculateBalanceRatioPrice(uint256 tokenId) public view returns (uint256, uint256, uint256) {
         address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         address tokenContract = IAuthorizer(authorizer).getToken();
+        address nftDataContract = IAuthorizer(authorizer).getNFTData();
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
         
@@ -563,7 +564,17 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         
         uint256 pricePerNFT = balance / totalSupply;
         
-        return (pricePerNFT, balance, totalSupply);
+        uint256 nftWeight = 1;
+        if (nftDataContract != address(0)) {
+            try INFTData(nftDataContract).calcNFTWeight(tokenId) returns (uint256 w) {
+                nftWeight = w > 0 ? w : 1;
+            } catch {
+            }
+        }
+        
+        uint256 weightedPrice = pricePerNFT * nftWeight;
+        
+        return (weightedPrice, balance, totalSupply);
     }
     
     /**
@@ -580,7 +591,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         INFTMint nft = INFTMint(nftContract);
         require(nft.ownerOf(tokenId) == msg.sender, "NFTBuyback: Not owner");
         
-        (uint256 buybackPrice, , ) = calculateBalanceRatioPrice();
+        (uint256 buybackPrice, , ) = calculateBalanceRatioPrice(tokenId);
         require(buybackPrice > 0, "NFTBuyback: Buyback price is zero");
         
         IERC20 token = IERC20(tokenContract);

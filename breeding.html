@@ -540,10 +540,14 @@
 
         function updateWalletDisplay(account) {
             const displayAddress = account.slice(0, 6) + '...' + account.slice(-4);
-            document.getElementById('walletBtn').textContent = displayAddress;
-            document.getElementById('walletAddress').textContent = displayAddress;
-            document.getElementById('connectWalletBtn').style.display = 'none';
-            document.getElementById('mobileConnectBtn').style.display = 'none';
+            const walletBtn = document.getElementById('walletBtn');
+            if (walletBtn) walletBtn.textContent = displayAddress;
+            const walletAddress = document.getElementById('walletAddress');
+            if (walletAddress) walletAddress.textContent = displayAddress;
+            const connectWalletBtn = document.getElementById('connectWalletBtn');
+            if (connectWalletBtn) connectWalletBtn.style.display = 'none';
+            const mobileConnectBtn = document.getElementById('mobileConnectBtn');
+            if (mobileConnectBtn) mobileConnectBtn.style.display = 'none';
         }
 
         async function refreshAllData() {

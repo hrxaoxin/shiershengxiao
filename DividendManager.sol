@@ -558,23 +558,44 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param level NFT等级（0-5）
     /// @param element NFT元素类型（3或4为稀有）
     /// @return 计算得到的权重值
-    function _calculateWeight(uint256 level, uint8 element) internal pure returns (uint256) {
+    function _calculateWeight(uint256 level, uint8 element) internal view returns (uint256) {
         bool isRare = (element == 3 || element == 4);
         
         if (level == 0) return 0;
         
-        if (isRare) {
-            uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
-            if (level <= MAX_NFT_LEVEL) {
-                return weights[level - 1];
+        address nftDataAddr = IAuthorizer(authorizer).getNFTData();
+        if (nftDataAddr == address(0)) {
+            if (isRare) {
+                uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
+                if (level <= MAX_NFT_LEVEL) {
+                    return weights[level - 1];
+                }
+                return weights[MAX_NFT_LEVEL - 1];
+            } else {
+                uint256[5] memory weights = [uint256(1), 2, 6, 18, 66];
+                if (level <= MAX_NFT_LEVEL) {
+                    return weights[level - 1];
+                }
+                return weights[MAX_NFT_LEVEL - 1];
             }
-            return weights[MAX_NFT_LEVEL - 1];
-        } else {
-            uint256[5] memory weights = [uint256(1), 2, 6, 18, 66];
-            if (level <= MAX_NFT_LEVEL) {
-                return weights[level - 1];
+        }
+        
+        try INFTData(nftDataAddr).getWeightByLevel(uint8(level), isRare) returns (uint256 w) {
+            return w > 0 ? w : 1;
+        } catch {
+            if (isRare) {
+                uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
+                if (level <= MAX_NFT_LEVEL) {
+                    return weights[level - 1];
+                }
+                return weights[MAX_NFT_LEVEL - 1];
+            } else {
+                uint256[5] memory weights = [uint256(1), 2, 6, 18, 66];
+                if (level <= MAX_NFT_LEVEL) {
+                    return weights[level - 1];
+                }
+                return weights[MAX_NFT_LEVEL - 1];
             }
-            return weights[MAX_NFT_LEVEL - 1];
         }
     }
 
@@ -582,8 +603,16 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param level NFT等级（0-5）
     /// @param isRare 是否为稀有元素
     /// @return 权重值
-    function getNFTWeight(uint256 level, bool isRare) external pure returns (uint256) {
+    function getNFTWeight(uint256 level, bool isRare) external view returns (uint256) {
         if (level == 0) return 0;
+        
+        address nftDataAddr = IAuthorizer(authorizer).getNFTData();
+        if (nftDataAddr != address(0)) {
+            try INFTData(nftDataAddr).getWeightByLevel(uint8(level), isRare) returns (uint256 w) {
+                if (w > 0) return w;
+            } catch {
+            }
+        }
         
         if (isRare) {
             uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
@@ -601,9 +630,44 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     /// @notice 获取权重配置
-    /// @return normalWeights 普通元素各等级权重 [1,2,6,18,66]
-    /// @return rareWeights 稀有元素各等级权重 [10,12,16,28,76]
-    function getWeightConfig() external pure returns (uint256[5] memory normalWeights, uint256[5] memory rareWeights) {
+    /// @return normalWeights 普通元素各等级权重
+    /// @return rareWeights 稀有元素各等级权重
+    function getWeightConfig() external view returns (uint256[5] memory normalWeights, uint256[5] memory rareWeights) {
+        address nftDataAddr = IAuthorizer(authorizer).getNFTData();
+        if (nftDataAddr != address(0)) {
+            bool hasData = false;
+            for (uint8 i = 0; i < 5; i++) {
+                try INFTData(nftDataAddr).getWeightByLevel(i + 1, false) returns (uint256 w) {
+                    if (w > 0) {
+                        normalWeights[i] = w;
+                        hasData = true;
+                    } else {
+                        hasData = false;
+                        break;
+                    }
+                } catch {
+                    hasData = false;
+                    break;
+                }
+            }
+            if (hasData) {
+                for (uint8 i = 0; i < 5; i++) {
+                    try INFTData(nftDataAddr).getWeightByLevel(i + 1, true) returns (uint256 w) {
+                        if (w > 0) {
+                            rareWeights[i] = w;
+                        } else {
+                            hasData = false;
+                            break;
+                        }
+                    } catch {
+                        hasData = false;
+                        break;
+                    }
+                }
+            }
+            if (hasData) return (normalWeights, rareWeights);
+        }
+        
         normalWeights = [uint256(1), 2, 6, 18, 66];
         rareWeights = [uint256(10), 12, 16, 28, 76];
     }

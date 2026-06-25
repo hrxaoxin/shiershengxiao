@@ -146,7 +146,7 @@ window.ZODIAC_CONFIG = (function() {
         wbnbContract: getEnvContractAddress('wbnb', '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'),
         authorizer: getEnvContractAddress('authorizer', '0xFfcEDAFA1aef266bA7E68cf67Cc8E191c44AF258'),
         rewardManager: getEnvContractAddress('rewardManager', '0x9575e82A7e741a8844EC7f4C382E7A82767572b1'),
-        dividendManager: getEnvContractAddress('dividendManager', '0x55537C520D78AA31A05619aFcEF48801D01A289d'),
+        dividendManager: getEnvContractAddress('dividendManager', '0x68845823d7f627612A44F651cAd06547D9383a98'),
         dividendManagerLP: getEnvContractAddress('dividendManagerLP', '0xF82353e671E910331aC604FA36499Df40041C040'),
         weightManager: getEnvContractAddress('weightManager', '0x5Be08747416E6aD188217af1C077aC0cC81dFeeF'),
         poolManager: getEnvContractAddress('poolManager', '0x1ECc5730C39C29636043277a85aeDCBe165463aa'),
@@ -156,9 +156,9 @@ window.ZODIAC_CONFIG = (function() {
         nftMint: getEnvContractAddress('nftMint', '0x3648Dd17DD1170FEC42D2BE05CA86E98D5D97d3c'),
         nftMintMetadata: getEnvContractAddress('nftMintMetadata', '0xf03215F849a0a665f5eCa46c2904553a42b4b1c6'),
         nftUpdate: getEnvContractAddress('nftUpdate', '0x3e43f680218923eb03137d5307418Cb5bD71AF53'),
-        nftData: getEnvContractAddress('nftData', '0x5f61e3Eba2beECE1A34572bEac7F1748FAb5a0e8'),
+        nftData: getEnvContractAddress('nftData', '0x14831094CfEa15766A5e06FD779eeadcB9259B71'),
         nftTrading: getEnvContractAddress('nftTrading', '0x01023a601053fFDEE23546A132F8cd09AAf1deA6'),
-        nftBuyback: getEnvContractAddress('nftBuyback', '0x66c5EBE6680eD749a0e1258A8eEdE1305d519e3C'),
+        nftBuyback: getEnvContractAddress('nftBuyback', '0x8b1D465957E8251e0F0129EC963Fb5554b353019'),
         breedingCore: getEnvContractAddress('breedingCore', '0xc31805140f8f3b0C6E0fD7a722479633c6AFa87d'),
         breedingMarket: getEnvContractAddress('breedingMarket', '0x8Fd236941d2A279c5f1A61f3FDFF8A2B23529C2A'),
         staking: getEnvContractAddress('staking', '0xbE5284B630C64f7302B17A78A8aE40Bd8089e5A6'),
@@ -9134,7 +9134,13 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
 		"name": "calculateBalanceRatioPrice",
 		"outputs": [
 			{
@@ -9806,6 +9812,31 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256[5]",
+				"name": "normalWeights",
+				"type": "uint256[5]"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256[5]",
+				"name": "rareWeights",
+				"type": "uint256[5]"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"name": "WeightsUpdated",
+		"type": "event"
+	},
+	{
 		"stateMutability": "payable",
 		"type": "fallback"
 	},
@@ -9894,6 +9925,25 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "",
 				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			}
+		],
+		"name": "calcNFTWeight",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -9993,6 +10043,30 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint8",
+				"name": "level",
+				"type": "uint8"
+			},
+			{
+				"internalType": "bool",
+				"name": "isRare",
+				"type": "bool"
+			}
+		],
+		"name": "getWeightByLevel",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
@@ -10001,6 +10075,25 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "initialize",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "normalWeights",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -10045,6 +10138,25 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "rareWeights",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "user",
 				"type": "address"
@@ -10063,6 +10175,24 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256[5]",
+				"name": "_normalWeights",
+				"type": "uint256[5]"
+			},
+			{
+				"internalType": "uint256[5]",
+				"name": "_rareWeights",
+				"type": "uint256[5]"
+			}
+		],
+		"name": "setAllWeights",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -10114,6 +10244,42 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setNFTInfo",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint8",
+				"name": "level",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint256",
+				"name": "weight",
+				"type": "uint256"
+			}
+		],
+		"name": "setNormalWeight",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint8",
+				"name": "level",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint256",
+				"name": "weight",
+				"type": "uint256"
+			}
+		],
+		"name": "setRareWeight",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -10256,7 +10422,7 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "receive"
 	}
 ],
-		stakingABI: [
+	stakingABI: [
 	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
@@ -10847,7 +11013,7 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256[5]"
 			}
 		],
-		"stateMutability": "pure",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -10957,7 +11123,7 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256[5]"
 			}
 		],
-		"stateMutability": "pure",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -21103,7 +21269,7 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "pure",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -21300,7 +21466,7 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256[5]"
 			}
 		],
-		"stateMutability": "pure",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{

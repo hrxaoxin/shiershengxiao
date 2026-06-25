@@ -189,6 +189,7 @@ window.ZODIAC_WEB3 = (function() {
         'staking': ABIS.stakingABI,
         'stakingLP': ABIS.stakingLPABI,
         'tokenStaking': ABIS.tokenStakingABI,
+        'tokenStakingLP': ABIS.tokenStakingLPABI,
         'breeding': ABIS.breedingABI,
         'breedingCore': ABIS.breedingCoreABI,
         'breedingMarket': ABIS.breedingMarketABI,

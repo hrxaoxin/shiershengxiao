@@ -1576,7 +1576,21 @@
                 const rarityColor = isRare ? 'text-purple-600' : 'text-gray-600';
                 
                 const level = parseInt(nftLevel, 10);
-                const weight = level * (isRare ? 2 : 1);
+                
+                // 从合约获取权重
+                let weight = level * (isRare ? 2 : 1);
+                try {
+                    const nftDataContract = await window.ZODIAC_WEB3.getContract('nftData', false);
+                    if (nftDataContract) {
+                        const realWeight = await nftDataContract.methods.getWeightByLevel(level, isRare).call();
+                        if (realWeight && realWeight > 0) {
+                            weight = parseInt(realWeight, 10);
+                        }
+                    }
+                } catch (e) {
+                    console.warn('获取NFT权重失败，使用简化计算:', e.message);
+                }
+                
                 const canBreed = level >= 5;
                 const canBattle = level >= 1;
                 const canStake = level >= 1;

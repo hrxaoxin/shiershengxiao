@@ -64,6 +64,11 @@ interface INFTDataInterface {
     function tokenLevel(uint256 tokenId) external view returns (uint8);
     function setTokenLevel(uint256 tokenId, uint8 level) external;
     function calcUserWeight(address user) external view returns (uint256);
+    function calcNFTWeight(uint256 tokenId) external view returns (uint256);
+    function getWeightByLevel(uint8 level, bool isRare) external view returns (uint256);
+    function setNormalWeight(uint8 level, uint256 weight) external;
+    function setRareWeight(uint8 level, uint256 weight) external;
+    function setAllWeights(uint256[5] calldata _normalWeights, uint256[5] calldata _rareWeights) external;
     function syncNFTData(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to) external;
     function removeUserNFT(address user, uint256 tokenId) external;
     function addUserNFT(address user, uint256 tokenId) external;
@@ -77,6 +82,8 @@ interface INFTData {
     function getNFTMintTime(uint256 tokenId) external view returns (uint256);
     function tokenType(uint256 tokenId) external view returns (uint256);
     function tokenLevel(uint256 tokenId) external view returns (uint8);
+    function calcNFTWeight(uint256 tokenId) external view returns (uint256);
+    function getWeightByLevel(uint8 level, bool isRare) external view returns (uint256);
 }
 
 /**
