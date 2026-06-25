@@ -288,8 +288,11 @@
 
         window.switchAttribute = function(attr) {
             currentFilter = attr;
-            document.querySelectorAll('.attribute-tab').forEach(tab => tab.classList.remove('active'));
-            const activeTab = document.querySelector(`.tab-${attr}`) || document.querySelector(`[onclick="switchAttribute('${attr}')"]`);
+            document.querySelectorAll('.attribute-tab').forEach(tab => {
+                tab.classList.remove('active');
+                tab.removeAttribute('style');
+            });
+            const activeTab = document.querySelector(`.tab-${attr}`);
             if (activeTab) {
                 activeTab.classList.add('active');
             }
@@ -298,20 +301,18 @@
 
         window.renderTokens = function() {
             const grid = document.getElementById('zodiacGrid');
-            const emptyState = document.getElementById('emptyState');
 
-            if (!grid || !emptyState) {
-                console.warn('[COLLECTION] zodiacGrid or emptyState not found');
+            if (!grid) {
+                console.warn('[COLLECTION] zodiacGrid not found');
                 return;
             }
 
-            emptyState.classList.add('hidden');
             grid.innerHTML = '';
             
             if (currentViewMode === 'collection') {
                 window.renderCollectionView(grid);
             } else {
-                window.renderMyCollectionView(grid, emptyState);
+                window.renderMyCollectionView(grid);
             }
         };
 
@@ -323,6 +324,17 @@
                 const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
                 const attrIndex = attrs.indexOf(currentFilter);
                 filteredTypes = allTypes.filter(t => t.elementIndex === attrIndex);
+            }
+            
+            if (filteredTypes.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full empty-collection">
+                        <div class="icon">🃏</div>
+                        <p class="text-gray-600 mb-4">该属性下没有生肖</p>
+                        <button class="btn-primary" onclick="switchAttribute('all')">查看全部</button>
+                    </div>
+                `;
+                return;
             }
             
             let html = '';
@@ -351,7 +363,7 @@
             lazyLoadImages();
         };
 
-        window.renderMyCollectionView = function(grid, emptyState) {
+        window.renderMyCollectionView = function(grid) {
             let filteredTokens = userTokens;
             
             if (currentFilter !== 'all') {
@@ -361,9 +373,13 @@
             }
 
             if (filteredTokens.length === 0) {
-                grid.innerHTML = '';
-                grid.appendChild(emptyState);
-                emptyState.classList.remove('hidden');
+                grid.innerHTML = `
+                    <div class="col-span-full empty-collection">
+                        <div class="icon">🃏</div>
+                        <p class="text-gray-600 mb-4">${currentFilter === 'all' ? '您还没有铸造任何生肖NFT' : '该属性下没有收藏的生肖'}</p>
+                        ${currentFilter === 'all' ? '<button class="btn-primary" onclick="window.location.href=\'mint.html\'">去铸造</button>' : '<button class="btn-primary" onclick="switchAttribute(\'all\')">查看全部</button>'}
+                    </div>
+                `;
                 return;
             }
 
