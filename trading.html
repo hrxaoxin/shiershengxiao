@@ -1060,12 +1060,32 @@
                 return;
             }
 
+            const priceNum = parseFloat(price);
+            if (isNaN(priceNum) || priceNum <= 0) {
+                ZODIAC_UI.showToast('请输入有效的价格', 'warning');
+                return;
+            }
+            if (priceNum > 1000) {
+                ZODIAC_UI.showToast('价格不能超过1000代币', 'warning');
+                return;
+            }
+
             console.log('[TRADING] calling checkNFT...');
             const isValid = await checkNFT(tokenId);
             console.log('[TRADING] checkNFT result:', isValid);
             if (!isValid) {
                 console.log('[TRADING] checkNFT failed, aborting');
                 return;
+            }
+
+            try {
+                const isPaused = await nftTradingContract.methods.paused().call();
+                if (isPaused) {
+                    ZODIAC_UI.showToast('交易市场已暂停，暂时无法上架', 'warning');
+                    return;
+                }
+            } catch (e) {
+                console.warn('[TRADING] Failed to check paused status:', e.message);
             }
 
             console.log('[TRADING] showing confirm modal...');
@@ -1089,28 +1109,13 @@
                 const isApproved = await checkApprovalForAll();
                 console.log('[TRADING] isApproved:', isApproved);
                 
-                console.log('[TRADING] nftMintContract address:', nftMintContract.options.address);
-                console.log('[TRADING] nftTrading address from config:', ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftTrading);
-                
-                // 检查 authorizer 中配置的 nftMintCore 地址
-                if (authorizerContract) {
-                    const authorizerNftMintCore = await authorizerContract.methods.getNFTMintCore().call();
-                    console.log('[TRADING] authorizer.getNFTMintCore():', authorizerNftMintCore);
-                    console.log('[TRADING] nftMintContract address (lowercase):', nftMintContract.options.address.toLowerCase());
-                    console.log('[TRADING] authorizer.getNFTMintCore() (lowercase):', authorizerNftMintCore.toLowerCase());
-                    
-                    if (nftMintContract.options.address.toLowerCase() !== authorizerNftMintCore.toLowerCase()) {
-                        console.error('[TRADING] ERROR: nftMintContract address mismatch!');
-                        console.error('[TRADING] Frontend config:', nftMintContract.options.address);
-                        console.error('[TRADING] Authorizer config:', authorizerNftMintCore);
-                        ZODIAC_UI.showToast('配置错误: 合约地址不匹配', 'error');
-                        throw new Error('合约地址配置不匹配');
-                    }
-                }
-                
                 if (!isApproved) {
                     console.log('[TRADING] approving...');
                     await approveForAll();
+                    const approved = await checkApprovalForAll();
+                    if (!approved) {
+                        throw new Error('授权未成功，请检查钱包授权状态');
+                    }
                 }
 
                 console.log('[TRADING] converting price to wei...');
@@ -1144,14 +1149,25 @@
                     errorMsg = '用户取消了操作';
                 } else if (error.message) {
                     errorMsg += ': ' + error.message;
-                    // 提取合约错误信息
-                    if (error.message.includes('NFTTrading: NFT escrow transfer failed')) {
-                        errorMsg = 'NFT托管转移失败，请检查NFT是否已授权给交易合约';
+                    if (error.message.includes('NFTTrading: Invalid price')) {
+                        errorMsg = '价格无效，请输入大于0的价格';
+                    } else if (error.message.includes('NFTTrading: Price too high')) {
+                        errorMsg = '价格过高，不能超过1000代币';
+                    } else if (error.message.includes('NFTTrading: Not token owner')) {
+                        errorMsg = '您不是此NFT的所有者';
+                    } else if (error.message.includes('NFTTrading: Already listed')) {
+                        errorMsg = '此NFT已上架';
+                    } else if (error.message.includes('NFTTrading: NFT escrow transfer failed')) {
+                        errorMsg = 'NFT转移失败，请检查NFT是否已授权给交易合约';
+                    } else if (error.message.includes('paused')) {
+                        errorMsg = '交易市场已暂停';
                     } else if (error.message.includes('execution reverted')) {
                         const match = error.message.match(/reverted:\s*(.+)/);
                         if (match) {
                             errorMsg = '交易失败: ' + match[1];
                         }
+                    } else if (error.message.includes('out of gas')) {
+                        errorMsg = 'Gas不足，请稍后重试';
                     }
                 }
                 ZODIAC_UI.showToast(errorMsg, 'error');

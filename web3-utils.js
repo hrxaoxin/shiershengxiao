@@ -553,9 +553,9 @@ window.ZODIAC_WEB3 = (function() {
                 'rechargeChallengeAttempts': 150000,
                 'challengeMockPlayer': 500000,
                 'challengeRealPlayer': 800000,
-                'listNFT': 200000,
-                'buyNFT': 300000,
-                'delistNFT': 150000,
+                'listNFT': 500000,
+                'buyNFT': 600000,
+                'delistNFT': 400000,
                 'upgradeWithToken': 800000,
                 'upgradeWithNFT': 1200000,
                 'upgradeWithUSDValue': 800000,
@@ -565,7 +565,6 @@ window.ZODIAC_WEB3 = (function() {
                 'cancelBreeding': 400000,
                 'listForMarketBreeding': 300000,
                 'delistFromMarketBreeding': 250000,
-                'delistNFT': 150000,
                 'claimReward': 300000,
                 'claimDividend': 300000,
                 'setBattleTeam': 250000,
@@ -586,9 +585,9 @@ window.ZODIAC_WEB3 = (function() {
             'rechargeChallengeAttempts': 300000,
             'challengeMockPlayer': 800000,
             'challengeRealPlayer': 1000000,
-            'listNFT': 300000,
-            'buyNFT': 400000,
-            'delistNFT': 300000,
+            'listNFT': 800000,
+            'buyNFT': 1000000,
+            'delistNFT': 600000,
             'upgradeWithToken': 1500000,
             'upgradeWithNFT': 2000000,
             'upgradeWithUSDValue': 1500000,
@@ -931,10 +930,20 @@ window.ZODIAC_WEB3 = (function() {
         let gas = opts.gas;
         let usedDefaultGas = false;
         if (!gas) {
-            console.warn(`[ZODIAC_WEB3] Using default gas limit for ${methodName} to avoid estimation issues`);
-            const defaultGas = getGasLimit(methodName);
-            gas = defaultGas.gas;
-            usedDefaultGas = true;
+            try {
+                console.log(`[ZODIAC_WEB3] Estimating gas for ${methodName}...`);
+                const estimatedGas = await contract.methods[methodName](...args).estimateGas({ 
+                    from: from || account,
+                    value: opts.value || 0
+                });
+                gas = Math.ceil(estimatedGas * 1.5);
+                console.log(`[ZODIAC_WEB3] Gas estimated: ${estimatedGas}, using: ${gas}`);
+            } catch (e) {
+                console.warn(`[ZODIAC_WEB3] Gas estimation failed for ${methodName}, using default gas limit:`, e.message);
+                const defaultGas = getGasLimit(methodName);
+                gas = defaultGas.gas;
+                usedDefaultGas = true;
+            }
         }
 
         let lastTxHash = null;
@@ -953,23 +962,14 @@ window.ZODIAC_WEB3 = (function() {
                     }
                 }
 
-                const currentNonce = await web3.eth.getTransactionCount(from, 'pending');
-                
-                if (pendingTransactionNonces.has(from) && pendingTransactionNonces.get(from) >= currentNonce) {
-                    console.warn(`[ZODIAC_WEB3] Pending transaction exists for ${from}, waiting for nonce ${currentNonce}`);
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-                    continue;
-                }
-
-                pendingTransactionNonces.set(from, currentNonce);
+                const sendParams = {
+                    from,
+                    gas: gas,
+                    value: opts.value || 0
+                };
 
                 const receipt = await new Promise((resolve, reject) => {
-                    contract.methods[methodName](...args).send({
-                        from,
-                        gas,
-                        value: opts.value || 0,
-                        nonce: currentNonce
-                    })
+                    contract.methods[methodName](...args).send(sendParams)
                     .on('transactionHash', function(txHash) {
                         lastTxHash = txHash;
                         trackTransaction(txHash, {
@@ -981,22 +981,25 @@ window.ZODIAC_WEB3 = (function() {
                         if (opts.onTransactionHash) opts.onTransactionHash(txHash);
                     })
                     .on('receipt', (receipt) => {
-                        pendingTransactionNonces.delete(from);
                         resolve(receipt);
                     })
                     .on('error', (error) => {
-                        pendingTransactionNonces.delete(from);
                         reject(error);
                     });
                 });
                 return receipt;
             } catch (error) {
-                pendingTransactionNonces.delete(from);
-                
                 const isRetryableError = isRetryableTransactionError(error);
                 
                 if (attempt < maxRetries && isRetryableError) {
-                    console.warn(`[ZODIAC_WEB3] Transaction attempt ${attempt} failed, retrying in ${retryDelayMs}ms: ${methodName}`, error);
+                    console.warn(`[ZODIAC_WEB3] Transaction attempt ${attempt} failed, retrying in ${retryDelayMs}ms: ${methodName}`, error.message);
+                    
+                    if (usedDefaultGas) {
+                        const defaultGas = getGasLimit(methodName);
+                        gas = Math.ceil(defaultGas.gas * 1.5);
+                        console.log(`[ZODIAC_WEB3] Increasing gas limit to ${gas}`);
+                    }
+                    
                     await new Promise(resolve => setTimeout(resolve, retryDelayMs));
                     continue;
                 }
@@ -1010,7 +1013,6 @@ window.ZODIAC_WEB3 = (function() {
             }
         }
         
-        pendingTransactionNonces.delete(from);
         throw new Error(`[ZODIAC_WEB3] Transaction failed after ${maxRetries} attempts: ${methodName}`);
     }
 
