@@ -572,11 +572,16 @@
                             const raw = await window.web3.eth.call(callParams);
                             if (!raw || raw === '0x' || raw === '0x0') continue;
 
-                            // 合约返回 18 位精度的 USDT/Token 价格
+                            // 合约返回值：PriceOracle.sol 中在 USDT/WBNB 路径都乘了 10**12（把 6 位 USDT 升成 18 位）
+                            // 但当 quoteToken==USDT 时，tokenState.price 已经是 18 位精度，导致合约返回了 30 位精度的值
+                            // 前端需要除以 10**12 恢复正确的 18 位精度
                             const hex = raw.replace(/^0x/i, '');
-                            const price = BigInt('0x' + (hex.length > 64 ? hex.slice(-64) : hex.padStart(64, '0')));
+                            const oraclePrice = BigInt('0x' + (hex.length > 64 ? hex.slice(-64) : hex.padStart(64, '0')));
+                            if (oraclePrice <= 0n) continue;
+                            // 除以 10^12 恢复 18 位精度
+                            const price = oraclePrice / 10n ** 12n;
                             const validated = validatePriceRange(price);
-                            console.log('fetchTokenPrice: oracle OK', validated.toString());
+                            console.log('fetchTokenPrice: oracle OK', 'raw=' + oraclePrice.toString(), 'div12=' + price.toString(), 'validated=' + validated.toString());
                             return validated;
                         } catch (e) {
                             console.warn(`fetchTokenPrice oracle gas=${gasLimit} failed:`, e.message);
