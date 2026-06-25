@@ -359,21 +359,107 @@
         let cachedTokenPrice = null;
         let cachedTokenPriceTime = 0;
         
+        // BSC PancakeSwap 常量
+        const PANCAKE_ROUTER_ADDR = '0x10ED43C718714eb63d5aA57B78B54704E256024E';
+        const WBNB_ADDR = '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c';
+        const USDT_ADDR = '0x55d398326f99059fF775485246999027B3197955';
+        
+        // 直接调用 PancakeRouter 计算代币价格（token → WBNB → USDT）
+        // 复制 PriceOracle.sol 的 fallback 路径 (lines 81-92)
+        async function fetchTokenPriceFromRouter(tokenAddr) {
+            if (!window.web3 || !tokenAddr) throw new Error('Web3或代币地址未初始化');
+            
+            console.log('fetchTokenPriceFromRouter: calling PancakeRouter directly');
+            
+            // 编码 getAmountsOut(10**18, [token, WBNB, USDT])
+            // 函数选择器: keccak256("getAmountsOut(uint256,address[])") = d06ca61f
+            // 参数1 amountIn: uint256 = 10**18
+            // 参数2 path offset: uint256 = 0x40 (64 bytes, amountIn(32) + offset(32))
+            // 动态数组: length(32) + elements(3*32)
+            const hex = (s) => typeof s === 'string' ? s.replace(/^0x/i, '') : s.toString(16);
+            const toHex32 = (v) => {
+                const bn = BigInt(typeof v === 'bigint' ? v : v);
+                return bn.toString(16).padStart(64, '0');
+            };
+            const padAddr32 = (addr) => '000000000000000000000000' + hex(addr);
+            
+            // 构建整个 calldata（纯 hex，不含 0x 前缀，最后再加）
+            const selector = 'd06ca61f';
+            const amountInHex = toHex32(10n**18n);                                    // 10^18
+            const offsetHex = toHex32(0x40);                                         // dynamic array offset = 64
+            const lengthHex = toHex32(3);                                            // 3 addresses
+            const pathHex = padAddr32(tokenAddr) + padAddr32(WBNB_ADDR) + padAddr32(USDT_ADDR);
+            
+            const calldata = '0x' + selector + amountInHex + offsetHex + lengthHex + pathHex;
+            console.log('fetchTokenPriceFromRouter calldata length:', calldata.length, 'chars');
+            
+            // 多档 gas 重试
+            const gasOptions = [null, 3000000, 6000000, 9000000];
+            let lastError = null;
+            
+            for (const gasLimit of gasOptions) {
+                try {
+                    const callParams = { to: PANCAKE_ROUTER_ADDR, data: calldata };
+                    if (gasLimit !== null) callParams.gas = gasLimit;
+                    
+                    console.log(`fetchTokenPriceFromRouter: eth_call gas=${gasLimit || 'default'}`);
+                    const rawResult = await window.web3.eth.call(callParams);
+                    console.log(`fetchTokenPriceFromRouter raw (gas=${gasLimit}):`, rawResult);
+                    
+                    if (!rawResult || rawResult === '0x' || rawResult === '0x0') {
+                        throw new Error(`Router returned empty: "${rawResult}"`);
+                    }
+                    
+                    // 解码 uint256[] 返回值
+                    // ABI 格式: offset(32B) | length(32B) | amounts[0](32B) | amounts[1](32B) | amounts[2](32B)
+                    const data = hex(rawResult);
+                    if (data.length < 320) throw new Error('Result too short: ' + data.length + ' chars');
+                    
+                    const offset = BigInt('0x' + data.slice(0, 64));
+                    if (offset !== 0x20n) console.warn('Unexpected offset:', offset);
+                    
+                    const arrayLen = BigInt('0x' + data.slice(64, 128));
+                    console.log('Router returned', arrayLen.toString(), 'amounts');
+                    if (arrayLen < 2n || arrayLen > 100n) throw new Error('Unexpected array length');
+                    
+                    // 取最后一个元素（USDT金额）
+                    const lastIdx = Number(arrayLen) - 1;
+                    const elemStart = 128 + lastIdx * 64;
+                    const elemEnd = elemStart + 64;
+                    const usdtAmount = BigInt('0x' + data.slice(elemStart, elemEnd));
+                    console.log(`fetchTokenPriceFromRouter USDT amount (raw):`, usdtAmount.toString());
+                    
+                    if (usdtAmount <= 0n) throw new Error('USDT amount is zero');
+                    
+                    return usdtAmount;
+                } catch (e) {
+                    lastError = e;
+                    console.warn(`fetchTokenPriceFromRouter gas=${gasLimit} failed:`, e.message);
+                }
+            }
+            
+            // 手动编码失败，用 Contract 方式兜底
+            try {
+                console.log('fetchTokenPriceFromRouter: Contract fallback');
+                const routerABI = [{"inputs":[{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"address[]","name":"path","type":"address[]"}],"name":"getAmountsOut","outputs":[{"internalType":"uint256[]","name":"amounts","type":"uint256[]"}],"stateMutability":"view","type":"function"}];
+                const router = new window.web3.eth.Contract(routerABI, PANCAKE_ROUTER_ADDR);
+                const amounts = await router.methods.getAmountsOut('1000000000000000000', [tokenAddr, WBNB_ADDR, USDT_ADDR]).call({ gas: 9000000 });
+                const usdtAmount = BigInt(String(amounts[amounts.length - 1]));
+                console.log('fetchTokenPriceFromRouter Contract fallback USDT:', usdtAmount.toString());
+                return usdtAmount;
+            } catch (contractErr) {
+                console.error('fetchTokenPriceFromRouter Contract fallback failed:', contractErr.message);
+            }
+            
+            throw lastError || new Error('PancakeRouter调用失败');
+        }
+        
         // 共用函数：直接通过 eth.call 获取代币价格（绕过 web3 Contract 的 ABI 解析层，避免 BSC 节点兼容性问题）
         async function fetchTokenPrice(oracleAddr) {
             if (!window.web3 || !oracleAddr) throw new Error('Web3或地址未初始化');
             
             // getTokenPriceUSD() 的函数选择器: keccak256("getTokenPriceUSD()").slice(0,10) = 0xe48f1d28
-            let funcSig;
-            try {
-                if (window.web3.eth && window.web3.eth.abi && window.web3.eth.abi.encodeFunctionSignature) {
-                    funcSig = window.web3.eth.abi.encodeFunctionSignature('getTokenPriceUSD()');
-                } else {
-                    funcSig = '0xe48f1d28';
-                }
-            } catch (e) {
-                funcSig = '0xe48f1d28'; // 硬编码回退
-            }
+            const funcSig = '0xe48f1d28';
             console.log('fetchTokenPrice using selector:', funcSig);
             
             // 多档 gas 重试（无gas → 300万 → 600万 → 900万）
@@ -389,14 +475,23 @@
                     const rawResult = await window.web3.eth.call(callParams);
                     console.log(`fetchTokenPrice raw result (gas=${gasLimit}):`, rawResult);
                     
+                    // 检查是否返回空值
+                    if (!rawResult || rawResult === '0x' || rawResult === '0x0') {
+                        throw new Error(`eth_call returned empty/zero result: "${rawResult}"`);
+                    }
+                    
                     // 尝试解码为 uint256
                     let price;
                     try {
                         price = window.web3.eth.abi.decodeParameter('uint256', rawResult);
                     } catch (decodeErr) {
-                        console.warn('decodeParameter failed, trying BigInt parse:', decodeErr.message);
-                        // 如果原始结果是 0x 格式，直接用 BigInt 解析
-                        price = BigInt(rawResult);
+                        console.warn('decodeParameter failed, trying manual hex parse:', decodeErr.message);
+                        // 去掉 0x 前缀后解析
+                        const hexStr = rawResult.startsWith('0x') ? rawResult.slice(2) : rawResult;
+                        if (!hexStr || !/^[0-9a-fA-F]+$/.test(hexStr)) {
+                            throw new Error('Invalid hex result: ' + rawResult);
+                        }
+                        price = BigInt('0x' + hexStr);
                     }
                     console.log(`fetchTokenPrice decoded (gas=${gasLimit}):`, String(price));
                     
@@ -420,6 +515,17 @@
                 }
             } catch (fallbackErr) {
                 console.error('fetchTokenPrice fallback also failed:', fallbackErr.message);
+            }
+            
+            // 终极兜底：直接调用 PancakeRouter 计算价格
+            try {
+                console.log('fetchTokenPrice: ultimate fallback via PancakeRouter');
+                const tokenAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract;
+                const usdtAmount = await fetchTokenPriceFromRouter(tokenAddr);
+                console.log('fetchTokenPrice ultimate fallback USDT amount:', usdtAmount.toString());
+                return usdtAmount;
+            } catch (routerErr) {
+                console.error('fetchTokenPrice ultimate fallback also failed:', routerErr.message);
             }
             
             throw lastError || new Error('获取价格失败：预言机不可达');
