@@ -242,7 +242,22 @@
             </div>
 
             <div class="mb-8">
-                <h3 class="text-2xl font-bold text-gray-800 mb-4 text-center">我的生肖NFT</h3>
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+                    <h3 class="text-2xl font-bold text-gray-800">我的生肖NFT</h3>
+                    <div class="flex items-center gap-4">
+                        <select id="filterType" class="input-field w-48">
+                            <option value="all">全部类型</option>
+                            <option value="water">水属性</option>
+                            <option value="wind">风属性</option>
+                            <option value="fire">火属性</option>
+                            <option value="dark">暗属性</option>
+                            <option value="light">光属性</option>
+                        </select>
+                        <div class="text-sm text-gray-600">
+                            代币余额: <span id="tokenBalance" class="font-bold text-blue-600">0</span>
+                        </div>
+                    </div>
+                </div>
                 <div id="nftGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                 </div>
             </div>
@@ -309,6 +324,7 @@
             document.getElementById('upgradeWithNftBtn').addEventListener('click', handleUpgradeWithNFT);
             document.getElementById('upgradeWithTokenBtn').addEventListener('click', handleUpgradeWithToken);
             document.getElementById('upgradeWithUSDValueBtn').addEventListener('click', handleUpgradeWithUSDValue);
+            document.getElementById('filterType').addEventListener('change', filterNFTs);
         }
 
         function initWalletUI() {
@@ -317,11 +333,13 @@
             ZODIAC_UI.on('walletConnected', async () => {
                 await initContracts();
                 await loadUserNFTs();
+                await updateWalletStatus();
             });
             // 监听 MetaMask 账户切换事件，自动刷新数据
             ZODIAC_WEB3.on('connect', async () => {
                 await initContracts();
                 await loadUserNFTs();
+                await updateWalletStatus();
             });
         }
 
@@ -338,6 +356,7 @@
                 updateWalletButton();
                 await initContracts();
                 await loadUserNFTs();
+                await updateWalletStatus();
             }
         }
 
@@ -351,6 +370,20 @@
                 walletBtnDesktop.textContent = shortAddress;
                 walletBtnDesktop.disabled = true;
                 walletBtnDesktop.style.background = 'linear-gradient(135deg, #4338ca 0%, #3730a3 100%)';
+            }
+        }
+
+        async function updateWalletStatus() {
+            if (!account || !tokenContract) return;
+            
+            try {
+                const balance = await tokenContract.methods.balanceOf(account).call();
+                const balanceInTokens = web3.utils.fromWei(balance, 'ether');
+                const balanceFormatted = parseFloat(balanceInTokens).toFixed(4);
+                document.getElementById('tokenBalance').textContent = balanceFormatted;
+            } catch (error) {
+                console.error('更新代币余额失败:', error);
+                document.getElementById('tokenBalance').textContent = '0';
             }
         }
 
@@ -739,6 +772,7 @@
                 }
 
                 const userNFTs = await loadNFTsParallel(tokenIds);
+                allUserNFTs = userNFTs;
                 renderNFTs(userNFTs);
             } catch (error) {
                 console.error('加载NFT失败:', error);
@@ -786,6 +820,8 @@
             };
         }
 
+        let allUserNFTs = [];
+
         function renderNFTs(nfts) {
             const nftGrid = document.getElementById('nftGrid');
             if (nfts.length === 0) {
@@ -811,6 +847,31 @@
                 `;
             });
             nftGrid.innerHTML = html;
+        }
+
+        function filterNFTs() {
+            const filterType = document.getElementById('filterType').value;
+            
+            if (!allUserNFTs || allUserNFTs.length === 0) {
+                return;
+            }
+            
+            if (filterType === 'all') {
+                renderNFTs(allUserNFTs);
+                return;
+            }
+            
+            const attrIndexes = { water: 0, wind: 1, fire: 2, dark: 3, light: 4 };
+            const targetAttrIndex = attrIndexes[filterType];
+            
+            if (targetAttrIndex !== undefined) {
+                const filtered = allUserNFTs.filter(nft => {
+                    const typeId = parseInt(nft.type, 10);
+                    const itemAttrIndex = Math.floor(typeId / 24);
+                    return itemAttrIndex === targetAttrIndex;
+                });
+                renderNFTs(filtered);
+            }
         }
 
         async function selectNFT(id, type, level, name, image) {

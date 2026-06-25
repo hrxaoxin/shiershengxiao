@@ -71,8 +71,6 @@
                 </div>
                 <div class="flex-1">
                     <h3 class="text-lg font-semibold text-gray-800">钱包信息</h3>
-                    <p class="text-sm text-gray-500" id="walletAddress">未连接钱包</p>
-                    <p class="text-xs text-gray-400" id="connectionStatus">请点击连接钱包按钮</p>
                 </div>
                 <div class="flex space-x-2">
                     <button class="btn-primary text-sm" id="connectWalletBtn">
@@ -478,7 +476,7 @@
         });
 
         function initWalletUI() {
-            ZODIAC_UI.initWalletButton('connectWalletBtn', 'walletAddress', 'connectionStatus');
+            ZODIAC_UI.initWalletButton('connectWalletBtn', null, null);
             ZODIAC_UI.on('walletConnected', async () => {
                 await initContracts();
                 await updateWalletStatus();
