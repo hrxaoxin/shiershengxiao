@@ -275,6 +275,7 @@
         let rewardManagerContract;
         let dividendManagerContract;
         let userTokens = [];
+        let allUserTokens = [];
         let ownedTypes = new Set();
         let currentFilter = 'all';
         let currentViewMode = 'collection';
@@ -364,12 +365,12 @@
         };
 
         window.renderMyCollectionView = function(grid) {
-            let filteredTokens = userTokens;
+            let filteredTokens = allUserTokens;
             
             if (currentFilter !== 'all') {
                 const attrs = ['water', 'wind', 'fire', 'dark', 'light'];
                 const attrIndex = attrs.indexOf(currentFilter);
-                filteredTokens = userTokens.filter(t => Math.floor(t.typeId / 24) === attrIndex);
+                filteredTokens = allUserTokens.filter(t => Math.floor(t.typeId / 24) === attrIndex);
             }
 
             if (filteredTokens.length === 0) {
@@ -389,16 +390,18 @@
                 const typeId = token.typeId;
                 const level = token.level || 1;
                 const growth = token.growth || 0;
+                const isRare = token.isRare;
                 const nftInfo = window.ZODIAC_UTILS.getNFTInfo(typeId);
 
                 html += `
                     <div class="zodiac-card nft-card-hover cursor-pointer"
                          data-nft-typeid="${typeId}" data-nft-tokenid="${token.tokenId}" data-nft-level="${level}" data-nft-growth="${growth}">
+                        ${isRare ? '<span class="collection-badge" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);">稀有</span>' : ''}
                         <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
                         <h4>${nftInfo.name}</h4>
                         <p>等级: ${getStars(level)}</p>
                         <p class="text-xs text-green-600">成长: ${growth}</p>
-                        <p>拥有 ${token.count} 张</p>
+                        <p class="text-xs text-gray-500">ID: ${token.tokenId}</p>
                     </div>
                 `;
             }
@@ -506,6 +509,7 @@
 
         async function loadUserTokens() {
             userTokens = [];
+            allUserTokens = [];
             ownedTypes.clear();
             
             try {
@@ -520,22 +524,26 @@
                     return Promise.all([
                         nftContract.methods.tokenType(tokenId).call(),
                         nftContract.methods.tokenLevel(tokenId).call(),
-                        nftContract.methods.tokenGrowth(tokenId).call().catch(() => '0')
-                    ]).then(([typeId, level, growth]) => ({
+                        nftContract.methods.tokenGrowth(tokenId).call().catch(() => '0'),
+                        nftContract.methods.isRare(tokenId).call().catch(() => false)
+                    ]).then(([typeId, level, growth, isRare]) => ({
                         tokenId: tokenId,
                         typeId: parseInt(typeId, 10),
                         level: parseInt(level, 10),
-                        growth: parseInt(growth, 10)
+                        growth: parseInt(growth, 10),
+                        isRare: isRare
                     }));
                 });
                 
                 const tokenInfos = await Promise.all(tokenInfoPromises);
                 
+                allUserTokens = tokenInfos;
+                
                 const typeMap = {};
                 for (const info of tokenInfos) {
                     ownedTypes.add(info.typeId);
                     if (!typeMap[info.typeId]) {
-                        typeMap[info.typeId] = { typeId: info.typeId, count: 0, level: info.level, growth: info.growth };
+                        typeMap[info.typeId] = { typeId: info.typeId, count: 0, level: info.level, growth: info.growth, isRare: info.isRare };
                     }
                     typeMap[info.typeId].count++;
                     if (info.level > typeMap[info.typeId].level) {
@@ -666,8 +674,8 @@
             document.getElementById('lightProgress').textContent = progress.light;
         }
 
-        function showCardModal(typeId, level, growth = 0) {
-            console.log('[COLLECTION] showCardModal started:', typeId, level, growth);
+        function showCardModal(typeId, level, growth = 0, tokenId = null) {
+            console.log('[COLLECTION] showCardModal started:', typeId, level, growth, tokenId);
             try {
                 const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
                 console.log('[COLLECTION] nftInfo:', nftInfo);
@@ -680,10 +688,16 @@
                 const isOwned = ownedTypes.has(typeId);
                 const userToken = userTokens.find(t => t.typeId === typeId);
                 const count = userToken ? userToken.count : 0;
-                const displayGrowth = userToken && userToken.growth ? userToken.growth : growth;
+                const displayGrowth = growth > 0 ? growth : (userToken && userToken.growth ? userToken.growth : 0);
                 
                 const element = nftInfo.elementKey || 'water';
-                const isRare = (element === 'light' || element === 'dark');
+                let isRare = (element === 'light' || element === 'dark');
+                if (tokenId !== null) {
+                    const specificToken = allUserTokens.find(t => t.tokenId == tokenId);
+                    if (specificToken) {
+                        isRare = specificToken.isRare;
+                    }
+                }
                 const rarityText = isRare ? '稀有' : '普通';
                 const rarityColor = isRare ? 'text-purple-600' : 'text-gray-600';
                 
@@ -703,7 +717,7 @@
                 document.getElementById('modalCardImage').style.filter = isOwned ? 'none' : 'grayscale(100%)';
                 document.getElementById('modalCardName').textContent = nftInfo.name || '未知生肖';
                 document.getElementById('modalCardDesc').textContent = desc;
-                document.getElementById('modalCardId').textContent = `类型ID: ${typeId}`;
+                document.getElementById('modalCardId').textContent = tokenId !== null ? `Token ID: ${tokenId}` : `类型ID: ${typeId}`;
                 
                 const rarityBadge = document.getElementById('modalCardRarity');
                 if (rarityBadge) {
@@ -793,8 +807,9 @@
                     const typeId = parseInt(card.getAttribute('data-nft-typeid'));
                     const level = parseInt(card.getAttribute('data-nft-level'));
                     const growth = parseInt(card.getAttribute('data-nft-growth')) || 0;
-                    console.log('[COLLECTION] showCardModal called with:', typeId, level, growth);
-                    showCardModal(typeId, level, growth);
+                    const tokenId = card.getAttribute('data-nft-tokenid') || null;
+                    console.log('[COLLECTION] showCardModal called with:', typeId, level, growth, tokenId);
+                    showCardModal(typeId, level, growth, tokenId);
                 }
             });
         });
