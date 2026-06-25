@@ -358,6 +358,72 @@
         // 缓存最近一次成功的代币价格，避免重复调用预言机
         let cachedTokenPrice = null;
         let cachedTokenPriceTime = 0;
+        
+        // 共用函数：直接通过 eth.call 获取代币价格（绕过 web3 Contract 的 ABI 解析层，避免 BSC 节点兼容性问题）
+        async function fetchTokenPrice(oracleAddr) {
+            if (!window.web3 || !oracleAddr) throw new Error('Web3或地址未初始化');
+            
+            // getTokenPriceUSD() 的函数选择器: keccak256("getTokenPriceUSD()").slice(0,10) = 0xe48f1d28
+            let funcSig;
+            try {
+                if (window.web3.eth && window.web3.eth.abi && window.web3.eth.abi.encodeFunctionSignature) {
+                    funcSig = window.web3.eth.abi.encodeFunctionSignature('getTokenPriceUSD()');
+                } else {
+                    funcSig = '0xe48f1d28';
+                }
+            } catch (e) {
+                funcSig = '0xe48f1d28'; // 硬编码回退
+            }
+            console.log('fetchTokenPrice using selector:', funcSig);
+            
+            // 多档 gas 重试（无gas → 300万 → 600万 → 900万）
+            const gasOptions = [null, 3000000, 6000000, 9000000];
+            let lastError = null;
+            
+            for (const gasLimit of gasOptions) {
+                try {
+                    const callParams = { to: oracleAddr, data: funcSig };
+                    if (gasLimit !== null) callParams.gas = gasLimit;
+                    
+                    console.log(`fetchTokenPrice: eth_call gas=${gasLimit || 'default'}`);
+                    const rawResult = await window.web3.eth.call(callParams);
+                    console.log(`fetchTokenPrice raw result (gas=${gasLimit}):`, rawResult);
+                    
+                    // 尝试解码为 uint256
+                    let price;
+                    try {
+                        price = window.web3.eth.abi.decodeParameter('uint256', rawResult);
+                    } catch (decodeErr) {
+                        console.warn('decodeParameter failed, trying BigInt parse:', decodeErr.message);
+                        // 如果原始结果是 0x 格式，直接用 BigInt 解析
+                        price = BigInt(rawResult);
+                    }
+                    console.log(`fetchTokenPrice decoded (gas=${gasLimit}):`, String(price));
+                    
+                    if (typeof price !== 'bigint') price = BigInt(String(price));
+                    return price;
+                } catch (e) {
+                    lastError = e;
+                    console.warn(`fetchTokenPrice attempt gas=${gasLimit} failed:`, e.message);
+                }
+            }
+            
+            // 所有重试都失败，尝试用 Contract 方式做最后一次兜底
+            try {
+                console.log('fetchTokenPrice: last resort via Contract.methods');
+                const abi = ZODIAC_CONFIG.ABIS.priceOracleABI;
+                if (abi) {
+                    const fallbackContract = new window.web3.eth.Contract(abi, oracleAddr);
+                    const result = await fallbackContract.methods.getTokenPriceUSD().call({ gas: 9000000 });
+                    console.log('fetchTokenPrice fallback result:', result);
+                    return BigInt(String(result));
+                }
+            } catch (fallbackErr) {
+                console.error('fetchTokenPrice fallback also failed:', fallbackErr.message);
+            }
+            
+            throw lastError || new Error('获取价格失败：预言机不可达');
+        }
 
         async function initContracts() {
             const [nft, token, nftUpdate] = await Promise.all([
@@ -573,8 +639,7 @@
                 } else if (!window.web3) {
                     usdValueText = '⚠ Web3未初始化';
                 } else {
-                    const priceOracleContract = new window.web3.eth.Contract(ZODIAC_CONFIG.ABIS.priceOracleABI, priceOracleAddr);
-                    const price = BigInt(String(await priceOracleContract.methods.getTokenPriceUSD().call({ gas: 3000000 })));
+                    const price = await fetchTokenPrice(priceOracleAddr);
                     console.log('selectNFT - price from oracle:', price.toString());
                     // 缓存价格，后续升阶操作可复用（有效期60秒）
                     if (price > 0n) {
@@ -1008,38 +1073,24 @@
                 }
             }
             
-            // 策略2：从预言机获取（带重试）
+            // 策略2：从预言机获取
             if (price <= 0n) {
-                let oracleSucceeded = false;
-                const gasOptions = [3000000, 6000000, 9000000];
-                
-                for (const gasLimit of gasOptions) {
-                    try {
-                        if (!priceOracleAddr || priceOracleAddr === '0x0000000000000000000000000000000000000000') {
-                            throw new Error('价格预言机地址未配置');
-                        }
-                        if (!window.web3) throw new Error('Web3未初始化');
-                        
-                        const oracleContract = new window.web3.eth.Contract(ZODIAC_CONFIG.ABIS.priceOracleABI, priceOracleAddr);
-                        const rawPrice = await oracleContract.methods.getTokenPriceUSD().call({ gas: gasLimit });
-                        console.log(`Oracle price (gas=${gasLimit}):`, rawPrice);
-                        
-                        const result = applyPrice(rawPrice);
-                        price = result.price;
-                        requiredTokens = result.requiredTokens;
-                        requiredTokensDisplay = (Number(requiredTokens) / 1e18).toFixed(4);
-                        // 更新缓存
-                        cachedTokenPrice = price;
-                        cachedTokenPriceTime = Date.now();
-                        console.log('Oracle price OK:', price.toString(), 'required tokens:', requiredTokensDisplay);
-                        oracleSucceeded = true;
-                        break;
-                    } catch (e) {
-                        console.warn(`Oracle attempt with gas=${gasLimit} failed:`, e.message);
+                try {
+                    if (!priceOracleAddr || priceOracleAddr === '0x0000000000000000000000000000000000000000') {
+                        throw new Error('价格预言机地址未配置');
                     }
-                }
-                
-                if (!oracleSucceeded) {
+                    
+                    const rawPrice = await fetchTokenPrice(priceOracleAddr);
+                    const result = applyPrice(rawPrice);
+                    price = result.price;
+                    requiredTokens = result.requiredTokens;
+                    requiredTokensDisplay = (Number(requiredTokens) / 1e18).toFixed(4);
+                    // 更新缓存
+                    cachedTokenPrice = price;
+                    cachedTokenPriceTime = Date.now();
+                    console.log('Oracle price OK:', price.toString(), 'required tokens:', requiredTokensDisplay);
+                } catch (e) {
+                    console.error('获取预言机价格失败:', e);
                     ZODIAC_UI.showToast('无法获取代币实时价格，请稍后重试。如持续出现请刷新页面或联系管理员', 'error');
                     return;
                 }
