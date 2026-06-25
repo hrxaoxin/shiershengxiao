@@ -856,9 +856,9 @@
                     }
                 
                     if (price > 0n) {
-                        // 公式: tokenAmount(18位精度) = usdAmountWei(18位精度) * 1e18 / price(18位精度)
-                        // requiredUSDWei 是18位精度的USDT数量，price 是18位精度的代币价格(每个代币价值多少USDT wei)
-                        const tokenAmount = usdWeiBigInt * 10n**18n / price;
+                        // 公式: tokenAmount(18位精度) = usdAmountWei(18位精度) * 1e36 / price(18位精度)
+                        // price 是18位精度的 USDT/Token 价格，需要除以1e18得到真实价格
+                        const tokenAmount = usdWeiBigInt * 10n**36n / price;
                         console.log('selectNFT - calculated tokenAmount:', tokenAmount.toString());
                         
                         if (tokenAmount > 0n) {
@@ -1257,15 +1257,15 @@
             const priceOracleAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.priceOracle;
             
             // 辅助函数：验证并计算价格 → 代币数量
-            // cost = usdValue(18位) * 1e18 / price(18位) - 与合约 _upgradeWithUSDValueInternal 公式一致
+            // price 是18位精度的 USDT/Token 价格，需要除以1e18得到真实价格
+            // 公式: tokenAmount(18位) = usdValue(18位) * 1e36 / price(18位)
             const applyPrice = (rawPrice) => {
                 const p = typeof rawPrice === 'bigint' ? rawPrice : BigInt(String(rawPrice));
                 if (p <= 0n) throw new Error('价格为零');
                 if (p < 10n**10n) throw new Error('价格过低（疑似单位错误）');
                 if (p > 10n**24n) throw new Error('价格过高（疑似单位错误）');
-                const tokens = usdWeiBigInt * 10n**18n / p;
+                const tokens = usdWeiBigInt * 10n**36n / p;
                 if (tokens <= 0n) throw new Error('代币数量无效');
-                // 与合约 require(cost <= 10**30) 保持一致
                 if (tokens > 10n**30n) throw new Error('代币数量异常（超出合约上限）');
                 return { price: p, requiredTokens: tokens };
             };

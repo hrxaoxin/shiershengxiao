@@ -89,11 +89,11 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
                     
                     try PANCAKE_ROUTER.getAmountsOut(tokenState.price, path) returns (uint256[] memory amounts) {
                         if (amounts.length == 2 && amounts[1] > 0) {
-                            return amounts[1] / 10**18;
+                            return amounts[1];
                         }
                     } catch {}
                 } else if (quoteToken == USDT) {
-                    return tokenState.price / 10**18;
+                    return tokenState.price;
                 }
             }
         } catch {}
@@ -105,7 +105,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
 
         try PANCAKE_ROUTER.getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
             if (amounts.length == 3 && amounts[2] > 0) {
-                return amounts[2] / 10**18;
+                return amounts[2];
             }
         } catch {}
 
@@ -129,11 +129,11 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
                     
                     try PANCAKE_ROUTER.getAmountsOut(tokenState.price, path) returns (uint256[] memory amounts) {
                         if (amounts.length == 2 && amounts[1] > 0) {
-                            return amounts[1] / 10**18;
+                            return amounts[1];
                         }
                     } catch {}
                 } else if (quoteToken == USDT) {
-                    return tokenState.price / 10**18;
+                    return tokenState.price;
                 }
             }
         } catch {}
@@ -145,7 +145,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
 
         try PANCAKE_ROUTER.getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
             if (amounts.length == 3 && amounts[2] > 0) {
-                return amounts[2] / 10**18;
+                return amounts[2];
             }
         } catch {}
 
