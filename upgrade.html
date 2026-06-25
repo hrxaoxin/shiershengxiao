@@ -435,9 +435,14 @@
                     const quoteHex = hex.slice(64 * 9, 64 * 10);
                     const quoteToken = '0x' + quoteHex.slice(24).toLowerCase();
 
-                    console.log('Flap Portal price (raw, 18 dec):', price.toString(), 'quoteToken:', quoteToken);
+                    console.log('Flap Portal price (raw):', price.toString(), 'quoteToken:', quoteToken);
 
-                    return { priceRaw: price, priceDecimals: 18, quoteToken };
+                    let decimals = 18;
+                    if (quoteToken.toLowerCase() === USDT_ADDR.toLowerCase()) {
+                        decimals = 6;
+                    }
+
+                    return { priceRaw: price, priceDecimals: decimals, quoteToken };
                 } catch (e) {
                     lastError = e;
                     console.warn(`fetchTokenPriceFromFlapPortal gas=${gasLimit} failed:`, e.message);
@@ -572,16 +577,12 @@
                             const raw = await window.web3.eth.call(callParams);
                             if (!raw || raw === '0x' || raw === '0x0') continue;
 
-                            // 合约返回值：PriceOracle.sol 中在 USDT/WBNB 路径都乘了 10**12（把 6 位 USDT 升成 18 位）
-                            // 但当 quoteToken==USDT 时，tokenState.price 已经是 18 位精度，导致合约返回了 30 位精度的值
-                            // 前端需要除以 10**12 恢复正确的 18 位精度
+                            // 合约返回值：PriceOracle.sol 已经将价格转换为18位精度
                             const hex = raw.replace(/^0x/i, '');
                             const oraclePrice = BigInt('0x' + (hex.length > 64 ? hex.slice(-64) : hex.padStart(64, '0')));
                             if (oraclePrice <= 0n) continue;
-                            // 除以 10^12 恢复 18 位精度
-                            //const price = oraclePrice / 10n ** 12n;
                             const validated = validatePriceRange(oraclePrice);
-                            console.log('fetchTokenPrice: oracle OK', 'raw=' + oraclePrice.toString(), 'div12=' + price.toString(), 'validated=' + validated.toString());
+                            console.log('fetchTokenPrice: oracle OK', 'price=' + validated.toString());
                             return validated;
                         } catch (e) {
                             console.warn(`fetchTokenPrice oracle gas=${gasLimit} failed:`, e.message);

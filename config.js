@@ -150,7 +150,7 @@ window.ZODIAC_CONFIG = (function() {
         dividendManagerLP: getEnvContractAddress('dividendManagerLP', '0xF82353e671E910331aC604FA36499Df40041C040'),
         weightManager: getEnvContractAddress('weightManager', '0x5Be08747416E6aD188217af1C077aC0cC81dFeeF'),
         poolManager: getEnvContractAddress('poolManager', '0x1ECc5730C39C29636043277a85aeDCBe165463aa'),
-        priceOracle: getEnvContractAddress('priceOracle', '0x249e496b310f14cD5F999634E53D40BBD5C0C114'),
+        priceOracle: getEnvContractAddress('priceOracle', '0x32C8459C924F1aC61Fe061bed90FB8E41e7eC170'),
         tokenBurner: getEnvContractAddress('tokenBurner', '0x78702588a9F88Ec844ad91C2FAb9632c797139D3'),
         nftMintCore: getEnvContractAddress('nftMintCore', '0x3648Dd17DD1170FEC42D2BE05CA86E98D5D97d3c'),
         nftMint: getEnvContractAddress('nftMint', '0x3648Dd17DD1170FEC42D2BE05CA86E98D5D97d3c'),
@@ -21858,6 +21858,19 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "getTokenPriceUSD",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getTokenPriceUSDV8",
 		"outputs": [
 			{
 				"internalType": "uint256",

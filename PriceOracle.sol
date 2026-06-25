@@ -23,6 +23,26 @@ interface IFlapPortal {
     }
 
     function getTokenV5(address token) external view returns (TokenStateV5 memory);
+
+    struct TokenStateV8 {
+        uint8 status;
+        uint256 reserve;
+        uint256 circulatingSupply;
+        uint256 price;
+        uint8 tokenVersion;
+        uint256 r;
+        uint256 h;
+        uint256 k;
+        uint256 dexSupplyThresh;
+        address quoteTokenAddress;
+        bool nativeToQuoteSwapEnabled;
+        bytes32 extensionID;
+        uint256 lpReserve;
+        uint256 lpSupply;
+        uint256 nativeReserve;
+    }
+
+    function getTokenV8(address token) external view returns (TokenStateV8 memory);
 }
 
 interface IPancakeRouter02 {
@@ -69,11 +89,11 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
                     
                     try PANCAKE_ROUTER.getAmountsOut(tokenState.price, path) returns (uint256[] memory amounts) {
                         if (amounts.length == 2 && amounts[1] > 0) {
-                            return amounts[1];
+                            return amounts[1] / 10**18;
                         }
                     } catch {}
                 } else if (quoteToken == USDT) {
-                    return tokenState.price;
+                    return tokenState.price / 10**18;
                 }
             }
         } catch {}
@@ -85,7 +105,47 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
 
         try PANCAKE_ROUTER.getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
             if (amounts.length == 3 && amounts[2] > 0) {
-                return amounts[2];
+                return amounts[2] / 10**18;
+            }
+        } catch {}
+
+        return 0;
+    }
+
+    function getTokenPriceUSDV8() external view returns (uint256) {
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address token = auth.getToken();
+        
+        if (token == address(0)) return 0;
+
+        try FLAP_PORTAL.getTokenV8(token) returns (IFlapPortal.TokenStateV8 memory tokenState) {
+            if (tokenState.status == 1 && tokenState.price > 0) {
+                address quoteToken = tokenState.quoteTokenAddress;
+                
+                if (quoteToken == address(0) || quoteToken == WBNB) {
+                    address[] memory path = new address[](2);
+                    path[0] = WBNB;
+                    path[1] = USDT;
+                    
+                    try PANCAKE_ROUTER.getAmountsOut(tokenState.price, path) returns (uint256[] memory amounts) {
+                        if (amounts.length == 2 && amounts[1] > 0) {
+                            return amounts[1] / 10**18;
+                        }
+                    } catch {}
+                } else if (quoteToken == USDT) {
+                    return tokenState.price / 10**18;
+                }
+            }
+        } catch {}
+
+        address[] memory path = new address[](3);
+        path[0] = token;
+        path[1] = WBNB;
+        path[2] = USDT;
+
+        try PANCAKE_ROUTER.getAmountsOut(10**18, path) returns (uint256[] memory amounts) {
+            if (amounts.length == 3 && amounts[2] > 0) {
+                return amounts[2] / 10**18;
             }
         } catch {}
 
