@@ -813,9 +813,8 @@
         async function sellWithBalanceRatioPrice() {
             if (!selectedNft || !buybackContract) return;
 
-            // 先刷新余额比例价格
             await loadBalanceRatioPrice();
-            const price = web3.utils.fromWei(balanceRatioPrice, 'ether');
+            const price = formatPrice(balanceRatioPrice);
 
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认以余额比例价出售',
@@ -903,7 +902,7 @@
         async function sellWithFixedPrice() {
             if (!selectedNft || !buybackContract) return;
 
-            const price = web3.utils.fromWei(fixedPrice, 'ether');
+            const price = formatPrice(fixedPrice);
 
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认以回购价出售',

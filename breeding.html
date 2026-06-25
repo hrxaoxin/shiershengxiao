@@ -633,15 +633,26 @@
             try {
                 nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
                 console.log('nftContract initialized:', !!nftContract);
+            } catch (e) {
+                console.warn('nftContract initialization failed:', e.message);
+            }
+            try {
                 breedingCoreContract = await window.ZODIAC_WEB3.getContract('breedingCore');
                 console.log('breedingCoreContract initialized:', !!breedingCoreContract);
+            } catch (e) {
+                console.warn('breedingCoreContract initialization failed:', e.message);
+            }
+            try {
                 breedingMarketContract = await window.ZODIAC_WEB3.getContract('breedingMarket');
                 console.log('breedingMarketContract initialized:', !!breedingMarketContract);
+            } catch (e) {
+                console.warn('breedingMarketContract initialization failed:', e.message);
+            }
+            try {
                 tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
                 console.log('tokenContract initialized:', !!tokenContract);
-            } catch (error) {
-                console.warn('合约初始化失败:', error.message);
-                ZODIAC_UI.showToast('合约初始化失败，请刷新重试', 'error');
+            } catch (e) {
+                console.warn('tokenContract initialization failed:', e.message);
             }
         }
 

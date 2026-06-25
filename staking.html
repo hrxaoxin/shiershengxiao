@@ -1211,6 +1211,100 @@
                 btn.innerHTML = '<i class="fas fa-gift mr-2"></i>领取LP奖励';
             }
         }
+
+        async function showNFTModal(nftId, nftType, nftLevel, nftName, nftImage) {
+            try {
+                const isRare = await nftContract.methods.isRare(nftId).call();
+                const growth = await nftContract.methods.tokenGrowth(nftId).call();
+                
+                const nftInfo = window.ZODIAC_UTILS.getNFTInfo(nftType);
+                const rarityText = isRare ? '稀有' : '普通';
+                
+                const level = parseInt(nftLevel, 10);
+                const weight = level * (isRare ? 2 : 1);
+                const canBreed = level >= 5;
+                const canBattle = level >= 1;
+                const canStake = level >= 1;
+                
+                const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+                const zodiacName = nftInfo.zodiac !== undefined ? (ZODIAC_CONFIG && ZODIAC_CONFIG.ZODIAC_NAMES ? ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac] : zodiacNames[nftInfo.zodiac]) : '未知';
+                
+                const displayGrowth = parseInt(growth, 10);
+                
+                document.getElementById('modalCardImage').src = nftImage;
+                document.getElementById('modalCardName').textContent = nftName;
+                document.getElementById('modalCardDesc').textContent = `${nftInfo.attrName || '未知'}属性生肖·${zodiacName}·${nftInfo.genderName || '未知'}`;
+                document.getElementById('modalCardId').textContent = nftId;
+                
+                const rarityBadge = document.getElementById('modalCardRarity');
+                if (rarityBadge) {
+                    rarityBadge.textContent = rarityText;
+                    rarityBadge.className = `text-xs font-bold px-2 py-1 rounded ${isRare ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`;
+                }
+                
+                const statsDiv = document.getElementById('modalCardStats');
+                if (statsDiv) {
+                    statsDiv.innerHTML = `
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-blue-50 rounded-lg p-3">
+                                <div class="text-xs text-gray-600 mb-1">稀有度</div>
+                                <div class="${isRare ? 'text-purple-600' : 'text-gray-600'} font-bold">${rarityText}</div>
+                            </div>
+                            <div class="bg-green-50 rounded-lg p-3">
+                                <div class="text-xs text-gray-600 mb-1">分红权重</div>
+                                <div class="text-green-600 font-bold">${weight}x</div>
+                            </div>
+                            <div class="bg-yellow-50 rounded-lg p-3">
+                                <div class="text-xs text-gray-600 mb-1">当前等级</div>
+                                <div class="text-yellow-600 font-bold">${'⭐'.repeat(level)}</div>
+                            </div>
+                            <div class="bg-purple-50 rounded-lg p-3">
+                                <div class="text-xs text-gray-600 mb-1">成长值</div>
+                                <div class="text-purple-600 font-bold">${displayGrowth}</div>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="text-xs text-gray-600 mb-2">可用功能</div>
+                            <div class="flex gap-2 flex-wrap">
+                                ${canBattle ? '<span class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs">⚔️ 战斗</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">⚔️ 战斗</span>'}
+                                ${canStake ? '<span class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs">💰 质押</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">💰 质押</span>'}
+                                ${canBreed ? '<span class="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs">🧬 孕育</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">🧬 孕育</span>'}
+                                <span class="px-2 py-1 bg-yellow-100 text-yellow-600 rounded text-xs">📊 分红</span>
+                            </div>
+                        </div>
+                        <div class="mt-4 text-xs text-gray-500">
+                            <p>💡 ${isRare ? '稀有属性' : '普通属性'}NFT，${isRare ? '权重更高' : '基础权重'}，适合参与各类游戏玩法。</p>
+                        </div>
+                    `;
+                }
+                
+                document.getElementById('cardModal').classList.remove('hidden');
+            } catch (error) {
+                console.error('Failed to show NFT modal:', error);
+            }
+        }
+
+        function closeNFTModal() {
+            document.getElementById('cardModal').classList.add('hidden');
+        }
     </script>
+
+    <div id="cardModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="text-center mb-4">
+                <button onclick="closeNFTModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+                    <i class="fas fa-times text-gray-600"></i>
+                </button>
+                <img id="modalCardImage" src="" alt="生肖" class="w-32 h-32 mx-auto mb-4 rounded-lg shadow-md">
+                <h3 id="modalCardName" class="text-xl font-bold text-gray-800 mb-2">生肖名称</h3>
+                <div class="flex items-center justify-center gap-2 mb-2">
+                    <span id="modalCardRarity" class="text-xs font-bold px-2 py-1 rounded bg-gray-100 text-gray-600">普通</span>
+                </div>
+                <p id="modalCardDesc" class="text-gray-600 text-sm mb-2">描述</p>
+                <p class="text-sm text-gray-500 mb-4">Token ID: <span id="modalCardId"></span></p>
+            </div>
+            <div id="modalCardStats"></div>
+        </div>
+    </div>
 </body>
 </html>
