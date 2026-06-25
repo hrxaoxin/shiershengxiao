@@ -483,6 +483,12 @@
                 await loadBuybackConfig();
                 await loadUserNftsForGrowth();
             });
+            ZODIAC_WEB3.on('connect', async () => {
+                await initContracts();
+                await updateWalletStatus();
+                await loadBuybackConfig();
+                await loadUserNftsForGrowth();
+            });
         }
 
         async function initWeb3() {
@@ -513,7 +519,8 @@
 
             try {
                 const balance = await tokenContract.methods.balanceOf(account).call();
-                const buybackBal = await tokenContract.methods.balanceOf(ZODIAC_CONFIG.CONTRACT_ADDRESSES.buyback).call();
+                const buybackAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftBuyback;
+                const buybackBal = await tokenContract.methods.balanceOf(buybackAddr).call();
                 const networkId = await web3.eth.getChainId();
 
                 document.getElementById('walletAddressDisplay').textContent = account.substring(0, 6) + '...' + account.substring(account.length - 4);

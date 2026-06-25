@@ -184,6 +184,21 @@
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); border-radius: 10px; }
+
+        .attribute-tab { padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; font-weight: 500; }
+        .attribute-tab.active { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+        .tab-water { background-color: #e0f2fe; color: #0369a1; }
+        .tab-water.active { background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%); color: white; }
+        .tab-wind { background-color: #dcfce7; color: #15803d; }
+        .tab-wind.active { background: linear-gradient(135deg, #22c55e 0%, #15803d 100%); color: white; }
+        .tab-fire { background-color: #fee2e2; color: #b91c1c; }
+        .tab-fire.active { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
+        .tab-dark { background-color: #ede9fe; color: #6d28d9; }
+        .tab-dark.active { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; }
+        .tab-light { background-color: #fef3c7; color: #d97706; }
+        .tab-light.active { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .tab-all { background-color: #e5e7eb; color: #374151; }
+        .tab-all.active { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); color: white; }
     </style>
 </head>
 <body>
@@ -207,6 +222,30 @@
         </header>
 
         <main class="px-4 pt-6 pb-24 md:pl-28">
+            <div class="bg-white rounded-xl p-6 shadow-md mb-8">
+                <div class="flex items-center mb-6">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-4">
+                        <i class="text-blue-500 text-xl">💰</i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-gray-800">钱包信息</h3>
+                        <p class="text-sm text-gray-500" id="walletAddress">未连接钱包</p>
+                        <p class="text-xs text-gray-400" id="connectionStatus">请点击连接钱包按钮</p>
+                    </div>
+                    <button id="connectWalletBtnDesktop" class="btn-primary text-sm"><i class="fas fa-plug mr-1"></i> 连接</button>
+                </div>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">代币余额</span>
+                        <span class="text-lg font-semibold text-gray-800" id="tokenBalance">0</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">授权状态</span>
+                        <span class="text-lg font-semibold text-gray-800" id="approvalStatus">未授权</span>
+                    </div>
+                </div>
+            </div>
+
             <div class="bg-white rounded-xl p-6 shadow-md mb-8">
                 <h2 class="text-2xl font-bold mb-4">为你的生肖NFT升阶，提升等级获得更多权益</h2>
                 <p class="text-gray-600 mb-6">选择一种升阶方式，提升你的生肖NFT等级，获得更高的分红权重</p>
@@ -242,20 +281,16 @@
             </div>
 
             <div class="mb-8">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-                    <h3 class="text-2xl font-bold text-gray-800">我的生肖NFT</h3>
-                    <div class="flex items-center gap-4">
-                        <select id="filterType" class="input-field w-48">
-                            <option value="all">全部类型</option>
-                            <option value="water">水属性</option>
-                            <option value="wind">风属性</option>
-                            <option value="fire">火属性</option>
-                            <option value="dark">暗属性</option>
-                            <option value="light">光属性</option>
-                        </select>
-                        <div class="text-sm text-gray-600">
-                            代币余额: <span id="tokenBalance" class="font-bold text-blue-600">0</span>
-                        </div>
+                <h3 class="text-2xl font-bold text-gray-800 mb-4">我的生肖NFT</h3>
+                <div class="mb-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-3">筛选属性</h3>
+                    <div class="flex flex-wrap gap-2">
+                        <button class="attribute-tab tab-water" onclick="switchAttribute('water')">💧 水</button>
+                        <button class="attribute-tab tab-wind" onclick="switchAttribute('wind')">🌬️ 风</button>
+                        <button class="attribute-tab tab-fire" onclick="switchAttribute('fire')">🔥 火</button>
+                        <button class="attribute-tab tab-dark" onclick="switchAttribute('dark')">🌙 暗</button>
+                        <button class="attribute-tab tab-light" onclick="switchAttribute('light')">☀️ 光</button>
+                        <button class="attribute-tab tab-all active" onclick="switchAttribute('all')">全部</button>
                     </div>
                 </div>
                 <div id="nftGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
@@ -324,12 +359,11 @@
             document.getElementById('upgradeWithNftBtn').addEventListener('click', handleUpgradeWithNFT);
             document.getElementById('upgradeWithTokenBtn').addEventListener('click', handleUpgradeWithToken);
             document.getElementById('upgradeWithUSDValueBtn').addEventListener('click', handleUpgradeWithUSDValue);
-            document.getElementById('filterType').addEventListener('change', filterNFTs);
         }
 
         function initWalletUI() {
             ZODIAC_UI.initWalletButton('walletBtn', null, null);
-            ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddressDesktop', null);
+            ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddress', 'connectionStatus');
             ZODIAC_UI.on('walletConnected', async () => {
                 await initContracts();
                 await loadUserNFTs();
@@ -849,20 +883,30 @@
             nftGrid.innerHTML = html;
         }
 
-        function filterNFTs() {
-            const filterType = document.getElementById('filterType').value;
+        let currentFilter = 'all';
+
+        window.switchAttribute = function(attr) {
+            currentFilter = attr;
+            document.querySelectorAll('.attribute-tab').forEach(tab => {
+                tab.classList.remove('active');
+                tab.removeAttribute('style');
+            });
+            const activeTab = document.querySelector(`.tab-${attr}`);
+            if (activeTab) {
+                activeTab.classList.add('active');
+            }
             
             if (!allUserNFTs || allUserNFTs.length === 0) {
                 return;
             }
             
-            if (filterType === 'all') {
+            if (attr === 'all') {
                 renderNFTs(allUserNFTs);
                 return;
             }
             
             const attrIndexes = { water: 0, wind: 1, fire: 2, dark: 3, light: 4 };
-            const targetAttrIndex = attrIndexes[filterType];
+            const targetAttrIndex = attrIndexes[attr];
             
             if (targetAttrIndex !== undefined) {
                 const filtered = allUserNFTs.filter(nft => {

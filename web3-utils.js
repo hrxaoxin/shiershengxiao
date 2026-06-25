@@ -298,7 +298,10 @@ window.ZODIAC_WEB3 = (function() {
             return contracts[name];
         }
         
-        const addr = CONTRACT_ADDRESSES[name];
+        let addr = CONTRACT_ADDRESSES[name];
+        if (!addr && name === 'buyback') {
+            addr = CONTRACT_ADDRESSES.nftBuyback;
+        }
         if (!addr || addr === '0x0000000000000000000000000000000000000000') {
             throw new Error(`[ZODIAC_WEB3] Contract address not configured: ${name}`);
         }
