@@ -579,8 +579,8 @@
                             const oraclePrice = BigInt('0x' + (hex.length > 64 ? hex.slice(-64) : hex.padStart(64, '0')));
                             if (oraclePrice <= 0n) continue;
                             // 除以 10^12 恢复 18 位精度
-                            const price = oraclePrice / 10n ** 12n;
-                            const validated = validatePriceRange(price);
+                            //const price = oraclePrice / 10n ** 12n;
+                            const validated = validatePriceRange(oraclePrice);
                             console.log('fetchTokenPrice: oracle OK', 'raw=' + oraclePrice.toString(), 'div12=' + price.toString(), 'validated=' + validated.toString());
                             return validated;
                         } catch (e) {
