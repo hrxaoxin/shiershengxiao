@@ -42,6 +42,20 @@
         .input-field:focus { outline: none; border-color: #ff6b6b; box-shadow: 0 0 0 0.2rem rgba(255, 107, 107, 0.25); }
         .card-hover { transition: all 0.3s ease; }
         .card-hover:hover { transform: translateY(-5px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15); }
+        .attribute-tab { padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; font-weight: 500; }
+        .attribute-tab.active { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+        .tab-water { background-color: #e0f2fe; color: #0369a1; }
+        .tab-water.active { background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%); color: white; }
+        .tab-wind { background-color: #dcfce7; color: #15803d; }
+        .tab-wind.active { background: linear-gradient(135deg, #22c55e 0%, #15803d 100%); color: white; }
+        .tab-fire { background-color: #fee2e2; color: #b91c1c; }
+        .tab-fire.active { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
+        .tab-dark { background-color: #ede9fe; color: #6d28d9; }
+        .tab-dark.active { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; }
+        .tab-light { background-color: #fef3c7; color: #d97706; }
+        .tab-light.active { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .tab-all { background-color: #e5e7eb; color: #374151; }
+        .tab-all.active { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); color: white; }
     </style>
 </head>
 <body>
@@ -168,6 +182,16 @@
                 <form id="listForm" class="space-y-6">
                     <div>
                         <label class="block text-gray-700 font-medium mb-2">选择NFT</label>
+                        <div class="mb-3">
+                            <div class="flex flex-wrap gap-2">
+                                <button class="attribute-tab tab-water" onclick="switchAttribute('water')">💧 水</button>
+                                <button class="attribute-tab tab-wind" onclick="switchAttribute('wind')">🌬️ 风</button>
+                                <button class="attribute-tab tab-fire" onclick="switchAttribute('fire')">🔥 火</button>
+                                <button class="attribute-tab tab-dark" onclick="switchAttribute('dark')">🌙 暗</button>
+                                <button class="attribute-tab tab-light" onclick="switchAttribute('light')">☀️ 光</button>
+                                <button class="attribute-tab tab-all active" onclick="switchAttribute('all')">全部</button>
+                            </div>
+                        </div>
                         <div id="userNftGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 max-h-96 overflow-y-auto p-2 border-2 border-dashed border-gray-300 rounded-lg">
                             <div class="col-span-full text-center py-8">
                                 <i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
@@ -300,6 +324,7 @@
         let pageCacheTimestamp = {};
         let lazyLoadObserver = null;
         let originalListings = [];
+        let currentAttributeFilter = 'all';
 
         function initLazyLoading() {
             if (lazyLoadObserver) {
@@ -1362,11 +1387,45 @@
 
                 userNftCache = nfts;
                 userNftCacheTimestamp = Date.now();
-                displayUserNftsForListing(nfts);
+                filterAndDisplayUserNfts(nfts);
             } catch (error) {
                 console.error('加载用户NFT失败:', error);
                 userNftGrid.innerHTML = '<div class="col-span-full text-center py-8"><p class="text-red-500">加载失败，请重试</p></div>';
             }
+        }
+
+        window.switchAttribute = function(attr) {
+            currentAttributeFilter = attr;
+            document.querySelectorAll('.attribute-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            const activeTab = document.querySelector(`.tab-${attr}`);
+            if (activeTab) {
+                activeTab.classList.add('active');
+            }
+            
+            if (userNftCache && userNftCache.length > 0) {
+                filterAndDisplayUserNfts(userNftCache);
+            }
+        }
+
+        function filterAndDisplayUserNfts(nfts) {
+            let filtered = nfts;
+            
+            if (currentAttributeFilter !== 'all') {
+                const attrIndexes = { water: 0, wind: 1, fire: 2, dark: 3, light: 4 };
+                const targetAttrIndex = attrIndexes[currentAttributeFilter];
+                
+                if (targetAttrIndex !== undefined) {
+                    filtered = nfts.filter(nft => {
+                        const typeId = parseInt(nft.type, 10);
+                        const itemAttrIndex = Math.floor(typeId / 24);
+                        return itemAttrIndex === targetAttrIndex;
+                    });
+                }
+            }
+            
+            displayUserNftsForListing(filtered);
         }
 
         function displayUserNftsForListing(nfts) {

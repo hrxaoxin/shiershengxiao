@@ -45,6 +45,20 @@
         .badge-common { background-color: #17a2b8; color: white; }
         .badge-rare { background-color: #dc3545; color: white; }
         .progress-bar { transition: width 0.5s ease-in-out; }
+        .attribute-tab { padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; font-weight: 500; }
+        .attribute-tab.active { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); }
+        .tab-water { background-color: #e0f2fe; color: #0369a1; }
+        .tab-water.active { background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%); color: white; }
+        .tab-wind { background-color: #dcfce7; color: #15803d; }
+        .tab-wind.active { background: linear-gradient(135deg, #22c55e 0%, #15803d 100%); color: white; }
+        .tab-fire { background-color: #fee2e2; color: #b91c1c; }
+        .tab-fire.active { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: white; }
+        .tab-dark { background-color: #ede9fe; color: #6d28d9; }
+        .tab-dark.active { background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); color: white; }
+        .tab-light { background-color: #fef3c7; color: #d97706; }
+        .tab-light.active { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; }
+        .tab-all { background-color: #e5e7eb; color: #374151; }
+        .tab-all.active { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); color: white; }
     </style>
 </head>
 <body>
@@ -126,6 +140,16 @@
                     </div>
                     
                     <div id="growthBuybackEnabled">
+                        <div class="mb-3">
+                            <div class="flex flex-wrap gap-2">
+                                <button class="attribute-tab tab-water" onclick="switchBuybackAttribute('water', 'growth')">💧 水</button>
+                                <button class="attribute-tab tab-wind" onclick="switchBuybackAttribute('wind', 'growth')">🌬️ 风</button>
+                                <button class="attribute-tab tab-fire" onclick="switchBuybackAttribute('fire', 'growth')">🔥 火</button>
+                                <button class="attribute-tab tab-dark" onclick="switchBuybackAttribute('dark', 'growth')">🌙 暗</button>
+                                <button class="attribute-tab tab-light" onclick="switchBuybackAttribute('light', 'growth')">☀️ 光</button>
+                                <button class="attribute-tab tab-all active" onclick="switchBuybackAttribute('all', 'growth')">全部</button>
+                            </div>
+                        </div>
                         <div id="userNftGridGrowth" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-96 overflow-y-auto p-2 border-2 border-dashed border-gray-300 rounded-lg mb-6">
                             <div class="col-span-full text-center py-8">
                                 <i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
@@ -219,6 +243,16 @@
                     </div>
 
                     <div id="autoBuybackEnabled" class="hidden">
+                        <div class="mb-3">
+                            <div class="flex flex-wrap gap-2">
+                                <button class="attribute-tab tab-water" onclick="switchBuybackAttribute('water', 'fixed')">💧 水</button>
+                                <button class="attribute-tab tab-wind" onclick="switchBuybackAttribute('wind', 'fixed')">🌬️ 风</button>
+                                <button class="attribute-tab tab-fire" onclick="switchBuybackAttribute('fire', 'fixed')">🔥 火</button>
+                                <button class="attribute-tab tab-dark" onclick="switchBuybackAttribute('dark', 'fixed')">🌙 暗</button>
+                                <button class="attribute-tab tab-light" onclick="switchBuybackAttribute('light', 'fixed')">☀️ 光</button>
+                                <button class="attribute-tab tab-all active" onclick="switchBuybackAttribute('all', 'fixed')">全部</button>
+                            </div>
+                        </div>
                         <div id="userNftGridFixed" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-64 overflow-y-auto p-2 border-2 border-dashed border-gray-300 rounded-lg mb-6">
                             <div class="col-span-full text-center py-8">
                                 <i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
@@ -301,6 +335,16 @@
                 </div>
 
                 <div id="balanceRatioBuybackEnabled" class="hidden">
+                    <div class="mb-3">
+                        <div class="flex flex-wrap gap-2">
+                            <button class="attribute-tab tab-water" onclick="switchBuybackAttribute('water', 'balanceRatio')">💧 水</button>
+                            <button class="attribute-tab tab-wind" onclick="switchBuybackAttribute('wind', 'balanceRatio')">🌬️ 风</button>
+                            <button class="attribute-tab tab-fire" onclick="switchBuybackAttribute('fire', 'balanceRatio')">🔥 火</button>
+                            <button class="attribute-tab tab-dark" onclick="switchBuybackAttribute('dark', 'balanceRatio')">🌙 暗</button>
+                            <button class="attribute-tab tab-light" onclick="switchBuybackAttribute('light', 'balanceRatio')">☀️ 光</button>
+                            <button class="attribute-tab tab-all active" onclick="switchBuybackAttribute('all', 'balanceRatio')">全部</button>
+                        </div>
+                    </div>
                     <div id="userNftGridBalanceRatio" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-64 overflow-y-auto p-2 border-2 border-dashed border-gray-300 rounded-lg mb-6">
                         <div class="col-span-full text-center py-8">
                             <i class="fa fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
@@ -728,9 +772,46 @@
             });
         }
 
+        let buybackCurrentFilter = { growth: 'all', fixed: 'all', balanceRatio: 'all' };
+
+        window.switchBuybackAttribute = function(attr, mode) {
+            buybackCurrentFilter[mode] = attr;
+            
+            document.querySelectorAll(`#${mode === 'growth' ? 'growthBuybackEnabled' : mode === 'fixed' ? 'autoBuybackEnabled' : 'balanceRatioBuybackEnabled'} .attribute-tab`).forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            const gridId = mode === 'growth' ? 'userNftGridGrowth' : mode === 'fixed' ? 'userNftGridFixed' : 'userNftGridBalanceRatio';
+            const activeTab = document.querySelector(`#${mode === 'growth' ? 'growthBuybackEnabled' : mode === 'fixed' ? 'autoBuybackEnabled' : 'balanceRatioBuybackEnabled'} .tab-${attr}`);
+            if (activeTab) {
+                activeTab.classList.add('active');
+            }
+            
+            if (!allUserNFTs || allUserNFTs.length === 0) {
+                return;
+            }
+            
+            let filtered = allUserNFTs;
+            if (attr !== 'all') {
+                const attrIndexes = { water: 0, wind: 1, fire: 2, dark: 3, light: 4 };
+                const targetAttrIndex = attrIndexes[attr];
+                
+                if (targetAttrIndex !== undefined) {
+                    filtered = allUserNFTs.filter(nft => {
+                        const typeId = parseInt(nft.type, 10);
+                        const itemAttrIndex = Math.floor(typeId / 24);
+                        return itemAttrIndex === targetAttrIndex;
+                    });
+                }
+            }
+            
+            const grid = document.getElementById(gridId);
+            displayUserNfts(grid, filtered, mode);
+        }
+
         async function selectNftForGrowth(tokenId, type, level, mintTime) {
             const nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
-            const imagePath = `images/fu-cards/${nftInfo.elementPrefix}${nftInfo.animalKey}_${nftInfo.gender}.png`;
+            const imagePath = nftInfo.imagePath;
 
             selectedTokenIdGrowth = tokenId;
 
@@ -788,7 +869,7 @@
 
         function selectNftForFixed(tokenId, type) {
             const nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
-            const imagePath = `images/fu-cards/${nftInfo.elementPrefix}${nftInfo.animalKey}_${nftInfo.gender}.png`;
+            const imagePath = nftInfo.imagePath;
 
             selectedTokenIdFixed = tokenId;
 
@@ -852,7 +933,7 @@
 
         function selectNftForBalanceRatio(tokenId, type) {
             const nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
-            const imagePath = `images/fu-cards/${nftInfo.elementPrefix}${nftInfo.animalKey}_${nftInfo.gender}.png`;
+            const imagePath = nftInfo.imagePath;
 
             selectedTokenIdBalanceRatio = tokenId;
 

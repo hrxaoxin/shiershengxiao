@@ -144,19 +144,23 @@
 
     <main class="px-4 pt-6 pb-24 md:pl-28 md:pr-4">
         <div class="bg-white rounded-xl p-6 shadow-md mb-8">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-4">
-                        <i class="text-blue-500 text-xl">💰</i>
-                    </div>
-                    <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-gray-800">钱包信息</h3>
-                        <p class="text-sm text-gray-500" id="walletBtn">未连接钱包</p>
-                    </div>
+            <div class="flex items-center mb-6">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-4">
+                    <i class="text-blue-500 text-xl">💰</i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-gray-800">钱包信息</h3>
+                    <p class="text-sm text-gray-500" id="walletBtn">未连接钱包</p>
                 </div>
                 <button class="btn-primary text-sm" id="mobileConnectBtn" onclick="handleConnectWallet()">
                     <i class="fas fa-plug mr-1"></i> 连接钱包
                 </button>
+            </div>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">代币余额</span>
+                    <span class="text-lg font-semibold text-gray-800" id="tokenBalance">0</span>
+                </div>
             </div>
         </div>
 
@@ -353,7 +357,7 @@
             MARKET: '1'
         };
         
-        let nftContract, breedingCoreContract, breedingMarketContract;
+        let nftContract, breedingCoreContract, breedingMarketContract, tokenContract;
         let currentTab = 'self';
         let selectedMaleNFT = null;
         let selectedFemaleNFT = null;
@@ -564,6 +568,7 @@
                 } catch (e) {
                     return;
                 }
+                await updateWalletStatus();
                 await loadBreedingConstants();
                 await loadNFTs();
                 await loadMarketOrders();
@@ -603,6 +608,7 @@
                     } catch (e) {
                         return;
                     }
+                    await updateWalletStatus();
                     await loadBreedingConstants();
                     await loadNFTs();
                     await loadMarketOrders();
@@ -619,13 +625,30 @@
             nftContract = null;
             breedingCoreContract = null;
             breedingMarketContract = null;
+            tokenContract = null;
             try {
                 nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
                 breedingCoreContract = await window.ZODIAC_WEB3.getContract('breedingCore');
                 breedingMarketContract = await window.ZODIAC_WEB3.getContract('breedingMarket');
+                tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
                 ZODIAC_UI.showToast('合约初始化失败，请刷新重试', 'error');
+            }
+        }
+
+        async function updateWalletStatus() {
+            if (!account || !tokenContract) return;
+
+            try {
+                const web3 = window.ZODIAC_WEB3.getWeb3();
+                const balance = await tokenContract.methods.balanceOf(account).call();
+                const balanceInTokens = web3.utils.fromWei(balance, 'ether');
+                const balanceFormatted = parseFloat(balanceInTokens).toFixed(4);
+                document.getElementById('tokenBalance').textContent = balanceFormatted;
+            } catch (error) {
+                console.error('更新代币余额失败:', error);
+                document.getElementById('tokenBalance').textContent = '0';
             }
         }
 
