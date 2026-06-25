@@ -787,17 +787,17 @@
                 activeTab.classList.add('active');
             }
             
-            if (!allUserNFTs || allUserNFTs.length === 0) {
+            if (!userNfts || userNfts.length === 0) {
                 return;
             }
             
-            let filtered = allUserNFTs;
+            let filtered = userNfts;
             if (attr !== 'all') {
                 const attrIndexes = { water: 0, wind: 1, fire: 2, dark: 3, light: 4 };
                 const targetAttrIndex = attrIndexes[attr];
                 
                 if (targetAttrIndex !== undefined) {
-                    filtered = allUserNFTs.filter(nft => {
+                    filtered = userNfts.filter(nft => {
                         const typeId = parseInt(nft.type, 10);
                         const itemAttrIndex = Math.floor(typeId / 24);
                         return itemAttrIndex === targetAttrIndex;

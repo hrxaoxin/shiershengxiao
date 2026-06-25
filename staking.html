@@ -129,16 +129,14 @@
 
     <main class="px-4 pt-6 pb-24 md:pl-28 md:pr-4">
         <div class="bg-white rounded-xl p-6 shadow-md mb-8">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center">
-                    <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-4">
-                        <i class="text-blue-500 text-xl">💰</i>
-                    </div>
-                    <div class="flex-1">
-                        <h3 class="text-lg font-semibold text-gray-800">钱包信息</h3>
-                        <p class="text-sm text-gray-500" id="walletAddress">未连接钱包</p>
-                        <p class="text-xs text-gray-400" id="connectionStatus">请点击连接钱包按钮</p>
-                    </div>
+            <div class="flex items-center mb-6">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mr-4">
+                    <i class="text-blue-500 text-xl">💰</i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-gray-800">钱包信息</h3>
+                    <p class="text-sm text-gray-500" id="walletAddress">未连接钱包</p>
+                    <p class="text-xs text-gray-400" id="connectionStatus">请点击连接钱包按钮</p>
                 </div>
                 <div class="flex space-x-2">
                     <button class="btn-primary text-sm" id="connectWalletBtn">
@@ -147,6 +145,12 @@
                     <button class="btn-secondary text-sm" id="refreshWallet">
                         <i class="fas fa-sync-alt mr-1"></i> 刷新
                     </button>
+                </div>
+            </div>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <span class="text-gray-600">代币余额</span>
+                    <span class="text-lg font-semibold text-gray-800" id="stakingTokenBalance">0</span>
                 </div>
             </div>
         </div>
@@ -438,6 +442,7 @@
             ZODIAC_UI.initWalletButton('connectWalletBtnDesktop', 'walletAddressDesktop', null);
             ZODIAC_WEB3.on('connect', async () => {
                 await initContracts();
+                await updateWalletStatus();
                 await loadStakingConstants();
                 await loadEligibleNFTs();
                 await loadMyStakes();
@@ -460,6 +465,7 @@
                 web3 = window.ZODIAC_WEB3.getWeb3();
                 updateWalletButton();
                 await initContracts();
+                await updateWalletStatus();
                 await loadStakingConstants();
                 await loadEligibleNFTs();
                 await loadMyStakes();
@@ -571,6 +577,20 @@
             }
         }
 
+        async function updateWalletStatus() {
+            if (!account || !tokenContract) return;
+
+            try {
+                const balance = await tokenContract.methods.balanceOf(account).call();
+                const balanceInTokens = web3.utils.fromWei(balance, 'ether');
+                const balanceFormatted = parseFloat(balanceInTokens).toFixed(4);
+                document.getElementById('stakingTokenBalance').textContent = balanceFormatted;
+            } catch (error) {
+                console.error('更新代币余额失败:', error);
+                document.getElementById('stakingTokenBalance').textContent = '0';
+            }
+        }
+
         async function loadStakingConstants() {
             try {
                 const minDuration = await stakingContract.methods.minStakingDuration().call();
@@ -629,23 +649,40 @@
             const eligibleNFTs = document.getElementById('eligibleNFTs');
 
             try {
-                const eligible = [];
-
                 const tokenIds = await nftContract.methods.getTokenIdsByOwner(account).call();
-                for (const tokenId of tokenIds) {
-                    const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
-                    const tokenType = await nftContract.methods.tokenType(tokenId).call();
+                
+                const nftPromises = tokenIds.map(tokenId => {
+                    return Promise.all([
+                        nftContract.methods.tokenLevel(tokenId).call(),
+                        nftContract.methods.tokenType(tokenId).call(),
+                        nftContract.methods.tokenGrowth(tokenId).call(),
+                        stakingContract.methods.getStakingInfo(tokenId).call()
+                    ]).then(([tokenLevel, tokenType, growth, stakeInfo]) => ({
+                        tokenId: tokenId.toString(),
+                        level: tokenLevel.toString(),
+                        type: tokenType.toString(),
+                        growth: parseInt(growth, 10),
+                        stakeInfo: stakeInfo
+                    })).catch(e => {
+                        console.warn(`获取NFT ${tokenId} 详情失败:`, e);
+                        return null;
+                    });
+                });
 
-                    if (await isNFTLevelEligible(tokenLevel)) {
-                        // 检查是否已质押
-                        const stakeInfo = await stakingContract.methods.getStakingInfo(tokenId).call();
-                        if (stakeInfo.owner === '0x0000000000000000000000000000000000000000') {
-                            const nftInfo = getNFTInfo(tokenType);
-                            const isRare = isNFTRare(tokenType);
+                const results = await Promise.all(nftPromises);
+                const nfts = results.filter(nft => nft !== null);
+
+                const eligible = [];
+                for (const nft of nfts) {
+                    if (await isNFTLevelEligible(nft.level)) {
+                        if (nft.stakeInfo.owner === '0x0000000000000000000000000000000000000000') {
+                            const nftInfo = getNFTInfo(nft.type);
+                            const isRare = isNFTRare(nft.type);
                             eligible.push({
-                                id: tokenId.toString(),
-                                type: tokenType.toString(),
-                                level: tokenLevel.toString(),
+                                id: nft.tokenId,
+                                type: nft.type,
+                                level: nft.level,
+                                growth: nft.growth,
                                 image: nftInfo.imagePath,
                                 name: nftInfo.name,
                                 isRare: isRare
@@ -665,10 +702,14 @@
                     const rarityClass = nft.isRare ? 'rarity-rare' : 'rarity-normal';
                     const rarityLabel = nft.isRare ? '稀有' : '普通';
                     html += `
-                        <div class="nft-card" onclick="toggleNFTSelection('${nft.id}')" data-token-id="${nft.id}">
+                        <div class="nft-card relative" onclick="toggleNFTSelection('${nft.id}')" data-token-id="${nft.id}">
+                            <button onclick="event.stopPropagation(); showNFTModal(${nft.id}, ${nft.type}, ${nft.level}, '${nft.name}', '${nft.image}')" class="info-btn absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-colors z-10" title="查看详情">
+                                <i class="fas fa-info text-blue-600 text-xs"></i>
+                            </button>
                             <img src="${nft.image}" alt="${nft.name}" class="w-full aspect-square object-contain mb-2" onerror="this.src='images/fu-cards/shuishu_1.png'">
                             <p class="text-gray-800 text-sm truncate">${nft.name}</p>
                             <p class="text-gray-500 text-xs">${getStars(nft.level)}</p>
+                            <p class="text-gray-400 text-xs">成长值: ${nft.growth}</p>
                             <span class="rarity-badge ${rarityClass}">${rarityLabel}</span>
                             <p class="text-gray-400 text-xs mt-1">ID: ${nft.id}</p>
                         </div>
@@ -697,30 +738,50 @@
 
                 document.getElementById('myStakedCount').textContent = tokenIds.length;
 
+                const stakePromises = tokenIds.map(tokenId => {
+                    return Promise.all([
+                        stakingContract.methods.getStakingInfo(tokenId).call(),
+                        nftContract.methods.tokenType(tokenId).call(),
+                        nftContract.methods.tokenLevel(tokenId).call(),
+                        nftContract.methods.tokenGrowth(tokenId).call()
+                    ]).then(([stakeInfo, tokenType, tokenLevel, growth]) => ({
+                        tokenId: tokenId.toString(),
+                        stakeInfo: stakeInfo,
+                        type: tokenType.toString(),
+                        level: tokenLevel.toString(),
+                        growth: parseInt(growth, 10)
+                    })).catch(e => {
+                        console.warn(`获取质押NFT ${tokenId} 详情失败:`, e);
+                        return null;
+                    });
+                });
+
+                const results = await Promise.all(stakePromises);
+                const stakes = results.filter(s => s !== null);
+
                 let html = '';
-                for (const tokenId of tokenIds) {
-                    const stakeInfo = await stakingContract.methods.getStakingInfo(tokenId).call();
-                    const tokenType = await nftContract.methods.tokenType(tokenId).call();
-                    const tokenLevel = await nftContract.methods.tokenLevel(tokenId).call();
-                    const nftInfo = getNFTInfo(tokenType);
-                    const weight = stakeInfo.isRare ? document.getElementById('rareWeight').textContent : document.getElementById('normalWeight').textContent;
+                for (const stake of stakes) {
+                    const nftInfo = getNFTInfo(stake.type);
+                    const isRare = isNFTRare(stake.type);
+                    const weight = isRare ? document.getElementById('rareWeight').textContent : document.getElementById('normalWeight').textContent;
 
                     html += `
-                        <div class="stake-card nft-card-hover" data-nft-typeid="${tokenType}" data-nft-tokenid="${tokenId}" data-nft-level="${tokenLevel}">
+                        <div class="stake-card nft-card-hover" data-nft-typeid="${stake.type}" data-nft-tokenid="${stake.tokenId}" data-nft-level="${stake.level}">
                             <div class="flex items-center gap-4 mb-4">
                                 <img src="${nftInfo.imagePath}" alt="${nftInfo.name}" class="w-16 h-16 object-contain" onerror="this.src='images/fu-cards/shuishu_1.png'">
                                 <div class="flex-1">
                                     <h4 class="text-lg font-bold text-gray-800">${nftInfo.name}</h4>
-                                    <p class="text-gray-500">等级: ${getStars(tokenLevel)}</p>
-                                    <p class="text-gray-400 text-xs">ID: ${tokenId}</p>
+                                    <p class="text-gray-500">等级: ${getStars(stake.level)}</p>
+                                    <p class="text-gray-400 text-xs">ID: ${stake.tokenId}</p>
                                     <p class="text-gray-500 text-sm">权重: ${weight}</p>
+                                    <p class="text-gray-400 text-xs">成长值: ${stake.growth}</p>
                                 </div>
                             </div>
                             <div class="flex justify-between items-center mb-4">
                                 <span class="text-gray-600">质押时间</span>
-                                <span class="text-gray-800 font-medium">${formatStakingTime(stakeInfo.stakeTime)}</span>
+                                <span class="text-gray-800 font-medium">${formatStakingTime(stake.stakeInfo.stakeTime)}</span>
                             </div>
-                            <button class="btn-secondary w-full" onclick="unstakeNFT('${tokenId}')">
+                            <button class="btn-secondary w-full" onclick="unstakeNFT('${stake.tokenId}')">
                                 赎回NFT
                             </button>
                         </div>
@@ -883,9 +944,11 @@
             try {
                 const stakingAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.staking;
                 
+                const tokenIdsNum = selectedNFTs.map(id => parseInt(id, 10));
+                
                 const batchSize = 10;
-                for (let i = 0; i < selectedNFTs.length; i += batchSize) {
-                    const batch = selectedNFTs.slice(i, i + batchSize);
+                for (let i = 0; i < tokenIdsNum.length; i += batchSize) {
+                    const batch = tokenIdsNum.slice(i, i + batchSize);
                     
                     for (const tokenId of batch) {
                         const isStaked = await checkAlreadyStaked(tokenId);
@@ -913,7 +976,7 @@
                     }
                 }
 
-                await ZODIAC_WEB3.stake(selectedNFTs);
+                await ZODIAC_WEB3.stake(tokenIdsNum);
 
                 ZODIAC_UI.showToast('质押成功！', 'success');
                 selectedNFTs = [];
