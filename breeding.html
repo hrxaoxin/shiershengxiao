@@ -631,6 +631,11 @@
 
         async function loadBreedingConstants() {
             try {
+                if (!breedingCoreContract) {
+                    console.warn('breedingCoreContract is null, skipping loadBreedingConstants');
+                    return;
+                }
+                
                 selfBreedingCooldown = parseInt(await breedingCoreContract.methods.selfBreedingCooldown().call(), 10);
                 marketBreedingCooldown = parseInt(await breedingCoreContract.methods.marketBreedingCooldown().call(), 10);
                 
@@ -643,8 +648,10 @@
                 document.getElementById('marketBreedingCooldown').textContent = formatDuration(marketBreedingCooldown);
                 document.getElementById('selfBreedingFee').textContent = selfFee;
                 document.getElementById('marketBreedingFee').textContent = marketFee;
+                console.log('孕育常量加载成功:', { selfBreedingCooldown, marketBreedingCooldown, selfFee, marketFee });
             } catch (error) {
                 console.error('加载孕育常量失败:', error);
+                ZODIAC_UI.showToast('加载孕育配置失败: ' + (error.message || '未知错误'), 'error');
             }
         }
 
