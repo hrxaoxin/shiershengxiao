@@ -931,12 +931,10 @@
             if (levelNum < 5) {
                 const upgradeToLevel = levelNum + 1;
                 const requiredUSDWei = await getUSDValue(upgradeToLevel);
-                // 确保字符串转换，防止 web3.js BN 对象导致 BigInt 错误
                 const usdWeiBigInt = BigInt(String(requiredUSDWei));
-                // 使用浮点除法（非BigInt除法），因为USDT值可能小于1，BigInt整数除法会截断为0
-                const requiredUSD = Number(usdWeiBigInt) / 1e18;
+                const requiredUSD = bigIntToDecimal(usdWeiBigInt, 18);
                 console.log('selectNFT - level:', levelNum, 'upgradeToLevel:', upgradeToLevel, 'requiredUSDWei:', requiredUSDWei, 'requiredUSD:', requiredUSD);
-               requiredUSDDisplay = requiredUSD.toFixed(4) + ' USDT';
+                requiredUSDDisplay = requiredUSD.toFixed(4) + ' USDT';
                 
                 try {
                 // 直接使用配置创建合约实例，避免依赖 ZODIAC_WEB3
@@ -1019,9 +1017,9 @@
                 
                 if (userNFTsCache) {
                     for (let i = 0; i < userNFTsCache.tokens.length; i++) {
-                        if (userNFTsCache.types[i] === type.toString()) {
+                        if (String(userNFTsCache.types[i]) === String(type)) {
                             sameTypeCount++;
-                            if (userNFTsCache.levels[i] === level.toString()) {
+                            if (String(userNFTsCache.levels[i]) === String(level)) {
                                 sameLevelCount++;
                             }
                         }
@@ -1384,10 +1382,8 @@
             
             const requiredUSDWei = await getUSDValue(levelNum);
             console.log('handleUpgradeWithUSDValue - requiredUSDWei:', requiredUSDWei);
-            // 确保字符串转换，防止 web3.js BN 对象导致 BigInt 报错
             const usdWeiBigInt = BigInt(String(requiredUSDWei));
-            // 使用浮点除法（非BigInt除法），因为USDT值可能小于1，BigInt整数除法会截断为0
-            const requiredUSD = Number(usdWeiBigInt) / 1e18;
+            const requiredUSD = bigIntToDecimal(usdWeiBigInt, 18);
             console.log('handleUpgradeWithUSDValue - requiredUSD:', requiredUSD);
             
             const nftId = parseInt(selectedNft.id, 10);

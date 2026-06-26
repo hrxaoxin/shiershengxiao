@@ -244,6 +244,37 @@
 
     <main class="battle-arena pt-10 pb-24 md:pl-28 md:pr-4 px-4">
         <div class="container mx-auto max-w-7xl">
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-6">
+                <div class="flex items-center mb-6">
+                    <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-4">
+                        <i class="text-white text-xl">💰</i>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="text-lg font-semibold text-white">钱包信息</h3>
+                        <p class="text-sm text-gray-300" id="walletAddress">未连接钱包</p>
+                        <p class="text-xs text-gray-400" id="connectionStatus">请点击连接钱包按钮</p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button class="btn-primary text-sm px-4 py-2 rounded-lg text-white font-medium" id="connectWalletBtn"><i class="fas fa-plug mr-1"></i> 连接</button>
+                        <button class="bg-white/10 text-sm px-4 py-2 rounded-lg text-white font-medium border border-white/20 hover:bg-white/20" id="refreshWallet"><i class="fas fa-sync-alt mr-1"></i> 刷新</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-white/5 rounded-lg p-3 text-center">
+                        <span class="text-gray-400 text-sm">代币余额</span>
+                        <div class="text-lg font-semibold text-white" id="tokenBalance">0</div>
+                    </div>
+                    <div class="bg-white/5 rounded-lg p-3 text-center">
+                        <span class="text-gray-400 text-sm">授权状态</span>
+                        <div class="text-lg font-semibold text-white" id="approvalStatus">未授权</div>
+                    </div>
+                    <div class="bg-white/5 rounded-lg p-3 text-center">
+                        <span class="text-gray-400 text-sm">充值价格</span>
+                        <div class="text-lg font-semibold text-white" id="rechargeCostDisplay">888 代币</div>
+                    </div>
+                </div>
+            </div>
+
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div class="lg:col-span-2 space-y-6">
                     <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
@@ -716,6 +747,7 @@
         let arenaRankingQueryContract;
         let arenaRewardContract;
         let arenaRewardLPContract;
+        let tokenContract;
         
         let matchRound = 1;
         let attackerMatchWins = 0;
@@ -1000,9 +1032,12 @@
                     accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
                     document.getElementById('walletAddress').textContent = shortenAddress(accounts[0]);
                     document.getElementById('walletAddress').classList.remove('hidden');
+                    document.getElementById('connectionStatus').textContent = '已连接';
                     document.getElementById('connectWalletBtn').textContent = '已连接';
                     
                     await initContracts();
+                    await updateTokenBalance();
+                    await updateApprovalStatus();
                     await loadMyNfts();
                     await loadLeaderboard();
                     await loadMyStats();
@@ -1020,6 +1055,35 @@
             }
         }
 
+        async function updateTokenBalance() {
+            if (!accounts.length || !tokenContract) return;
+            try {
+                const balance = await tokenContract.methods.balanceOf(accounts[0]).call();
+                const balanceInTokens = web3.utils.fromWei(balance, 'ether');
+                document.getElementById('tokenBalance').textContent = parseFloat(balanceInTokens).toFixed(4);
+            } catch (error) {
+                console.error('更新代币余额失败:', error);
+                document.getElementById('tokenBalance').textContent = '0.0000';
+            }
+        }
+
+        async function updateApprovalStatus() {
+            if (!accounts.length || !tokenContract) return;
+            try {
+                const allowance = await tokenContract.methods.allowance(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer).call();
+                if (BigInt(allowance) > 0n) {
+                    document.getElementById('approvalStatus').textContent = '已授权';
+                    document.getElementById('approvalStatus').className = 'text-lg font-semibold text-green-400';
+                } else {
+                    document.getElementById('approvalStatus').textContent = '未授权';
+                    document.getElementById('approvalStatus').className = 'text-lg font-semibold text-red-400';
+                }
+            } catch (error) {
+                console.error('更新授权状态失败:', error);
+                document.getElementById('approvalStatus').textContent = '未知';
+            }
+        }
+
         async function initContracts() {
             const config = ZODIAC_CONFIG;
             battleContract = new web3.eth.Contract(config.ABIS.battleABI, config.CONTRACT_ADDRESSES.battle);
@@ -1030,6 +1094,7 @@
             arenaRewardContract = new web3.eth.Contract(config.ABIS.arenaRewardABI, config.CONTRACT_ADDRESSES.arenaReward);
             arenaRewardLPContract = new web3.eth.Contract(config.ABIS.arenaRewardLPABI, config.CONTRACT_ADDRESSES.arenaRewardLP);
             nftContract = new web3.eth.Contract(config.ABIS.nftMintABI, config.CONTRACT_ADDRESSES.nftMint);
+            tokenContract = new web3.eth.Contract(config.ABIS.tokenABI, config.CONTRACT_ADDRESSES.token);
             await loadArenaConfig();
         }
 
@@ -1379,8 +1444,16 @@
                 const currentTeam = await arenaPlayerContract.methods.getPlayerBattleTeam(accounts[0]).call();
                 const existingTokens = currentTeam.filter(id => id !== '0' && id !== 0);
                 if (existingTokens.length > 0) {
-                    ZODIAC_UI.showToast('您已经设置了战队，请先清除后再重新设置', 'warning');
-                    return;
+                    const confirm = await ZODIAC_UI.showConfirmModal(
+                        '替换战队',
+                        '您已经设置了战队，确定要替换为新战队吗？旧战队中的NFT将被解除质押。',
+                        { confirmText: '确认替换' }
+                    );
+                    if (!confirm) return;
+                    
+                    ZODIAC_UI.showLoading('正在清除旧战队...');
+                    await ZODIAC_WEB3.clearArenaTeam();
+                    await ZODIAC_WEB3.unstakeArenaNFTs(existingTokens);
                 }
                 
                 const tokenIds = battleTeam.map(nft => nft.tokenId);
@@ -1585,9 +1658,9 @@
         async function loadMyStats() {
             try {
                 const playerRecord = await arenaBattleContract.methods.players(accounts[0]).call();
-                const points = playerRecord.score || '0';
-                const wins = playerRecord.wins || '0';
-                const losses = playerRecord.losses || '0';
+                const points = playerRecord.score || playerRecord[0] || '0';
+                const wins = playerRecord.wins || playerRecord[1] || '0';
+                const losses = playerRecord.losses || playerRecord[2] || '0';
 
                 document.getElementById('myPoints').textContent = points;
                 document.getElementById('myWins').textContent = wins;
@@ -1598,7 +1671,14 @@
                 const total = totalWins + totalLosses;
                 const winRate = total > 0 ? ((totalWins / total) * 100).toFixed(1) + '%' : '-';
                 document.getElementById('myWinRate').textContent = winRate;
-                document.getElementById('myRank').textContent = '-';
+
+                try {
+                    const userRank = await arenaRankingQueryContract.methods.getPlayerRank(accounts[0]).call();
+                    const userRankNum = parseInt(userRank) || 0;
+                    document.getElementById('myRank').textContent = userRankNum > 0 ? '#' + userRankNum : '-';
+                } catch (e) {
+                    document.getElementById('myRank').textContent = '-';
+                }
             } catch (error) {
                 console.error('加载战绩失败:', error);
                 document.getElementById('myPoints').textContent = '0';

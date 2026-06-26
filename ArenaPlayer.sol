@@ -156,6 +156,9 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         __ReentrancyGuard_init();
         __Pausable_init();
         authorizer = _authorizerAddress;
+        
+        maxRechargeAttempts = 5;
+        rechargeCost = 888 * 10**18;
     }
     
     /**

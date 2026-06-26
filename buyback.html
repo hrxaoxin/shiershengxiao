@@ -880,6 +880,8 @@
                 await loadBalanceRatioPrice(tokenId);
                 document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(balanceRatioPrice) + ' 代币';
                 document.getElementById('sellWithBalanceRatioBtn').disabled = false;
+            } else {
+                await loadBalanceRatioPrice(tokenId);
             }
 
             holdingDaysRefreshInterval = setInterval(() => {
@@ -979,13 +981,11 @@
                     return calculateGrowthPriceFallback(level, isRare, holdingDays);
                 }
 
-                const fallback = calculateGrowthPriceFallback(level, isRare, holdingDays);
-                
                 return {
                     basePrice: basePrice,
-                    bonusPercent: fallback.bonusPercent,
-                    finalPrice: String(Math.floor((parseFloat(web3.utils.fromWei(basePrice, 'ether')) * (1 + fallback.bonusPercent / 100)) * 10**18)),
-                    daysToMax: fallback.daysToMax,
+                    bonusPercent: bonusPercent,
+                    finalPrice: finalPrice,
+                    daysToMax: daysToMax,
                     holdingDays: holdingDays
                 };
             } catch (error) {

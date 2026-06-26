@@ -177,6 +177,11 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
+        
+        maxBuybackMultiplier = 110;
+        fixedBuybackOpen = false;
+        growthBuybackOpen = false;
+        balanceRatioBuybackOpen = false;
     }
 
     /**
