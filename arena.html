@@ -806,96 +806,120 @@
         };
 
         async function init() {
-            const connectBtn = document.getElementById('connectWalletBtn');
-            if (connectBtn) {
-                connectBtn.addEventListener('click', connectWallet);
+            try {
+                const connectBtn = document.getElementById('connectWalletBtn');
+                if (connectBtn) {
+                    connectBtn.addEventListener('click', connectWallet);
+                }
+                document.getElementById('challengeBtn')?.addEventListener('click', executeRealChallenge);
+                document.getElementById('mobileChallengeBtn')?.addEventListener('click', executeRealChallenge);
+                document.getElementById('closeBattleModal')?.addEventListener('click', () => {
+                    calculateBattleResult();
+                    document.getElementById('battleModal')?.classList.add('hidden');
+                    matchRound = 1;
+                    attackerMatchWins = 0;
+                    defenderMatchWins = 0;
+                    selectedOpponent = null;
+                    const oppTeam = document.getElementById('opponentBattleTeam');
+                    if (oppTeam) oppTeam.innerHTML = '<div class="text-gray-500 text-center py-8">请选择对手</div>';
+                    const chalBtn = document.getElementById('challengeBtn');
+                    if (chalBtn) chalBtn.disabled = true;
+                    loadLeaderboard();
+                });
+                document.getElementById('skipBtn')?.addEventListener('click', () => {
+                    const skipBtn = document.getElementById('skipBtn');
+                    if (skipBtn) {
+                        skipBtn.disabled = true;
+                        skipBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    }
+                    const mobileSkipBtn = document.getElementById('mobileSkipBtn');
+                    if (mobileSkipBtn) {
+                        mobileSkipBtn.style.display = 'none';
+                    }
+                    isBattleSkipped = true;
+                });
+                document.getElementById('mobileSkipBtn')?.addEventListener('click', () => {
+                    const mobileSkipBtn = document.getElementById('mobileSkipBtn');
+                    if (mobileSkipBtn) mobileSkipBtn.style.display = 'none';
+                    const skipBtn = document.getElementById('skipBtn');
+                    if (skipBtn) {
+                        skipBtn.disabled = true;
+                        skipBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    }
+                    isBattleSkipped = true;
+                });
+                document.getElementById('fightBtn')?.addEventListener('click', startBattle);
+                document.getElementById('mobileFightBtn')?.addEventListener('click', startBattle);
+                document.getElementById('closeBattleBtn')?.addEventListener('click', function() {
+                    calculateBattleResult();
+                    document.getElementById('battleModal')?.classList.add('hidden');
+                    matchRound = 1;
+                    attackerMatchWins = 0;
+                    defenderMatchWins = 0;
+                    selectedOpponent = null;
+                    const oppTeam = document.getElementById('opponentBattleTeam');
+                    if (oppTeam) oppTeam.innerHTML = '<div class="text-gray-500 text-center py-8">请选择对手</div>';
+                    const chalBtn = document.getElementById('challengeBtn');
+                    if (chalBtn) chalBtn.disabled = true;
+                    loadLeaderboard();
+                });
+                document.getElementById('clearBattleTeamBtn')?.addEventListener('click', clearBattleTeam);
+                document.getElementById('saveBattleTeamBtn')?.addEventListener('click', saveBattleTeam);
+                document.getElementById('rechargeBtn')?.addEventListener('click', rechargeAttempts);
+                document.getElementById('mobileCloseBattleBtn')?.addEventListener('click', function() {
+                    calculateBattleResult();
+                    document.getElementById('battleModal')?.classList.add('hidden');
+                    matchRound = 1;
+                    attackerMatchWins = 0;
+                    defenderMatchWins = 0;
+                    selectedOpponent = null;
+                    const oppTeam = document.getElementById('opponentBattleTeam');
+                    if (oppTeam) oppTeam.innerHTML = '<div class="text-gray-500 text-center py-8">请选择对手</div>';
+                    const chalBtn = document.getElementById('challengeBtn');
+                    if (chalBtn) chalBtn.disabled = true;
+                    loadLeaderboard();
+                });
+                
+                // 分页事件监听
+                document.getElementById('prevPage')?.addEventListener('click', function() {
+                    if (currentPage > 1) {
+                        loadLeaderboard(currentPage - 1, pageSize);
+                    }
+                });
+                
+                document.getElementById('nextPage')?.addEventListener('click', function() {
+                    if (currentPage < totalPages) {
+                        loadLeaderboard(currentPage + 1, pageSize);
+                    }
+                });
+                
+                document.getElementById('pageSizeSelect')?.addEventListener('change', function(e) {
+                    pageSize = parseInt(e.target.value);
+                    currentPage = 1;
+                    loadLeaderboard(1, pageSize);
+                });
+                
+                const refreshBtn = document.getElementById('refreshWallet');
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', async () => {
+                        await updateTokenBalance();
+                        await updateApprovalStatus();
+                    });
+                }
+                
+                try {
+                    setupEventListeners();
+                } catch (e) {
+                    console.warn('设置事件监听器失败:', e);
+                }
+                
+                renderTeamSlots();
+                updateSaveButtons();
+                updateChallengeBtn();
+                loadLeaderboard();
+            } catch (e) {
+                console.error('init 函数执行失败:', e);
             }
-            document.getElementById('challengeBtn').addEventListener('click', executeRealChallenge);
-            document.getElementById('mobileChallengeBtn')?.addEventListener('click', executeRealChallenge);
-            document.getElementById('closeBattleModal').addEventListener('click', () => {
-                calculateBattleResult();
-                document.getElementById('battleModal').classList.add('hidden');
-                matchRound = 1;
-                attackerMatchWins = 0;
-                defenderMatchWins = 0;
-                selectedOpponent = null;
-                document.getElementById('opponentBattleTeam').innerHTML = '<div class="text-gray-500 text-center py-8">请选择对手</div>';
-                document.getElementById('challengeBtn').disabled = true;
-                loadLeaderboard();
-            });
-            document.getElementById('skipBtn').addEventListener('click', () => {
-                const skipBtn = document.getElementById('skipBtn');
-                skipBtn.disabled = true;
-                skipBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                const mobileSkipBtn = document.getElementById('mobileSkipBtn');
-                if (mobileSkipBtn) {
-                    mobileSkipBtn.style.display = 'none';
-                }
-                isBattleSkipped = true;
-            });
-            document.getElementById('mobileSkipBtn')?.addEventListener('click', () => {
-                const mobileSkipBtn = document.getElementById('mobileSkipBtn');
-                mobileSkipBtn.style.display = 'none';
-                const skipBtn = document.getElementById('skipBtn');
-                if (skipBtn) {
-                    skipBtn.disabled = true;
-                    skipBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                }
-                isBattleSkipped = true;
-            });
-            document.getElementById('fightBtn').addEventListener('click', startBattle);
-            document.getElementById('mobileFightBtn')?.addEventListener('click', startBattle);
-            document.getElementById('closeBattleBtn').addEventListener('click', function() {
-                calculateBattleResult();
-                document.getElementById('battleModal').classList.add('hidden');
-                matchRound = 1;
-                attackerMatchWins = 0;
-                defenderMatchWins = 0;
-                selectedOpponent = null;
-                document.getElementById('opponentBattleTeam').innerHTML = '<div class="text-gray-500 text-center py-8">请选择对手</div>';
-                document.getElementById('challengeBtn').disabled = true;
-                loadLeaderboard();
-            });
-            document.getElementById('clearBattleTeamBtn').addEventListener('click', clearBattleTeam);
-            document.getElementById('saveBattleTeamBtn').addEventListener('click', saveBattleTeam);
-            document.getElementById('rechargeBtn').addEventListener('click', rechargeAttempts);
-            document.getElementById('mobileCloseBattleBtn')?.addEventListener('click', function() {
-                calculateBattleResult();
-                document.getElementById('battleModal').classList.add('hidden');
-                matchRound = 1;
-                attackerMatchWins = 0;
-                defenderMatchWins = 0;
-                selectedOpponent = null;
-                document.getElementById('opponentBattleTeam').innerHTML = '<div class="text-gray-500 text-center py-8">请选择对手</div>';
-                document.getElementById('challengeBtn').disabled = true;
-                loadLeaderboard();
-            });
-            
-            // 分页事件监听
-            document.getElementById('prevPage').addEventListener('click', function() {
-                if (currentPage > 1) {
-                    loadLeaderboard(currentPage - 1, pageSize);
-                }
-            });
-            
-            document.getElementById('nextPage').addEventListener('click', function() {
-                if (currentPage < totalPages) {
-                    loadLeaderboard(currentPage + 1, pageSize);
-                }
-            });
-            
-            document.getElementById('pageSizeSelect').addEventListener('change', function(e) {
-                pageSize = parseInt(e.target.value);
-                currentPage = 1;
-                loadLeaderboard(1, pageSize);
-            });
-            
-            setupEventListeners();
-            
-            renderTeamSlots();
-            updateSaveButtons();
-            updateChallengeBtn();
-            loadLeaderboard();
         }
 
         let arenaUnsubscribeFunctions = [];
@@ -1086,16 +1110,63 @@
 
         async function initContracts() {
             const config = ZODIAC_CONFIG;
-            battleContract = new web3.eth.Contract(config.ABIS.battleABI, config.CONTRACT_ADDRESSES.battle);
-            arenaContract = new web3.eth.Contract(config.ABIS.arenaABI, config.CONTRACT_ADDRESSES.arena);
-            arenaPlayerContract = new web3.eth.Contract(config.ABIS.arenaPlayerABI, config.CONTRACT_ADDRESSES.arenaPlayer);
-            arenaBattleContract = new web3.eth.Contract(config.ABIS.arenaBattleABI, config.CONTRACT_ADDRESSES.arenaBattle);
-            arenaRankingQueryContract = new web3.eth.Contract(config.ABIS.arenaRankingQueryABI, config.CONTRACT_ADDRESSES.arenaRankingQuery);
-            arenaRewardContract = new web3.eth.Contract(config.ABIS.arenaRewardABI, config.CONTRACT_ADDRESSES.arenaReward);
-            arenaRewardLPContract = new web3.eth.Contract(config.ABIS.arenaRewardLPABI, config.CONTRACT_ADDRESSES.arenaRewardLP);
-            nftContract = new web3.eth.Contract(config.ABIS.nftMintABI, config.CONTRACT_ADDRESSES.nftMint);
-            tokenContract = new web3.eth.Contract(config.ABIS.tokenABI, config.CONTRACT_ADDRESSES.tokenContract);
-            await loadArenaConfig();
+            try {
+                if (config.ABIS.battleABI && config.CONTRACT_ADDRESSES.battle) {
+                    battleContract = new web3.eth.Contract(config.ABIS.battleABI, config.CONTRACT_ADDRESSES.battle);
+                }
+            } catch (e) { console.warn('Failed to init battleContract:', e.message); }
+            
+            try {
+                if (config.ABIS.arenaABI && config.CONTRACT_ADDRESSES.arena) {
+                    arenaContract = new web3.eth.Contract(config.ABIS.arenaABI, config.CONTRACT_ADDRESSES.arena);
+                }
+            } catch (e) { console.warn('Failed to init arenaContract:', e.message); }
+            
+            try {
+                if (config.ABIS.arenaPlayerABI && config.CONTRACT_ADDRESSES.arenaPlayer) {
+                    arenaPlayerContract = new web3.eth.Contract(config.ABIS.arenaPlayerABI, config.CONTRACT_ADDRESSES.arenaPlayer);
+                }
+            } catch (e) { console.warn('Failed to init arenaPlayerContract:', e.message); }
+            
+            try {
+                if (config.ABIS.arenaBattleABI && config.CONTRACT_ADDRESSES.arenaBattle) {
+                    arenaBattleContract = new web3.eth.Contract(config.ABIS.arenaBattleABI, config.CONTRACT_ADDRESSES.arenaBattle);
+                }
+            } catch (e) { console.warn('Failed to init arenaBattleContract:', e.message); }
+            
+            try {
+                if (config.ABIS.arenaRankingQueryABI && config.CONTRACT_ADDRESSES.arenaRankingQuery) {
+                    arenaRankingQueryContract = new web3.eth.Contract(config.ABIS.arenaRankingQueryABI, config.CONTRACT_ADDRESSES.arenaRankingQuery);
+                }
+            } catch (e) { console.warn('Failed to init arenaRankingQueryContract:', e.message); }
+            
+            try {
+                if (config.ABIS.arenaRewardABI && config.CONTRACT_ADDRESSES.arenaReward) {
+                    arenaRewardContract = new web3.eth.Contract(config.ABIS.arenaRewardABI, config.CONTRACT_ADDRESSES.arenaReward);
+                }
+            } catch (e) { console.warn('Failed to init arenaRewardContract:', e.message); }
+            
+            try {
+                if (config.ABIS.arenaRewardLPABI && config.CONTRACT_ADDRESSES.arenaRewardLP) {
+                    arenaRewardLPContract = new web3.eth.Contract(config.ABIS.arenaRewardLPABI, config.CONTRACT_ADDRESSES.arenaRewardLP);
+                }
+            } catch (e) { console.warn('Failed to init arenaRewardLPContract:', e.message); }
+            
+            try {
+                if (config.ABIS.nftMintABI && config.CONTRACT_ADDRESSES.nftMint) {
+                    nftContract = new web3.eth.Contract(config.ABIS.nftMintABI, config.CONTRACT_ADDRESSES.nftMint);
+                }
+            } catch (e) { console.warn('Failed to init nftContract:', e.message); }
+            
+            try {
+                if (config.ABIS.tokenABI && config.CONTRACT_ADDRESSES.tokenContract) {
+                    tokenContract = new web3.eth.Contract(config.ABIS.tokenABI, config.CONTRACT_ADDRESSES.tokenContract);
+                }
+            } catch (e) { console.warn('Failed to init tokenContract:', e.message); }
+            
+            try {
+                await loadArenaConfig();
+            } catch (e) { console.warn('Failed to load arena config:', e.message); }
         }
 
         async function loadArenaConfig() {

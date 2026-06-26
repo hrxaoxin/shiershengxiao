@@ -1381,6 +1381,7 @@
             
             const requiredUSDWei = await getUSDValue(levelNum);
             console.log('handleUpgradeWithUSDValue - requiredUSDWei:', requiredUSDWei);
+            const usdWeiBigInt = BigInt(String(requiredUSDWei));
             const requiredUSD = parseFloat(web3.utils.fromWei(String(requiredUSDWei), 'ether'));
             console.log('handleUpgradeWithUSDValue - requiredUSD:', requiredUSD);
             

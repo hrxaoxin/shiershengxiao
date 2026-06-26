@@ -974,6 +974,17 @@
                 if (basePrice === '0' && finalPrice === '0' && bonusPercent === 0) {
                     return calculateGrowthPriceFallback(level, isRare, holdingDays);
                 }
+                
+                if (bonusPercent === 0 && holdingDays > 0) {
+                    const fallback = calculateGrowthPriceFallback(level, isRare, holdingDays);
+                    return {
+                        basePrice: basePrice,
+                        bonusPercent: fallback.bonusPercent,
+                        finalPrice: fallback.finalPrice,
+                        daysToMax: daysToMax,
+                        holdingDays: holdingDays
+                    };
+                }
 
                 return {
                     basePrice: basePrice,
@@ -1006,16 +1017,12 @@
             }
 
             const basePriceValue = totalCost * discount / 100;
-            const maxPrice = totalCost * maxBuybackMultiplier / 100;
-
-            const maxBonusDays = (maxBuybackMultiplier - discount) * daysToBreakEven / (100 - discount);
+            const maxBonusPercent = maxBuybackMultiplier - 100;
+            const maxBonusDays = (maxBonusPercent * daysToBreakEven) / (100 - discount);
             const actualDays = Math.min(holdingDays, Math.floor(maxBonusDays));
-
-            const bonusBase = maxPrice - basePriceValue;
-            const bonusAmount = bonusBase * actualDays / maxBonusDays;
-            const bonusPercent = Math.floor((bonusAmount / basePriceValue) * 100);
-
-            const finalPriceValue = basePriceValue + bonusAmount;
+            
+            const bonusPercent = Math.floor((actualDays * (100 - discount)) / daysToBreakEven);
+            const finalPriceValue = basePriceValue * (100 + bonusPercent) / 100;
 
             return {
                 basePrice: String(Math.floor(basePriceValue * 10**18)),
