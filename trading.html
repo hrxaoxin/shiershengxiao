@@ -960,7 +960,8 @@
             if (retryCount === 0) {
                 const confirm = await ZODIAC_UI.showConfirmModal(
                     '确认购买',
-                    `将花费 ${currentBuyPrice} 代币 购买此NFT，确定继续？`
+                    `将花费 ${currentBuyPrice} 代币 购买此NFT，确定继续？`,
+                    { confirmText: '确认购买' }
                 );
 
                 if (!confirm) {
@@ -1117,7 +1118,8 @@
             console.log('[TRADING] showing confirm modal...');
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认上架',
-                `将NFT #${tokenId} 以 ${price} 代币 的价格上架，确定继续？`
+                `将NFT #${tokenId} 以 ${price} 代币 的价格上架，确定继续？`,
+                { confirmText: '确认上架' }
             );
             console.log('[TRADING] confirm result:', confirm);
 
@@ -1214,7 +1216,8 @@
             
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认授权',
-                '将授权交易合约管理您的NFT，确定继续？'
+                '将授权交易合约管理您的NFT，确定继续？',
+                { confirmText: '确认授权' }
             );
             
             if (!confirm) return;
@@ -1325,7 +1328,8 @@
 
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认取消上架',
-                '确定要取消此NFT的上架吗？'
+                '确定要取消此NFT的上架吗？',
+                { confirmText: '取消上架' }
             );
 
             if (!confirm) return;

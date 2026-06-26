@@ -499,6 +499,15 @@
                 nftMintContract = await window.ZODIAC_WEB3.getContract('nftMint');
                 nftDataContract = await window.ZODIAC_WEB3.getContract('nftData');
                 tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
+                console.log('[BUYBACK] Contracts initialized:', {
+                    buybackContract: !!buybackContract,
+                    nftMintContract: !!nftMintContract,
+                    nftDataContract: !!nftDataContract,
+                    tokenContract: !!tokenContract
+                });
+                if (nftDataContract) {
+                    console.log('[BUYBACK] nftDataContract address:', nftDataContract.options.address);
+                }
             } catch (error) {
                 console.warn('合约初始化失败:', error.message);
             }
@@ -669,9 +678,12 @@
                 if (nftDataContract) {
                     try {
                         mintTime = parseInt(await nftDataContract.methods.getNFTMintTime(tid).call(), 10);
+                        console.log(`[BUYBACK] NFT ${tid} mintTime from nftDataContract:`, mintTime);
                     } catch (e) {
                         console.warn(`获取NFT ${tid} mintTime失败:`, e.message);
                     }
+                } else {
+                    console.warn(`[BUYBACK] NFT ${tid} nftDataContract is null/undefined`);
                 }
 
                 if (type === 0 && level === 1 && growth === 0 && mintTime === 0) {
@@ -780,6 +792,24 @@
             const nftInfo = window.ZODIAC_UTILS.getNFTInfo(type);
             const imagePath = nftInfo.imagePath;
 
+            if (!mintTime || mintTime <= 0) {
+                console.log(`[BUYBACK] selectUnifiedNft - mintTime is 0 or invalid, trying to re-query...`);
+                try {
+                    const dataContract = await window.ZODIAC_WEB3.getContract('nftData', false);
+                    if (dataContract) {
+                        const queriedMintTime = parseInt(await dataContract.methods.getNFTMintTime(tokenId).call(), 10);
+                        if (queriedMintTime > 0) {
+                            mintTime = queriedMintTime;
+                            console.log(`[BUYBACK] selectUnifiedNft - successfully re-queried mintTime:`, mintTime);
+                        } else {
+                            console.log(`[BUYBACK] selectUnifiedNft - re-query returned 0`);
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`[BUYBACK] selectUnifiedNft - re-query failed:`, e.message);
+                }
+            }
+
             selectedNft = { tokenId, type, level, mintTime, nftInfo, imagePath };
 
             document.getElementById('unifiedSelectedNftInfo').classList.remove('hidden');
@@ -815,8 +845,16 @@
 
         async function updateHoldingDaysAndPrice(tokenId, mintTime) {
             const now = Math.floor(Date.now() / 1000);
-            const holdingDays = Math.floor((now - mintTime) / 86400);
-            document.getElementById('holdingDays').textContent = holdingDays + ' 天';
+            let holdingDays = 0;
+            let displayDays = '--';
+            
+            if (mintTime && mintTime > 0 && mintTime < now) {
+                holdingDays = Math.floor((now - mintTime) / 86400);
+                displayDays = holdingDays + ' 天';
+            } else {
+                displayDays = '待确认';
+            }
+            document.getElementById('holdingDays').textContent = displayDays;
 
             if (growthBuybackOpen) {
                 const growthPrice = await calculateGrowthPrice(tokenId);
@@ -891,7 +929,8 @@
 
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认以余额比例价出售',
-                `将NFT #${selectedNft.tokenId} 以 ${price} 代币的价格出售给回购合约，确定继续？`
+                `将NFT #${selectedNft.tokenId} 以 ${price} 代币的价格出售给回购合约，确定继续？`,
+                { confirmText: '以余额比例价出售' }
             );
 
             if (!confirm) return;
@@ -936,7 +975,8 @@
 
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认以成长价出售',
-                `将NFT #${selectedNft.tokenId} 以 ${finalPrice} 代币的价格出售给回购合约，确定继续？`
+                `将NFT #${selectedNft.tokenId} 以 ${finalPrice} 代币的价格出售给回购合约，确定继续？`,
+                { confirmText: '以成长价出售' }
             );
 
             if (!confirm) return;
@@ -978,8 +1018,9 @@
             const price = formatPrice(fixedPrice);
 
             const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认以回购价出售',
-                `将NFT #${selectedNft.tokenId} 以 ${price} 代币的价格出售给回购合约，确定继续？`
+                '确认以固定价出售',
+                `将NFT #${selectedNft.tokenId} 以 ${price} 代币的价格出售给回购合约，确定继续？`,
+                { confirmText: '以固定价出售' }
             );
 
             if (!confirm) return;
@@ -1026,7 +1067,8 @@
 
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认授权',
-                '将授权回购合约管理您的NFT，确定继续？'
+                '将授权回购合约管理您的NFT，确定继续？',
+                { confirmText: '确认授权' }
             );
 
             if (!confirm) return;

@@ -772,6 +772,13 @@
 
                 document.getElementById('myStakedCount').textContent = tokenIds.length;
 
+                let minStakingDuration = 1800;
+                try {
+                    minStakingDuration = parseInt(await stakingContract.methods.minStakingDuration().call(), 10);
+                } catch (e) {
+                    console.warn('获取最小质押时间失败，使用默认30分钟:', e);
+                }
+
                 const stakePromises = tokenIds.map(tokenId => {
                     return Promise.all([
                         stakingContract.methods.getStakingInfo(tokenId).call(),
@@ -793,11 +800,18 @@
                 const results = await Promise.all(stakePromises);
                 const stakes = results.filter(s => s !== null);
 
+                const now = Math.floor(Date.now() / 1000);
                 let html = '';
                 for (const stake of stakes) {
                     const nftInfo = getNFTInfo(stake.type);
                     const isRare = isNFTRare(stake.type);
                     const weight = isRare ? document.getElementById('rareWeight').textContent : document.getElementById('normalWeight').textContent;
+                    
+                    const stakeTime = parseInt(stake.stakeInfo.stakeTime, 10);
+                    const unlockTime = stakeTime + minStakingDuration;
+                    const isLocked = now < unlockTime;
+                    const remainingSeconds = isLocked ? unlockTime - now : 0;
+                    const remainingMinutes = Math.ceil(remainingSeconds / 60);
 
                     html += `
                         <div class="stake-card nft-card-hover" data-nft-typeid="${stake.type}" data-nft-tokenid="${stake.tokenId}" data-nft-level="${stake.level}">
@@ -815,9 +829,18 @@
                                 <span class="text-gray-600">质押时间</span>
                                 <span class="text-gray-800 font-medium">${formatStakingTime(stake.stakeInfo.stakeTime)}</span>
                             </div>
-                            <button class="btn-secondary w-full" onclick="unstakeNFT('${stake.tokenId}')">
-                                赎回NFT
-                            </button>
+                            ${isLocked ? `
+                                <div class="mb-2 text-xs text-orange-600 text-center">
+                                    <i class="fas fa-lock mr-1"></i>锁定期中，还剩 ${remainingMinutes} 分钟
+                                </div>
+                                <button class="btn-secondary w-full opacity-50 cursor-not-allowed" disabled>
+                                    赎回NFT
+                                </button>
+                            ` : `
+                                <button class="btn-secondary w-full" onclick="unstakeNFT('${stake.tokenId}')">
+                                    赎回NFT
+                                </button>
+                            `}
                         </div>
                     `;
                 }
@@ -1003,8 +1026,9 @@
 
         async function unstakeNFT(tokenId) {
             const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认赎回',
-                '确定要赎回这个NFT吗？'
+                '确认赎回NFT',
+                '确定要赎回这个NFT吗？\n\n赎回后将停止获得质押奖励',
+                { confirmText: '赎回NFT' }
             );
 
             if (!confirm) return;
@@ -1054,13 +1078,6 @@
         document.getElementById('refreshWallet').addEventListener('click', initWeb3);
         document.getElementById('stakeBtn').addEventListener('click', stakeNFTs);
         document.getElementById('claimBtn').addEventListener('click', claimRewards);
-        
-        document.getElementById('tokenStakeBtn').addEventListener('click', handleTokenStake);
-        document.getElementById('tokenUnstakeBtn').addEventListener('click', handleTokenUnstake);
-        document.getElementById('claimTokenRewardsBtn').addEventListener('click', claimTokenRewards);
-        
-        document.getElementById('tokenStakeAmount').addEventListener('input', updateTokenStakeButton);
-        document.getElementById('tokenUnstakeAmount').addEventListener('input', updateTokenUnstakeButton);
 
         setInterval(loadRewards, 60000);
     </script>
@@ -1358,6 +1375,13 @@
         function closeNFTModal() {
             document.getElementById('cardModal').classList.add('hidden');
         }
+
+        document.getElementById('tokenStakeBtn').addEventListener('click', handleTokenStake);
+        document.getElementById('tokenUnstakeBtn').addEventListener('click', handleTokenUnstake);
+        document.getElementById('claimTokenRewardsBtn').addEventListener('click', claimTokenRewards);
+        
+        document.getElementById('tokenStakeAmount').addEventListener('input', updateTokenStakeButton);
+        document.getElementById('tokenUnstakeAmount').addEventListener('input', updateTokenUnstakeButton);
     </script>
 
     <div id="cardModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">

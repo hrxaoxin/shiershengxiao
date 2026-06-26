@@ -921,7 +921,8 @@
             const upgradeSection = document.getElementById('upgradeSection');
 
             const levelNum = parseInt(level, 10);
-            const requiredTokens = levelNum < 5 ? await getRequiredTokens(levelNum) : 0;
+            const requiredTokensResult = levelNum < 5 ? await getRequiredTokens(levelNum) : { display: 0, wei: '0' };
+            const requiredTokens = requiredTokensResult.display;
             const requiredNFTs = levelNum < 5 ? levelNum : 0;
             
             // 计算USDT价值升级所需的代币数量
@@ -1170,8 +1171,9 @@
             }
 
             const confirmed = await ZODIAC_UI.showConfirmModal(
-                '升级确认',
-                '确认使用NFT升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗 ' + requiredNFTs + ' 张相同类型的NFT'
+                '使用NFT升阶确认',
+                '确认使用NFT升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗 ' + requiredNFTs + ' 张相同类型的NFT',
+                { confirmText: '使用NFT升阶' }
             );
 
             if (!confirmed) return;
@@ -1179,16 +1181,32 @@
             try {
                 ZODIAC_UI.showLoading('检查授权...');
                 
-                // 检查NFT授权 - 直接调用合约
                 const isApproved = await nftContract.methods.isApprovedForAll(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
                 if (!isApproved) {
                     ZODIAC_UI.showLoading('请求授权...');
                     await nftContract.methods.setApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, true).send({ from: account, gas: 100000 });
                 }
                 
+                ZODIAC_UI.showLoading('检查交易可行性...');
+                
+                try {
+                    await nftUpdateContract.methods.upgradeWithNFT(nftId).call({ from: account });
+                } catch (callError) {
+                    ZODIAC_UI.hideLoading();
+                    const errorMsg = callError.message || callError.toString();
+                    let userMsg = '升阶可能失败，请检查条件后重试';
+                    if (errorMsg.includes('E15')) userMsg = '错误：您不是该NFT的所有者';
+                    else if (errorMsg.includes('E16')) userMsg = '错误：NFT已达到最高等级';
+                    else if (errorMsg.includes('E17')) userMsg = '错误：同类型同级NFT数量不足';
+                    else if (errorMsg.includes('E28')) userMsg = '错误：可销毁的NFT数量不足';
+                    else if (errorMsg.includes('E33')) userMsg = '错误：持有NFT数量过多，请先减少持有量';
+                    else if (errorMsg.includes('paused')) userMsg = '错误：合约已暂停';
+                    ZODIAC_UI.showToast(userMsg, 'error');
+                    return;
+                }
+                
                 ZODIAC_UI.showLoading('升级中，请确认钱包交易...');
                 
-                // 直接调用合约，不使用 ZODIAC_WEB3 的封装
                 const result = await nftUpdateContract.methods.upgradeWithNFT(nftId).send({ 
                     from: account, 
                     gas: 4000000 
@@ -1232,14 +1250,15 @@
                 console.error('检查合约暂停状态失败:', e);
             }
 
-            const requiredTokens = await getRequiredTokens(selectedNft.level);
+            const requiredTokensResult = await getRequiredTokens(selectedNft.level);
+            const requiredTokens = requiredTokensResult.display;
+            const requiredTokensWei = requiredTokensResult.wei;
             const nftId = parseInt(selectedNft.id, 10);
             
             // 检查代币余额
             try {
                 const balance = await tokenContract.methods.balanceOf(account).call();
-                const requiredWei = web3.utils.toWei(requiredTokens.toString(), 'ether');
-                if (BigInt(balance) < BigInt(requiredWei)) {
+                if (BigInt(balance) < BigInt(requiredTokensWei)) {
                     ZODIAC_UI.showToast('代币余额不足！需要 ' + requiredTokens.toLocaleString() + ' 枚代币', 'error');
                     return;
                 }
@@ -1248,8 +1267,9 @@
             }
 
             const confirmed = await ZODIAC_UI.showConfirmModal(
-                '升级确认',
-                '确认使用代币升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗 ' + requiredTokens.toLocaleString() + ' 枚代币'
+                '使用代币升阶确认',
+                '确认使用代币升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗 ' + requiredTokens.toLocaleString() + ' 枚代币',
+                { confirmText: '使用代币升阶' }
             );
 
             if (!confirmed) return;
@@ -1257,17 +1277,33 @@
             try {
                 ZODIAC_UI.showLoading('检查授权...');
                 
-                // 检查代币授权 - 直接调用合约
-                const requiredTokensWei = web3.utils.toWei(requiredTokens.toString(), 'ether');
                 const allowance = await tokenContract.methods.allowance(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
                 if (BigInt(allowance) < BigInt(requiredTokensWei)) {
                     ZODIAC_UI.showLoading('请求授权...');
-                    await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, requiredTokensWei).send({ from: account, gas: 100000 });
+                    await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff').send({ from: account, gas: 100000 });
+                }
+                
+                ZODIAC_UI.showLoading('检查交易可行性...');
+                
+                try {
+                    await nftUpdateContract.methods.upgradeWithToken(nftId).call({ from: account });
+                } catch (callError) {
+                    ZODIAC_UI.hideLoading();
+                    const errorMsg = callError.message || callError.toString();
+                    let userMsg = '升阶可能失败，请检查条件后重试';
+                    if (errorMsg.includes('E15')) userMsg = '错误：您不是该NFT的所有者';
+                    else if (errorMsg.includes('E16')) userMsg = '错误：NFT已达到最高等级';
+                    else if (errorMsg.includes('E18')) userMsg = '错误：NFT等级数据异常，请联系管理员';
+                    else if (errorMsg.includes('E7')) userMsg = '错误：代币合约未设置';
+                    else if (errorMsg.includes('E8') && errorMsg.includes('balance')) userMsg = '错误：代币余额不足';
+                    else if (errorMsg.includes('E8') && errorMsg.includes('allowance')) userMsg = '错误：代币授权不足，请重新授权';
+                    else if (errorMsg.includes('paused')) userMsg = '错误：合约已暂停';
+                    ZODIAC_UI.showToast(userMsg, 'error');
+                    return;
                 }
                 
                 ZODIAC_UI.showLoading('升级中，请确认钱包交易...');
                 
-                // 直接调用合约
                 const result = await nftUpdateContract.methods.upgradeWithToken(nftId).send({ 
                     from: account, 
                     gas: 3000000 
@@ -1423,8 +1459,9 @@
             console.log('Showing confirm modal with:', { nftId, level: selectedNft.level, requiredUSD, requiredTokensDisplay });
             
             const confirmed = await ZODIAC_UI.showConfirmModal(
-                '升级确认',
-                'NFT ID: ' + nftId + '\n等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n\n需要消耗价值 ' + requiredUSD.toFixed(4) + ' USDT 的代币\n≈ ' + requiredTokensDisplay + ' Token 将被销毁\n\n确认使用 USDT 价值升阶？'
+                '使用USDT价值升阶确认',
+                'NFT ID: ' + nftId + '\n等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n\n需要消耗价值 ' + requiredUSD.toFixed(4) + ' USDT 的代币\n≈ ' + requiredTokensDisplay + ' Token 将被销毁\n\n确认使用 USDT 价值升阶？',
+                { confirmText: '使用USDT价值升阶' }
             );
 
             if (!confirmed) return;
@@ -1432,16 +1469,36 @@
             try {
                 ZODIAC_UI.showLoading('检查授权...');
                 
-                // 检查代币授权
                 const allowance = BigInt(await tokenContract.methods.allowance(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call());
                 if (allowance < requiredTokens) {
                     ZODIAC_UI.showLoading('请求授权...');
                     await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff').send({ from: account, gas: 100000 });
                 }
                 
+                ZODIAC_UI.showLoading('检查交易可行性...');
+                
+                try {
+                    await nftUpdateContract.methods.upgradeWithUSDValue(nftId).call({ from: account });
+                } catch (callError) {
+                    ZODIAC_UI.hideLoading();
+                    const errorMsg = callError.message || callError.toString();
+                    let userMsg = '升阶可能失败，请检查条件后重试';
+                    if (errorMsg.includes('E15')) userMsg = '错误：您不是该NFT的所有者';
+                    else if (errorMsg.includes('E16')) userMsg = '错误：NFT已达到最高等级';
+                    else if (errorMsg.includes('E18')) userMsg = '错误：NFT等级数据异常，请联系管理员';
+                    else if (errorMsg.includes('E20')) userMsg = '错误：价格预言机未设置';
+                    else if (errorMsg.includes('E21')) userMsg = '错误：无效的价格';
+                    else if (errorMsg.includes('E22')) userMsg = '错误：USDT价值为零';
+                    else if (errorMsg.includes('E23')) userMsg = '错误：计算的代币数量为零';
+                    else if (errorMsg.includes('E8') && errorMsg.includes('balance')) userMsg = '错误：代币余额不足';
+                    else if (errorMsg.includes('E8') && errorMsg.includes('allowance')) userMsg = '错误：代币授权不足，请重新授权';
+                    else if (errorMsg.includes('paused')) userMsg = '错误：合约已暂停';
+                    ZODIAC_UI.showToast(userMsg, 'error');
+                    return;
+                }
+                
                 ZODIAC_UI.showLoading('升级中：销毁 ' + requiredTokensDisplay + ' Token，请确认钱包交易...');
                 
-                // 调用合约升级
                 const result = await nftUpdateContract.methods.upgradeWithUSDValue(nftId).send({ 
                     from: account, 
                     gas: 4000000 
@@ -1471,13 +1528,12 @@
 
         async function getRequiredTokens(level) {
             if (!nftUpdateContract) {
-                // 回退到硬编码值
                 switch (level) {
-                    case 1: return 10000;
-                    case 2: return 40000;
-                    case 3: return 120000;
-                    case 4: return 480000;
-                    default: return 0;
+                    case 1: return { display: 10000, wei: '10000000000000000000000' };
+                    case 2: return { display: 40000, wei: '40000000000000000000000' };
+                    case 3: return { display: 120000, wei: '120000000000000000000000' };
+                    case 4: return { display: 480000, wei: '480000000000000000000000' };
+                    default: return { display: 0, wei: '0' };
                 }
             }
             try {
@@ -1490,16 +1546,17 @@
                     : level == 4
                     ? await nftUpdateContract.methods.level4UpgradeCost().call()
                     : '0';
-                return parseInt(costWei) / 10**18;
+                const costBigInt = BigInt(String(costWei));
+                const display = Number(costBigInt / 10n**18n);
+                return { display: display, wei: String(costWei) };
             } catch (e) {
                 console.error('Failed to get upgrade cost from contract:', e);
-                // 回退到硬编码值
                 switch (level) {
-                    case 1: return 10000;
-                    case 2: return 40000;
-                    case 3: return 120000;
-                    case 4: return 480000;
-                    default: return 0;
+                    case 1: return { display: 10000, wei: '10000000000000000000000' };
+                    case 2: return { display: 40000, wei: '40000000000000000000000' };
+                    case 3: return { display: 120000, wei: '120000000000000000000000' };
+                    case 4: return { display: 480000, wei: '480000000000000000000000' };
+                    default: return { display: 0, wei: '0' };
                 }
             }
         }

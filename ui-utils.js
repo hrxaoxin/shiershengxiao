@@ -266,8 +266,11 @@ window.ZODIAC_UI = (function() {
         document.body.removeChild(textarea);
     }
 
-    function showConfirmModal(title, message) {
+    function showConfirmModal(title, message, options) {
         return new Promise(function(resolve) {
+            const confirmText = (options && options.confirmText) || '确认';
+            const cancelText = (options && options.cancelText) || '取消';
+            
             let modal = document.getElementById('zodiacConfirmModal');
             if (!modal) {
                 modal = document.createElement('div');
@@ -275,8 +278,8 @@ window.ZODIAC_UI = (function() {
                 modal.className = 'fixed inset-0 bg-black/60 flex items-center justify-center z-50';
                 modal.innerHTML = `
                     <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 shadow-xl">
-                        <h3 class="text-xl font-bold text-gray-800 mb-4">${title}</h3>
-                        <p class="text-gray-600 mb-6">${message}</p>
+                        <h3 id="zodiacModalTitle" class="text-xl font-bold text-gray-800 mb-4"></h3>
+                        <p id="zodiacModalMessage" class="text-gray-600 mb-6 whitespace-pre-line"></p>
                         <div class="flex space-x-3">
                             <button id="confirmCancelBtn" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
                                 取消
@@ -290,8 +293,15 @@ window.ZODIAC_UI = (function() {
                 document.body.appendChild(modal);
             }
 
+            const titleEl = modal.querySelector('#zodiacModalTitle');
+            const messageEl = modal.querySelector('#zodiacModalMessage');
             const cancelBtn = modal.querySelector('#confirmCancelBtn');
             const okBtn = modal.querySelector('#confirmOkBtn');
+
+            titleEl.textContent = title;
+            messageEl.textContent = message;
+            cancelBtn.textContent = cancelText;
+            okBtn.textContent = confirmText;
 
             const handleCancel = function() {
                 modal.style.display = 'none';
