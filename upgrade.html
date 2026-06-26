@@ -929,12 +929,13 @@
             let usdValueText = '';
             let requiredUSDDisplay = '';
             if (levelNum < 5) {
-                const requiredUSDWei = await getUSDValue(levelNum);
+                const upgradeToLevel = levelNum + 1;
+                const requiredUSDWei = await getUSDValue(upgradeToLevel);
                 // 确保字符串转换，防止 web3.js BN 对象导致 BigInt 错误
                 const usdWeiBigInt = BigInt(String(requiredUSDWei));
                 // 使用浮点除法（非BigInt除法），因为USDT值可能小于1，BigInt整数除法会截断为0
                 const requiredUSD = Number(usdWeiBigInt) / 1e18;
-                console.log('selectNFT - level:', levelNum, 'requiredUSDWei:', requiredUSDWei, 'requiredUSD:', requiredUSD);
+                console.log('selectNFT - level:', levelNum, 'upgradeToLevel:', upgradeToLevel, 'requiredUSDWei:', requiredUSDWei, 'requiredUSD:', requiredUSD);
                requiredUSDDisplay = requiredUSD.toFixed(4) + ' USDT';
                 
                 try {

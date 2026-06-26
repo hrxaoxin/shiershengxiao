@@ -294,7 +294,7 @@
 
             <div id="balanceRatioSection">
                 <div class="bg-orange-50 p-4 rounded-lg mb-4">
-                    <div class="grid grid-cols-3 gap-4">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div class="text-center">
                             <p class="text-gray-600 text-sm">合约余额</p>
                             <p class="text-xl font-bold text-green-600" id="balanceRatioBalance">-</p>
@@ -302,6 +302,10 @@
                         <div class="text-center">
                             <p class="text-gray-600 text-sm">NFT总量</p>
                             <p class="text-xl font-bold text-blue-600" id="balanceRatioTotalSupply">-</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-gray-600 text-sm">总权重</p>
+                            <p class="text-xl font-bold text-purple-600" id="balanceRatioTotalWeight">-</p>
                         </div>
                         <div class="text-center">
                             <p class="text-gray-600 text-sm">单张回购价</p>
@@ -323,6 +327,10 @@
                             <div>
                                 <p class="text-gray-500 text-sm">回购价格</p>
                                 <p class="text-2xl font-bold text-red-600" id="finalBalanceRatioPrice">-</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-gray-500 text-sm">当前NFT权重</p>
+                                <p class="text-2xl font-bold text-purple-600" id="balanceRatioNftWeight">-</p>
                             </div>
                         </div>
                     </div>
@@ -618,6 +626,30 @@
                 document.getElementById('balanceRatioBalance').textContent = web3.utils.fromWei(balance, 'ether');
                 document.getElementById('balanceRatioTotalSupply').textContent = totalSupply;
                 document.getElementById('balanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
+
+                try {
+                    const dividendManagerAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.dividendManager;
+                    if (dividendManagerAddr && dividendManagerAddr !== '0x0000000000000000000000000000000000000000') {
+                        const dividendABI = [{"inputs":[],"name":"getTotalWeight","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}];
+                        const dividendContract = new web3.eth.Contract(dividendABI, dividendManagerAddr);
+                        const totalWeight = await dividendContract.methods.getTotalWeight().call();
+                        document.getElementById('balanceRatioTotalWeight').textContent = totalWeight;
+
+                        if (tokenId && nftDataContract) {
+                            try {
+                                const nftWeight = await nftDataContract.methods.calcNFTWeight(tokenId).call();
+                                const nftWeightEl = document.getElementById('balanceRatioNftWeight');
+                                if (nftWeightEl) {
+                                    nftWeightEl.textContent = nftWeight;
+                                }
+                            } catch (e) {
+                                console.warn('获取选中NFT权重失败:', e.message);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('获取总权重失败:', e.message);
+                }
             } catch (error) {
                 console.error('加载余额比例价格失败:', error);
             }
@@ -684,6 +716,25 @@
                     }
                 } else {
                     console.warn(`[BUYBACK] NFT ${tid} nftDataContract is null/undefined`);
+                }
+
+                if (mintTime <= 0 && nftMintContract) {
+                    console.log(`[BUYBACK] NFT ${tid} mintTime is 0, trying to get from Mint event...`);
+                    try {
+                        const events = await nftMintContract.getPastEvents('Mint', {
+                            filter: { tokenId: tid },
+                            fromBlock: 0,
+                            toBlock: 'latest'
+                        });
+                        if (events.length > 0) {
+                            const blockNumber = events[0].blockNumber;
+                            const block = await web3.eth.getBlock(blockNumber);
+                            mintTime = block.timestamp;
+                            console.log(`[BUYBACK] NFT ${tid} mintTime from Mint event:`, mintTime);
+                        }
+                    } catch (e) {
+                        console.warn(`获取NFT ${tid} mintTime从事件失败:`, e.message);
+                    }
                 }
 
                 if (type === 0 && level === 1 && growth === 0 && mintTime === 0) {

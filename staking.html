@@ -518,11 +518,41 @@
                     return;
                 }
                 
-                const myWeight = myStakedCount * (parseInt(document.getElementById('normalWeight').textContent) || 1);
-                const dailyRewardBNB = (myWeight / totalWeighted) * 10;
-                const annualRate = (dailyRewardBNB * 365 / 100) * 100;
+                let myWeight = 0;
+                try {
+                    myWeight = await stakingContract.methods.userStakedWeight(account).call();
+                    myWeight = parseInt(myWeight, 10) || myStakedCount;
+                } catch (e) {
+                    console.warn('获取用户质押权重失败，使用估算:', e.message);
+                    myWeight = myStakedCount;
+                }
                 
-                document.getElementById('dailyReward').textContent = dailyRewardBNB.toFixed(4);
+                const pendingReward = await stakingContract.methods.getPendingReward(account).call();
+                const pendingRewardEth = parseFloat(web3.utils.fromWei(pendingReward, 'ether'));
+                
+                const myStakes = await stakingContract.methods.getUserStakedNFTs(account).call();
+                let totalStakingDays = 0;
+                for (const tokenId of myStakes) {
+                    const stakeInfo = await stakingContract.methods.getStakingInfo(tokenId).call();
+                    const stakeTime = parseInt(stakeInfo.stakeTime || stakeInfo[1] || 0, 10);
+                    if (stakeTime > 0) {
+                        const stakingDays = (Date.now() / 1000 - stakeTime) / 86400;
+                        if (stakingDays > 0) totalStakingDays += stakingDays;
+                    }
+                }
+                
+                let dailyReward = 0;
+                if (totalStakingDays > 0) {
+                    dailyReward = pendingRewardEth / totalStakingDays * myStakes.length;
+                } else {
+                    dailyReward = (myWeight / parseInt(totalWeighted)) * 0.1;
+                }
+                
+                const userBalance = await tokenContract.methods.balanceOf(account).call();
+                const userBalanceEth = parseFloat(web3.utils.fromWei(userBalance, 'ether'));
+                const annualRate = userBalanceEth > 0 ? (dailyReward * 365 / userBalanceEth) * 100 : 0;
+                
+                document.getElementById('dailyReward').textContent = dailyReward.toFixed(4);
                 document.getElementById('annualRate').textContent = annualRate.toFixed(2) + '%';
             } catch (error) {
                 console.error('更新收益预估失败:', error);
@@ -931,11 +961,12 @@
         }
 
         function toggleNFTSelection(tokenId) {
-            const index = selectedNFTs.indexOf(tokenId);
-            const cardElement = document.querySelector(`[data-token-id="${tokenId}"]`);
+            const tokenIdStr = String(tokenId);
+            const index = selectedNFTs.indexOf(tokenIdStr);
+            const cardElement = document.querySelector(`[data-token-id="${tokenIdStr}"]`);
             
             if (index === -1) {
-                selectedNFTs.push(tokenId);
+                selectedNFTs.push(tokenIdStr);
                 if (cardElement) cardElement.classList.add('selected');
             } else {
                 selectedNFTs.splice(index, 1);
@@ -1240,6 +1271,42 @@
                 return;
             }
 
+            const amountWei = web3.utils.toWei(amount, 'ether');
+
+            try {
+                const stakeInfo = await tokenStakingContract.methods.getUserStake(account).call();
+                const stakedAmount = stakeInfo.amount || stakeInfo[0] || '0';
+                const stakedAt = stakeInfo.stakedAt || stakeInfo[3] || '0';
+
+                if (parseInt(stakedAmount, 10) < parseInt(amountWei, 10)) {
+                    ZODIAC_UI.showToast('赎回数量超过质押数量', 'error');
+                    return;
+                }
+
+                if (parseInt(stakedAt, 10) === 0) {
+                    ZODIAC_UI.showToast('没有找到质押记录', 'error');
+                    return;
+                }
+
+                const minDuration = await tokenStakingContract.methods.MIN_STAKING_DURATION().call();
+                const minDurationSeconds = parseInt(minDuration, 10);
+                const currentTime = Math.floor(Date.now() / 1000);
+
+                if (currentTime < parseInt(stakedAt, 10) + minDurationSeconds) {
+                    const remainingMinutes = Math.ceil((parseInt(stakedAt, 10) + minDurationSeconds - currentTime) / 60);
+                    ZODIAC_UI.showToast(`锁仓期未结束，还需等待 ${remainingMinutes} 分钟`, 'error');
+                    return;
+                }
+
+                const isPaused = await tokenStakingContract.methods.paused().call();
+                if (isPaused) {
+                    ZODIAC_UI.showToast('合约已暂停，请稍后重试', 'error');
+                    return;
+                }
+            } catch (e) {
+                console.warn('预检查失败:', e.message);
+            }
+
             const confirm = await ZODIAC_UI.showConfirmModal(
                 '确认赎回',
                 `将赎回 ${amount} 代币，同时领取累积奖励`
@@ -1252,7 +1319,6 @@
             btn.textContent = '赎回中...';
 
             try {
-                const amountWei = web3.utils.toWei(amount, 'ether');
                 await ZODIAC_WEB3.unstakeTokens(amountWei);
 
                 ZODIAC_UI.showToast('代币赎回成功！', 'success');
