@@ -521,7 +521,10 @@
                         typeId = parseInt(await nftContract.methods.tokenType(tokenId).call(), 10);
                     } catch (e2) { console.warn(`获取NFT ${tokenId} type失败:`, e2.message); }
                     try {
-                        level = parseInt(await nftContract.methods.tokenLevel(tokenId).call(), 10);
+                        const nftDataContract = await window.ZODIAC_WEB3.getContract('nftData', false);
+                        if (nftDataContract) {
+                            level = parseInt(await nftDataContract.methods.tokenLevel(tokenId).call(), 10);
+                        }
                     } catch (e2) { console.warn(`获取NFT ${tokenId} level失败:`, e2.message); }
                 }
 
@@ -712,7 +715,7 @@
             document.getElementById('lightProgress').textContent = progress.light;
         }
 
-        function showCardModal(typeId, level, growth = 0, tokenId = null) {
+        async function showCardModal(typeId, level, growth = 0, tokenId = null) {
             console.log('[COLLECTION] showCardModal started:', typeId, level, growth, tokenId);
             try {
                 const nftInfo = ZODIAC_UTILS.getNFTInfo(typeId);
@@ -741,16 +744,18 @@
                 
                 // 从合约获取权重
                 let weight = level * (isRare ? 2 : 1);
-                try {
-                    const nftDataContract = await window.ZODIAC_WEB3.getContract('nftData', false);
-                    if (nftDataContract) {
-                        const realWeight = await nftDataContract.methods.getWeightByLevel(level, isRare).call();
-                        if (realWeight && realWeight > 0) {
-                            weight = parseInt(realWeight, 10);
+                if (level > 0) {
+                    try {
+                        const nftDataContract = await window.ZODIAC_WEB3.getContract('nftData', false);
+                        if (nftDataContract) {
+                            const realWeight = await nftDataContract.methods.getWeightByLevel(level, isRare).call();
+                            if (realWeight && realWeight > 0) {
+                                weight = parseInt(realWeight, 10);
+                            }
                         }
+                    } catch (e) {
+                        console.warn('获取NFT权重失败，使用简化计算:', e.message);
                     }
-                } catch (e) {
-                    console.warn('获取NFT权重失败，使用简化计算:', e.message);
                 }
                 
                 const canBreed = level >= 5;
@@ -856,7 +861,7 @@
                 }
                 if (card && card.hasAttribute('data-nft-typeid')) {
                     const typeId = parseInt(card.getAttribute('data-nft-typeid'));
-                    const level = parseInt(card.getAttribute('data-nft-level'));
+                    const level = parseInt(card.getAttribute('data-nft-level')) || 0;
                     const growth = parseInt(card.getAttribute('data-nft-growth')) || 0;
                     const tokenId = card.getAttribute('data-nft-tokenid') || null;
                     console.log('[COLLECTION] showCardModal called with:', typeId, level, growth, tokenId);
