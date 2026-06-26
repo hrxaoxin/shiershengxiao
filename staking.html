@@ -260,17 +260,17 @@
         </div>
 
         <div id="tokenStakePanel" class="hidden">
-            <p class="text-lg text-gray-600 mb-8">质押代币获得LP奖励，支持弹性释放机制</p>
+            <p class="text-lg text-gray-600 mb-8" id="tokenStakeIntroText">质押代币获得LP奖励，支持弹性释放机制</p>
 
             <div class="info-box mb-8">
                 <h3 class="text-xl font-bold text-gray-800 mb-4">🌟 代币质押规则</h3>
                 <ul class="text-gray-600 space-y-2">
-                    <li>• 质押代币获得LP奖励</li>
+                    <li id="tokenRule1">• 质押代币获得LP奖励</li>
                     <li>• 最低质押时长 <span id="tokenMinDuration">30</span> 分钟</li>
                     <li>• 当前每日释放比例 <span id="dailyReleaseRatioDisplay">1.0</span>%，支持弹性增量机制</li>
                     <li>• 赎回时自动领取累积奖励</li>
-                    <li>• 奖励以LP形式发放，领取时自动兑换为代币和WBNB</li>
-                    <li>• 双重收益：项目分红 + DEX交易手续费</li>
+                    <li id="tokenRule5">• 奖励以LP形式发放，领取时自动兑换为代币和WBNB</li>
+                    <li id="tokenRule6">• 双重收益：项目分红 + DEX交易手续费</li>
                 </ul>
             </div>
 
@@ -328,7 +328,7 @@
                     <h3 class="text-xl font-bold text-gray-800 mb-4">📊 代币质押合约信息</h3>
                     <div class="space-y-4">
                         <div class="p-4 bg-gray-50 rounded-lg">
-                            <span class="text-sm text-gray-600">合约LP奖励余额</span>
+                            <span class="text-sm text-gray-600" id="contractRewardBalanceLabel">合约LP奖励余额</span>
                             <p class="text-lg font-bold text-gray-800" id="tokenStakingBNBBalance">0.00</p>
                         </div>
                         <div class="p-4 bg-gray-50 rounded-lg">
@@ -994,6 +994,45 @@
             
             const claimTokenRewardsBtnText = document.getElementById('claimTokenRewardsBtnText');
             if (claimTokenRewardsBtnText) claimTokenRewardsBtnText.textContent = '领取' + displayText;
+            
+            const tokenStakeIntroText = document.getElementById('tokenStakeIntroText');
+            if (tokenStakeIntroText) tokenStakeIntroText.textContent = '质押代币获得' + displayText + '，支持弹性释放机制';
+            
+            const tokenRule1 = document.getElementById('tokenRule1');
+            if (tokenRule1) tokenRule1.textContent = '• 质押代币获得' + displayText;
+            
+            const tokenRule5 = document.getElementById('tokenRule5');
+            if (tokenRule5) {
+                switch(type) {
+                    case 0:
+                        tokenRule5.textContent = '• 奖励以LP形式发放，领取时自动兑换为代币和WBNB';
+                        break;
+                    case 1:
+                        tokenRule5.textContent = '• 奖励以代币形式发放，直接到账钱包';
+                        break;
+                    case 2:
+                        tokenRule5.textContent = '• 奖励以BNB形式发放，直接到账钱包';
+                        break;
+                }
+            }
+            
+            const tokenRule6 = document.getElementById('tokenRule6');
+            if (tokenRule6) {
+                switch(type) {
+                    case 0:
+                        tokenRule6.textContent = '• 双重收益：项目分红 + DEX交易手续费';
+                        break;
+                    case 1:
+                        tokenRule6.textContent = '• 稳定收益：项目分红奖励';
+                        break;
+                    case 2:
+                        tokenRule6.textContent = '• 实时收益：BNB直接到账';
+                        break;
+                }
+            }
+            
+            const contractRewardBalanceLabel = document.getElementById('contractRewardBalanceLabel');
+            if (contractRewardBalanceLabel) contractRewardBalanceLabel.textContent = '合约' + displayText + '余额';
             
             const descElement = document.querySelector('#rewardEstimate .text-xs.text-gray-500');
             if (descElement) {

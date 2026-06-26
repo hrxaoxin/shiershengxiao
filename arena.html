@@ -413,29 +413,31 @@
                     <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
                         <h3 class="text-white font-semibold mb-4 flex items-center justify-between">
                             <span class="flex items-center">
-                                <span class="mr-2">📊</span> 排行榜
+                                <span class="mr-2">🏆</span> 排行榜
                             </span>
                             <span id="leaderboardStats" class="text-xs text-gray-400"></span>
                         </h3>
-                        <div id="leaderboard" class="space-y-3 max-h-64 overflow-y-auto">
+                        <div id="leaderboard" class="space-y-2 max-h-80 overflow-y-auto pr-1">
                             <div class="text-center text-gray-400 py-4">加载中...</div>
                         </div>
-                        <div id="pagination" class="mt-4 flex items-center justify-center space-x-2">
-                            <button id="prevPage" class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                                上一页
+                        <div id="pagination" class="mt-4 flex items-center justify-between">
+                            <button id="prevPage" class="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-600" disabled>
+                                <i class="fas fa-chevron-left mr-1 text-xs"></i> 上一页
                             </button>
-                            <div class="flex items-center space-x-1">
-                                <span id="currentPage" class="text-white text-sm">1</span>
-                                <span class="text-gray-400 text-sm">/</span>
-                                <span id="totalPages" class="text-gray-400 text-sm">1</span>
+                            <div class="flex items-center space-x-2">
+                                <span id="currentPage" class="text-white font-bold">1</span>
+                                <span class="text-gray-500">/</span>
+                                <span id="totalPages" class="text-gray-400">1</span>
                             </div>
-                            <button id="nextPage" class="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
-                                下一页
+                            <button id="nextPage" class="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all disabled:bg-gray-600 disabled:text-gray-400 disabled:cursor-not-allowed disabled:hover:bg-gray-600" disabled>
+                                下一页 <i class="fas fa-chevron-right ml-1 text-xs"></i>
                             </button>
-                            <select id="pageSizeSelect" class="ml-2 px-2 py-1 text-sm bg-gray-700 text-white rounded-lg border border-gray-600">
-                                <option value="10">10/页</option>
-                                <option value="20">20/页</option>
-                                <option value="50">50/页</option>
+                        </div>
+                        <div class="mt-3 flex justify-center">
+                            <select id="pageSizeSelect" class="px-3 py-1.5 text-sm bg-gray-700/50 text-gray-300 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-500">
+                                <option value="10">10 条/页</option>
+                                <option value="20">20 条/页</option>
+                                <option value="50">50 条/页</option>
                             </select>
                         </div>
                     </div>
@@ -1567,30 +1569,59 @@
                 if (!confirm) return;
                 
                 if (existingTokens.length > 0) {
-                    ZODIAC_UI.showLoading('正在清除旧战队...');
-                    await ZODIAC_WEB3.clearArenaTeam();
-                    await ZODIAC_WEB3.unstakeArenaNFTs(existingTokens);
+                    try {
+                        await ZODIAC_UI.handleTransaction(
+                            async () => {
+                                await ZODIAC_WEB3.clearArenaTeam();
+                                await ZODIAC_WEB3.unstakeArenaNFTs(existingTokens);
+                            },
+                            {
+                                actionName: '清除旧战队',
+                                loadingMessage: '正在清除旧战队并解除质押...',
+                                successMessage: '旧战队已清除'
+                            }
+                        );
+                    } catch (e) {
+                        console.error('清除旧战队失败:', e);
+                        return;
+                    }
                 }
-                
-                ZODIAC_UI.showLoading('正在检查NFT授权状态...');
                 
                 const isApproved = await nftContract.methods.isApprovedForAll(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer).call();
                 
                 if (!isApproved) {
-                    await ZODIAC_UI.handleTransaction(
-                        () => nftContract.methods.setApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer, true).send({ from: accounts[0] }),
-                        {
-                            actionName: 'NFT授权',
-                            loadingMessage: '正在授权NFT...',
-                            successMessage: 'NFT授权成功'
-                        }
-                    );
+                    try {
+                        await ZODIAC_UI.handleTransaction(
+                            () => nftContract.methods.setApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer, true).send({ from: accounts[0] }),
+                            {
+                                actionName: 'NFT授权',
+                                loadingMessage: '正在授权NFT...',
+                                successMessage: 'NFT授权成功',
+                                showConfirmation: true,
+                                confirmationMessage: '确定要授权所有NFT给竞技场合约吗？这是质押NFT所必需的操作。'
+                            }
+                        );
+                    } catch (e) {
+                        console.error('NFT授权失败:', e);
+                        return;
+                    }
                 }
                 
-                ZODIAC_UI.showLoading('正在质押NFT...');
-                await ZODIAC_WEB3.stakeArenaNFTs(tokenIds);
+                try {
+                    await ZODIAC_UI.handleTransaction(
+                        () => ZODIAC_WEB3.stakeArenaNFTs(tokenIds),
+                        {
+                            actionName: '质押NFT',
+                            loadingMessage: '正在质押NFT到合约...',
+                            successMessage: 'NFT质押成功'
+                        }
+                    );
+                } catch (e) {
+                    console.error('质押NFT失败:', e);
+                    ZODIAC_UI.showToast('质押NFT失败，请检查NFT是否已授权', 'error');
+                    return;
+                }
                 
-                ZODIAC_UI.showLoading('正在设置战队...');
                 let gas;
                 try {
                     const gasResult = await ZODIAC_WEB3.estimateGas(arenaPlayerContract, 'setBattleTeam', [tokenIds], accounts[0]);
@@ -1601,12 +1632,18 @@
                 }
                 
                 const teamArray = [...tokenIds];
-                const receipt = await arenaPlayerContract.methods.setBattleTeam(teamArray).send({ from: accounts[0], gas: gas });
-                
-                ZODIAC_UI.hideLoading();
-                ZODIAC_UI.showToast('战队设置成功！NFT已质押进合约', 'success');
-                updateBattleTeamDisplay();
-                await loadMyTeam();
+                await ZODIAC_UI.handleTransaction(
+                    () => arenaPlayerContract.methods.setBattleTeam(teamArray).send({ from: accounts[0], gas: gas }),
+                    {
+                        actionName: '设置战队',
+                        loadingMessage: '正在设置战队...',
+                        successMessage: '战队设置成功！',
+                        onConfirmation: () => {
+                            updateBattleTeamDisplay();
+                            loadMyTeam();
+                        }
+                    }
+                );
             } catch (error) {
                 ZODIAC_UI.hideLoading();
                 console.error('设置战队失败:', error);
@@ -1618,6 +1655,31 @@
             try {
                 const config = ZODIAC_CONFIG.ARENA_CONFIG;
                 
+                // 预检查：当前赛季是否活跃
+                try {
+                    if (arenaRankingQueryContract) {
+                        const currentSeasonId = await arenaRankingQueryContract.methods.currentSeasonId().call();
+                        if (!currentSeasonId || parseInt(currentSeasonId) <= 0) {
+                            ZODIAC_UI.showToast('当前没有活跃的赛季，无法充值', 'warning');
+                            return;
+                        }
+                    }
+                } catch (seasonError) {
+                    console.warn('检查赛季状态失败:', seasonError);
+                }
+                
+                // 预检查：是否已达最大充值次数
+                try {
+                    const count = await arenaPlayerContract.methods.rechargeCount(accounts[0]).call();
+                    const maxCount = await arenaPlayerContract.methods.maxRechargeAttempts().call();
+                    if (parseInt(count) >= parseInt(maxCount)) {
+                        ZODIAC_UI.showToast('已达到今日最大充值次数限制', 'warning');
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('检查充值次数失败:', e);
+                }
+                
                 // 从合约动态获取充值费用，而不是从配置
                 const rechargeCostWei = await arenaPlayerContract.methods.rechargeCost().call();
                 const rechargeCost = (parseInt(rechargeCostWei) / 10**18).toFixed(0);
@@ -1628,6 +1690,17 @@
                 }
                 
                 const tokenContract = new web3.eth.Contract(ZODIAC_CONFIG.ABIS.tokenABI, ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract);
+                
+                // 预检查：代币余额
+                try {
+                    const balance = await tokenContract.methods.balanceOf(accounts[0]).call();
+                    if (parseInt(balance) < parseInt(rechargeCostWei)) {
+                        ZODIAC_UI.showToast('代币余额不足，无法充值', 'error');
+                        return;
+                    }
+                } catch (e) {
+                    console.warn('检查代币余额失败:', e);
+                }
                 
                 let allowance;
                 try {
@@ -1642,52 +1715,36 @@
                 const requiredAmount = rechargeCostWei;
                 
                 if (allowance < requiredAmount) {
-                    await ZODIAC_UI.handleTransaction(
-                        () => tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer, requiredAmount).send({ from: accounts[0] }),
-                        {
-                            actionName: '代币授权',
-                            loadingMessage: '正在授权代币...',
-                            successMessage: '代币授权成功',
-                            showConfirmation: true,
-                            confirmationMessage: `确定要授权 ${rechargeCost} 代币给竞技场合约用于充值挑战次数吗？`,
-                            onError: (approveError) => {
-                                console.error('授权失败:', approveError);
-                                ZODIAC_UI.showToast('代币授权失败: ' + (approveError.message || '未知错误'), 'error');
+                    try {
+                        await ZODIAC_UI.handleTransaction(
+                            () => tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer, requiredAmount).send({ from: accounts[0] }),
+                            {
+                                actionName: '代币授权',
+                                loadingMessage: '正在授权代币...',
+                                successMessage: '代币授权成功',
+                                showConfirmation: true,
+                                confirmationMessage: `确定要授权 ${rechargeCost} 代币给竞技场合约用于充值挑战次数吗？`
                             }
-                        }
-                    );
-                }
-                
-                let gas;
-                try {
-                    const gasResult = await ZODIAC_WEB3.estimateGas(arenaPlayerContract, 'rechargeChallengeAttempts', [], accounts[0]);
-                    gas = Math.floor(gasResult.gas * 1.2);
-                } catch (gasError) {
-                    console.error('估算Gas失败:', gasError);
-                    gas = 250000;
+                        );
+                    } catch (approveError) {
+                        console.error('授权失败:', approveError);
+                        return;
+                    }
                 }
                 
                 // 从合约获取每次充值获得的挑战次数
-                const rechargeAttempts = await arenaPlayerContract.methods.RECHARGE_ATTEMPTS().call();
+                const rechargeAttemptsNum = await arenaPlayerContract.methods.RECHARGE_ATTEMPTS().call();
                 
                 await ZODIAC_UI.handleTransaction(
-                    () => arenaPlayerContract.methods.rechargeChallengeAttempts().send({ from: accounts[0], gas: gas }),
+                    () => arenaPlayerContract.methods.rechargeChallengeAttempts().send({ from: accounts[0] }),
                     {
                         actionName: '充值挑战次数',
                         loadingMessage: '正在销毁代币获取挑战次数...',
-                        successMessage: `充值成功！销毁 ${rechargeCost} 代币，获得 ${rechargeAttempts} 次挑战机会`,
+                        successMessage: `充值成功！获得 ${rechargeAttemptsNum} 次挑战机会`,
                         showConfirmation: true,
-                        confirmationMessage: `确定要销毁 ${rechargeCost} 代币来获取 ${rechargeAttempts} 次挑战机会吗？`,
+                        confirmationMessage: `确定要消耗 ${rechargeCost} 代币来获取 ${rechargeAttemptsNum} 次挑战机会吗？`,
                         onConfirmation: () => {
                             loadRemainingAttempts();
-                        },
-                        onError: (error) => {
-                            console.error('交易失败:', error);
-                            if (error.message && error.message.includes('Insufficient token allowance')) {
-                                ZODIAC_UI.showToast('代币授权不足，请重新授权', 'error');
-                            } else if (error.message && error.message.includes('Max recharge limit reached')) {
-                                ZODIAC_UI.showToast('已达到最大充值次数限制', 'error');
-                            }
                         }
                     }
                 );
@@ -2152,20 +2209,38 @@
                 }
                 
                 const leaderboard = document.getElementById('leaderboard');
-                leaderboard.innerHTML = topPlayers.map((player, index) => `
-                    <div class="p-2 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors flex items-center" 
+                leaderboard.innerHTML = topPlayers.map((player, index) => {
+                    const rankBadgeColor = player.rank === 1 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' : 
+                                           player.rank === 2 ? 'bg-gradient-to-br from-gray-300 to-gray-500' :
+                                           player.rank === 3 ? 'bg-gradient-to-br from-amber-600 to-amber-800' :
+                                           'bg-gray-700';
+                    const rankTextColor = player.rank <= 3 ? 'text-yellow-400' : 'text-gray-400';
+                    return `
+                    <div class="p-3 bg-white/5 hover:bg-white/10 rounded-xl cursor-pointer transition-all duration-200 flex items-center group border border-transparent hover:border-blue-500/30" 
                          onclick="selectOpponent(${index})">
-                        <div class="rank-badge w-7 h-7 rounded-full flex items-center justify-center text-white font-bold text-xs mr-2">
+                        <div class="${rankBadgeColor} w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3 shadow-lg flex-shrink-0">
                             ${player.rank}
                         </div>
                         <div class="flex-1 min-w-0">
-                            <div class="text-white text-sm font-medium truncate">${player.isMock ? '模拟玩家' + player.rank : shortenAddress(player.address)}</div>
-                            <div class="flex gap-1 mt-1">${player.team && player.team.length > 0 ? player.team.slice(0, 6).map(nft => `<div class="relative"><img src="${nft.imagePath}" alt="${nft.name}" class="w-5 h-5 rounded object-cover" /><span class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-blue-500 rounded-full flex items-center justify-center text-xs text-white font-bold">${nft.level}</span></div>`).join('') : ''}</div>
+                            <div class="text-white text-sm font-semibold truncate mb-1">${player.isMock ? '模拟玩家' + player.rank : shortenAddress(player.address)}</div>
+                            <div class="flex gap-1 items-center">
+                                ${player.team && player.team.length > 0 ? player.team.slice(0, 6).map(nft => `
+                                    <div class="relative w-6 h-6">
+                                        <img src="${nft.imagePath}" alt="${nft.name}" class="w-6 h-6 rounded object-cover border border-white/20" />
+                                        <span class="absolute -bottom-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-[10px] text-white font-bold border border-gray-900">${nft.level}</span>
+                                    </div>
+                                `).join('') : '<span class="text-gray-500 text-xs">暂无战队</span>'}
+                            </div>
                         </div>
-                        <div class="text-yellow-400 text-xs font-medium mr-2">${parseFloat(rewards[index]) > 0 ? rewards[index] : '--'} Token</div>
-                        <div class="text-white text-xs font-medium">${player.points}</div>
+                        <div class="text-right ml-3 flex-shrink-0">
+                            <div class="text-yellow-400 text-sm font-bold">${parseFloat(rewards[index]) > 0 ? rewards[index] : '--'} <span class="text-xs text-yellow-600">Token</span></div>
+                            <div class="text-white/80 text-xs mt-0.5 flex items-center justify-end">
+                                <span class="${rankTextColor} font-semibold">${player.points}</span>
+                                <span class="text-gray-500 ml-1">积分</span>
+                            </div>
+                        </div>
                     </div>
-                `).join('');
+                `}).join('');
             } catch (error) {
                 console.error('加载排行榜失败:', error);
             }
