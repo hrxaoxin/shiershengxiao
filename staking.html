@@ -1190,6 +1190,17 @@
                 document.getElementById('dailyReleaseRatioDisplay').textContent = '--';
                 
                 try {
+                    if (tokenStakingLPContract) {
+                        const rewardRate = await tokenStakingLPContract.methods.rewardRate().call();
+                        const rewardRatePercent = (parseInt(rewardRate, 10) / 100).toFixed(2);
+                        document.getElementById('dailyReleaseRatioDisplay').textContent = rewardRatePercent + '%';
+                        document.getElementById('currentReleaseRatio').textContent = '每日释放比例';
+                    }
+                } catch (e) {
+                    console.warn('读取释放比例失败:', e);
+                }
+                
+                try {
                     const minDuration = await tokenStakingContract.methods.MIN_STAKING_DURATION().call();
                     const minDurationMinutes = Math.floor(parseInt(minDuration, 10) / 60);
                     document.getElementById('tokenMinDuration').textContent = minDurationMinutes;
@@ -1198,7 +1209,11 @@
                 }
 
                 document.getElementById('tokenStakeBtn').disabled = !hasBalance;
-                document.getElementById('tokenUnstakeBtn').disabled = !(stakedAmount && parseInt(stakedAmount, 10) > 0);
+                const hasStaked = stakedAmount && parseInt(stakedAmount, 10) > 0;
+                document.getElementById('tokenUnstakeBtn').disabled = !hasStaked;
+                if (hasStaked) {
+                    document.getElementById('tokenUnstakeAmount').value = web3.utils.fromWei(stakedAmount, 'ether');
+                }
                 document.getElementById('claimTokenRewardsBtn').disabled = !(parseFloat(claimableLP) > 0);
             } catch (error) {
                 console.error('加载代币质押信息失败:', error);

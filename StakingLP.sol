@@ -138,6 +138,16 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         slippage = 1000;
         autoCompoundEnabled = true;
         minCompoundAmount = 1000000000000000;
+        
+        rewardRate = 100;
+        maxRewardRate = 500;
+        maxDailyRewardPercent = 100;
+        rateStep = 10;
+        todayStart = 0;
+        todayRewardAmount = 0;
+        todayIncomingTokens = 0;
+        globalRewardPerWeight = 0;
+        totalWeightedNFTs = 0;
     }
 
     /**

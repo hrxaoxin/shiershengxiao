@@ -144,6 +144,15 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         __Pausable_init();
         authorizer = _authorizerAddress;
         rewardType = RewardType.LP;
+        
+        rewardRate = 100;
+        maxRewardRate = 500;
+        maxDailyRewardPercent = 100;
+        rateStep = 10;
+        todayStart = 0;
+        todayRewardAmount = 0;
+        todayIncomingTokens = 0;
+        dailyRewardPerToken = 0;
     }
     
     /**

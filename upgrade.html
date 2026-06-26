@@ -1128,7 +1128,11 @@
 
         async function handleUpgradeWithNFT() {
             if (!selectedNft) return;
-            if (parseInt(selectedNft.level) >= 5) return;
+            const levelNum = parseInt(selectedNft.level, 10);
+            if (levelNum < 1 || levelNum >= 5) {
+                ZODIAC_UI.showToast('无效的NFT等级，请刷新页面后重试', 'error');
+                return;
+            }
             if (!nftContract || !nftUpdateContract || !account) {
                 ZODIAC_UI.showToast('合约未初始化', 'error');
                 return;
@@ -1233,7 +1237,11 @@
 
         async function handleUpgradeWithToken() {
             if (!selectedNft) return;
-            if (parseInt(selectedNft.level) >= 5) return;
+            const levelNum = parseInt(selectedNft.level, 10);
+            if (levelNum < 1 || levelNum >= 5) {
+                ZODIAC_UI.showToast('无效的NFT等级，请刷新页面后重试', 'error');
+                return;
+            }
             if (!tokenContract || !nftUpdateContract || !account) {
                 ZODIAC_UI.showToast('合约未初始化', 'error');
                 return;
@@ -1340,8 +1348,10 @@
                 return;
             }
             
-            if (parseInt(selectedNft.level) >= 5) {
-                console.log('handleUpgradeWithUSDValue - level >= 5');
+            const levelNum = parseInt(selectedNft.level, 10);
+            if (levelNum < 1 || levelNum >= 5) {
+                console.log('handleUpgradeWithUSDValue - invalid level:', levelNum);
+                ZODIAC_UI.showToast('无效的NFT等级，请刷新页面后重试', 'error');
                 return;
             }
             
