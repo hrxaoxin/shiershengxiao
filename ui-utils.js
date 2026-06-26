@@ -355,6 +355,53 @@ window.ZODIAC_UI = (function() {
         handleContractError(error, actionName);
     }
 
+    async function handleTransaction(transactionFactory, options) {
+        const {
+            actionName = '交易',
+            loadingMessage = '处理中...',
+            successMessage = '操作成功',
+            showConfirmation = false,
+            confirmationMessage = '确定要执行此操作吗？',
+            onConfirmation = null,
+            onError = null
+        } = options || {};
+
+        if (showConfirmation) {
+            const confirm = await showConfirmModal(actionName, confirmationMessage);
+            if (!confirm) {
+                return;
+            }
+        }
+
+        showLoading(loadingMessage);
+
+        try {
+            const transactionPromise = typeof transactionFactory === 'function' 
+                ? transactionFactory() 
+                : transactionFactory;
+            const result = await transactionPromise;
+            hideLoading();
+            showToast(successMessage, 'success');
+            
+            if (typeof onConfirmation === 'function') {
+                onConfirmation(result);
+            }
+            
+            return result;
+        } catch (error) {
+            hideLoading();
+            console.error(`[ZODIAC_UI] ${actionName}失败:`, error);
+            
+            if (typeof onError === 'function') {
+                onError(error);
+            } else {
+                handleContractError(error, actionName);
+            }
+            
+            throw error;
+        }
+    }
+
     // --- NFT Tooltip ---
     let nftTooltip = null;
 
@@ -533,6 +580,7 @@ window.ZODIAC_UI = (function() {
         showConfirmModal,
         handleContractError,
         handleError,
+        handleTransaction,
         initGlobalErrorHandler,
         initNFTTooltips
     };

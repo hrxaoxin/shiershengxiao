@@ -1537,9 +1537,9 @@
                     return;
                 }
                 
-                // 从 ArenaPlayer 检查是否已有战队（而不是从 ArenaBattle）
                 const currentTeam = await arenaPlayerContract.methods.getPlayerBattleTeam(accounts[0]).call();
                 const existingTokens = currentTeam.filter(id => id !== '0' && id !== 0);
+                
                 if (existingTokens.length > 0) {
                     const confirm = await ZODIAC_UI.showConfirmModal(
                         '替换战队',
@@ -1572,21 +1572,45 @@
                 const isApproved = await nftContract.methods.isApprovedForAll(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer).call();
                 
                 if (!isApproved) {
-                    ZODIAC_UI.showLoading('正在授权NFT...');
-                    await nftContract.methods.setApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer, true).send({ from: accounts[0] });
+                    await ZODIAC_UI.handleTransaction(
+                        () => nftContract.methods.setApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer, true).send({ from: accounts[0] }),
+                        {
+                            actionName: 'NFT授权',
+                            loadingMessage: '正在授权NFT...',
+                            successMessage: 'NFT授权成功',
+                            showConfirmation: true,
+                            confirmationMessage: '确定要授权NFT给竞技场合约吗？授权后合约可以转移您的NFT用于战斗质押。'
+                        }
+                    );
                 }
                 
                 ZODIAC_UI.showLoading('正在质押NFT...');
                 await ZODIAC_WEB3.stakeArenaNFTs(tokenIds);
                 
                 ZODIAC_UI.showLoading('正在设置战队...');
-                const gasResult = await ZODIAC_WEB3.estimateGas(arenaPlayerContract, 'setBattleTeam', [tokenIds], accounts[0]);
-                await arenaPlayerContract.methods.setBattleTeam(tokenIds).send({ from: accounts[0], gas: gasResult.gas });
+                let gas;
+                try {
+                    const gasResult = await ZODIAC_WEB3.estimateGas(arenaPlayerContract, 'setBattleTeam', [tokenIds], accounts[0]);
+                    gas = Math.floor(gasResult.gas * 1.2);
+                } catch (gasError) {
+                    console.error('估算Gas失败:', gasError);
+                    gas = 300000;
+                }
                 
-                ZODIAC_UI.hideLoading();
-                ZODIAC_UI.showToast('战队设置成功！NFT已质押进合约', 'success');
-                updateBattleTeamDisplay();
-                await loadMyTeam();
+                await ZODIAC_UI.handleTransaction(
+                    () => arenaPlayerContract.methods.setBattleTeam(tokenIds).send({ from: accounts[0], gas: gas }),
+                    {
+                        actionName: '保存战队',
+                        loadingMessage: '正在设置战队...',
+                        successMessage: '战队设置成功！NFT已质押进合约',
+                        showConfirmation: true,
+                        confirmationMessage: '确定要保存战队并质押NFT吗？战斗期间NFT将不可转移。',
+                        onConfirmation: () => {
+                            updateBattleTeamDisplay();
+                            loadMyTeam();
+                        }
+                    }
+                );
             } catch (error) {
                 ZODIAC_UI.hideLoading();
                 console.error('设置战队失败:', error);
@@ -1622,36 +1646,36 @@
                 const requiredAmount = rechargeCostWei;
                 
                 if (allowance < requiredAmount) {
-                    try {
-                        ZODIAC_UI.showLoading('正在授权代币...');
-                        const approveTx = await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer, requiredAmount).send({ from: accounts[0] });
-                        if (!approveTx.status) {
-                            throw new Error('代币授权失败');
+                    await ZODIAC_UI.handleTransaction(
+                        () => tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer, requiredAmount).send({ from: accounts[0] }),
+                        {
+                            actionName: '代币授权',
+                            loadingMessage: '正在授权代币...',
+                            successMessage: '代币授权成功',
+                            showConfirmation: true,
+                            confirmationMessage: `确定要授权 ${rechargeCost} 代币给竞技场合约用于充值挑战次数吗？`,
+                            onError: (approveError) => {
+                                console.error('授权失败:', approveError);
+                                ZODIAC_UI.showToast('代币授权失败: ' + (approveError.message || '未知错误'), 'error');
+                            }
                         }
-                        ZODIAC_UI.hideLoading();
-                        ZODIAC_UI.showToast('代币授权成功', 'success');
-                    } catch (approveError) {
-                        ZODIAC_UI.hideLoading();
-                        console.error('授权失败:', approveError);
-                        ZODIAC_UI.showToast('代币授权失败: ' + (approveError.message || '未知错误'), 'error');
-                        return;
-                    }
+                    );
                 }
                 
                 let gas;
                 try {
                     const gasResult = await ZODIAC_WEB3.estimateGas(arenaPlayerContract, 'rechargeChallengeAttempts', [], accounts[0]);
-                    gas = gasResult.gas;
+                    gas = Math.floor(gasResult.gas * 1.2);
                 } catch (gasError) {
                     console.error('估算Gas失败:', gasError);
-                    gas = 200000;
+                    gas = 250000;
                 }
                 
                 // 从合约获取每次充值获得的挑战次数
                 const rechargeAttempts = await arenaPlayerContract.methods.RECHARGE_ATTEMPTS().call();
                 
                 await ZODIAC_UI.handleTransaction(
-                    arenaPlayerContract.methods.rechargeChallengeAttempts().send({ from: accounts[0], gas: gas }),
+                    () => arenaPlayerContract.methods.rechargeChallengeAttempts().send({ from: accounts[0], gas: gas }),
                     {
                         actionName: '充值挑战次数',
                         loadingMessage: '正在销毁代币获取挑战次数...',
