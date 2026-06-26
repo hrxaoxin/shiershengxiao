@@ -954,6 +954,7 @@
                     if (price > 0n) {
                         // 公式: tokenAmount(18位精度) = usdAmountWei(18位精度) * 1e18 / price(18位精度)
                         // price 是18位精度的 USDT/Token 价格，需要除以1e18得到真实价格
+                        const usdWeiBigInt = BigInt(String(requiredUSDWei));
                         const tokenAmount = usdWeiBigInt * 10n**18n / price;
                         console.log('selectNFT - calculated tokenAmount:', tokenAmount.toString());
                         

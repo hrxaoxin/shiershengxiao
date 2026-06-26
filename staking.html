@@ -203,14 +203,14 @@
             </div>
 
             <div class="info-box mb-8">
-                <h3 class="text-xl font-bold text-gray-800 mb-4">🎁 LP奖励信息</h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-4" id="rewardInfoTitle">🎁 LP奖励信息</h3>
                 <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg mb-4">
-                    <span class="text-lg font-medium text-gray-800">可领取LP奖励</span>
+                    <span class="text-lg font-medium text-gray-800" id="rewardLabel">可领取LP奖励</span>
                     <span class="text-lg font-bold text-purple-600" id="rewardsAmount">0.00</span>
                 </div>
                 <div class="p-4 bg-purple-50 rounded-lg mb-4">
-                    <div class="text-sm text-purple-600 font-medium mb-2">💡 LP奖励说明</div>
-                    <p class="text-xs text-gray-600">LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包，您将获得双重收益：项目分红 + DEX交易手续费</p>
+                    <div class="text-sm text-purple-600 font-medium mb-2" id="rewardDescTitle">💡 LP奖励说明</div>
+                    <p class="text-xs text-gray-600" id="rewardDescText">LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包，您将获得双重收益：项目分红 + DEX交易手续费</p>
                 </div>
                 <div id="rewardEstimate" class="p-4 bg-blue-50 rounded-lg mb-4">
                     <div class="text-sm text-blue-600 font-medium mb-2">📈 收益预估</div>
@@ -232,7 +232,7 @@
                     </div>
                 </div>
                 <button id="claimBtn" class="btn-primary w-full" disabled>
-                    <i class="fas fa-gift mr-2"></i>领取LP奖励
+                    <i class="fas fa-gift mr-2"></i><span id="claimBtnText">领取LP奖励</span>
                 </button>
             </div>
 
@@ -299,7 +299,7 @@
                             <p class="text-xl font-bold text-gray-800" id="myTokenStakeAmount">0.00</p>
                         </div>
                         <div class="p-4 bg-gray-50 rounded-lg">
-                            <span class="text-sm text-gray-600">可领取LP奖励</span>
+                            <span class="text-sm text-gray-600" id="tokenRewardLabel">可领取LP奖励</span>
                             <p class="text-xl font-bold text-purple-600" id="tokenRewardsAmount">0.00</p>
                         </div>
                         <div class="p-4 bg-gray-50 rounded-lg">
@@ -344,17 +344,17 @@
             </div>
 
             <div class="info-box">
-                <h3 class="text-xl font-bold text-gray-800 mb-4">🎯 领取LP奖励</h3>
+                <h3 class="text-xl font-bold text-gray-800 mb-4" id="tokenRewardTitle">🎯 领取LP奖励</h3>
                 <div class="p-4 bg-purple-50 rounded-lg mb-4">
-                    <div class="text-sm text-purple-600 font-medium mb-2">💡 LP奖励说明</div>
-                    <p class="text-xs text-gray-600">LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包</p>
+                    <div class="text-sm text-purple-600 font-medium mb-2" id="tokenRewardDescTitle">💡 LP奖励说明</div>
+                    <p class="text-xs text-gray-600" id="tokenRewardDescText">LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包</p>
                 </div>
                 <div class="flex justify-between items-center p-4 bg-gray-50 rounded-lg mb-4">
-                    <span class="text-lg font-medium text-gray-800">可领取LP奖励</span>
+                    <span class="text-lg font-medium text-gray-800" id="tokenRewardAmountLabel">可领取LP奖励</span>
                     <span class="text-lg font-bold text-purple-600" id="claimableBNB">0.00</span>
                 </div>
                 <button id="claimTokenRewardsBtn" class="btn-primary w-full" disabled>
-                    <i class="fas fa-gift mr-2"></i>领取LP奖励
+                    <i class="fas fa-gift mr-2"></i><span id="claimTokenRewardsBtnText">领取LP奖励</span>
                 </button>
             </div>
         </div>
@@ -934,19 +934,80 @@
         }
 
         function updateRewardDescription(rewardType) {
-            const descElement = document.querySelector('#rewardEstimate .text-xs.text-gray-500');
-            if (!descElement) return;
+            const type = parseInt(rewardType);
+            const displayText = getRewardDisplayText(type);
+            const icon = type === 2 ? '💰' : (type === 1 ? '🪙' : '🎁');
             
-            switch(parseInt(rewardType)) {
-                case 0:
-                    descElement.textContent = '收益预估基于当前总权重计算，实际收益可能因其他用户质押/解质押而变化。LP奖励领取后自动兑换为代币和WBNB';
-                    break;
-                case 1:
-                    descElement.textContent = '收益预估基于当前总权重计算，实际收益可能因其他用户质押/解质押而变化';
-                    break;
-                case 2:
-                    descElement.textContent = '收益预估基于当前总权重计算，实际收益可能因其他用户质押/解质押而变化。BNB奖励直接发放至钱包';
-                    break;
+            const rewardInfoTitle = document.getElementById('rewardInfoTitle');
+            if (rewardInfoTitle) rewardInfoTitle.textContent = icon + ' ' + displayText + '信息';
+            
+            const rewardLabel = document.getElementById('rewardLabel');
+            if (rewardLabel) rewardLabel.textContent = '可领取' + displayText;
+            
+            const rewardDescTitle = document.getElementById('rewardDescTitle');
+            if (rewardDescTitle) rewardDescTitle.textContent = '💡 ' + displayText + '说明';
+            
+            const rewardDescText = document.getElementById('rewardDescText');
+            if (rewardDescText) {
+                switch(type) {
+                    case 0:
+                        rewardDescText.textContent = 'LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包，您将获得双重收益：项目分红 + DEX交易手续费';
+                        break;
+                    case 1:
+                        rewardDescText.textContent = '代币奖励直接发放至您的钱包';
+                        break;
+                    case 2:
+                        rewardDescText.textContent = 'BNB奖励直接发放至您的钱包';
+                        break;
+                }
+            }
+            
+            const claimBtnText = document.getElementById('claimBtnText');
+            if (claimBtnText) claimBtnText.textContent = '领取' + displayText;
+            
+            const tokenRewardLabel = document.getElementById('tokenRewardLabel');
+            if (tokenRewardLabel) tokenRewardLabel.textContent = '可领取' + displayText;
+            
+            const tokenRewardTitle = document.getElementById('tokenRewardTitle');
+            if (tokenRewardTitle) tokenRewardTitle.textContent = '🎯 领取' + displayText;
+            
+            const tokenRewardDescTitle = document.getElementById('tokenRewardDescTitle');
+            if (tokenRewardDescTitle) tokenRewardDescTitle.textContent = '💡 ' + displayText + '说明';
+            
+            const tokenRewardDescText = document.getElementById('tokenRewardDescText');
+            if (tokenRewardDescText) {
+                switch(type) {
+                    case 0:
+                        tokenRewardDescText.textContent = 'LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包';
+                        break;
+                    case 1:
+                        tokenRewardDescText.textContent = '代币奖励直接发放至您的钱包';
+                        break;
+                    case 2:
+                        tokenRewardDescText.textContent = 'BNB奖励直接发放至您的钱包';
+                        break;
+                }
+            }
+            
+            const tokenRewardAmountLabel = document.getElementById('tokenRewardAmountLabel');
+            if (tokenRewardAmountLabel) tokenRewardAmountLabel.textContent = '可领取' + displayText;
+            
+            const claimTokenRewardsBtnText = document.getElementById('claimTokenRewardsBtnText');
+            if (claimTokenRewardsBtnText) claimTokenRewardsBtnText.textContent = '领取' + displayText;
+            
+            const descElement = document.querySelector('#rewardEstimate .text-xs.text-gray-500');
+            if (descElement) {
+                switch(type) {
+                    case 0:
+                        descElement.textContent = '收益预估基于当前总权重计算，实际收益可能因其他用户质押/解质押而变化。LP奖励领取后自动兑换为代币和WBNB';
+                        break;
+                    case 1:
+                        descElement.textContent = '收益预估基于当前总权重计算，实际收益可能因其他用户质押/解质押而变化';
+                        break;
+                    case 2:
+                        descElement.textContent = '收益预估基于当前总权重计算，实际收益可能因其他用户质押/解质押而变化。BNB奖励直接发放至钱包';
+                        break;
+                }
             }
         }
 

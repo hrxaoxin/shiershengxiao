@@ -545,4 +545,306 @@ library LPLib {
         }
         return 0;
     }
+
+    struct RewardPoolState {
+        uint256 lpRewardPoolBalance;
+        uint256 tokenRewardPoolBalance;
+        uint256 bnbRewardPoolBalance;
+        uint256 totalWeightedNFTs;
+        uint256 globalRewardPerWeight;
+        uint256 stakingRewardPrecision;
+        RewardType rewardType;
+        uint256 todayStart;
+        uint256 rewardRate;
+        uint256 maxRewardRate;
+        uint256 maxDailyRewardPercent;
+        uint256 rateStep;
+        uint256 todayRewardAmount;
+        uint256 todayIncomingTokens;
+        uint256 rewardPrecision;
+    }
+
+    error RP_InvalidAmount();
+    error RP_LPOverflow();
+    error RP_TokenOverflow();
+    error RP_BNBOverflow();
+
+    event LPAddedToPool(uint256 lpAmount);
+    event TokenAddedToPool(uint256 tokenAmount);
+    event BNBAddedToPool(uint256 bnbAmount);
+
+    function addToRewardPool(
+        RewardPoolState memory state,
+        uint256 amount,
+        RewardType type_
+    ) internal returns (RewardPoolState memory) {
+        if (type_ == RewardType.LP) {
+            uint256 newBalance = state.lpRewardPoolBalance + amount;
+            if (newBalance < state.lpRewardPoolBalance) revert RP_LPOverflow();
+            state.lpRewardPoolBalance = newBalance;
+            emit LPAddedToPool(amount);
+        } else if (type_ == RewardType.TOKEN) {
+            uint256 newBalance = state.tokenRewardPoolBalance + amount;
+            if (newBalance < state.tokenRewardPoolBalance) revert RP_TokenOverflow();
+            state.tokenRewardPoolBalance = newBalance;
+            emit TokenAddedToPool(amount);
+        } else if (type_ == RewardType.BNB) {
+            uint256 newBalance = state.bnbRewardPoolBalance + amount;
+            if (newBalance < state.bnbRewardPoolBalance) revert RP_BNBOverflow();
+            state.bnbRewardPoolBalance = newBalance;
+            emit BNBAddedToPool(amount);
+        }
+
+        if (state.totalWeightedNFTs > 0 && (type_ == RewardType.LP || type_ == RewardType.TOKEN)) {
+            uint256 increment = (amount * state.stakingRewardPrecision) / state.totalWeightedNFTs;
+            if (state.globalRewardPerWeight > type(uint256).max - increment) revert RP_InvalidAmount();
+            state.globalRewardPerWeight += increment;
+        }
+
+        return state;
+    }
+
+    function convertPoolAssets(
+        RewardPoolState memory state,
+        IAuthorizer authorizer,
+        RewardType fromType,
+        RewardType toType
+    ) internal returns (RewardPoolState memory) {
+        if (fromType == RewardType.LP && toType == RewardType.TOKEN) {
+            if (state.lpRewardPoolBalance > 0) {
+                uint256 tokenAmount = redeemLPToToken(authorizer, state.lpRewardPoolBalance);
+                state.lpRewardPoolBalance = 0;
+                if (tokenAmount > 0) {
+                    state.tokenRewardPoolBalance += tokenAmount;
+                }
+            }
+        } else if (fromType == RewardType.LP && toType == RewardType.BNB) {
+            if (state.lpRewardPoolBalance > 0) {
+                uint256 wbnbAmount = redeemLPToWBNB(authorizer, state.lpRewardPoolBalance);
+                state.lpRewardPoolBalance = 0;
+                if (wbnbAmount > 0) {
+                    state.bnbRewardPoolBalance += wbnbAmount;
+                }
+            }
+        } else if (fromType == RewardType.TOKEN && toType == RewardType.LP) {
+            if (state.tokenRewardPoolBalance > 0) {
+                uint256 lpAmount = convertTokenToLP(authorizer, state.tokenRewardPoolBalance);
+                state.tokenRewardPoolBalance = 0;
+                if (lpAmount > 0) {
+                    state.lpRewardPoolBalance += lpAmount;
+                }
+            }
+        } else if (fromType == RewardType.TOKEN && toType == RewardType.BNB) {
+            if (state.tokenRewardPoolBalance > 0) {
+                uint256 bnbAmount = swapTokenToBNB(authorizer, state.tokenRewardPoolBalance);
+                state.tokenRewardPoolBalance = 0;
+                if (bnbAmount > 0) {
+                    state.bnbRewardPoolBalance += bnbAmount;
+                }
+            }
+        } else if (fromType == RewardType.BNB && toType == RewardType.LP) {
+            if (state.bnbRewardPoolBalance > 0) {
+                uint256 lpAmount = convertBNBToLP(authorizer, state.bnbRewardPoolBalance);
+                state.bnbRewardPoolBalance = 0;
+                if (lpAmount > 0) {
+                    state.lpRewardPoolBalance += lpAmount;
+                }
+            }
+        } else if (fromType == RewardType.BNB && toType == RewardType.TOKEN) {
+            if (state.bnbRewardPoolBalance > 0) {
+                uint256 tokenAmount = swapBNBToToken(authorizer, state.bnbRewardPoolBalance);
+                state.bnbRewardPoolBalance = 0;
+                if (tokenAmount > 0) {
+                    state.tokenRewardPoolBalance += tokenAmount;
+                }
+            }
+        }
+
+        return state;
+    }
+
+    function processIncomingBNB(
+        RewardPoolState memory state,
+        IAuthorizer authorizer,
+        RewardType rewardType,
+        uint256 amount
+    ) internal returns (RewardPoolState memory) {
+        if (rewardType == RewardType.LP) {
+            uint256 lpAmount = convertBNBToLP(authorizer, amount);
+            if (lpAmount > 0) {
+                state = addToRewardPool(state, lpAmount, RewardType.LP);
+            }
+        } else if (rewardType == RewardType.TOKEN) {
+            uint256 tokenAmount = swapBNBToToken(authorizer, amount);
+            if (tokenAmount > 0) {
+                state = addToRewardPool(state, tokenAmount, RewardType.TOKEN);
+            }
+        } else {
+            state = addToRewardPool(state, amount, RewardType.BNB);
+        }
+
+        return state;
+    }
+
+    function processIncomingToken(
+        RewardPoolState memory state,
+        IAuthorizer authorizer,
+        RewardType rewardType,
+        address token,
+        uint256 amount
+    ) internal returns (RewardPoolState memory) {
+        address wbnb = authorizer.getWBNB();
+        address mainToken = authorizer.getToken();
+
+        if (token == wbnb) {
+            if (rewardType == RewardType.LP) {
+                IWBNB(wbnb).withdraw(amount);
+                uint256 lpAmount = convertBNBToLP(authorizer, amount);
+                if (lpAmount > 0) {
+                    state = addToRewardPool(state, lpAmount, RewardType.LP);
+                }
+            } else if (rewardType == RewardType.TOKEN) {
+                uint256 tokenAmount = swapWBNBToToken(authorizer, amount);
+                if (tokenAmount > 0) {
+                    state = addToRewardPool(state, tokenAmount, RewardType.TOKEN);
+                }
+            } else {
+                IWBNB(wbnb).withdraw(amount);
+                state = addToRewardPool(state, amount, RewardType.BNB);
+            }
+        } else if (token == mainToken) {
+            if (rewardType == RewardType.LP) {
+                uint256 lpAmount = convertTokenToLP(authorizer, amount);
+                if (lpAmount > 0) {
+                    state = addToRewardPool(state, lpAmount, RewardType.LP);
+                }
+            } else if (rewardType == RewardType.TOKEN) {
+                state = addToRewardPool(state, amount, RewardType.TOKEN);
+            } else {
+                uint256 bnbAmount = swapTokenToBNB(authorizer, amount);
+                if (bnbAmount > 0) {
+                    state = addToRewardPool(state, bnbAmount, RewardType.BNB);
+                }
+            }
+        } else {
+            uint256 bnbAmount = swapTokenToBNB(authorizer, amount);
+            if (bnbAmount > 0) {
+                state = processIncomingBNB(state, authorizer, rewardType, bnbAmount);
+            }
+        }
+
+        return state;
+    }
+
+    error MIG_SameDEX();
+    error MIG_ZeroAmount();
+    error MIG_InsufficientLP();
+    error MIG_RedeemFailed();
+    error MIG_CreateFailed();
+
+    event LPMigrated(uint8 oldDexType, uint8 newDexType, uint256 oldLPAmount, uint256 newLPAmount);
+
+    function migrateLP(
+        RewardPoolState memory state,
+        IAuthorizer authorizer,
+        uint8 oldDexType,
+        uint8 newDexType,
+        uint256 lpAmount
+    ) internal returns (RewardPoolState memory, uint256) {
+        if (oldDexType == newDexType) revert MIG_SameDEX();
+        if (lpAmount == 0) revert MIG_ZeroAmount();
+        if (lpAmount > state.lpRewardPoolBalance) revert MIG_InsufficientLP();
+
+        uint256 tokenAmount;
+        uint256 wbnbAmount;
+        
+        (tokenAmount, wbnbAmount) = authorizer.redeemLPFromDEX(lpAmount, oldDexType);
+        
+        if (tokenAmount == 0 && wbnbAmount == 0) revert MIG_RedeemFailed();
+
+        uint256 newLPAmount = authorizer.convertToLP(tokenAmount, wbnbAmount, newDexType);
+        
+        if (newLPAmount == 0) revert MIG_CreateFailed();
+
+        state.lpRewardPoolBalance -= lpAmount;
+        state.lpRewardPoolBalance += newLPAmount;
+        
+        emit LPMigrated(oldDexType, newDexType, lpAmount, newLPAmount);
+        return (state, newLPAmount);
+    }
+
+    event DailyRewardCalculated(uint256 dailyReward, uint256 rewardPerWeight);
+    event RewardRateUpdated(uint256 newRate);
+
+    function calculateDailyReward(RewardPoolState memory state) internal returns (RewardPoolState memory) {
+        uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
+        if (currentDayStart <= state.todayStart) return state;
+
+        state.todayStart = currentDayStart;
+        state.rewardRate = 100;
+
+        RewardType currentType = state.rewardType;
+        uint256 poolBalance;
+
+        if (currentType == RewardType.LP) {
+            poolBalance = state.lpRewardPoolBalance;
+        } else if (currentType == RewardType.TOKEN) {
+            poolBalance = state.tokenRewardPoolBalance;
+        } else {
+            poolBalance = state.bnbRewardPoolBalance;
+        }
+
+        if (poolBalance == 0 || state.totalWeightedNFTs == 0) {
+            state.todayRewardAmount = 0;
+            state.todayIncomingTokens = 0;
+            return state;
+        }
+
+        uint256 expectedDailyReward = poolBalance * state.rewardRate / state.rewardPrecision;
+        
+        if (expectedDailyReward > 0 && state.todayIncomingTokens > expectedDailyReward) {
+            uint256 multiple = state.todayIncomingTokens / expectedDailyReward;
+            uint256 steps = multiple - 1;
+            uint256 maxSteps = (state.maxRewardRate - state.rewardRate) / state.rateStep;
+
+            if (steps > maxSteps) {
+                steps = maxSteps;
+            }
+
+            uint256 newRate = state.rewardRate + (steps * state.rateStep);
+
+            if (newRate != state.rewardRate) {
+                state.rewardRate = newRate;
+                emit RewardRateUpdated(state.rewardRate);
+            }
+        }
+
+        uint256 dailyReward = poolBalance * state.rewardRate / state.rewardPrecision;
+        uint256 maxDailyReward = poolBalance * state.maxDailyRewardPercent / 1000;
+        
+        if (dailyReward > maxDailyReward) {
+            dailyReward = maxDailyReward;
+        }
+
+        if (dailyReward > 0) {
+            uint256 increment = (dailyReward * state.stakingRewardPrecision) / state.totalWeightedNFTs;
+            state.globalRewardPerWeight += increment;
+            state.todayRewardAmount = dailyReward;
+            
+            if (currentType == RewardType.LP) {
+                state.lpRewardPoolBalance -= dailyReward;
+            } else if (currentType == RewardType.TOKEN) {
+                state.tokenRewardPoolBalance -= dailyReward;
+            } else {
+                state.bnbRewardPoolBalance -= dailyReward;
+            }
+            
+            emit DailyRewardCalculated(dailyReward, increment);
+        } else {
+            state.todayRewardAmount = 0;
+        }
+
+        state.todayIncomingTokens = 0;
+        return state;
+    }
 }

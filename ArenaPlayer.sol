@@ -38,7 +38,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
  * - onlyOwner：暂停合约、设置参数
  * - onlyAuthorized：质押、解除质押、设置队伍
  */
-contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable, IERC721Receiver {
     using SafeERC20 for IERC20;
     
     /**
@@ -180,8 +180,8 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return bytes4 接收接口ID
      * @notice 允许合约接收NFT质押
      */
-    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
-        return IERC721Receiver.onERC721Received.selector;
+    function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external override returns (bytes4) {
+        return 0x150b7a02;
     }
 
     /**
