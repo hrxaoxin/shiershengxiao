@@ -1378,13 +1378,22 @@
                         nftMintContract.methods.tokenLevel(tid).call(),
                         nftMintContract.methods.tokenGrowth(tid).call(),
                         nftTradingContract.methods.getListingInfo(tid).call().catch(() => ['0x0000000000000000000000000000000000000000', '0', '0'])
-                    ]).then(([nftType, nftLevel, nftGrowth, listingInfo]) => ({
-                        tokenId: tid,
-                        type: parseInt(nftType, 10),
-                        level: parseInt(nftLevel, 10),
-                        growth: parseInt(nftGrowth, 10),
-                        isListed: listingInfo[0] !== '0x0000000000000000000000000000000000000000'
-                    }));
+                    ]).then(([nftType, nftLevel, nftGrowth, listingInfo]) => {
+                        let isListed = false;
+                        if (Array.isArray(listingInfo) && listingInfo.length >= 3) {
+                            isListed = listingInfo[0] !== '0x0000000000000000000000000000000000000000' && listingInfo[0] !== null && listingInfo[0] !== undefined;
+                        } else if (listingInfo && typeof listingInfo === 'object') {
+                            const seller = listingInfo.seller || listingInfo[0];
+                            isListed = seller && seller !== '0x0000000000000000000000000000000000000000';
+                        }
+                        return {
+                            tokenId: tid,
+                            type: parseInt(nftType, 10),
+                            level: parseInt(nftLevel, 10),
+                            growth: parseInt(nftGrowth, 10),
+                            isListed: isListed
+                        };
+                    });
                 });
 
                 const nfts = await Promise.all(nftPromises);

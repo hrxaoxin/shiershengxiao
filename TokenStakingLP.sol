@@ -143,7 +143,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         __ReentrancyGuard_init();
         __Pausable_init();
         authorizer = _authorizerAddress;
-        rewardType = RewardType.LP;
+        rewardType = RewardType.BNB;
         
         rewardRate = 100;
         maxRewardRate = 500;

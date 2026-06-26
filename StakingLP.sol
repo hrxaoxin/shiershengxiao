@@ -133,7 +133,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         __Pausable_init();
         
         authorizer = _authorizerAddress;
-        rewardType = RewardType.LP;
+        rewardType = RewardType.BNB;
         
         slippage = 1000;
         autoCompoundEnabled = true;

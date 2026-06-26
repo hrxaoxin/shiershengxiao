@@ -1104,10 +1104,10 @@
         }
 
         async function updateApprovalStatus() {
-            if (!accounts.length || !tokenContract) return;
+            if (!accounts.length || !nftContract) return;
             try {
-                const allowance = await tokenContract.methods.allowance(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer).call();
-                if (BigInt(allowance) > 0n) {
+                const isApproved = await nftContract.methods.isApprovedForAll(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer).call();
+                if (isApproved) {
                     document.getElementById('approvalStatus').textContent = '已授权';
                     document.getElementById('approvalStatus').className = 'text-lg font-semibold text-green-400';
                 } else {
@@ -1228,6 +1228,7 @@
                     const tokenInfo = await nftContract.methods.getNFTData(tokenId).call();
                     const tokenType = tokenInfo.tokenType_;
                     const level = tokenInfo.level;
+                    const growth = tokenInfo.growth || '0';
                     
                     const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
                     const zodiac = nftInfo.animalName;
@@ -1252,7 +1253,8 @@
                         tokenId: tokenId,
                         tokenType: tokenType,
                         level: level,
-                        attr: nftInfo.attrName,
+                        growth: growth,
+                        attr: nftInfo.elementKey,
                         attrName: nftInfo.attrName,
                         zodiacIndex: nftInfo.zodiacIndex,
                         zodiac: zodiac,
@@ -1379,7 +1381,7 @@
                                 ${nft.isStaked ? '<div class="absolute -top-1 -right-1 w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center text-xs">🔒</div>' : ''}
                             </div>
                             <div class="text-white text-sm font-medium">${nft.name}</div>
-                            <div class="text-gray-400 text-xs">Lv.${nft.level} ${ELEMENT_EMOJIS[nft.attr]}</div>
+                            <div class="text-gray-400 text-xs">Lv.${nft.level} 成长:${nft.growth}</div>
                             ${isCurrent ? '<div class="text-xs text-green-400 mt-1">✓ 当前选中</div>' : ''}
                             ${isInTeam ? '<div class="text-xs text-red-400 mt-1">已在队伍中</div>' : ''}
                             ${nft.isStaked ? '<div class="text-xs text-yellow-400 mt-1">已质押</div>' : ''}
@@ -1566,8 +1568,8 @@
                 await ZODIAC_WEB3.stakeArenaNFTs(tokenIds);
                 
                 ZODIAC_UI.showLoading('正在设置战队...');
-                const gas = await ZODIAC_WEB3.estimateGas(arenaPlayerContract, 'setBattleTeam', [tokenIds], accounts[0]);
-                await arenaPlayerContract.methods.setBattleTeam(tokenIds).send({ from: accounts[0], gas: gas });
+                const gasResult = await ZODIAC_WEB3.estimateGas(arenaPlayerContract, 'setBattleTeam', [tokenIds], accounts[0]);
+                await arenaPlayerContract.methods.setBattleTeam(tokenIds).send({ from: accounts[0], gas: gasResult.gas });
                 
                 ZODIAC_UI.hideLoading();
                 ZODIAC_UI.showToast('战队设置成功！NFT已质押进合约', 'success');
@@ -1626,7 +1628,8 @@
                 
                 let gas;
                 try {
-                    gas = await ZODIAC_WEB3.estimateGas(arenaPlayerContract, 'rechargeChallengeAttempts', [], accounts[0]);
+                    const gasResult = await ZODIAC_WEB3.estimateGas(arenaPlayerContract, 'rechargeChallengeAttempts', [], accounts[0]);
+                    gas = gasResult.gas;
                 } catch (gasError) {
                     console.error('估算Gas失败:', gasError);
                     gas = 200000;
@@ -2081,13 +2084,13 @@
                 document.getElementById('leaderboard').dataset.leaderboardData = JSON.stringify(topPlayers);
                 
                 // 获取当前用户的排名
-                if (account) {
+                if (accounts.length > 0) {
                     try {
-                        const userRank = await arenaRankingQueryContract.methods.getPlayerRank(account).call();
+                        const userRank = await arenaRankingQueryContract.methods.getPlayerRank(accounts[0]).call();
                         const userRankNum = parseInt(userRank) || 0;
                         
                         if (userRankNum > 0) {
-                            const myStats = await arenaBattleContract.methods.getPlayerRecord(account).call();
+                            const myStats = await arenaBattleContract.methods.getPlayerRecord(accounts[0]).call();
                             const userPoints = parseInt(myStats[0] || '0');
                             
                             const myRankDiv = document.getElementById('myRankDisplay');
