@@ -156,7 +156,7 @@ window.ZODIAC_CONFIG = (function() {
         nftMint: getEnvContractAddress('nftMint', '0x3648Dd17DD1170FEC42D2BE05CA86E98D5D97d3c'),
         nftMintMetadata: getEnvContractAddress('nftMintMetadata', '0xf03215F849a0a665f5eCa46c2904553a42b4b1c6'),
         nftUpdate: getEnvContractAddress('nftUpdate', '0xACCFe0A44Bb0aA6d3CcD530D700ce07656c9C38F'),
-        nftData: getEnvContractAddress('nftData', '0x14831094CfEa15766A5e06FD779eeadcB9259B71'),
+        nftData: getEnvContractAddress('nftData', '0x1aBeE92ED8b3D29aF9b6C5239ecFC518b0149B82'),
         nftTrading: getEnvContractAddress('nftTrading', '0x01023a601053fFDEE23546A132F8cd09AAf1deA6'),
         nftBuyback: getEnvContractAddress('nftBuyback', '0x8b1D465957E8251e0F0129EC963Fb5554b353019'),
         breedingCore: getEnvContractAddress('breedingCore', '0xc31805140f8f3b0C6E0fD7a722479633c6AFa87d'),
