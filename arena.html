@@ -859,6 +859,11 @@
             });
             
             setupEventListeners();
+            
+            renderTeamSlots();
+            updateSaveButtons();
+            updateChallengeBtn();
+            loadLeaderboard();
         }
 
         let arenaUnsubscribeFunctions = [];
@@ -1933,8 +1938,13 @@
                 const rewards = [];
                 for (let i = 0; i < topPlayers.length; i++) {
                     try {
-                        const rewardWei = await arenaRewardContract.methods.getRewardForRank(topPlayers[i].rank).call();
-                        rewards.push(web3.utils.fromWei(rewardWei, 'ether'));
+                        if (arenaRewardContract && web3) {
+                            const rewardWei = await arenaRewardContract.methods.getRewardForRank(topPlayers[i].rank).call();
+                            rewards.push(web3.utils.fromWei(rewardWei, 'ether'));
+                        } else {
+                            const baseRewards = [5000, 3000, 2000, 1500, 1200, 1000, 900, 800, 700, 600];
+                            rewards.push(topPlayers[i].rank <= 10 ? String(baseRewards[topPlayers[i].rank - 1]) : String(Math.max(50, 500 - (topPlayers[i].rank - 10) * 5)));
+                        }
                     } catch (e) {
                         rewards.push('0');
                     }

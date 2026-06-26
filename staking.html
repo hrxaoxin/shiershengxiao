@@ -1186,15 +1186,15 @@
                     document.getElementById('totalStakedTokens').textContent = '0';
                 }
 
-                document.getElementById('currentReleaseRatio').textContent = '由LP合约管理';
+                document.getElementById('currentReleaseRatio').textContent = '--';
                 document.getElementById('dailyReleaseRatioDisplay').textContent = '--';
                 
                 try {
                     if (tokenStakingLPContract) {
                         const rewardRate = await tokenStakingLPContract.methods.rewardRate().call();
                         const rewardRatePercent = (parseInt(rewardRate, 10) / 100).toFixed(2);
-                        document.getElementById('dailyReleaseRatioDisplay').textContent = rewardRatePercent + '%';
-                        document.getElementById('currentReleaseRatio').textContent = '每日释放比例';
+                        document.getElementById('dailyReleaseRatioDisplay').textContent = rewardRatePercent;
+                        document.getElementById('currentReleaseRatio').textContent = rewardRatePercent + '%';
                     }
                 } catch (e) {
                     console.warn('读取释放比例失败:', e);

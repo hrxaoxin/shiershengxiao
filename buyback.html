@@ -908,12 +908,15 @@
             document.getElementById('holdingDays').textContent = displayDays;
 
             if (growthBuybackOpen) {
-                const growthPrice = await calculateGrowthPrice(tokenId);
+                const nftLevel = selectedNft ? selectedNft.level : 1;
+                const isRare = selectedNft && selectedNft.nftInfo ? selectedNft.nftInfo.isRare : false;
+                const growthPrice = await calculateGrowthPrice(tokenId, nftLevel, isRare, mintTime);
                 document.getElementById('basePrice').textContent = formatPrice(growthPrice.basePrice);
                 document.getElementById('holdingBonus').textContent = '+' + growthPrice.bonusPercent + '%';
                 document.getElementById('finalGrowthPrice').textContent = formatPrice(growthPrice.finalPrice);
 
-                const bonusProgress = Math.min(growthPrice.bonusPercent, 100);
+                const progressDays = Math.min(holdingDays, growthPrice.daysToMax);
+                const bonusProgress = growthPrice.daysToMax > 0 ? Math.floor((progressDays / growthPrice.daysToMax) * 100) : 0;
                 document.getElementById('bonusProgressText').textContent = bonusProgress + '%';
                 document.getElementById('bonusProgressBar').style.width = bonusProgress + '%';
                 document.getElementById('bonusHint').textContent = `持有${growthPrice.daysToMax}天可达最高回购价`;
@@ -940,9 +943,16 @@
             }));
         }
 
-        async function calculateGrowthPrice(tokenId) {
+        async function calculateGrowthPrice(tokenId, nftLevel, isRare, mintTime) {
+            const level = nftLevel || 1;
+            const now = Math.floor(Date.now() / 1000);
+            let holdingDays = 0;
+            if (mintTime && mintTime > 0 && mintTime < now) {
+                holdingDays = Math.floor((now - mintTime) / 86400);
+            }
+
             if (!buybackContract) {
-                return { basePrice: '0', bonusPercent: 0, finalPrice: '0', daysToMax: 90 };
+                return calculateGrowthPriceFallback(level, isRare, holdingDays);
             }
 
             try {
@@ -965,11 +975,54 @@
                     daysToMax = parseInt(result.daysToMax || result['3'] || '90', 10);
                 }
                 
-                return { basePrice, bonusPercent, finalPrice, daysToMax };
+                if (basePrice === '0' && finalPrice === '0' && bonusPercent === 0) {
+                    return calculateGrowthPriceFallback(level, isRare, holdingDays);
+                }
+                
+                return { basePrice, bonusPercent, finalPrice, daysToMax, holdingDays };
             } catch (error) {
                 console.error('计算成长价格失败:', error);
-                return { basePrice: '0', bonusPercent: 0, finalPrice: '0', daysToMax: 90 };
+                return calculateGrowthPriceFallback(level, isRare, holdingDays);
             }
+        }
+
+        function calculateGrowthPriceFallback(level, isRare, holdingDays) {
+            const discountRates = { 1: 10, 2: 15, 3: 20, 4: 25, 5: 30 };
+            const breakEvenDays = { 1: 90, 2: 85, 3: 80, 4: 75, 5: 70 };
+            const maxBuybackMultiplier = 110;
+
+            const discount = discountRates[level] || 10;
+            const daysToBreakEven = breakEvenDays[level] || 90;
+
+            const normalMintCost = 8888;
+            const rareMintCost = 88888;
+            const upgradeCosts = [10000, 40000, 120000, 480000];
+
+            let totalCost = isRare ? rareMintCost : normalMintCost;
+            for (let i = 1; i < level; i++) {
+                totalCost += upgradeCosts[i - 1] || 0;
+            }
+
+            const basePriceValue = totalCost * discount / 100;
+            const maxPrice = totalCost * maxBuybackMultiplier / 100;
+
+            const maxBonusDays = (maxBuybackMultiplier - discount) * daysToBreakEven / (100 - discount);
+            const actualDays = Math.min(holdingDays, Math.floor(maxBonusDays));
+
+            const bonusBase = maxPrice - basePriceValue;
+            const bonusAmount = bonusBase * actualDays / maxBonusDays;
+            const bonusPercent = Math.floor((bonusAmount / basePriceValue) * 100);
+
+            const finalPriceValue = basePriceValue + bonusAmount;
+
+            return {
+                basePrice: String(Math.floor(basePriceValue * 10**18)),
+                bonusPercent: bonusPercent,
+                finalPrice: String(Math.floor(finalPriceValue * 10**18)),
+                daysToMax: Math.floor(maxBonusDays),
+                holdingDays: holdingDays,
+                isFallback: true
+            };
         }
 
         async function sellWithBalanceRatioPrice() {
@@ -1021,7 +1074,9 @@
         async function sellWithGrowthPrice() {
             if (!selectedNft || !buybackContract) return;
 
-            const price = await calculateGrowthPrice(selectedNft.tokenId);
+            const nftLevel = selectedNft.level || 1;
+            const isRare = selectedNft.nftInfo ? selectedNft.nftInfo.isRare : false;
+            const price = await calculateGrowthPrice(selectedNft.tokenId, nftLevel, isRare, selectedNft.mintTime);
             const finalPrice = web3.utils.fromWei(price.finalPrice, 'ether');
 
             const confirm = await ZODIAC_UI.showConfirmModal(
