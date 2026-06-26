@@ -742,6 +742,7 @@
         let accounts = [];
         let battleContract;
         let arenaContract;
+        let arenaRankingManagerContract;
         let arenaPlayerContract;
         let arenaBattleContract;
         let arenaRankingQueryContract;
@@ -1135,6 +1136,12 @@
             } catch (e) { console.warn('Failed to init arenaContract:', e.message); }
             
             try {
+                if (config.ABIS.arenaRankingManagerABI && config.CONTRACT_ADDRESSES.arenaRankingManager) {
+                    arenaRankingManagerContract = new web3.eth.Contract(config.ABIS.arenaRankingManagerABI, config.CONTRACT_ADDRESSES.arenaRankingManager);
+                }
+            } catch (e) { console.warn('Failed to init arenaRankingManagerContract:', e.message); }
+            
+            try {
                 if (config.ABIS.arenaPlayerABI && config.CONTRACT_ADDRESSES.arenaPlayer) {
                     arenaPlayerContract = new web3.eth.Contract(config.ABIS.arenaPlayerABI, config.CONTRACT_ADDRESSES.arenaPlayer);
                 }
@@ -1228,7 +1235,12 @@
                     const tokenInfo = await nftContract.methods.getNFTData(tokenId).call();
                     const tokenType = tokenInfo.tokenType_;
                     const level = tokenInfo.level;
-                    const growth = tokenInfo.growth || '0';
+                    let growth = '0';
+                    try {
+                        growth = await nftContract.methods.tokenGrowth(tokenId).call();
+                    } catch (e) {
+                        console.warn(`获取NFT ${tokenId} 成长值失败:`, e.message);
+                    }
                     
                     const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
                     const zodiac = nftInfo.animalName;
@@ -1733,8 +1745,9 @@
 
         async function loadArenaMode() {
             try {
-                const mode = await arenaContract.methods.arenaMode().call();
-                const controlType = await arenaContract.methods.modeControlType().call();
+                if (!arenaRankingManagerContract) return;
+                const mode = await arenaRankingManagerContract.methods.arenaMode().call();
+                const controlType = await arenaRankingManagerContract.methods.modeControlType().call();
                 updateCurrentModeDisplay(parseInt(mode, 10), parseInt(controlType, 10));
             } catch (error) {
                 console.error('加载竞技场模式失败:', error);

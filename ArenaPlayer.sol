@@ -176,6 +176,15 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     /**
+     * @dev ERC721安全转账接收函数
+     * @return bytes4 接收接口ID
+     * @notice 允许合约接收NFT质押
+     */
+    function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+        return IERC721Receiver.onERC721Received.selector;
+    }
+
+    /**
      * @dev 暂停合约
      */
     function pause() external onlyOwner {

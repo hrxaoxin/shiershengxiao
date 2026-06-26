@@ -327,6 +327,21 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     }
 
     /**
+     * @dev 管理员设置NFT等级（仅合约所有者可调用）
+     * @param tokenId NFT ID
+     * @param newLevel 新等级（1-5）
+     */
+    function adminSetNFTLevel(uint256 tokenId, uint8 newLevel) external onlyOwner {
+        require(newLevel >= 1 && newLevel <= 5, "NFTUpdate: Invalid level");
+        IAuthorizer auth = IAuthorizer(authorizer);
+        address nftAddr = auth.getNFTMintCore();
+        require(nftAddr != address(0), "NFTUpdate: NFT contract not set");
+        INFTMint nft = INFTMint(nftAddr);
+        nft.adminSetNFTLevel(tokenId, newLevel);
+        emit AdminLevelSet(tokenId, newLevel);
+    }
+
+    /**
      * @dev 获取所有等级的USD价值升级费用
      * @return 所有等级的USD升级费用数组
      */
@@ -721,6 +736,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param cost 新的USDT费用（精度18位）
      */
     event USDUpgradeCostChanged(uint8 level, uint256 cost);
+    event AdminLevelSet(uint256 indexed tokenId, uint8 newLevel);
     
     /**
      * @dev 紧急提取BNB（仅限合约所有者）

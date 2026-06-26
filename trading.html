@@ -1464,11 +1464,12 @@
                 const stars = window.ZODIAC_UTILS.getStars(nft.level);
 
                 html += `
-                    <div class="nft-card cursor-pointer rounded-lg border-2 ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'} transition-all duration-200 p-3 text-center relative" 
+                    <div class="nft-card cursor-pointer rounded-lg border-2 ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'} transition-all duration-200 p-3 text-center relative ${nft.isListed ? 'opacity-60' : ''}" 
                          data-tokenid="${nft.tokenId}" data-type="${nft.type}">
                         <button onclick="event.stopPropagation(); showNFTModal(${nft.tokenId}, ${nft.type}, ${nft.level}, '${nftInfo.name}', '${imagePath}')" class="info-btn absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-100 hover:bg-blue-200 flex items-center justify-center transition-colors z-10" title="查看详情">
                             <i class="fas fa-info text-blue-600 text-xs"></i>
                         </button>
+                        ${nft.isListed ? '<div class="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded z-10">已上架</div>' : ''}
                         <div class="w-full aspect-square rounded-lg bg-gray-100 mb-2 overflow-hidden flex items-center justify-center">
                             <img src="${imagePath}" alt="${nftInfo.name}" class="w-full h-full object-cover" onerror="this.style.display='none'; this.parentElement.innerHTML='<span class=\\'text-3xl\\'>🐾</span>';">
                         </div>
