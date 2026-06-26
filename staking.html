@@ -652,21 +652,7 @@
                 const tokenIds = await nftContract.methods.getTokenIdsByOwner(account).call();
                 
                 const nftPromises = tokenIds.map(tokenId => {
-                    return Promise.all([
-                        nftContract.methods.tokenLevel(tokenId).call(),
-                        nftContract.methods.tokenType(tokenId).call(),
-                        nftContract.methods.tokenGrowth(tokenId).call(),
-                        stakingContract.methods.getStakingInfo(tokenId).call()
-                    ]).then(([tokenLevel, tokenType, growth, stakeInfo]) => ({
-                        tokenId: tokenId.toString(),
-                        level: tokenLevel.toString(),
-                        type: tokenType.toString(),
-                        growth: parseInt(growth, 10),
-                        stakeInfo: stakeInfo
-                    })).catch(e => {
-                        console.warn(`获取NFT ${tokenId} 详情失败:`, e);
-                        return null;
-                    });
+                    return loadSingleStakingNFT(tokenId);
                 });
 
                 const results = await Promise.all(nftPromises);
@@ -722,6 +708,54 @@
                 ZODIAC_UI.showToast('加载NFT失败: ' + error.message, 'error');
             }
             ZODIAC_UI.hideLoading();
+        }
+
+        async function loadSingleStakingNFT(tokenId) {
+            try {
+                let tokenLevel = '1', tokenType = '0', growth = 0, stakeInfo = { owner: '0x0000000000000000000000000000000000000000' };
+
+                try {
+                    const nftData = await nftContract.methods.getNFTData(tokenId).call();
+                    tokenType = (nftData.tokenType_ || nftData[0] || 0).toString();
+                    tokenLevel = (nftData.level || nftData[1] || 1).toString();
+                } catch (e) {
+                    console.warn(`获取NFT ${tokenId} 基础数据失败，尝试单独获取:`, e.message);
+                    try {
+                        tokenType = (await nftContract.methods.tokenType(tokenId).call()).toString();
+                    } catch (e2) { console.warn(`获取NFT ${tokenId} type失败:`, e2.message); }
+                    try {
+                        tokenLevel = (await nftContract.methods.tokenLevel(tokenId).call()).toString();
+                    } catch (e2) { console.warn(`获取NFT ${tokenId} level失败:`, e2.message); }
+                }
+
+                try {
+                    growth = parseInt(await nftContract.methods.tokenGrowth(tokenId).call(), 10);
+                } catch (e) {
+                    console.warn(`获取NFT ${tokenId} growth失败:`, e.message);
+                }
+
+                try {
+                    stakeInfo = await stakingContract.methods.getStakingInfo(tokenId).call();
+                } catch (e) {
+                    console.warn(`获取NFT ${tokenId} 质押信息失败:`, e.message);
+                }
+
+                if (tokenType === '0') {
+                    console.warn(`NFT ${tokenId} type为0，可能无效`);
+                    return null;
+                }
+
+                return {
+                    tokenId: tokenId.toString(),
+                    level: tokenLevel.toString(),
+                    type: tokenType.toString(),
+                    growth: growth,
+                    stakeInfo: stakeInfo
+                };
+            } catch (e) {
+                console.warn(`获取NFT ${tokenId} 详情完全失败:`, e);
+                return null;
+            }
         }
 
         async function loadMyStakes() {

@@ -507,6 +507,55 @@
             });
         }
 
+        async function loadSingleTokenInfo(tokenId) {
+            try {
+                let typeId = 0, level = 1, growth = 0, isRare = false;
+
+                try {
+                    const nftData = await nftContract.methods.getNFTData(tokenId).call();
+                    typeId = parseInt(nftData.tokenType_ || nftData[0] || 0, 10);
+                    level = parseInt(nftData.level || nftData[1] || 1, 10);
+                } catch (e) {
+                    console.warn(`获取NFT ${tokenId} 基础数据失败，尝试单独获取:`, e.message);
+                    try {
+                        typeId = parseInt(await nftContract.methods.tokenType(tokenId).call(), 10);
+                    } catch (e2) { console.warn(`获取NFT ${tokenId} type失败:`, e2.message); }
+                    try {
+                        level = parseInt(await nftContract.methods.tokenLevel(tokenId).call(), 10);
+                    } catch (e2) { console.warn(`获取NFT ${tokenId} level失败:`, e2.message); }
+                }
+
+                try {
+                    growth = parseInt(await nftContract.methods.tokenGrowth(tokenId).call(), 10);
+                } catch (e) {
+                    console.warn(`获取NFT ${tokenId} growth失败:`, e.message);
+                }
+
+                try {
+                    isRare = await nftContract.methods.isRare(tokenId).call();
+                } catch (e) {
+                    console.warn(`获取NFT ${tokenId} isRare失败:`, e.message);
+                    isRare = typeId >= 72;
+                }
+
+                if (typeId === 0) {
+                    console.warn(`NFT ${tokenId} typeId为0，可能无效`);
+                    return null;
+                }
+
+                return {
+                    tokenId: tokenId,
+                    typeId: typeId,
+                    level: level,
+                    growth: growth,
+                    isRare: isRare
+                };
+            } catch (e) {
+                console.warn(`获取NFT ${tokenId} 详情完全失败:`, e);
+                return null;
+            }
+        }
+
         async function loadUserTokens() {
             userTokens = [];
             allUserTokens = [];
@@ -521,21 +570,10 @@
                 const tokenIds = await nftContract.methods.getTokenIdsByOwner(account).call();
                 
                 const tokenInfoPromises = tokenIds.map(tokenId => {
-                    return Promise.all([
-                        nftContract.methods.tokenType(tokenId).call(),
-                        nftContract.methods.tokenLevel(tokenId).call(),
-                        nftContract.methods.tokenGrowth(tokenId).call().catch(() => '0'),
-                        nftContract.methods.isRare(tokenId).call().catch(() => false)
-                    ]).then(([typeId, level, growth, isRare]) => ({
-                        tokenId: tokenId,
-                        typeId: parseInt(typeId, 10),
-                        level: parseInt(level, 10),
-                        growth: parseInt(growth, 10),
-                        isRare: isRare
-                    }));
+                    return loadSingleTokenInfo(tokenId);
                 });
                 
-                const tokenInfos = await Promise.all(tokenInfoPromises);
+                const tokenInfos = (await Promise.all(tokenInfoPromises)).filter(t => t !== null);
                 
                 allUserTokens = tokenInfos;
                 

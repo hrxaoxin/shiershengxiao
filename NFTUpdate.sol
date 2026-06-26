@@ -523,10 +523,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     function _updateUserWeight(address user, uint8 level, bool isAdd, NFTDataTypes.ElementType element, address dividendAddr) internal {
         try IDividendManager(dividendAddr).updateUserWeight(user, uint256(level), isAdd, uint8(element)) {
             // 成功
-        } catch Error(string memory reason) {
-            revert(string(abi.encodePacked("NFTUpdate: Update weight failed - ", reason)));
         } catch {
-            revert("NFTUpdate: Update weight failed with unknown error");
+            // 忽略分红权重更新失败，不影响升级主流程
         }
         
         // 修复：添加 WeightManager 同步，确保权重数据一致性

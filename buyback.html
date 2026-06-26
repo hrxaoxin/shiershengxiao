@@ -629,21 +629,7 @@
                 
                 const nftPromises = tokenIds.map(tokenId => {
                     const tid = parseInt(tokenId, 10);
-                    return Promise.all([
-                        nftMintContract.methods.tokenType(tid).call(),
-                        nftMintContract.methods.tokenLevel(tid).call(),
-                        nftMintContract.methods.tokenGrowth(tid).call(),
-                        nftDataContract.methods.getNFTMintTime(tid).call()
-                    ]).then(([type, level, growth, mintTime]) => ({
-                        tokenId: tid,
-                        type: parseInt(type, 10),
-                        level: parseInt(level, 10),
-                        growth: parseInt(growth, 10),
-                        mintTime: parseInt(mintTime, 10)
-                    })).catch(e => {
-                        console.warn(`获取NFT ${tid} 详情失败:`, e);
-                        return null;
-                    });
+                    return loadSingleNftData(tid);
                 });
 
                 const results = await Promise.all(nftPromises);
@@ -653,6 +639,56 @@
             } catch (error) {
                 console.error('加载用户NFT失败:', error);
                 grid.innerHTML = '<div class="col-span-full text-center py-8"><p class="text-red-500">加载失败，请重试</p></div>';
+            }
+        }
+
+        async function loadSingleNftData(tid) {
+            try {
+                let type = 0, level = 1, growth = 0, mintTime = 0;
+
+                try {
+                    const nftData = await nftMintContract.methods.getNFTData(tid).call();
+                    type = parseInt(nftData.tokenType_ || nftData[0] || 0, 10);
+                    level = parseInt(nftData.level || nftData[1] || 1, 10);
+                } catch (e) {
+                    console.warn(`获取NFT ${tid} 基础数据失败，尝试单独获取:`, e.message);
+                    try {
+                        type = parseInt(await nftMintContract.methods.tokenType(tid).call(), 10);
+                    } catch (e2) { console.warn(`获取NFT ${tid} type失败:`, e2.message); }
+                    try {
+                        level = parseInt(await nftMintContract.methods.tokenLevel(tid).call(), 10);
+                    } catch (e2) { console.warn(`获取NFT ${tid} level失败:`, e2.message); }
+                }
+
+                try {
+                    growth = parseInt(await nftMintContract.methods.tokenGrowth(tid).call(), 10);
+                } catch (e) {
+                    console.warn(`获取NFT ${tid} growth失败:`, e.message);
+                }
+
+                if (nftDataContract) {
+                    try {
+                        mintTime = parseInt(await nftDataContract.methods.getNFTMintTime(tid).call(), 10);
+                    } catch (e) {
+                        console.warn(`获取NFT ${tid} mintTime失败:`, e.message);
+                    }
+                }
+
+                if (type === 0 && level === 1 && growth === 0 && mintTime === 0) {
+                    console.warn(`NFT ${tid} 所有数据都是默认值，可能无效`);
+                    return null;
+                }
+
+                return {
+                    tokenId: tid,
+                    type: type,
+                    level: level,
+                    growth: growth,
+                    mintTime: mintTime
+                };
+            } catch (e) {
+                console.warn(`获取NFT ${tid} 详情完全失败:`, e);
+                return null;
             }
         }
 
