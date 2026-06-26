@@ -931,8 +931,7 @@
             if (levelNum < 5) {
                 const upgradeToLevel = levelNum + 1;
                 const requiredUSDWei = await getUSDValue(upgradeToLevel);
-                const usdWeiBigInt = BigInt(String(requiredUSDWei));
-                const requiredUSD = bigIntToDecimal(usdWeiBigInt, 18);
+                const requiredUSD = parseFloat(web3.utils.fromWei(String(requiredUSDWei), 'ether'));
                 console.log('selectNFT - level:', levelNum, 'upgradeToLevel:', upgradeToLevel, 'requiredUSDWei:', requiredUSDWei, 'requiredUSD:', requiredUSD);
                 requiredUSDDisplay = requiredUSD.toFixed(4) + ' USDT';
                 
@@ -1382,8 +1381,7 @@
             
             const requiredUSDWei = await getUSDValue(levelNum);
             console.log('handleUpgradeWithUSDValue - requiredUSDWei:', requiredUSDWei);
-            const usdWeiBigInt = BigInt(String(requiredUSDWei));
-            const requiredUSD = bigIntToDecimal(usdWeiBigInt, 18);
+            const requiredUSD = parseFloat(web3.utils.fromWei(String(requiredUSDWei), 'ether'));
             console.log('handleUpgradeWithUSDValue - requiredUSD:', requiredUSD);
             
             const nftId = parseInt(selectedNft.id, 10);

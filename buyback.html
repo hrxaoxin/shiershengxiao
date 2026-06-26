@@ -876,13 +876,9 @@
                 document.getElementById('sellWithFixedBtn').disabled = false;
             }
 
-            if (balanceRatioBuybackOpen) {
-                await loadBalanceRatioPrice(tokenId);
-                document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(balanceRatioPrice) + ' 代币';
-                document.getElementById('sellWithBalanceRatioBtn').disabled = false;
-            } else {
-                await loadBalanceRatioPrice(tokenId);
-            }
+            await loadBalanceRatioPrice(tokenId);
+            document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(balanceRatioPrice) + ' 代币';
+            document.getElementById('sellWithBalanceRatioBtn').disabled = !balanceRatioBuybackOpen;
 
             holdingDaysRefreshInterval = setInterval(() => {
                 updateHoldingDaysAndPrice(tokenId, mintTime);
@@ -909,21 +905,19 @@
             }
             document.getElementById('holdingDays').textContent = displayDays;
 
-            if (growthBuybackOpen) {
-                const nftLevel = selectedNft ? selectedNft.level : 1;
-                const isRare = selectedNft && selectedNft.nftInfo ? selectedNft.nftInfo.isRare : false;
-                const growthPrice = await calculateGrowthPrice(tokenId, nftLevel, isRare, mintTime);
-                document.getElementById('basePrice').textContent = formatPrice(growthPrice.basePrice);
-                document.getElementById('holdingBonus').textContent = '+' + growthPrice.bonusPercent + '%';
-                document.getElementById('finalGrowthPrice').textContent = formatPrice(growthPrice.finalPrice);
+            const nftLevel = selectedNft ? selectedNft.level : 1;
+            const isRare = selectedNft && selectedNft.nftInfo ? selectedNft.nftInfo.isRare : false;
+            const growthPrice = await calculateGrowthPrice(tokenId, nftLevel, isRare, mintTime);
+            document.getElementById('basePrice').textContent = formatPrice(growthPrice.basePrice);
+            document.getElementById('holdingBonus').textContent = '+' + growthPrice.bonusPercent + '%';
+            document.getElementById('finalGrowthPrice').textContent = formatPrice(growthPrice.finalPrice);
 
-                const progressDays = Math.min(holdingDays, growthPrice.daysToMax);
-                const bonusProgress = growthPrice.daysToMax > 0 ? Math.floor((progressDays / growthPrice.daysToMax) * 100) : 0;
-                document.getElementById('bonusProgressText').textContent = bonusProgress + '%';
-                document.getElementById('bonusProgressBar').style.width = bonusProgress + '%';
-                document.getElementById('bonusHint').textContent = `持有${growthPrice.daysToMax}天可达最高回购价`;
-                document.getElementById('sellWithGrowthBtn').disabled = false;
-            }
+            const progressDays = Math.min(holdingDays, growthPrice.daysToMax);
+            const bonusProgress = growthPrice.daysToMax > 0 ? Math.floor((progressDays / growthPrice.daysToMax) * 100) : 0;
+            document.getElementById('bonusProgressText').textContent = bonusProgress + '%';
+            document.getElementById('bonusProgressBar').style.width = bonusProgress + '%';
+            document.getElementById('bonusHint').textContent = `持有${growthPrice.daysToMax}天可达最高回购价`;
+            document.getElementById('sellWithGrowthBtn').disabled = !growthBuybackOpen;
         }
 
         function clearUnifiedSelection() {

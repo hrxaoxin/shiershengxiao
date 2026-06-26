@@ -1094,7 +1094,7 @@
             arenaRewardContract = new web3.eth.Contract(config.ABIS.arenaRewardABI, config.CONTRACT_ADDRESSES.arenaReward);
             arenaRewardLPContract = new web3.eth.Contract(config.ABIS.arenaRewardLPABI, config.CONTRACT_ADDRESSES.arenaRewardLP);
             nftContract = new web3.eth.Contract(config.ABIS.nftMintABI, config.CONTRACT_ADDRESSES.nftMint);
-            tokenContract = new web3.eth.Contract(config.ABIS.tokenABI, config.CONTRACT_ADDRESSES.token);
+            tokenContract = new web3.eth.Contract(config.ABIS.tokenABI, config.CONTRACT_ADDRESSES.tokenContract);
             await loadArenaConfig();
         }
 
@@ -1918,12 +1918,10 @@
                     for (let i = 0; i < entries.length; i++) {
                         const entry = entries[i];
                         const address = entry.playerAddress;
-                        if (address === '0x0000000000000000000000000000000000000000') continue;
-                        
                         const points = parseInt(entry.points || '0');
                         const wins = parseInt(entry.wins || '0');
                         const losses = parseInt(entry.losses || '0');
-                        const isMock = points >= 10000;
+                        const isMock = address === '0x0000000000000000000000000000000000000000' || points >= 10000;
                         const rank = startRank + i;
                         
                         let team = [];
@@ -1957,6 +1955,9 @@
                                     }
                                 }
                             } catch (e) {}
+                        } else {
+                            const opponent = mockOpponents[rank % mockOpponents.length];
+                            team = opponent.team;
                         }
                         
                         topPlayers.push({
@@ -1966,6 +1967,7 @@
                             losses: losses,
                             rank: rank,
                             isMock: isMock,
+                            mockIndex: isMock ? rank % mockOpponents.length : null,
                             team: team
                         });
                     }
