@@ -283,7 +283,7 @@
                 </div>
                 <div class="flex-1">
                     <h3 class="text-lg font-semibold text-gray-800">余额比例回购</h3>
-                    <p class="text-sm text-gray-500">根据合约代币余额/NFT总供应量计算回购价格</p>
+                    <p class="text-sm text-gray-500">根据所选NFT的权重占总权重的比例来计算回购价格</p>
                 </div>
                 <div class="flex items-center">
                     <span id="balanceRatioBuybackStatus" class="px-3 py-1 rounded-full text-sm font-medium bg-gray-200 text-gray-600">
@@ -540,7 +540,7 @@
                 
                 document.getElementById('walletAddressDisplay').textContent = account.substring(0, 6) + '...' + account.substring(account.length - 4);
                 document.getElementById('tokenBalance').textContent = balanceFormatted;
-                document.getElementById('buybackBalance').textContent = web3.utils.fromWei(buybackBal, 'ether');
+                document.getElementById('buybackBalance').textContent = parseFloat(web3.utils.fromWei(buybackBal, 'ether')).toFixed(4);
 
                 document.getElementById('networkName').textContent = '已连接';
             } catch (error) {
@@ -623,7 +623,7 @@
 
                 balanceRatioPrice = pricePerNFT;
 
-                document.getElementById('balanceRatioBalance').textContent = web3.utils.fromWei(balance, 'ether');
+                document.getElementById('balanceRatioBalance').textContent = parseFloat(web3.utils.fromWei(balance, 'ether')).toFixed(4);
                 document.getElementById('balanceRatioTotalSupply').textContent = totalSupply;
                 document.getElementById('balanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
 
@@ -978,8 +978,16 @@
                 if (basePrice === '0' && finalPrice === '0' && bonusPercent === 0) {
                     return calculateGrowthPriceFallback(level, isRare, holdingDays);
                 }
+
+                const fallback = calculateGrowthPriceFallback(level, isRare, holdingDays);
                 
-                return { basePrice, bonusPercent, finalPrice, daysToMax, holdingDays };
+                return {
+                    basePrice: basePrice,
+                    bonusPercent: fallback.bonusPercent,
+                    finalPrice: String(Math.floor((parseFloat(web3.utils.fromWei(basePrice, 'ether')) * (1 + fallback.bonusPercent / 100)) * 10**18)),
+                    daysToMax: fallback.daysToMax,
+                    holdingDays: holdingDays
+                };
             } catch (error) {
                 console.error('计算成长价格失败:', error);
                 return calculateGrowthPriceFallback(level, isRare, holdingDays);
