@@ -32,7 +32,7 @@ ArenaRankingManager实现：
 0xcAEc0C28a41C1aaE04E63dA0A173d23A1E679884
 ArenaRankingManager代理：
 0x7dE5978f9FE2863e561C4208Aa91945e8aB30d9F
-
+   
 ArenaRankingQuery实现：
 0xdA8E7d0Ba2872Ce840ffbf7E849AD3698533Dd9B
 ArenaRankingQuery代理：

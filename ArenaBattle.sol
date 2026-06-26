@@ -45,11 +45,6 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     address public authorizer;
     
     /**
-     * @dev 每次胜利的基础奖励（0.1 BNB）
-     */
-    uint256 public baseRewardPerWin = 100000000000000000; // 0.1 BNB
-    
-    /**
      * @dev 战斗冷却时间（秒）
      */
     uint256 public constant BATTLE_COOLDOWN = 30 seconds;
