@@ -1048,7 +1048,7 @@
                 console.log('[TRADING] checkNFT: listingInfo:', listingInfo);
                 
                 let seller, priceWei, listTime;
-                if (Array.isArray(listingInfo)) {
+                if (Array.isArray(listingInfo) && listingInfo.length >= 3) {
                     [seller, priceWei, listTime] = listingInfo;
                 } else if (listingInfo && typeof listingInfo === 'object') {
                     seller = listingInfo.seller || listingInfo[0];
@@ -1059,7 +1059,7 @@
                     seller = '0x0000000000000000000000000000000000000000';
                 }
                 console.log('[TRADING] checkNFT: seller:', seller, 'priceWei:', priceWei, 'listTime:', listTime);
-                const active = seller !== '0x0000000000000000000000000000000000000000' && seller !== null && seller !== undefined;
+                const active = seller && seller !== '0x0000000000000000000000000000000000000000' && seller !== null && seller !== undefined;
                 if (active) {
                     console.log('[TRADING] checkNFT: already listed');
                     ZODIAC_UI.showToast('此NFT已上架', 'warning');

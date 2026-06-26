@@ -1527,7 +1527,7 @@ window.ZODIAC_WEB3 = (function() {
             }
             seen.add(tokenIds[i]);
         }
-        const contract = await getContract('arena');
+        const contract = await getContract('arenaPlayer');
         const receipt = await sendAndTrackTransaction(contract, 'stakeNFTs', [tokenIds]);
         return receipt;
     }
@@ -1551,13 +1551,13 @@ window.ZODIAC_WEB3 = (function() {
             }
             seen.add(tokenIds[i]);
         }
-        const contract = await getContract('arena');
+        const contract = await getContract('arenaPlayer');
         const receipt = await sendAndTrackTransaction(contract, 'unstakeNFTs', [tokenIds]);
         return receipt;
     }
 
     async function clearArenaTeam() {
-        const contract = await getContract('arena');
+        const contract = await getContract('arenaPlayer');
         const receipt = await sendAndTrackTransaction(contract, 'clearBattleTeam', []);
         return receipt;
     }

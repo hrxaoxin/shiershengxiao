@@ -930,7 +930,7 @@
             let requiredUSDDisplay = '';
             if (levelNum < 5) {
                 const upgradeToLevel = levelNum + 1;
-                const requiredUSDWei = await getUSDValue(upgradeToLevel);
+                const requiredUSDWei = await getUSDValue(levelNum);
                 const requiredUSD = parseFloat(web3.utils.fromWei(String(requiredUSDWei), 'ether'));
                 console.log('selectNFT - level:', levelNum, 'upgradeToLevel:', upgradeToLevel, 'requiredUSDWei:', requiredUSDWei, 'requiredUSD:', requiredUSD);
                 requiredUSDDisplay = requiredUSD.toFixed(4) + ' USDT';

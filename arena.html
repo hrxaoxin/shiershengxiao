@@ -916,6 +916,18 @@
                 renderTeamSlots();
                 updateSaveButtons();
                 updateChallengeBtn();
+                
+                if (typeof window.ethereum !== 'undefined' && !accounts.length) {
+                    try {
+                        const connectedAccounts = await window.ethereum.request({ method: 'eth_accounts' });
+                        if (connectedAccounts.length > 0) {
+                            await connectWallet();
+                        }
+                    } catch (e) {
+                        console.warn('自动连接钱包失败:', e.message);
+                    }
+                }
+                
                 loadLeaderboard();
             } catch (e) {
                 console.error('init 函数执行失败:', e);
@@ -1218,7 +1230,7 @@
                     const level = tokenInfo.level;
                     
                     const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
-                    const zodiac = ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiacIndex];
+                    const zodiac = nftInfo.animalName;
                     const name = `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`;
                     
                     const imagePath = ZODIAC_UTILS.getNFTInfo(tokenType).imagePath;
@@ -1941,7 +1953,7 @@
         // 暴露给 inline onclick
         window.claimSeasonReward = claimSeasonRewardHandler;
 
-            let currentPage = 1;
+        let currentPage = 1;
         let totalPages = 1;
         let totalPlayers = 0;
         let pageSize = 10;
@@ -2006,7 +2018,7 @@
                                             const nftData = await nftContract.methods.getNFTData(tokenId).call();
                                             const tokenType = nftData.tokenType_ || nftData[0];
                                             const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
-                                            const zodiac = ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiacIndex];
+                                            const zodiac = nftInfo.animalName;
                                             team.push({
                                                 tokenId: tokenId,
                                                 name: `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`,
