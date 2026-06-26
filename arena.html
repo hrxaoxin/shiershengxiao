@@ -1537,22 +1537,6 @@
                     return;
                 }
                 
-                const currentTeam = await arenaPlayerContract.methods.getPlayerBattleTeam(accounts[0]).call();
-                const existingTokens = currentTeam.filter(id => id !== '0' && id !== 0);
-                
-                if (existingTokens.length > 0) {
-                    const confirm = await ZODIAC_UI.showConfirmModal(
-                        '替换战队',
-                        '您已经设置了战队，确定要替换为新战队吗？旧战队中的NFT将被解除质押。',
-                        { confirmText: '确认替换' }
-                    );
-                    if (!confirm) return;
-                    
-                    ZODIAC_UI.showLoading('正在清除旧战队...');
-                    await ZODIAC_WEB3.clearArenaTeam();
-                    await ZODIAC_WEB3.unstakeArenaNFTs(existingTokens);
-                }
-                
                 const tokenIds = battleTeam.map(nft => nft.tokenId);
                 
                 ZODIAC_UI.showLoading('正在检查NFT质押状态...');
@@ -1567,6 +1551,27 @@
                     }
                 }
                 
+                const currentTeam = await arenaPlayerContract.methods.getPlayerBattleTeam(accounts[0]).call();
+                const existingTokens = currentTeam.filter(id => id !== '0' && id !== 0);
+                
+                let confirmationText = '确定要保存战队并质押NFT吗？战斗期间NFT将不可转移。';
+                if (existingTokens.length > 0) {
+                    confirmationText = '您已经设置了战队，确定要替换为新战队吗？旧战队中的NFT将被解除质押，新战队的NFT将被质押。';
+                }
+                
+                const confirm = await ZODIAC_UI.showConfirmModal(
+                    existingTokens.length > 0 ? '替换战队' : '保存战队',
+                    confirmationText,
+                    { confirmText: existingTokens.length > 0 ? '确认替换' : '确认保存' }
+                );
+                if (!confirm) return;
+                
+                if (existingTokens.length > 0) {
+                    ZODIAC_UI.showLoading('正在清除旧战队...');
+                    await ZODIAC_WEB3.clearArenaTeam();
+                    await ZODIAC_WEB3.unstakeArenaNFTs(existingTokens);
+                }
+                
                 ZODIAC_UI.showLoading('正在检查NFT授权状态...');
                 
                 const isApproved = await nftContract.methods.isApprovedForAll(accounts[0], ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaPlayer).call();
@@ -1577,9 +1582,7 @@
                         {
                             actionName: 'NFT授权',
                             loadingMessage: '正在授权NFT...',
-                            successMessage: 'NFT授权成功',
-                            showConfirmation: true,
-                            confirmationMessage: '确定要授权NFT给竞技场合约吗？授权后合约可以转移您的NFT用于战斗质押。'
+                            successMessage: 'NFT授权成功'
                         }
                     );
                 }
@@ -1597,20 +1600,13 @@
                     gas = 300000;
                 }
                 
-                await ZODIAC_UI.handleTransaction(
-                    () => arenaPlayerContract.methods.setBattleTeam(tokenIds).send({ from: accounts[0], gas: gas }),
-                    {
-                        actionName: '保存战队',
-                        loadingMessage: '正在设置战队...',
-                        successMessage: '战队设置成功！NFT已质押进合约',
-                        showConfirmation: true,
-                        confirmationMessage: '确定要保存战队并质押NFT吗？战斗期间NFT将不可转移。',
-                        onConfirmation: () => {
-                            updateBattleTeamDisplay();
-                            loadMyTeam();
-                        }
-                    }
-                );
+                const teamArray = [...tokenIds];
+                const receipt = await arenaPlayerContract.methods.setBattleTeam(teamArray).send({ from: accounts[0], gas: gas });
+                
+                ZODIAC_UI.hideLoading();
+                ZODIAC_UI.showToast('战队设置成功！NFT已质押进合约', 'success');
+                updateBattleTeamDisplay();
+                await loadMyTeam();
             } catch (error) {
                 ZODIAC_UI.hideLoading();
                 console.error('设置战队失败:', error);
