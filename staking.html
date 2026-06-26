@@ -453,8 +453,9 @@
             ZODIAC_WEB3.on('disconnect', () => {
                 stopRewardEstimateRefresh();
                 account = null;
-                document.getElementById('rewardsAmount').textContent = '0.00 LP';
-                document.getElementById('tokenRewardsAmount').textContent = '0.00 LP';
+                const defaultUnit = 'BNB';
+                document.getElementById('rewardsAmount').textContent = '0.00 ' + defaultUnit;
+                document.getElementById('tokenRewardsAmount').textContent = '0.00 ' + defaultUnit;
             });
         }
 
@@ -1270,13 +1271,16 @@
 
                 try {
                     let lpBalance = '0';
+                    let rewardUnit = 'LP';
                     if (tokenStakingLPContract) {
                         const lpBalanceWei = await tokenStakingLPContract.methods.lpRewardPoolBalance().call();
                         lpBalance = web3.utils.fromWei(lpBalanceWei, 'ether').substring(0, 10);
+                        const rewardType = await tokenStakingLPContract.methods.rewardType().call();
+                        rewardUnit = getRewardUnit(rewardType);
                     }
-                    document.getElementById('tokenStakingBNBBalance').textContent = lpBalance + ' LP';
+                    document.getElementById('tokenStakingBNBBalance').textContent = lpBalance + ' ' + rewardUnit;
                 } catch (e) {
-                    document.getElementById('tokenStakingBNBBalance').textContent = '0 LP';
+                    document.getElementById('tokenStakingBNBBalance').textContent = '0 BNB';
                 }
 
                 try {

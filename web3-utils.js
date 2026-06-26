@@ -1576,7 +1576,7 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error('[ZODIAC_WEB3] Invalid mock player index');
         }
         try {
-            const contract = await getContract('arena');
+            const contract = await getContract('arenaRankingManager');
             const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [playerTeam, mockIndex]);
             return receipt;
         } catch (e) {
@@ -1596,7 +1596,7 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error(`[ZODIAC_WEB3] challengeRealPlayer requires exactly 6 NFTs, got ${playerTeam.length}`);
         }
         try {
-            const contract = await getContract('arena');
+            const contract = await getContract('arenaRankingManager');
             const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer, playerTeam]);
             return receipt;
         } catch (e) {

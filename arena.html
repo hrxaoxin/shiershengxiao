@@ -1431,6 +1431,7 @@
                                 <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-white text-xs">${nft.name}</div>
                                 <div class="text-gray-400 text-xs">Lv.${nft.level}</div>
+                                <div class="text-green-400 text-xs">成长: ${nft.growth || 0}</div>
                             </div>
                         ` : `
                             <span class="text-gray-500 text-xs">${isFrontRow ? '前排' : '后排'}${(i % FRONT_ROW_SIZE) + 1}</span>
@@ -1770,6 +1771,7 @@
                                 <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-white text-xs">${nft.name}</div>
                                 <div class="text-gray-400 text-xs">Lv.${nft.level}</div>
+                                <div class="text-green-400 text-xs">成长: ${nft.growth || 0}</div>
                             </div>
                         `).join('')}
                     </div>
@@ -1779,6 +1781,7 @@
                                 <img src="${nft.imagePath}" alt="${nft.name}" class="w-10 h-10 rounded-lg object-cover mx-auto mb-1">
                                 <div class="text-white text-xs">${nft.name}</div>
                                 <div class="text-gray-400 text-xs">Lv.${nft.level}</div>
+                                <div class="text-green-400 text-xs">成长: ${nft.growth || 0}</div>
                             </div>
                         `).join('')}
                     </div>
@@ -1793,8 +1796,9 @@
                 battleTeam = [];
                 
                 battleTeamTokens.forEach((tokenId, index) => {
-                    if (tokenId !== '0') {
-                        const nft = myNfts.find(n => n.tokenId === tokenId);
+                    if (tokenId !== '0' && tokenId !== 0) {
+                        const tokenIdStr = String(tokenId);
+                        const nft = myNfts.find(n => String(n.tokenId) === tokenIdStr);
                         if (nft) {
                             battleTeam[index] = { ...nft };
                             nft.inBattleTeam = true;
