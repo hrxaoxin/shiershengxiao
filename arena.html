@@ -2608,6 +2608,18 @@
                     return;
                 }
 
+                console.log('[ARENA] 检查链上战队数据...');
+                const onChainTeam = await arenaPlayerContract.methods.getPlayerBattleTeam(accounts[0]).call();
+                const validOnChainTokens = onChainTeam.filter(id => id !== '0' && id !== 0);
+                
+                if (validOnChainTokens.length === 0) {
+                    ZODIAC_UI.showToast('请先点击"保存战队并质押NFT"按钮，将战队保存到链上', 'warning');
+                    ZODIAC_UI.hideLoading();
+                    return;
+                }
+                
+                console.log(`[ARENA] 链上战队: ${JSON.stringify(onChainTeam)}`);
+
                 for (const tokenId of playerTeam) {
                     const stakedOwner = await arenaPlayerContract.methods.nftStakedOwner(tokenId).call();
                     if (stakedOwner.toLowerCase() !== accounts[0].toLowerCase()) {

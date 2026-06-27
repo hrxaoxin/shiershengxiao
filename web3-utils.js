@@ -1583,6 +1583,15 @@ window.ZODIAC_WEB3 = (function() {
             const contract = await getContract('arenaRankingManager');
             console.log(`[ZODIAC_WEB3] challengeMockPlayer params: mockIndex=${mockIndex}`);
             
+            console.log('[ZODIAC_WEB3] Performing dry-run call...');
+            try {
+                const result = await contract.methods.challengeMockPlayer(mockIndex).call({ from: account });
+                console.log('[ZODIAC_WEB3] Dry-run succeeded:', result);
+            } catch (dryRunError) {
+                console.error('[ZODIAC_WEB3] Dry-run failed - contract would revert:', dryRunError.message);
+                throw new Error(`[ZODIAC_WEB3] 交易将失败: ${dryRunError.message}`);
+            }
+            
             const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [mockIndex], {
                 gas: 1500000
             });
@@ -1600,6 +1609,15 @@ window.ZODIAC_WEB3 = (function() {
         try {
             const contract = await getContract('arenaRankingManager');
             console.log(`[ZODIAC_WEB3] challengeRealPlayer params: challengedPlayer=${challengedPlayer}`);
+            
+            console.log('[ZODIAC_WEB3] Performing dry-run call...');
+            try {
+                const result = await contract.methods.challengeRealPlayer(challengedPlayer).call({ from: account });
+                console.log('[ZODIAC_WEB3] Dry-run succeeded:', result);
+            } catch (dryRunError) {
+                console.error('[ZODIAC_WEB3] Dry-run failed - contract would revert:', dryRunError.message);
+                throw new Error(`[ZODIAC_WEB3] 交易将失败: ${dryRunError.message}`);
+            }
             
             const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer], {
                 gas: 1500000
