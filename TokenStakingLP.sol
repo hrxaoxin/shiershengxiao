@@ -190,7 +190,12 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      */
     receive() external payable {
         if (msg.value > 0) {
-            _processIncomingBNB(msg.value);
+            LPLib.RewardPoolState memory state = _getSimplePoolState();
+            uint256 lpBefore = state.lpRewardPoolBalance;
+            uint256 tokenBefore = state.tokenRewardPoolBalance;
+            state = LPLib.processIncomingBNB(state, IAuthorizer(authorizer), rewardType, msg.value);
+            _setSimplePoolState(state);
+            _updateRewardPerToken(lpBefore, tokenBefore, state);
         }
     }
 
@@ -200,7 +205,12 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      */
     function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
         require(amount > 0, "TokenStakingLP: Amount must be > 0");
-        _processIncomingBNB(amount);
+        LPLib.RewardPoolState memory state = _getSimplePoolState();
+        uint256 lpBefore = state.lpRewardPoolBalance;
+        uint256 tokenBefore = state.tokenRewardPoolBalance;
+        state = LPLib.processIncomingBNB(state, IAuthorizer(authorizer), rewardType, amount);
+        _setSimplePoolState(state);
+        _updateRewardPerToken(lpBefore, tokenBefore, state);
     }
 
     /**
@@ -213,7 +223,12 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         require(amount > 0, "TokenStakingLP: Amount must be > 0");
         
         IBEP20(token).transferFrom(msg.sender, address(this), amount);
-        _processIncomingToken(token, amount);
+        LPLib.RewardPoolState memory state = _getSimplePoolState();
+        uint256 lpBefore = state.lpRewardPoolBalance;
+        uint256 tokenBefore = state.tokenRewardPoolBalance;
+        state = LPLib.processIncomingToken(state, IAuthorizer(authorizer), rewardType, token, amount);
+        _setSimplePoolState(state);
+        _updateRewardPerToken(lpBefore, tokenBefore, state);
     }
 
     /**
@@ -224,114 +239,52 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     function receiveMultipleTokens(address[] calldata tokens, uint256[] calldata amounts) external onlyOwnerOrAuthorizer {
         require(tokens.length == amounts.length, "TokenStakingLP: Arrays length mismatch");
         
+        LPLib.RewardPoolState memory state = _getSimplePoolState();
+        uint256 lpBefore = state.lpRewardPoolBalance;
+        uint256 tokenBefore = state.tokenRewardPoolBalance;
+        
         for (uint256 i = 0; i < tokens.length; i++) {
             if (amounts[i] > 0) {
                 IBEP20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
-                _processIncomingToken(tokens[i], amounts[i]);
+                state = LPLib.processIncomingToken(state, IAuthorizer(authorizer), rewardType, tokens[i], amounts[i]);
             }
         }
-    }
-
-    /**
-     * @dev 处理流入的BNB（内部函数）
-     * @param amount BNB数量
-     */
-    function _processIncomingBNB(uint256 amount) internal {
-        RewardType currentType = rewardType;
         
-        if (currentType == RewardType.LP) {
-            uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(amount);
-            if (lpAmount > 0) {
-                _addToRewardPool(lpAmount, currentType);
-            }
-        } else if (currentType == RewardType.TOKEN) {
-            uint256 tokenAmount = IAuthorizer(authorizer).swapBNBToToken(amount);
-            if (tokenAmount > 0) {
-                _addToRewardPool(tokenAmount, currentType);
-            }
-        } else if (currentType == RewardType.BNB) {
-            _addToRewardPool(amount, currentType);
-        }
+        _setSimplePoolState(state);
+        _updateRewardPerToken(lpBefore, tokenBefore, state);
     }
 
-    /**
-     * @dev 处理流入的代币（内部函数）
-     * @param token 代币地址
-     * @param amount 代币数量
-     */
-    function _processIncomingToken(address token, uint256 amount) internal {
-        RewardType currentType = rewardType;
-        address wbnb = IAuthorizer(authorizer).getWBNB();
-        address mainToken = IAuthorizer(authorizer).getToken();
-        
-        if (token == wbnb) {
-            if (currentType == RewardType.LP) {
-                IWBNB(wbnb).withdraw(amount);
-                uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(amount);
-                if (lpAmount > 0) {
-                    _addToRewardPool(lpAmount, currentType);
-                }
-            } else if (currentType == RewardType.TOKEN) {
-                uint256 tokenAmount = IAuthorizer(authorizer).swapWBNBToToken(amount);
-                if (tokenAmount > 0) {
-                    _addToRewardPool(tokenAmount, currentType);
-                }
-            } else if (currentType == RewardType.BNB) {
-                IWBNB(wbnb).withdraw(amount);
-                _addToRewardPool(amount, currentType);
-            }
-        } else if (token == mainToken) {
-            if (currentType == RewardType.LP) {
-                uint256 lpAmount = IAuthorizer(authorizer).convertTokenToLP(amount);
-                if (lpAmount > 0) {
-                    _addToRewardPool(lpAmount, currentType);
-                }
-            } else if (currentType == RewardType.TOKEN) {
-                _addToRewardPool(amount, currentType);
-            } else if (currentType == RewardType.BNB) {
-                uint256 bnbAmount = IAuthorizer(authorizer).swapTokenToBNB(amount);
-                if (bnbAmount > 0) {
-                    _addToRewardPool(bnbAmount, currentType);
-                }
-            }
-        } else {
-            uint256 bnbAmount = IAuthorizer(authorizer).swapTokenToBNB(amount);
-            if (bnbAmount > 0) {
-                _processIncomingBNB(bnbAmount);
-            }
-        }
+    function _getSimplePoolState() internal view returns (LPLib.RewardPoolState memory state) {
+        state.lpRewardPoolBalance = lpRewardPoolBalance;
+        state.tokenRewardPoolBalance = tokenRewardPoolBalance;
+        state.bnbRewardPoolBalance = bnbRewardPoolBalance;
+        state.rewardType = rewardType;
+        state.stakingRewardPrecision = STAKING_REWARD_PRECISION;
     }
 
-    /**
-     * @dev 添加到奖励池（内部函数）
-     * @param amount 奖励数量
-     * @param type_ 奖励类型
-     */
-    function _addToRewardPool(uint256 amount, RewardType type_) internal {
-        if (type_ == RewardType.LP) {
-            uint256 newBalance = lpRewardPoolBalance + amount;
-            require(newBalance >= lpRewardPoolBalance, "TokenStakingLP: LP overflow");
-            lpRewardPoolBalance = newBalance;
-            emit LPAddedToPool(amount);
-        } else if (type_ == RewardType.TOKEN) {
-            uint256 newBalance = tokenRewardPoolBalance + amount;
-            require(newBalance >= tokenRewardPoolBalance, "TokenStakingLP: Token overflow");
-            tokenRewardPoolBalance = newBalance;
-            emit TokenAddedToPool(amount);
-        } else if (type_ == RewardType.BNB) {
-            uint256 newBalance = bnbRewardPoolBalance + amount;
-            require(newBalance >= bnbRewardPoolBalance, "TokenStakingLP: BNB overflow");
-            bnbRewardPoolBalance = newBalance;
-            emit BNBAddedToPool(amount);
-        }
+    function _setSimplePoolState(LPLib.RewardPoolState memory state) internal {
+        lpRewardPoolBalance = state.lpRewardPoolBalance;
+        tokenRewardPoolBalance = state.tokenRewardPoolBalance;
+        bnbRewardPoolBalance = state.bnbRewardPoolBalance;
+    }
 
-        if ((type_ == RewardType.LP || type_ == RewardType.TOKEN)) {
+    function _updateRewardPerToken(uint256 lpBefore, uint256 tokenBefore, LPLib.RewardPoolState memory state) internal {
+        if (rewardType == RewardType.LP || rewardType == RewardType.TOKEN) {
             address tokenStaking = IAuthorizer(authorizer).getTokenStaking();
             uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
             
             if (totalStaked > 0) {
-                uint256 increment = (amount * REWARD_PRECISION) / totalStaked;
-                dailyRewardPerToken += increment;
+                uint256 addedAmount = 0;
+                if (rewardType == RewardType.LP) {
+                    addedAmount = state.lpRewardPoolBalance - lpBefore;
+                } else if (rewardType == RewardType.TOKEN) {
+                    addedAmount = state.tokenRewardPoolBalance - tokenBefore;
+                }
+                
+                if (addedAmount > 0) {
+                    uint256 increment = (addedAmount * REWARD_PRECISION) / totalStaked;
+                    dailyRewardPerToken += increment;
+                }
             }
         }
     }
@@ -358,55 +311,9 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param toType 目标奖励类型
      */
     function _convertPoolAssets(RewardType fromType, RewardType toType) internal {
-        if (fromType == RewardType.LP && toType == RewardType.TOKEN) {
-            if (lpRewardPoolBalance > 0) {
-                uint256 tokenAmount = IAuthorizer(authorizer).redeemLPToToken(lpRewardPoolBalance);
-                lpRewardPoolBalance = 0;
-                if (tokenAmount > 0) {
-                    tokenRewardPoolBalance += tokenAmount;
-                }
-            }
-        } else if (fromType == RewardType.LP && toType == RewardType.BNB) {
-            if (lpRewardPoolBalance > 0) {
-                uint256 wbnbAmount = IAuthorizer(authorizer).redeemLPToWBNB(lpRewardPoolBalance);
-                lpRewardPoolBalance = 0;
-                if (wbnbAmount > 0) {
-                    bnbRewardPoolBalance += wbnbAmount;
-                }
-            }
-        } else if (fromType == RewardType.TOKEN && toType == RewardType.LP) {
-            if (tokenRewardPoolBalance > 0) {
-                uint256 lpAmount = IAuthorizer(authorizer).convertTokenToLP(tokenRewardPoolBalance);
-                tokenRewardPoolBalance = 0;
-                if (lpAmount > 0) {
-                    lpRewardPoolBalance += lpAmount;
-                }
-            }
-        } else if (fromType == RewardType.TOKEN && toType == RewardType.BNB) {
-            if (tokenRewardPoolBalance > 0) {
-                uint256 bnbAmount = IAuthorizer(authorizer).swapTokenToBNB(tokenRewardPoolBalance);
-                tokenRewardPoolBalance = 0;
-                if (bnbAmount > 0) {
-                    bnbRewardPoolBalance += bnbAmount;
-                }
-            }
-        } else if (fromType == RewardType.BNB && toType == RewardType.LP) {
-            if (bnbRewardPoolBalance > 0) {
-                uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(bnbRewardPoolBalance);
-                bnbRewardPoolBalance = 0;
-                if (lpAmount > 0) {
-                    lpRewardPoolBalance += lpAmount;
-                }
-            }
-        } else if (fromType == RewardType.BNB && toType == RewardType.TOKEN) {
-            if (bnbRewardPoolBalance > 0) {
-                uint256 tokenAmount = IAuthorizer(authorizer).swapBNBToToken(bnbRewardPoolBalance);
-                bnbRewardPoolBalance = 0;
-                if (tokenAmount > 0) {
-                    tokenRewardPoolBalance += tokenAmount;
-                }
-            }
-        }
+        LPLib.RewardPoolState memory state = _getSimplePoolState();
+        state = LPLib.convertPoolAssets(state, IAuthorizer(authorizer), fromType, toType);
+        _setSimplePoolState(state);
     }
 
     /**

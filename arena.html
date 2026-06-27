@@ -396,7 +396,7 @@
                         </h3>
                         <div id="rewardPoolDisplay" class="text-center mb-4 p-4 bg-yellow-500/10 rounded-lg">
                             <div class="text-yellow-400 text-2xl font-bold" id="rewardPoolAmount">--</div>
-                            <div class="text-gray-400 text-sm mt-1">代币总奖励</div>
+                            <div class="text-gray-400 text-sm mt-1" id="rewardPoolLabel">代币总奖励</div>
                             <div class="text-gray-500 text-xs mt-2" id="rewardRateInfo">奖励由LP合约发放</div>
                         </div>
                         <div id="rewardRules" class="mt-4 p-3 bg-blue-500/10 rounded-lg">
@@ -472,20 +472,20 @@
 
                     <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6">
                         <h3 class="text-white font-semibold mb-4 flex items-center">
-                            <span class="mr-2">🎁</span> LP奖励领取
+                            <span class="mr-2">🎁</span> <span id="rewardSectionTitle">LP奖励领取</span>
                         </h3>
                         <div class="p-3 bg-purple-500/20 rounded-lg mb-4">
-                            <p class="text-xs text-purple-300">💡 LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包</p>
+                            <p class="text-xs text-purple-300" id="rewardTipText">💡 LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包</p>
                         </div>
                         <div id="rewardsSection">
                             <div class="mb-4">
-                                <h4 class="text-gray-300 text-sm mb-2">可领取LP奖励</h4>
+                                <h4 class="text-gray-300 text-sm mb-2" id="unclaimedRewardTitle">可领取LP奖励</h4>
                                 <div id="unclaimedRewards" class="space-y-2">
                                     <div class="text-center text-gray-500 py-2">加载中...</div>
                                 </div>
                             </div>
                             <div>
-                                <h4 class="text-gray-300 text-sm mb-2">已领取LP奖励</h4>
+                                <h4 class="text-gray-300 text-sm mb-2" id="claimedRewardTitle">已领取LP奖励</h4>
                                 <div id="claimedRewards" class="space-y-2">
                                     <div class="text-center text-gray-500 py-2">加载中...</div>
                                 </div>
@@ -1795,16 +1795,66 @@
                 
                 battleTeam = [];
                 
-                battleTeamTokens.forEach((tokenId, index) => {
+                for (let index = 0; index < battleTeamTokens.length; index++) {
+                    const tokenId = battleTeamTokens[index];
                     if (tokenId !== '0' && tokenId !== 0) {
                         const tokenIdStr = String(tokenId);
-                        const nft = myNfts.find(n => String(n.tokenId) === tokenIdStr);
+                        let nft = myNfts.find(n => String(n.tokenId) === tokenIdStr);
+                        
+                        if (!nft) {
+                            try {
+                                const tokenInfo = await nftContract.methods.getNFTData(tokenId).call();
+                                const tokenType = tokenInfo.tokenType_;
+                                const level = tokenInfo.level;
+                                let growth = '0';
+                                try {
+                                    growth = await nftContract.methods.tokenGrowth(tokenId).call();
+                                } catch (e) {
+                                    console.warn(`获取NFT ${tokenId} 成长值失败:`, e.message);
+                                }
+                                
+                                const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
+                                const zodiac = nftInfo.animalName;
+                                const name = `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`;
+                                const imagePath = nftInfo.imagePath;
+                                
+                                const skillData = await battleContract.methods.getSkill(tokenType).call();
+                                const skill = {
+                                    name: skillData.skillId || skillData[0],
+                                    type: SKILL_TYPE_MAP[skillData.skillType || skillData[1]],
+                                    value: skillData.damage || skillData[2],
+                                    cooldown: skillData.cooldown || skillData[3],
+                                    duration: skillData.duration || skillData[4],
+                                    isAoe: skillData.isAoe || skillData[5]
+                                };
+                                
+                                nft = {
+                                    tokenId: tokenId,
+                                    tokenType: tokenType,
+                                    level: level,
+                                    growth: growth,
+                                    attr: nftInfo.elementKey,
+                                    attrName: nftInfo.attrName,
+                                    zodiacIndex: nftInfo.zodiacIndex,
+                                    zodiac: zodiac,
+                                    gender: nftInfo.gender,
+                                    name: name,
+                                    imagePath: imagePath,
+                                    skill: skill,
+                                    inBattleTeam: true,
+                                    isStaked: true
+                                };
+                            } catch (e) {
+                                console.error(`获取战队NFT ${tokenId} 数据失败:`, e);
+                            }
+                        }
+                        
                         if (nft) {
                             battleTeam[index] = { ...nft };
                             nft.inBattleTeam = true;
                         }
                     }
-                });
+                }
                 
                 renderTeamSlots();
                 updateSaveButtons();
@@ -1879,15 +1929,32 @@
             }
         }
 
+        function getRewardUnit(type) {
+            switch(type) {
+                case 0: return 'LP';
+                case 1: return 'TOKEN';
+                case 2: return 'BNB';
+                default: return 'LP';
+            }
+        }
+
+        function getRewardName(type) {
+            switch(type) {
+                case 0: return 'LP奖励';
+                case 1: return '代币奖励';
+                case 2: return 'BNB奖励';
+                default: return 'LP奖励';
+            }
+        }
+
         async function loadRewardPool() {
             try {
-                // 获取当前奖励池（使用 arenaRankingQueryContract）
                 let rewardPoolWei = '0';
+                let rewardType = 0;
                 try {
                     const seasonInfo = await arenaRankingQueryContract.methods.getCurrentSeasonInfo().call();
                     rewardPoolWei = seasonInfo.rewardPool || '0';
                 } catch (e) {
-                    // 回退方案：读取合约 BNB 余额作为奖励池
                     try {
                         rewardPoolWei = await window.ZODIAC_WEB3.getWeb3().eth.getBalance(ZODIAC_CONFIG.CONTRACT_ADDRESSES.arenaReward);
                     } catch (e2) {
@@ -1895,11 +1962,32 @@
                     }
                 }
                 
+                try {
+                    rewardType = parseInt(await arenaRewardLPContract.methods.rewardType().call());
+                } catch (e) {
+                    rewardType = 0;
+                }
+                
                 const rewardPoolEth = web3.utils.fromWei(rewardPoolWei, 'ether');
                 document.getElementById('rewardPoolAmount').textContent = parseFloat(rewardPoolEth) > 0 ? rewardPoolEth : '--';
                 
-                // 获取奖励比例
-                document.getElementById('rewardRateInfo').textContent = '奖励由LP合约发放';
+                const rewardUnit = getRewardUnit(rewardType);
+                const rewardName = getRewardName(rewardType);
+                
+                document.getElementById('rewardPoolLabel').textContent = rewardUnit + '总奖励';
+                document.getElementById('rewardRateInfo').textContent = '奖励由' + rewardName + '合约发放';
+                
+                document.getElementById('rewardSectionTitle').textContent = rewardName + '领取';
+                document.getElementById('unclaimedRewardTitle').textContent = '可领取' + rewardName;
+                document.getElementById('claimedRewardTitle').textContent = '已领取' + rewardName;
+                
+                if (rewardType === 2) {
+                    document.getElementById('rewardTipText').textContent = '💡 BNB奖励直接发放到您的钱包';
+                } else if (rewardType === 1) {
+                    document.getElementById('rewardTipText').textContent = '💡 代币奖励直接发放到您的钱包';
+                } else {
+                    document.getElementById('rewardTipText').textContent = '💡 LP奖励领取后会自动兑换为代币和WBNB发送到您的钱包';
+                }
             } catch (error) {
                 console.error('加载奖励池失败:', error);
             }
