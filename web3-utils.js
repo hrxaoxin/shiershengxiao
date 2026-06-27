@@ -200,6 +200,7 @@ window.ZODIAC_WEB3 = (function() {
         'nftUpdate': ABIS.nftUpdateABI,
         'battle': ABIS.battleABI,
         'arena': ABIS.arenaABI,
+        'arenaRankingManager': ABIS.arenaRankingManagerABI,
         'arenaReward': ABIS.arenaRewardABI,
         'arenaLeaderboard': ABIS.arenaLeaderboardABI,
         'arenaPlayer': ABIS.arenaPlayerABI,

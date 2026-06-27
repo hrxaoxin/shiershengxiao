@@ -7,7 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
-import "./LPLib.sol";
+import "./TokenStakingLPLib.sol";
 
 /**
  * @title TokenStakingLP
@@ -37,7 +37,6 @@ import "./LPLib.sol";
  * - UUPS可升级模式，由onlyOwner授权升级
  */
 contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    using LPLib for IAuthorizer;
     
     /** @dev 奖励精度缩放因子（1e18），用于避免 dailyRewardPerToken 整数截断 */
     uint256 private constant REWARD_PRECISION = 1e18;
@@ -84,6 +83,22 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
 
     /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[48] private __gap;
+
+    // Custom errors for reduced bytecode size
+    error InvalidAuthorizer();
+    error NotAuthorized();
+    error AmountZero();
+    error InvalidToken();
+    error ArraysLengthMismatch();
+    error NoStakedTokens();
+    error InsufficientLP();
+    error InsufficientToken();
+    error InsufficientBNB();
+    error InvalidRewardRate();
+    error InvalidMaxRate();
+    error InvalidPercent();
+    error InvalidStep();
+    error AlreadyInitialized();
 
     /**
      * @dev LP奖励领取事件
@@ -137,7 +152,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param _authorizerAddress 授权合约地址
      */
     function initialize(address _authorizerAddress) external initializer {
-        require(_authorizerAddress != address(0), "TokenStakingLP: Invalid authorizer");
+        if (_authorizerAddress == address(0)) revert InvalidAuthorizer();
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -181,7 +196,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
             return;
         }
         IAuthorizer auth = IAuthorizer(authorizer);
-        require(auth.isSystemContract(msg.sender), "TokenStakingLP: Not authorized");
+        if (!auth.isSystemContract(msg.sender)) revert NotAuthorized();
         _;
     }
 
@@ -190,10 +205,10 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      */
     receive() external payable {
         if (msg.value > 0) {
-            LPLib.RewardPoolState memory state = _getSimplePoolState();
+            TokenStakingLPLib.RewardPoolState memory state = _getSimplePoolState();
             uint256 lpBefore = state.lpRewardPoolBalance;
             uint256 tokenBefore = state.tokenRewardPoolBalance;
-            state = LPLib.processIncomingBNB(state, IAuthorizer(authorizer), rewardType, msg.value);
+            state = TokenStakingLPLib.processIncomingBNB(state, IAuthorizer(authorizer), rewardType, msg.value);
             _setSimplePoolState(state);
             _updateRewardPerToken(lpBefore, tokenBefore, state);
         }
@@ -204,11 +219,11 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param amount BNB数量
      */
     function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
-        require(amount > 0, "TokenStakingLP: Amount must be > 0");
-        LPLib.RewardPoolState memory state = _getSimplePoolState();
+        if (amount == 0) revert AmountZero();
+        TokenStakingLPLib.RewardPoolState memory state = _getSimplePoolState();
         uint256 lpBefore = state.lpRewardPoolBalance;
         uint256 tokenBefore = state.tokenRewardPoolBalance;
-        state = LPLib.processIncomingBNB(state, IAuthorizer(authorizer), rewardType, amount);
+        state = TokenStakingLPLib.processIncomingBNB(state, IAuthorizer(authorizer), rewardType, amount);
         _setSimplePoolState(state);
         _updateRewardPerToken(lpBefore, tokenBefore, state);
     }
@@ -219,14 +234,14 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param amount 代币数量
      */
     function receiveToken(address token, uint256 amount) external onlyOwnerOrAuthorizer {
-        require(token != address(0), "TokenStakingLP: Invalid token address");
-        require(amount > 0, "TokenStakingLP: Amount must be > 0");
+        if (token == address(0)) revert InvalidToken();
+        if (amount == 0) revert AmountZero();
         
         IBEP20(token).transferFrom(msg.sender, address(this), amount);
-        LPLib.RewardPoolState memory state = _getSimplePoolState();
+        TokenStakingLPLib.RewardPoolState memory state = _getSimplePoolState();
         uint256 lpBefore = state.lpRewardPoolBalance;
         uint256 tokenBefore = state.tokenRewardPoolBalance;
-        state = LPLib.processIncomingToken(state, IAuthorizer(authorizer), rewardType, token, amount);
+        state = TokenStakingLPLib.processIncomingToken(state, IAuthorizer(authorizer), rewardType, token, amount);
         _setSimplePoolState(state);
         _updateRewardPerToken(lpBefore, tokenBefore, state);
     }
@@ -237,16 +252,16 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param amounts 代币数量数组
      */
     function receiveMultipleTokens(address[] calldata tokens, uint256[] calldata amounts) external onlyOwnerOrAuthorizer {
-        require(tokens.length == amounts.length, "TokenStakingLP: Arrays length mismatch");
+        if (tokens.length != amounts.length) revert ArraysLengthMismatch();
         
-        LPLib.RewardPoolState memory state = _getSimplePoolState();
+        TokenStakingLPLib.RewardPoolState memory state = _getSimplePoolState();
         uint256 lpBefore = state.lpRewardPoolBalance;
         uint256 tokenBefore = state.tokenRewardPoolBalance;
         
         for (uint256 i = 0; i < tokens.length; i++) {
             if (amounts[i] > 0) {
                 IBEP20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
-                state = LPLib.processIncomingToken(state, IAuthorizer(authorizer), rewardType, tokens[i], amounts[i]);
+                state = TokenStakingLPLib.processIncomingToken(state, IAuthorizer(authorizer), rewardType, tokens[i], amounts[i]);
             }
         }
         
@@ -254,7 +269,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         _updateRewardPerToken(lpBefore, tokenBefore, state);
     }
 
-    function _getSimplePoolState() internal view returns (LPLib.RewardPoolState memory state) {
+    function _getSimplePoolState() internal view returns (TokenStakingLPLib.RewardPoolState memory state) {
         state.lpRewardPoolBalance = lpRewardPoolBalance;
         state.tokenRewardPoolBalance = tokenRewardPoolBalance;
         state.bnbRewardPoolBalance = bnbRewardPoolBalance;
@@ -262,13 +277,13 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         state.stakingRewardPrecision = STAKING_REWARD_PRECISION;
     }
 
-    function _setSimplePoolState(LPLib.RewardPoolState memory state) internal {
+    function _setSimplePoolState(TokenStakingLPLib.RewardPoolState memory state) internal {
         lpRewardPoolBalance = state.lpRewardPoolBalance;
         tokenRewardPoolBalance = state.tokenRewardPoolBalance;
         bnbRewardPoolBalance = state.bnbRewardPoolBalance;
     }
 
-    function _updateRewardPerToken(uint256 lpBefore, uint256 tokenBefore, LPLib.RewardPoolState memory state) internal {
+    function _updateRewardPerToken(uint256 lpBefore, uint256 tokenBefore, TokenStakingLPLib.RewardPoolState memory state) internal {
         if (rewardType == RewardType.LP || rewardType == RewardType.TOKEN) {
             address tokenStaking = IAuthorizer(authorizer).getTokenStaking();
             uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
@@ -311,8 +326,8 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param toType 目标奖励类型
      */
     function _convertPoolAssets(RewardType fromType, RewardType toType) internal {
-        LPLib.RewardPoolState memory state = _getSimplePoolState();
-        state = LPLib.convertPoolAssets(state, IAuthorizer(authorizer), fromType, toType);
+        TokenStakingLPLib.RewardPoolState memory state = _getSimplePoolState();
+        state = TokenStakingLPLib.convertPoolAssets(state, IAuthorizer(authorizer), fromType, toType);
         _setSimplePoolState(state);
     }
 
@@ -320,7 +335,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @dev 复利手续费（仅owner）
      */
     function compoundFees() external onlyOwner {
-        IAuthorizer(authorizer).compoundFees();
+        TokenStakingLPLib.compoundFees(IAuthorizer(authorizer));
     }
 
     /**
@@ -329,7 +344,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     function claimLPReward() external nonReentrant whenNotPaused {
         address tokenStaking = IAuthorizer(authorizer).getTokenStaking();
         ITokenStaking.StakeInfo memory stake = ITokenStaking(tokenStaking).getUserStake(msg.sender);
-        require(stake.amount > 0, "TokenStakingLP: No staked tokens");
+        if (stake.amount == 0) revert NoStakedTokens();
 
         RewardType currentType = rewardType;
         
@@ -354,12 +369,12 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         uint256 reward = stake.amount * (currentRate - lastRate) / REWARD_PRECISION;
         
         if (currentType == RewardType.LP) {
-            require(reward <= lpRewardPoolBalance, "TokenStakingLP: Insufficient LP");
+            if (reward > lpRewardPoolBalance) revert InsufficientLP();
             lpRewardPoolBalance -= reward;
-            IAuthorizer(authorizer).redeemLPToUser(reward, msg.sender);
+            TokenStakingLPLib.redeemLPToUser(IAuthorizer(authorizer), reward, msg.sender);
             emit LPRewardsClaimed(msg.sender, reward);
         } else if (currentType == RewardType.TOKEN) {
-            require(reward <= tokenRewardPoolBalance, "TokenStakingLP: Insufficient Token");
+            if (reward > tokenRewardPoolBalance) revert InsufficientToken();
             tokenRewardPoolBalance -= reward;
             IBEP20 token = IBEP20(IAuthorizer(authorizer).getToken());
             token.transfer(msg.sender, reward);
@@ -401,7 +416,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param amount 提取金额
      */
     function emergencyWithdrawWBNB(uint256 amount) external onlyOwner nonReentrant {
-        IAuthorizer(authorizer).emergencyWithdrawWBNB(amount);
+        TokenStakingLPLib.emergencyWithdrawWBNB(IAuthorizer(authorizer), amount);
         emit EmergencyWBNBWithdrawn(msg.sender, owner(), amount);
     }
 
@@ -410,7 +425,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param _authorizerAddress 新的授权合约地址
      */
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
-        require(_authorizerAddress != address(0), "TokenStakingLP: Invalid authorizer");
+        if (_authorizerAddress == address(0)) revert InvalidAuthorizer();
         authorizer = _authorizerAddress;
     }
 
@@ -419,7 +434,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param _rewardRate 新的奖励率（万分比）
      */
     function setRewardRate(uint256 _rewardRate) external onlyOwner {
-        require(_rewardRate > 0 && _rewardRate <= maxRewardRate, "TokenStakingLP: Invalid reward rate");
+        if (_rewardRate == 0 || _rewardRate > maxRewardRate) revert InvalidRewardRate();
         rewardRate = _rewardRate;
         emit RewardRateUpdated(_rewardRate);
     }
@@ -429,7 +444,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param _maxRewardRate 最大奖励率（万分比）
      */
     function setMaxRewardRate(uint256 _maxRewardRate) external onlyOwner {
-        require(_maxRewardRate >= rewardRate, "TokenStakingLP: Max rate must be >= current rate");
+        if (_maxRewardRate < rewardRate) revert InvalidMaxRate();
         maxRewardRate = _maxRewardRate;
     }
 
@@ -438,7 +453,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param _percent 百分比（千分比，100 = 10%）
      */
     function setMaxDailyRewardPercent(uint256 _percent) external onlyOwner {
-        require(_percent > 0 && _percent <= 500, "TokenStakingLP: Invalid percent");
+        if (_percent == 0 || _percent > 500) revert InvalidPercent();
         maxDailyRewardPercent = _percent;
     }
 
@@ -554,7 +569,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param _rateStep 调整步长（万分比）
      */
     function setRateStep(uint256 _rateStep) external onlyOwner {
-        require(_rateStep > 0, "TokenStakingLP: Step must be > 0");
+        if (_rateStep == 0) revert InvalidStep();
         rateStep = _rateStep;
     }
 }
