@@ -217,12 +217,17 @@ window.ZODIAC_WEB3 = (function() {
             const authorizerAddr = CONTRACT_ADDRESSES.authorizer;
             if (!authorizerAddr || authorizerAddr === '0x0000000000000000000000000000000000000000') {
                 console.warn('[ZODIAC_WEB3] authorizer address not configured');
-                return CONTRACT_ADDRESSES.tokenContract; // 回退到配置地址
+                return CONTRACT_ADDRESSES.tokenContract;
             }
             const authorizerContract = new web3.eth.Contract(ABIS.authorizerABI, authorizerAddr);
             const tokenAddress = await authorizerContract.methods.getToken().call();
             console.log('[ZODIAC_WEB3] Token address from authorizer:', tokenAddress);
-            return tokenAddress;
+            if (tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000') {
+                return tokenAddress;
+            } else {
+                console.warn('[ZODIAC_WEB3] Authorizer returned zero token address, falling back to config');
+                return CONTRACT_ADDRESSES.tokenContract;
+            }
         } catch (e) {
             console.warn('[ZODIAC_WEB3] Failed to get token from authorizer, using configured address:', e.message);
             return CONTRACT_ADDRESSES.tokenContract;

@@ -1364,6 +1364,15 @@
             try {
                 const amountWei = web3.utils.toWei(amount, 'ether');
                 
+                if (!tokenContract) {
+                    throw new Error('代币合约未初始化');
+                }
+                
+                const tokenAddress = tokenContract.options.address;
+                if (!tokenAddress || tokenAddress === '0x0000000000000000000000000000000000000000') {
+                    throw new Error('代币合约地址无效');
+                }
+                
                 const allowance = await tokenContract.methods.allowance(account, tokenStakingAddress).call();
                 if (parseInt(allowance, 10) < parseInt(amountWei, 10)) {
                     await ZODIAC_WEB3.approveToken(tokenStakingAddress, amountWei);
