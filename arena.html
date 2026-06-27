@@ -2617,10 +2617,13 @@
                     }
                 }
 
+                console.log(`[ARENA] executeRealChallenge: opponent=${selectedOpponent.address}, isMock=${selectedOpponent.isMock}, team=${JSON.stringify(playerTeam)}`);
+
                 let victory = null;
                 let challengeTx = null;
                 if (selectedOpponent.isMock) {
                     const mockIndex = selectedOpponent.mockIndex !== undefined ? selectedOpponent.mockIndex : 0;
+                    console.log(`[ARENA] Calling challengeMockPlayer with mockIndex=${mockIndex}`);
                     challengeTx = await ZODIAC_WEB3.challengeMockPlayer(playerTeam, mockIndex);
                     victory = challengeTx.events?.ChallengeResult?.returnValues?.isVictory;
                     if (victory === undefined) {
@@ -2628,6 +2631,7 @@
                     }
                 } else {
                     const defenderAddress = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
+                    console.log(`[ARENA] Calling challengeRealPlayer with defender=${defenderAddress}`);
                     challengeTx = await ZODIAC_WEB3.challengeRealPlayer(defenderAddress, playerTeam);
                     victory = challengeTx.events?.ChallengeResult?.returnValues?.isVictory;
                     if (victory === undefined) {

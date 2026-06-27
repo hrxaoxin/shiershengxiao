@@ -949,10 +949,14 @@ window.ZODIAC_WEB3 = (function() {
                 gas = Math.ceil(estimatedGas * 1.5);
                 console.log(`[ZODIAC_WEB3] Gas estimated: ${estimatedGas}, using: ${gas}`);
             } catch (e) {
-                console.warn(`[ZODIAC_WEB3] Gas estimation failed for ${methodName}, using default gas limit:`, e.message);
+                console.warn(`[ZODIAC_WEB3] Gas estimation failed for ${methodName}:`, e.message);
+                if (e.message && e.message.includes('revert')) {
+                    throw new Error(`[ZODIAC_WEB3] Transaction would revert: ${e.message}`);
+                }
                 const defaultGas = getGasLimit(methodName);
                 gas = defaultGas.gas;
                 usedDefaultGas = true;
+                console.warn(`[ZODIAC_WEB3] Using default gas limit: ${gas}`);
             }
         }
 
@@ -1583,8 +1587,18 @@ window.ZODIAC_WEB3 = (function() {
         }
         try {
             const contract = await getContract('arenaRankingManager');
-            const teamNumbers = playerTeam.map(id => typeof id === 'string' ? BigInt(id).toString() : id.toString());
-            const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [teamNumbers, mockIndex]);
+            const teamNumbers = playerTeam.map(id => {
+                const num = typeof id === 'string' ? parseInt(id, 10) : Number(id);
+                if (isNaN(num) || num < 0) {
+                    throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
+                }
+                return num;
+            });
+            console.log(`[ZODIAC_WEB3] challengeMockPlayer params: team=${JSON.stringify(teamNumbers)}, mockIndex=${mockIndex}`);
+            
+            const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [teamNumbers, mockIndex], {
+                gas: 1500000
+            });
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] challengeMockPlayer failed:', e);
@@ -1604,8 +1618,18 @@ window.ZODIAC_WEB3 = (function() {
         }
         try {
             const contract = await getContract('arenaRankingManager');
-            const teamNumbers = playerTeam.map(id => typeof id === 'string' ? BigInt(id).toString() : id.toString());
-            const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer, teamNumbers]);
+            const teamNumbers = playerTeam.map(id => {
+                const num = typeof id === 'string' ? parseInt(id, 10) : Number(id);
+                if (isNaN(num) || num < 0) {
+                    throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
+                }
+                return num;
+            });
+            console.log(`[ZODIAC_WEB3] challengeRealPlayer params: challengedPlayer=${challengedPlayer}, team=${JSON.stringify(teamNumbers)}`);
+            
+            const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer, teamNumbers], {
+                gas: 1500000
+            });
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] challengeRealPlayer failed:', e);
