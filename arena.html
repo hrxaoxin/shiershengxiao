@@ -1233,53 +1233,63 @@
                 const tokenIds = await nftContract.methods.getTokenIdsByOwner(accounts[0]).call();
                 myNfts = [];
                 
-                for (const tokenId of tokenIds) {
-                    const tokenInfo = await nftContract.methods.getNFTData(tokenId).call();
-                    const tokenType = tokenInfo.tokenType_;
-                    const level = tokenInfo.level;
-                    let growth = '0';
+                const loadNftPromises = tokenIds.map(async (tokenId) => {
                     try {
-                        growth = await nftContract.methods.tokenGrowth(tokenId).call();
+                        const [tokenInfo, growth, stakedOwner] = await Promise.all([
+                            nftContract.methods.getNFTData(tokenId).call(),
+                            nftContract.methods.tokenGrowth(tokenId).call().catch(() => '0'),
+                            arenaPlayerContract.methods.nftStakedOwner(tokenId).call().catch(() => '0x0000000000000000000000000000000000000000')
+                        ]);
+                        
+                        const tokenType = tokenInfo.tokenType_;
+                        const level = tokenInfo.level;
+                        const isStaked = stakedOwner !== '0x0000000000000000000000000000000000000000';
+                        
+                        const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
+                        const zodiac = nftInfo.animalName;
+                        const name = `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`;
+                        const imagePath = nftInfo.imagePath;
+                        
+                        let skill;
+                        if (skillCache[tokenType]) {
+                            skill = skillCache[tokenType];
+                        } else {
+                            const skillData = await battleContract.methods.getSkill(tokenType).call();
+                            skill = {
+                                name: skillData.skillId || skillData[0],
+                                type: SKILL_TYPE_MAP[skillData.skillType || skillData[1]],
+                                value: skillData.damage || skillData[2],
+                                cooldown: skillData.cooldown || skillData[3],
+                                duration: skillData.duration || skillData[4],
+                                isAoe: skillData.isAoe || skillData[5]
+                            };
+                            skillCache[tokenType] = skill;
+                        }
+                        
+                        return {
+                            tokenId: tokenId,
+                            tokenType: tokenType,
+                            level: level,
+                            growth: growth,
+                            attr: nftInfo.elementKey,
+                            attrName: nftInfo.attrName,
+                            zodiacIndex: nftInfo.zodiacIndex,
+                            zodiac: zodiac,
+                            gender: nftInfo.gender,
+                            name: name,
+                            imagePath: imagePath,
+                            skill: skill,
+                            inBattleTeam: false,
+                            isStaked: isStaked
+                        };
                     } catch (e) {
-                        console.warn(`获取NFT ${tokenId} 成长值失败:`, e.message);
+                        console.error(`获取NFT ${tokenId} 数据失败:`, e);
+                        return null;
                     }
-                    
-                    const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
-                    const zodiac = nftInfo.animalName;
-                    const name = `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`;
-                    
-                    const imagePath = ZODIAC_UTILS.getNFTInfo(tokenType).imagePath;
-                    
-                    const skillData = await battleContract.methods.getSkill(tokenType).call();
-                    const skill = {
-                        name: skillData.skillId || skillData[0],
-                        type: SKILL_TYPE_MAP[skillData.skillType || skillData[1]],
-                        value: skillData.damage || skillData[2],
-                        cooldown: skillData.cooldown || skillData[3],
-                        duration: skillData.duration || skillData[4],
-                        isAoe: skillData.isAoe || skillData[5]
-                    };
-                    
-                    const stakedOwner = await arenaPlayerContract.methods.nftStakedOwner(tokenId).call();
-                    const isStaked = stakedOwner !== '0x0000000000000000000000000000000000000000';
-                    
-                    myNfts.push({
-                        tokenId: tokenId,
-                        tokenType: tokenType,
-                        level: level,
-                        growth: growth,
-                        attr: nftInfo.elementKey,
-                        attrName: nftInfo.attrName,
-                        zodiacIndex: nftInfo.zodiacIndex,
-                        zodiac: zodiac,
-                        gender: nftInfo.gender,
-                        name: name,
-                        imagePath: imagePath,
-                        skill: skill,
-                        inBattleTeam: false,
-                        isStaked: isStaked
-                    });
-                }
+                });
+                
+                const results = await Promise.all(loadNftPromises);
+                myNfts = results.filter(n => n !== null);
             } catch (error) {
                 console.error('加载NFT失败:', error);
             }
@@ -1789,37 +1799,45 @@
             `;
         }
 
+        const skillCache = {};
+
         async function loadMyTeam() {
             try {
                 const battleTeamTokens = await arenaPlayerContract.methods.getPlayerBattleTeam(accounts[0]).call();
                 
                 battleTeam = [];
                 
-                for (let index = 0; index < battleTeamTokens.length; index++) {
-                    const tokenId = battleTeamTokens[index];
-                    if (tokenId !== '0' && tokenId !== 0) {
-                        const tokenIdStr = String(tokenId);
-                        let nft = myNfts.find(n => String(n.tokenId) === tokenIdStr);
-                        
-                        if (!nft) {
-                            try {
-                                const tokenInfo = await nftContract.methods.getNFTData(tokenId).call();
-                                const tokenType = tokenInfo.tokenType_;
-                                const level = tokenInfo.level;
-                                let growth = '0';
-                                try {
-                                    growth = await nftContract.methods.tokenGrowth(tokenId).call();
-                                } catch (e) {
-                                    console.warn(`获取NFT ${tokenId} 成长值失败:`, e.message);
-                                }
-                                
-                                const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
-                                const zodiac = nftInfo.animalName;
-                                const name = `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`;
-                                const imagePath = nftInfo.imagePath;
-                                
+                const validTokens = battleTeamTokens.map((tokenId, index) => ({
+                    tokenId,
+                    index,
+                    isValid: tokenId !== '0' && tokenId !== 0
+                })).filter(t => t.isValid);
+                
+                const loadTokenPromises = validTokens.map(async ({ tokenId, index }) => {
+                    const tokenIdStr = String(tokenId);
+                    let nft = myNfts.find(n => String(n.tokenId) === tokenIdStr);
+                    
+                    if (!nft) {
+                        try {
+                            const [tokenInfo, growth] = await Promise.all([
+                                nftContract.methods.getNFTData(tokenId).call(),
+                                nftContract.methods.tokenGrowth(tokenId).call().catch(() => '0')
+                            ]);
+                            
+                            const tokenType = tokenInfo.tokenType_;
+                            const level = tokenInfo.level;
+                            
+                            const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
+                            const zodiac = nftInfo.animalName;
+                            const name = `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`;
+                            const imagePath = nftInfo.imagePath;
+                            
+                            let skill;
+                            if (skillCache[tokenType]) {
+                                skill = skillCache[tokenType];
+                            } else {
                                 const skillData = await battleContract.methods.getSkill(tokenType).call();
-                                const skill = {
+                                skill = {
                                     name: skillData.skillId || skillData[0],
                                     type: SKILL_TYPE_MAP[skillData.skillType || skillData[1]],
                                     value: skillData.damage || skillData[2],
@@ -1827,34 +1845,43 @@
                                     duration: skillData.duration || skillData[4],
                                     isAoe: skillData.isAoe || skillData[5]
                                 };
-                                
-                                nft = {
-                                    tokenId: tokenId,
-                                    tokenType: tokenType,
-                                    level: level,
-                                    growth: growth,
-                                    attr: nftInfo.elementKey,
-                                    attrName: nftInfo.attrName,
-                                    zodiacIndex: nftInfo.zodiacIndex,
-                                    zodiac: zodiac,
-                                    gender: nftInfo.gender,
-                                    name: name,
-                                    imagePath: imagePath,
-                                    skill: skill,
-                                    inBattleTeam: true,
-                                    isStaked: true
-                                };
-                            } catch (e) {
-                                console.error(`获取战队NFT ${tokenId} 数据失败:`, e);
+                                skillCache[tokenType] = skill;
                             }
-                        }
-                        
-                        if (nft) {
-                            battleTeam[index] = { ...nft };
-                            nft.inBattleTeam = true;
+                            
+                            nft = {
+                                tokenId: tokenId,
+                                tokenType: tokenType,
+                                level: level,
+                                growth: growth,
+                                attr: nftInfo.elementKey,
+                                attrName: nftInfo.attrName,
+                                zodiacIndex: nftInfo.zodiacIndex,
+                                zodiac: zodiac,
+                                gender: nftInfo.gender,
+                                name: name,
+                                imagePath: imagePath,
+                                skill: skill,
+                                inBattleTeam: true,
+                                isStaked: true
+                            };
+                        } catch (e) {
+                            console.error(`获取战队NFT ${tokenId} 数据失败:`, e);
                         }
                     }
-                }
+                    
+                    if (nft) {
+                        nft.inBattleTeam = true;
+                        return { index, nft };
+                    }
+                    return null;
+                });
+                
+                const results = await Promise.all(loadTokenPromises);
+                results.forEach(result => {
+                    if (result) {
+                        battleTeam[result.index] = { ...result.nft };
+                    }
+                });
                 
                 renderTeamSlots();
                 updateSaveButtons();
@@ -2183,8 +2210,7 @@
                 if (!useMockData && paginationResult && paginationResult.entries && paginationResult.entries.length > 0) {
                     const entries = paginationResult.entries;
                     
-                    for (let i = 0; i < entries.length; i++) {
-                        const entry = entries[i];
+                    const playerPromises = entries.map(async (entry, i) => {
                         const address = entry.playerAddress;
                         const points = parseInt(entry.points || '0');
                         const wins = parseInt(entry.wins || '0');
@@ -2192,53 +2218,76 @@
                         const isMock = address === '0x0000000000000000000000000000000000000000' || points >= 10000;
                         const rank = startRank + i;
                         
-                        let team = [];
-                        
-                        if (!isMock) {
-                            try {
-                                const teamTokens = await arenaPlayerContract.methods.getPlayerBattleTeam(address).call();
-                                for (const tokenId of teamTokens) {
-                                    if (tokenId && tokenId !== '0' && tokenId !== 0) {
-                                        try {
-                                            const nftData = await nftContract.methods.getNFTData(tokenId).call();
-                                            const tokenType = nftData.tokenType_ || nftData[0];
-                                            const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
-                                            const zodiac = nftInfo.animalName;
-                                            team.push({
-                                                tokenId: tokenId,
-                                                name: `${nftInfo.attrName}${zodiac}${nftInfo.gender === '公' ? '·雄' : '·雌'}`,
-                                                level: nftData.level || nftData[1],
-                                                element: ZODIAC_UTILS.getNFTInfo(tokenType).elementKey,
-                                                imagePath: nftInfo.imagePath
-                                            });
-                                        } catch (e) {
-                                            team.push({
-                                                tokenId: tokenId,
-                                                name: '未知',
-                                                level: 1,
-                                                element: 'water',
-                                                imagePath: `${IPFS_BASE_1}shuishu_0.png`
-                                            });
-                                        }
-                                    }
-                                }
-                            } catch (e) {}
-                        } else {
+                        if (isMock) {
                             const opponent = mockOpponents[rank % mockOpponents.length];
-                            team = opponent.team;
+                            return {
+                                address: address,
+                                points: points,
+                                wins: wins,
+                                losses: losses,
+                                rank: rank,
+                                isMock: true,
+                                mockIndex: rank % mockOpponents.length,
+                                team: opponent.team
+                            };
                         }
                         
-                        topPlayers.push({
-                            address: address,
-                            points: points,
-                            wins: wins,
-                            losses: losses,
-                            rank: rank,
-                            isMock: isMock,
-                            mockIndex: isMock ? rank % mockOpponents.length : null,
-                            team: team
-                        });
-                    }
+                        try {
+                            const teamTokens = await arenaPlayerContract.methods.getPlayerBattleTeam(address).call();
+                            const validTokens = teamTokens.filter(t => t && t !== '0' && t !== 0);
+                            
+                            const nftDataPromises = validTokens.map(tokenId => 
+                                nftContract.methods.getNFTData(tokenId).call().catch(() => null)
+                            );
+                            const nftDataResults = await Promise.all(nftDataPromises);
+                            
+                            const team = nftDataResults.map((nftData, idx) => {
+                                if (!nftData) {
+                                    return {
+                                        tokenId: validTokens[idx],
+                                        name: '未知',
+                                        level: 1,
+                                        element: 'water',
+                                        imagePath: `${IPFS_BASE_1}shuishu_0.png`
+                                    };
+                                }
+                                const tokenType = nftData.tokenType_ || nftData[0];
+                                const nftInfo = ZODIAC_UTILS.getNFTInfo(tokenType);
+                                return {
+                                    tokenId: validTokens[idx],
+                                    name: `${nftInfo.attrName}${nftInfo.animalName}${nftInfo.gender === '公' ? '·雄' : '·雌'}`,
+                                    level: nftData.level || nftData[1],
+                                    element: nftInfo.elementKey,
+                                    imagePath: nftInfo.imagePath
+                                };
+                            });
+                            
+                            return {
+                                address: address,
+                                points: points,
+                                wins: wins,
+                                losses: losses,
+                                rank: rank,
+                                isMock: false,
+                                mockIndex: null,
+                                team: team
+                            };
+                        } catch (e) {
+                            return {
+                                address: address,
+                                points: points,
+                                wins: wins,
+                                losses: losses,
+                                rank: rank,
+                                isMock: false,
+                                mockIndex: null,
+                                team: []
+                            };
+                        }
+                    });
+                    
+                    const playersData = await Promise.all(playerPromises);
+                    topPlayers.push(...playersData);
                 } else {
                     totalPages = 10;
                     totalPlayers = 100;
@@ -2265,40 +2314,35 @@
                 
                 document.getElementById('leaderboard').dataset.leaderboardData = JSON.stringify(topPlayers);
                 
-                // 获取当前用户的排名
-                if (accounts.length > 0) {
+                if (accounts.length > 0 && !useMockData) {
                     try {
-                        const userRank = await arenaRankingQueryContract.methods.getPlayerRank(accounts[0]).call();
+                        const [userRank, myStats] = await Promise.all([
+                            arenaRankingQueryContract.methods.getPlayerRank(accounts[0]).call().catch(() => '0'),
+                            arenaBattleContract.methods.getPlayerRecord(accounts[0]).call().catch(() => ['0'])
+                        ]);
                         const userRankNum = parseInt(userRank) || 0;
+                        const userPoints = parseInt(myStats[0] || '0');
                         
-                        if (userRankNum > 0) {
-                            const myStats = await arenaBattleContract.methods.getPlayerRecord(accounts[0]).call();
-                            const userPoints = parseInt(myStats[0] || '0');
-                            
-                            const myRankDiv = document.getElementById('myRankDisplay');
-                            if (myRankDiv) {
-                                myRankDiv.innerHTML = `当前排名: <span class="text-yellow-400 font-bold">#${userRankNum}</span> | 积分: ${userPoints}`;
-                            }
+                        const myRankDiv = document.getElementById('myRankDisplay');
+                        if (myRankDiv && userRankNum > 0) {
+                            myRankDiv.innerHTML = `当前排名: <span class="text-yellow-400 font-bold">#${userRankNum}</span> | 积分: ${userPoints}`;
                         }
                     } catch (e) {
                         console.log('获取用户排名失败:', e);
                     }
                 }
                 
-                const rewards = [];
-                for (let i = 0; i < topPlayers.length; i++) {
-                    try {
-                        if (arenaRewardContract && web3) {
-                            const rewardWei = await arenaRewardContract.methods.getRewardForRank(topPlayers[i].rank).call();
-                            rewards.push(web3.utils.fromWei(rewardWei, 'ether'));
-                        } else {
-                            const baseRewards = [5000, 3000, 2000, 1500, 1200, 1000, 900, 800, 700, 600];
-                            rewards.push(topPlayers[i].rank <= 10 ? String(baseRewards[topPlayers[i].rank - 1]) : String(Math.max(50, 500 - (topPlayers[i].rank - 10) * 5)));
-                        }
-                    } catch (e) {
-                        rewards.push('0');
+                const rewardPromises = topPlayers.map(player => {
+                    if (arenaRewardContract && web3) {
+                        return arenaRewardContract.methods.getRewardForRank(player.rank).call()
+                            .then(wei => web3.utils.fromWei(wei, 'ether'))
+                            .catch(() => '0');
+                    } else {
+                        const baseRewards = [5000, 3000, 2000, 1500, 1200, 1000, 900, 800, 700, 600];
+                        return Promise.resolve(player.rank <= 10 ? String(baseRewards[player.rank - 1]) : String(Math.max(50, 500 - (player.rank - 10) * 5)));
                     }
-                }
+                });
+                const rewards = await Promise.all(rewardPromises);
                 
                 const leaderboard = document.getElementById('leaderboard');
                 leaderboard.innerHTML = topPlayers.map((player, index) => {

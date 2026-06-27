@@ -1583,7 +1583,8 @@ window.ZODIAC_WEB3 = (function() {
         }
         try {
             const contract = await getContract('arenaRankingManager');
-            const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [playerTeam, mockIndex]);
+            const teamNumbers = playerTeam.map(id => typeof id === 'string' ? BigInt(id).toString() : id.toString());
+            const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [teamNumbers, mockIndex]);
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] challengeMockPlayer failed:', e);
@@ -1603,7 +1604,8 @@ window.ZODIAC_WEB3 = (function() {
         }
         try {
             const contract = await getContract('arenaRankingManager');
-            const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer, playerTeam]);
+            const teamNumbers = playerTeam.map(id => typeof id === 'string' ? BigInt(id).toString() : id.toString());
+            const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer, teamNumbers]);
             return receipt;
         } catch (e) {
             console.error('[ZODIAC_WEB3] challengeRealPlayer failed:', e);
