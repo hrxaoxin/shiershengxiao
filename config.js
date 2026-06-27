@@ -12195,6 +12195,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256[6]",
+				"name": "playerTeam",
+				"type": "uint256[6]"
+			},
+			{
 				"internalType": "uint256",
 				"name": "mockIndex",
 				"type": "uint256"
@@ -12204,13 +12209,8 @@ window.ZODIAC_CONFIG = (function() {
 		"outputs": [
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "success",
 				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -12222,19 +12222,19 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "challengedPlayer",
 				"type": "address"
+			},
+			{
+				"internalType": "uint256[6]",
+				"name": "playerTeam",
+				"type": "uint256[6]"
 			}
 		],
 		"name": "challengeRealPlayer",
 		"outputs": [
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "success",
 				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -13623,6 +13623,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256[6]",
+				"name": "playerTeam",
+				"type": "uint256[6]"
+			},
+			{
 				"internalType": "uint256",
 				"name": "mockIndex",
 				"type": "uint256"
@@ -13632,13 +13637,8 @@ window.ZODIAC_CONFIG = (function() {
 		"outputs": [
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "success",
 				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -13650,19 +13650,19 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "challengedPlayer",
 				"type": "address"
+			},
+			{
+				"internalType": "uint256[6]",
+				"name": "playerTeam",
+				"type": "uint256[6]"
 			}
 		],
 		"name": "challengeRealPlayer",
 		"outputs": [
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "success",
 				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -18186,6 +18186,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256[6]",
+				"name": "playerTeam",
+				"type": "uint256[6]"
+			},
+			{
 				"internalType": "uint256",
 				"name": "mockIndex",
 				"type": "uint256"
@@ -18195,13 +18200,8 @@ window.ZODIAC_CONFIG = (function() {
 		"outputs": [
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "success",
 				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -18213,19 +18213,19 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "challengedPlayer",
 				"type": "address"
+			},
+			{
+				"internalType": "uint256[6]",
+				"name": "playerTeam",
+				"type": "uint256[6]"
 			}
 		],
 		"name": "challengeRealPlayer",
 		"outputs": [
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "success",
 				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "nonpayable",
