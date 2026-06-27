@@ -1572,13 +1572,7 @@ window.ZODIAC_WEB3 = (function() {
         return receipt;
     }
 
-    async function challengeMockPlayer(playerTeam, mockIndex) {
-        if (!playerTeam || !Array.isArray(playerTeam)) {
-            throw new Error('[ZODIAC_WEB3] challengeMockPlayer requires an array of team tokenIds');
-        }
-        if (playerTeam.length !== 6) {
-            throw new Error(`[ZODIAC_WEB3] challengeMockPlayer requires exactly 6 NFTs, got ${playerTeam.length}`);
-        }
+    async function challengeMockPlayer(mockIndex) {
         if (mockIndex === undefined || mockIndex === null) {
             throw new Error('[ZODIAC_WEB3] Invalid mock player index');
         }
@@ -1587,16 +1581,9 @@ window.ZODIAC_WEB3 = (function() {
         }
         try {
             const contract = await getContract('arenaRankingManager');
-            const teamNumbers = playerTeam.map(id => {
-                const num = typeof id === 'string' ? parseInt(id, 10) : Number(id);
-                if (isNaN(num) || num < 0) {
-                    throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
-                }
-                return num;
-            });
-            console.log(`[ZODIAC_WEB3] challengeMockPlayer params: team=${JSON.stringify(teamNumbers)}, mockIndex=${mockIndex}`);
+            console.log(`[ZODIAC_WEB3] challengeMockPlayer params: mockIndex=${mockIndex}`);
             
-            const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [teamNumbers, mockIndex], {
+            const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [mockIndex], {
                 gas: 1500000
             });
             return receipt;
@@ -1606,28 +1593,15 @@ window.ZODIAC_WEB3 = (function() {
         }
     }
 
-    async function challengeRealPlayer(challengedPlayer, playerTeam) {
+    async function challengeRealPlayer(challengedPlayer) {
         if (!challengedPlayer || challengedPlayer === '0x0000000000000000000000000000000000000000') {
             throw new Error('[ZODIAC_WEB3] Invalid challenged player address');
         }
-        if (!playerTeam || !Array.isArray(playerTeam)) {
-            throw new Error('[ZODIAC_WEB3] challengeRealPlayer requires an array of team tokenIds');
-        }
-        if (playerTeam.length !== 6) {
-            throw new Error(`[ZODIAC_WEB3] challengeRealPlayer requires exactly 6 NFTs, got ${playerTeam.length}`);
-        }
         try {
             const contract = await getContract('arenaRankingManager');
-            const teamNumbers = playerTeam.map(id => {
-                const num = typeof id === 'string' ? parseInt(id, 10) : Number(id);
-                if (isNaN(num) || num < 0) {
-                    throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
-                }
-                return num;
-            });
-            console.log(`[ZODIAC_WEB3] challengeRealPlayer params: challengedPlayer=${challengedPlayer}, team=${JSON.stringify(teamNumbers)}`);
+            console.log(`[ZODIAC_WEB3] challengeRealPlayer params: challengedPlayer=${challengedPlayer}`);
             
-            const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer, teamNumbers], {
+            const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer], {
                 gas: 1500000
             });
             return receipt;
