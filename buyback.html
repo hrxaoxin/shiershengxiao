@@ -626,6 +626,7 @@
                 document.getElementById('balanceRatioBalance').textContent = parseFloat(web3.utils.fromWei(balance, 'ether')).toFixed(4);
                 document.getElementById('balanceRatioTotalSupply').textContent = totalSupply;
                 document.getElementById('balanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
+                document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
 
                 try {
                     const dividendManagerAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.dividendManager;
@@ -635,15 +636,34 @@
                         const totalWeight = await dividendContract.methods.getTotalWeight().call();
                         document.getElementById('balanceRatioTotalWeight').textContent = totalWeight;
 
-                        if (tokenId && nftDataContract) {
-                            try {
-                                const nftWeight = await nftDataContract.methods.calcNFTWeight(tokenId).call();
+                        if (tokenId) {
+                            if (!nftDataContract) {
+                                try {
+                                    nftDataContract = await window.ZODIAC_WEB3.getContract('nftData');
+                                } catch (e) {
+                                    console.warn('重新获取nftDataContract失败:', e.message);
+                                }
+                            }
+                            if (nftDataContract) {
+                                try {
+                                    const nftWeight = await nftDataContract.methods.calcNFTWeight(tokenId).call();
+                                    const nftWeightEl = document.getElementById('balanceRatioNftWeight');
+                                    if (nftWeightEl) {
+                                        nftWeightEl.textContent = nftWeight;
+                                    }
+                                } catch (e) {
+                                    console.warn('获取选中NFT权重失败:', e.message);
+                                }
+                            } else {
                                 const nftWeightEl = document.getElementById('balanceRatioNftWeight');
                                 if (nftWeightEl) {
-                                    nftWeightEl.textContent = nftWeight;
+                                    nftWeightEl.textContent = '-';
                                 }
-                            } catch (e) {
-                                console.warn('获取选中NFT权重失败:', e.message);
+                            }
+                        } else {
+                            const nftWeightEl = document.getElementById('balanceRatioNftWeight');
+                            if (nftWeightEl) {
+                                nftWeightEl.textContent = '-';
                             }
                         }
                     }
@@ -768,7 +788,7 @@
                 const isRare = nftInfo.isRare;
                 const stars = window.ZODIAC_UTILS.getStars(nft.level);
                 const imagePath = nftInfo.imagePath;
-                const isSelected = selectedNft && selectedNft.tokenId === nft.tokenId;
+                const isSelected = selectedNft && String(selectedNft.tokenId) === String(nft.tokenId);
 
                 html += `
                     <div class="nft-card cursor-pointer rounded-lg border-2 ${isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-white'} hover:border-purple-400 hover:bg-purple-50 transition-all duration-200 p-3 text-center relative" 
@@ -1016,19 +1036,17 @@
                 totalCost += upgradeCosts[i - 1] || 0;
             }
 
-            const basePriceValue = totalCost * discount / 100;
-            const maxBonusPercent = maxBuybackMultiplier - 100;
-            const maxBonusDays = (maxBonusPercent * daysToBreakEven) / (100 - discount);
-            const actualDays = Math.min(holdingDays, Math.floor(maxBonusDays));
+            const maxBonusPercent = maxBuybackMultiplier - discount;
+            const actualBonusDays = Math.min(holdingDays, maxBonusPercent);
             
-            const bonusPercent = Math.floor((actualDays * (100 - discount)) / daysToBreakEven);
-            const finalPriceValue = basePriceValue * (100 + bonusPercent) / 100;
+            const bonusPercent = actualBonusDays;
+            const finalPriceValue = totalCost * (discount + bonusPercent) / 100;
 
             return {
-                basePrice: String(Math.floor(basePriceValue * 10**18)),
+                basePrice: String(Math.floor(totalCost * discount / 100 * 10**18)),
                 bonusPercent: bonusPercent,
                 finalPrice: String(Math.floor(finalPriceValue * 10**18)),
-                daysToMax: Math.floor(maxBonusDays),
+                daysToMax: maxBonusPercent,
                 holdingDays: holdingDays,
                 isFallback: true
             };
