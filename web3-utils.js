@@ -1584,17 +1584,39 @@ window.ZODIAC_WEB3 = (function() {
         }
         try {
             const contract = await getContract('arenaRankingManager');
-            const teamNumbers = playerTeam.map(id => {
-                const num = typeof id === 'string' ? parseInt(id, 10) : Number(id);
-                if (isNaN(num) || num < 0) {
-                    throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
+            const teamStrings = playerTeam.map(id => {
+                if (typeof id === 'number') {
+                    if (id < 0 || isNaN(id)) {
+                        throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
+                    }
+                    return String(id);
                 }
-                return num;
+                if (typeof id === 'string') {
+                    const num = parseInt(id, 10);
+                    if (isNaN(num) || num < 0) {
+                        throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
+                    }
+                    return id;
+                }
+                if (id && id.toString) {
+                    return id.toString();
+                }
+                throw new Error(`[ZODIAC_WEB3] Invalid tokenId type: ${typeof id}`);
             });
-            console.log(`[ZODIAC_WEB3] challengeMockPlayer params: team=${JSON.stringify(teamNumbers)}, mockIndex=${mockIndex}`);
+            const mockIndexStr = typeof mockIndex === 'number' ? String(mockIndex) : mockIndex;
+            console.log(`[ZODIAC_WEB3] challengeMockPlayer params: team=${JSON.stringify(teamStrings)}, mockIndex=${mockIndexStr}`);
             
-            const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [teamNumbers, mockIndex], {
-                gas: 2000000
+            console.log('[ZODIAC_WEB3] Performing dry-run call...');
+            try {
+                const result = await contract.methods.challengeMockPlayer(teamStrings, mockIndexStr).call({ from: account });
+                console.log('[ZODIAC_WEB3] Dry-run succeeded:', result);
+            } catch (dryRunError) {
+                console.error('[ZODIAC_WEB3] Dry-run failed:', dryRunError.message);
+                console.error('[ZODIAC_WEB3] Dry-run full error:', JSON.stringify(dryRunError, Object.getOwnPropertyNames(dryRunError), 2));
+            }
+            
+            const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [teamStrings, mockIndexStr], {
+                gas: 3000000
             });
             return receipt;
         } catch (e) {
@@ -1615,17 +1637,38 @@ window.ZODIAC_WEB3 = (function() {
         }
         try {
             const contract = await getContract('arenaRankingManager');
-            const teamNumbers = playerTeam.map(id => {
-                const num = typeof id === 'string' ? parseInt(id, 10) : Number(id);
-                if (isNaN(num) || num < 0) {
-                    throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
+            const teamStrings = playerTeam.map(id => {
+                if (typeof id === 'number') {
+                    if (id < 0 || isNaN(id)) {
+                        throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
+                    }
+                    return String(id);
                 }
-                return num;
+                if (typeof id === 'string') {
+                    const num = parseInt(id, 10);
+                    if (isNaN(num) || num < 0) {
+                        throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
+                    }
+                    return id;
+                }
+                if (id && id.toString) {
+                    return id.toString();
+                }
+                throw new Error(`[ZODIAC_WEB3] Invalid tokenId type: ${typeof id}`);
             });
-            console.log(`[ZODIAC_WEB3] challengeRealPlayer params: challengedPlayer=${challengedPlayer}, team=${JSON.stringify(teamNumbers)}`);
+            console.log(`[ZODIAC_WEB3] challengeRealPlayer params: challengedPlayer=${challengedPlayer}, team=${JSON.stringify(teamStrings)}`);
             
-            const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer, teamNumbers], {
-                gas: 2000000
+            console.log('[ZODIAC_WEB3] Performing dry-run call...');
+            try {
+                const result = await contract.methods.challengeRealPlayer(challengedPlayer, teamStrings).call({ from: account });
+                console.log('[ZODIAC_WEB3] Dry-run succeeded:', result);
+            } catch (dryRunError) {
+                console.error('[ZODIAC_WEB3] Dry-run failed:', dryRunError.message);
+                console.error('[ZODIAC_WEB3] Dry-run full error:', JSON.stringify(dryRunError, Object.getOwnPropertyNames(dryRunError), 2));
+            }
+            
+            const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer, teamStrings], {
+                gas: 3000000
             });
             return receipt;
         } catch (e) {

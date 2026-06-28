@@ -933,7 +933,6 @@
             }
 
             await loadBalanceRatioPrice(tokenId);
-            document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(balanceRatioPrice) + ' 代币';
             document.getElementById('sellWithBalanceRatioBtn').disabled = !balanceRatioBuybackOpen;
 
             holdingDaysRefreshInterval = setInterval(() => {
@@ -1028,24 +1027,15 @@
                     daysToMax = parseInt(result.daysToMax || result['3'] || '90', 10);
                 }
                 
-                if (basePrice === '0' && finalPrice === '0' && bonusPercent === 0) {
+                console.log(`[BUYBACK] calculateBuybackPrice result: basePrice=${basePrice}, bonusPercent=${bonusPercent}, finalPrice=${finalPrice}, daysToMax=${daysToMax}`);
+                
+                if (basePrice === '0' && finalPrice === '0') {
                     return calculateGrowthPriceFallback(level, isRare, holdingDays);
                 }
                 
                 const fallback = calculateGrowthPriceFallback(level, isRare, holdingDays);
                 const maxPrice = fallback.maxPrice;
                 
-                if (bonusPercent === 0 && holdingDays > 0) {
-                    return {
-                        basePrice: basePrice,
-                        bonusPercent: fallback.bonusPercent,
-                        finalPrice: fallback.finalPrice,
-                        maxPrice: maxPrice,
-                        daysToMax: daysToMax,
-                        holdingDays: holdingDays
-                    };
-                }
-
                 return {
                     basePrice: basePrice,
                     bonusPercent: bonusPercent,
