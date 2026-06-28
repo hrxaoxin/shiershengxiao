@@ -1579,8 +1579,8 @@ window.ZODIAC_WEB3 = (function() {
         if (mockIndex === undefined || mockIndex === null) {
             throw new Error('[ZODIAC_WEB3] Invalid mock player index');
         }
-        if (typeof mockIndex === 'number' && mockIndex < 0) {
-            throw new Error('[ZODIAC_WEB3] Invalid mock player index');
+        if (typeof mockIndex === 'number' && mockIndex < 1) {
+            throw new Error('[ZODIAC_WEB3] Invalid mock player index, must be >= 1');
         }
         try {
             const contract = await getContract('arenaRankingManager');
@@ -1606,13 +1606,22 @@ window.ZODIAC_WEB3 = (function() {
             const mockIndexStr = typeof mockIndex === 'number' ? String(mockIndex) : mockIndex;
             console.log(`[ZODIAC_WEB3] challengeMockPlayer params: team=${JSON.stringify(teamStrings)}, mockIndex=${mockIndexStr}`);
             
-            console.log('[ZODIAC_WEB3] Performing dry-run call...');
+            console.log('[ZODIAC_WEB3] Performing dry-run call to estimate error...');
             try {
                 const result = await contract.methods.challengeMockPlayer(teamStrings, mockIndexStr).call({ from: account });
                 console.log('[ZODIAC_WEB3] Dry-run succeeded:', result);
             } catch (dryRunError) {
                 console.error('[ZODIAC_WEB3] Dry-run failed:', dryRunError.message);
-                console.error('[ZODIAC_WEB3] Dry-run full error:', JSON.stringify(dryRunError, Object.getOwnPropertyNames(dryRunError), 2));
+                let reason = '未知错误';
+                if (dryRunError.message) {
+                    const match = dryRunError.message.match(/revert[:\s]+(.+?)(?:\s+at\s+|\s*$|"|')/i);
+                    if (match) {
+                        reason = match[1].trim();
+                    } else if (dryRunError.message.includes('revert')) {
+                        reason = dryRunError.message.substring(0, 200);
+                    }
+                }
+                console.error(`[ZODIAC_WEB3] Dry-run reason: ${reason}`);
             }
             
             const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [teamStrings, mockIndexStr], {

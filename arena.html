@@ -2627,6 +2627,42 @@
 
                 console.log(`[ARENA] executeRealChallenge: opponent=${selectedOpponent.address}, isMock=${selectedOpponent.isMock}, team=${JSON.stringify(playerTeam)}`);
 
+                const arenaRankingContract = await window.ZODIAC_WEB3.getContract('arenaRankingManager');
+                if (arenaRankingContract) {
+                    console.log('[ARENA] Pre-check: calling challengeMockPlayer with .call()...');
+                    try {
+                        const mockIndex = selectedOpponent.isMock 
+                            ? (selectedOpponent.mockIndex !== undefined ? selectedOpponent.mockIndex : 1)
+                            : 1;
+                        const teamStr = playerTeam.map(id => String(id));
+                        
+                        if (selectedOpponent.isMock) {
+                            const dryResult = await arenaRankingContract.methods.challengeMockPlayer(teamStr, String(mockIndex)).call({ from: accounts[0] });
+                            console.log('[ARENA] Pre-check success:', dryResult);
+                        } else {
+                            const defenderAddr = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
+                            const dryResult = await arenaRankingContract.methods.challengeRealPlayer(defenderAddr, teamStr).call({ from: accounts[0] });
+                            console.log('[ARENA] Pre-check success:', dryResult);
+                        }
+                    } catch (preCheckError) {
+                        console.error('[ARENA] Pre-check failed:', preCheckError.message);
+                        let errorMsg = '发起挑战失败，请检查战队配置';
+                        if (preCheckError.message) {
+                            const revertMatch = preCheckError.message.match(/revert[:\s]+(.+?)(?:\s+at\s+|\s*$|"|')/i);
+                            if (revertMatch) {
+                                errorMsg = revertMatch[1].trim();
+                            } else if (preCheckError.message.length < 200) {
+                                errorMsg = preCheckError.message;
+                            }
+                        }
+                        ZODIAC_UI.hideLoading();
+                        ZODIAC_UI.showToast(errorMsg, 'error');
+                        if (btn) btn.disabled = false;
+                        if (mobileBtn) mobileBtn.disabled = false;
+                        return;
+                    }
+                }
+
                 let victory = null;
                 let challengeTx = null;
                 if (selectedOpponent.isMock) {

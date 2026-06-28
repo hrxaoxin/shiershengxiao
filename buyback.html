@@ -598,116 +598,101 @@
         }
 
         async function loadBalanceRatioPrice(tokenId) {
-            console.log(`[BUYBACK] loadBalanceRatioPrice called with tokenId:`, tokenId);
+            console.log(`[BUYBACK] loadBalanceRatioPrice called with tokenId:`, tokenId, `type:`, typeof tokenId);
             if (!buybackContract) {
                 console.log('[BUYBACK] buybackContract is null');
                 return;
             }
 
             try {
-                let result;
-                if (tokenId) {
-                    console.log(`[BUYBACK] Calling calculateBalanceRatioPrice with tokenId:`, tokenId);
-                    result = await buybackContract.methods.calculateBalanceRatioPrice(tokenId).call();
-                } else {
-                    console.log(`[BUYBACK] Calling calculateBalanceRatioPrice with tokenId: 0`);
-                    result = await buybackContract.methods.calculateBalanceRatioPrice(0).call();
-                }
-                console.log(`[BUYBACK] calculateBalanceRatioPrice result:`, result);
+                const balanceWei = await tokenContract.methods.balanceOf(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftBuyback).call();
+                const totalSupply = await nftMintContract.methods.totalSupply().call();
+                const balanceNum = parseFloat(web3.utils.fromWei(balanceWei, 'ether'));
                 
-                const pricePerNFT = result.pricePerNFT || result['0'];
-                const balance = result.balance || result['1'];
-                const totalSupply = result.totalSupply || result['2'];
-
-                balanceRatioPrice = pricePerNFT;
-                console.log(`[BUYBACK] pricePerNFT:`, pricePerNFT, `balance:`, balance, `totalSupply:`, totalSupply);
-
-                document.getElementById('balanceRatioBalance').textContent = parseFloat(web3.utils.fromWei(balance, 'ether')).toFixed(4);
+                document.getElementById('balanceRatioBalance').textContent = balanceNum.toFixed(4);
                 document.getElementById('balanceRatioTotalSupply').textContent = totalSupply;
+                console.log(`[BUYBACK] balance=${balanceNum}, totalSupply=${totalSupply}`);
 
                 const detailsEl = document.getElementById('balanceRatioPriceDetails');
                 const hintEl = detailsEl ? detailsEl.querySelector('p.text-center') : null;
+                
                 if (detailsEl) {
                     if (tokenId) {
                         detailsEl.classList.remove('border-orange-200');
                         detailsEl.classList.add('border-orange-400');
-                        if (hintEl) {
-                            hintEl.style.display = 'none';
-                        }
+                        if (hintEl) hintEl.style.display = 'none';
                     } else {
                         detailsEl.classList.remove('border-orange-400');
                         detailsEl.classList.add('border-orange-200');
-                        if (hintEl) {
-                            hintEl.style.display = 'block';
-                        }
+                        if (hintEl) hintEl.style.display = 'block';
                     }
                 }
 
+                let totalWeight = '0';
+                let nftWeight = '0';
+                let calculatedPrice = '0';
+                
                 try {
                     const dividendManagerAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.dividendManager;
                     if (dividendManagerAddr && dividendManagerAddr !== '0x0000000000000000000000000000000000000000') {
                         const dividendABI = [{"inputs":[],"name":"getTotalWeight","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}];
                         const dividendContract = new web3.eth.Contract(dividendABI, dividendManagerAddr);
-                        const totalWeight = await dividendContract.methods.getTotalWeight().call();
+                        totalWeight = await dividendContract.methods.getTotalWeight().call();
                         document.getElementById('balanceRatioTotalWeight').textContent = totalWeight;
                         console.log(`[BUYBACK] totalWeight:`, totalWeight);
-
-                        if (tokenId) {
-                            if (!nftDataContract) {
-                                try {
-                                    nftDataContract = await window.ZODIAC_WEB3.getContract('nftData');
-                                    console.log('[BUYBACK] Successfully got nftDataContract');
-                                } catch (e) {
-                                    console.warn('重新获取nftDataContract失败:', e.message);
-                                }
-                            }
-                            if (nftDataContract) {
-                                try {
-                                    const nftWeight = await nftDataContract.methods.calcNFTWeight(tokenId).call();
-                                    console.log(`[BUYBACK] Got nftWeight for tokenId ${tokenId}:`, nftWeight);
-                                    const nftWeightEl = document.getElementById('balanceRatioNftWeight');
-                                    if (nftWeightEl) {
-                                        nftWeightEl.textContent = nftWeight;
-                                    }
-                                    
-                                    const balanceNum = parseFloat(web3.utils.fromWei(balance, 'ether'));
-                                    const totalWeightNum = parseFloat(totalWeight);
-                                    const nftWeightNum = parseFloat(nftWeight);
-                                    const calculatedPrice = balanceNum * (nftWeightNum / totalWeightNum);
-                                    console.log(`[BUYBACK] Calculated price: balance=${balanceNum}, nftWeight=${nftWeightNum}, totalWeight=${totalWeightNum}, price=${calculatedPrice}`);
-                                    
-                                    document.getElementById('finalBalanceRatioPrice').textContent = calculatedPrice.toFixed(4) + ' 代币';
-                                } catch (e) {
-                                    console.warn('获取选中NFT权重失败:', e.message);
-                                    const nftWeightEl = document.getElementById('balanceRatioNftWeight');
-                                    if (nftWeightEl) {
-                                        nftWeightEl.textContent = '-';
-                                    }
-                                    document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
-                                }
-                            } else {
-                                const nftWeightEl = document.getElementById('balanceRatioNftWeight');
-                                if (nftWeightEl) {
-                                    nftWeightEl.textContent = '-';
-                                }
-                                document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
-                            }
-                        } else {
-                            const nftWeightEl = document.getElementById('balanceRatioNftWeight');
-                            if (nftWeightEl) {
-                                nftWeightEl.textContent = '-';
-                            }
-                            document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
-                        }
-                    } else {
-                        document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
                     }
                 } catch (e) {
-                    console.warn('获取总权重失败:', e.message);
-                    document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
+                    console.warn('[BUYBACK] 获取总权重失败:', e.message);
+                    document.getElementById('balanceRatioTotalWeight').textContent = '-';
+                }
+
+                if (tokenId) {
+                    try {
+                        console.log(`[BUYBACK] Getting nftData contract for weight calculation...`);
+                        let weightContract = nftDataContract;
+                        if (!weightContract) {
+                            weightContract = await window.ZODIAC_WEB3.getContract('nftData');
+                            console.log('[BUYBACK] Got nftData contract fresh:', weightContract ? 'success' : 'null');
+                        }
+                        
+                        if (weightContract) {
+                            const tokenIdStr = String(tokenId);
+                            console.log(`[BUYBACK] Calling calcNFTWeight with tokenId:`, tokenIdStr);
+                            nftWeight = await weightContract.methods.calcNFTWeight(tokenIdStr).call();
+                            console.log(`[BUYBACK] nftWeight result:`, nftWeight);
+                            
+                            const nftWeightEl = document.getElementById('balanceRatioNftWeight');
+                            if (nftWeightEl) {
+                                nftWeightEl.textContent = nftWeight;
+                            }
+                            
+                            if (totalWeight && parseFloat(totalWeight) > 0 && nftWeight) {
+                                const nftWeightNum = parseFloat(nftWeight);
+                                const totalWeightNum = parseFloat(totalWeight);
+                                calculatedPrice = balanceNum * (nftWeightNum / totalWeightNum);
+                                console.log(`[BUYBACK] Calculated price: ${balanceNum} * (${nftWeightNum} / ${totalWeightNum}) = ${calculatedPrice}`);
+                                document.getElementById('finalBalanceRatioPrice').textContent = calculatedPrice.toFixed(4) + ' 代币';
+                            } else {
+                                console.log(`[BUYBACK] Cannot calculate price: totalWeight=${totalWeight}, nftWeight=${nftWeight}`);
+                                document.getElementById('finalBalanceRatioPrice').textContent = '-';
+                            }
+                        } else {
+                            console.warn('[BUYBACK] nftDataContract is still null');
+                            document.getElementById('balanceRatioNftWeight').textContent = '-';
+                            document.getElementById('finalBalanceRatioPrice').textContent = '-';
+                        }
+                    } catch (e) {
+                        console.warn('[BUYBACK] 获取NFT权重失败:', e.message, e.stack);
+                        document.getElementById('balanceRatioNftWeight').textContent = '-';
+                        document.getElementById('finalBalanceRatioPrice').textContent = '-';
+                    }
+                } else {
+                    document.getElementById('balanceRatioNftWeight').textContent = '-';
+                    const avgPrice = totalSupply > 0 ? balanceNum / parseInt(totalSupply, 10) : 0;
+                    document.getElementById('finalBalanceRatioPrice').textContent = avgPrice.toFixed(4) + ' 代币';
                 }
             } catch (error) {
-                console.error('加载余额比例价格失败:', error);
+                console.error('[BUYBACK] 加载余额比例价格失败:', error);
             }
         }
 
@@ -1034,13 +1019,24 @@
                 }
                 
                 const fallback = calculateGrowthPriceFallback(level, isRare, holdingDays);
-                const maxPrice = fallback.maxPrice;
                 
+                if (bonusPercent === 0 && holdingDays > 0) {
+                    console.log(`[BUYBACK] Contract returned 0% bonus but holdingDays=${holdingDays}, using fallback calculation`);
+                    return {
+                        basePrice: basePrice,
+                        bonusPercent: fallback.bonusPercent,
+                        finalPrice: fallback.finalPrice,
+                        maxPrice: fallback.maxPrice,
+                        daysToMax: daysToMax,
+                        holdingDays: holdingDays
+                    };
+                }
+
                 return {
                     basePrice: basePrice,
                     bonusPercent: bonusPercent,
                     finalPrice: finalPrice,
-                    maxPrice: maxPrice,
+                    maxPrice: fallback.maxPrice,
                     daysToMax: daysToMax,
                     holdingDays: holdingDays
                 };
@@ -1068,19 +1064,23 @@
             }
 
             const basePriceValue = totalCost * discount / 100;
-            const maxBonusPercent = maxBuybackMultiplier - discount;
-            const actualBonusDays = Math.min(holdingDays, maxBonusPercent);
+            const maxBonusPercent = maxBuybackMultiplier - 100;
+            const maxBonusDays = (maxBonusPercent * daysToBreakEven) / (100 - discount);
+            const actualBonusDays = Math.min(holdingDays, maxBonusDays);
             
-            const bonusPercent = actualBonusDays;
-            const finalPriceValue = totalCost * (discount + bonusPercent) / 100;
+            const bonusPercent = Math.floor((actualBonusDays * (100 - discount)) / daysToBreakEven);
+            const bonusAmount = basePriceValue * actualBonusDays / daysToBreakEven;
+            const finalPriceValue = basePriceValue + bonusAmount;
             const maxPriceValue = totalCost * maxBuybackMultiplier / 100;
+
+            const cappedFinal = Math.min(finalPriceValue, maxPriceValue);
 
             return {
                 basePrice: String(Math.floor(basePriceValue * 10**18)),
                 bonusPercent: bonusPercent,
-                finalPrice: String(Math.floor(finalPriceValue * 10**18)),
+                finalPrice: String(Math.floor(cappedFinal * 10**18)),
                 maxPrice: String(Math.floor(maxPriceValue * 10**18)),
-                daysToMax: maxBonusPercent,
+                daysToMax: Math.floor(maxBonusDays),
                 holdingDays: holdingDays,
                 isFallback: true
             };
