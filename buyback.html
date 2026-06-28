@@ -201,7 +201,7 @@
                                     <p class="text-xl font-bold text-orange-600" id="holdingBonus">-</p>
                                 </div>
                                 <div class="bg-white p-3 rounded-lg">
-                                    <p class="text-gray-500 text-sm">最终回购价</p>
+                                    <p class="text-gray-500 text-sm">当前回购价</p>
                                     <p class="text-xl font-bold text-red-600" id="finalGrowthPrice">-</p>
                                 </div>
                             </div>
@@ -214,6 +214,10 @@
                                     <div id="bonusProgressBar" class="progress-bar bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full" style="width: 0%"></div>
                                 </div>
                                 <p class="text-xs text-gray-400 mt-1" id="bonusHint">持有时间越长，回购价格越高</p>
+                                <div class="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center">
+                                    <span class="text-sm text-gray-500">最高回购价</span>
+                                    <span class="text-lg font-bold text-purple-600" id="maxGrowthPrice">-</span>
+                                </div>
                             </div>
                         </div>
 
@@ -294,7 +298,7 @@
 
             <div id="balanceRatioSection">
                 <div class="bg-orange-50 p-4 rounded-lg mb-4">
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-3 gap-4">
                         <div class="text-center">
                             <p class="text-gray-600 text-sm">合约余额</p>
                             <p class="text-xl font-bold text-green-600" id="balanceRatioBalance">-</p>
@@ -306,10 +310,6 @@
                         <div class="text-center">
                             <p class="text-gray-600 text-sm">总权重</p>
                             <p class="text-xl font-bold text-purple-600" id="balanceRatioTotalWeight">-</p>
-                        </div>
-                        <div class="text-center">
-                            <p class="text-gray-600 text-sm">单张回购价</p>
-                            <p class="text-xl font-bold text-red-600" id="balanceRatioPrice">-</p>
                         </div>
                     </div>
                 </div>
@@ -625,8 +625,18 @@
 
                 document.getElementById('balanceRatioBalance').textContent = parseFloat(web3.utils.fromWei(balance, 'ether')).toFixed(4);
                 document.getElementById('balanceRatioTotalSupply').textContent = totalSupply;
-                document.getElementById('balanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
                 document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
+
+                const detailsEl = document.getElementById('balanceRatioPriceDetails');
+                if (detailsEl) {
+                    if (tokenId) {
+                        detailsEl.classList.remove('border-orange-200');
+                        detailsEl.classList.add('border-orange-400');
+                    } else {
+                        detailsEl.classList.remove('border-orange-400');
+                        detailsEl.classList.add('border-orange-200');
+                    }
+                }
 
                 try {
                     const dividendManagerAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.dividendManager;
@@ -653,6 +663,10 @@
                                     }
                                 } catch (e) {
                                     console.warn('获取选中NFT权重失败:', e.message);
+                                    const nftWeightEl = document.getElementById('balanceRatioNftWeight');
+                                    if (nftWeightEl) {
+                                        nftWeightEl.textContent = '-';
+                                    }
                                 }
                             } else {
                                 const nftWeightEl = document.getElementById('balanceRatioNftWeight');
@@ -931,6 +945,7 @@
             document.getElementById('basePrice').textContent = formatPrice(growthPrice.basePrice);
             document.getElementById('holdingBonus').textContent = '+' + growthPrice.bonusPercent + '%';
             document.getElementById('finalGrowthPrice').textContent = formatPrice(growthPrice.finalPrice);
+            document.getElementById('maxGrowthPrice').textContent = formatPrice(growthPrice.maxPrice) + ' 代币';
 
             const progressDays = Math.min(holdingDays, growthPrice.daysToMax);
             const bonusProgress = growthPrice.daysToMax > 0 ? Math.floor((progressDays / growthPrice.daysToMax) * 100) : 0;
@@ -995,12 +1010,15 @@
                     return calculateGrowthPriceFallback(level, isRare, holdingDays);
                 }
                 
+                const fallback = calculateGrowthPriceFallback(level, isRare, holdingDays);
+                const maxPrice = fallback.maxPrice;
+                
                 if (bonusPercent === 0 && holdingDays > 0) {
-                    const fallback = calculateGrowthPriceFallback(level, isRare, holdingDays);
                     return {
                         basePrice: basePrice,
                         bonusPercent: fallback.bonusPercent,
                         finalPrice: fallback.finalPrice,
+                        maxPrice: maxPrice,
                         daysToMax: daysToMax,
                         holdingDays: holdingDays
                     };
@@ -1010,6 +1028,7 @@
                     basePrice: basePrice,
                     bonusPercent: bonusPercent,
                     finalPrice: finalPrice,
+                    maxPrice: maxPrice,
                     daysToMax: daysToMax,
                     holdingDays: holdingDays
                 };
@@ -1041,11 +1060,13 @@
             
             const bonusPercent = actualBonusDays;
             const finalPriceValue = totalCost * (discount + bonusPercent) / 100;
+            const maxPriceValue = totalCost * maxBuybackMultiplier / 100;
 
             return {
                 basePrice: String(Math.floor(totalCost * discount / 100 * 10**18)),
                 bonusPercent: bonusPercent,
                 finalPrice: String(Math.floor(finalPriceValue * 10**18)),
+                maxPrice: String(Math.floor(maxPriceValue * 10**18)),
                 daysToMax: maxBonusPercent,
                 holdingDays: holdingDays,
                 isFallback: true
