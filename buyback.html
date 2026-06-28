@@ -624,8 +624,6 @@
 
                 document.getElementById('balanceRatioBalance').textContent = parseFloat(web3.utils.fromWei(balance, 'ether')).toFixed(4);
                 document.getElementById('balanceRatioTotalSupply').textContent = totalSupply;
-                document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
-                console.log(`[BUYBACK] Updated finalBalanceRatioPrice to:`, formatPrice(pricePerNFT) + ' 代币');
 
                 const detailsEl = document.getElementById('balanceRatioPriceDetails');
                 const hintEl = detailsEl ? detailsEl.querySelector('p.text-center') : null;
@@ -652,6 +650,7 @@
                         const dividendContract = new web3.eth.Contract(dividendABI, dividendManagerAddr);
                         const totalWeight = await dividendContract.methods.getTotalWeight().call();
                         document.getElementById('balanceRatioTotalWeight').textContent = totalWeight;
+                        console.log(`[BUYBACK] totalWeight:`, totalWeight);
 
                         if (tokenId) {
                             if (!nftDataContract) {
@@ -670,28 +669,42 @@
                                     if (nftWeightEl) {
                                         nftWeightEl.textContent = nftWeight;
                                     }
+                                    
+                                    const balanceNum = parseFloat(web3.utils.fromWei(balance, 'ether'));
+                                    const totalWeightNum = parseFloat(totalWeight);
+                                    const nftWeightNum = parseFloat(nftWeight);
+                                    const calculatedPrice = balanceNum * (nftWeightNum / totalWeightNum);
+                                    console.log(`[BUYBACK] Calculated price: balance=${balanceNum}, nftWeight=${nftWeightNum}, totalWeight=${totalWeightNum}, price=${calculatedPrice}`);
+                                    
+                                    document.getElementById('finalBalanceRatioPrice').textContent = calculatedPrice.toFixed(4) + ' 代币';
                                 } catch (e) {
                                     console.warn('获取选中NFT权重失败:', e.message);
                                     const nftWeightEl = document.getElementById('balanceRatioNftWeight');
                                     if (nftWeightEl) {
                                         nftWeightEl.textContent = '-';
                                     }
+                                    document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
                                 }
                             } else {
                                 const nftWeightEl = document.getElementById('balanceRatioNftWeight');
                                 if (nftWeightEl) {
                                     nftWeightEl.textContent = '-';
                                 }
+                                document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
                             }
                         } else {
                             const nftWeightEl = document.getElementById('balanceRatioNftWeight');
                             if (nftWeightEl) {
                                 nftWeightEl.textContent = '-';
                             }
+                            document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
                         }
+                    } else {
+                        document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
                     }
                 } catch (e) {
                     console.warn('获取总权重失败:', e.message);
+                    document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
                 }
             } catch (error) {
                 console.error('加载余额比例价格失败:', error);
@@ -1055,9 +1068,9 @@
             const discount = discountRates[level] || 10;
             const daysToBreakEven = breakEvenDays[level] || 90;
 
-            const normalMintCost = 8888;
-            const rareMintCost = 88888;
-            const upgradeCosts = [10000, 40000, 120000, 480000];
+            const normalMintCost = 1;
+            const rareMintCost = 10;
+            const upgradeCosts = [2, 5, 15, 50];
 
             let totalCost = isRare ? rareMintCost : normalMintCost;
             for (let i = 1; i < level; i++) {
@@ -1069,7 +1082,7 @@
             const actualBonusDays = Math.min(holdingDays, maxBonusPercent);
             
             const bonusPercent = actualBonusDays;
-            const finalPriceValue = basePriceValue * (100 + bonusPercent) / 100;
+            const finalPriceValue = totalCost * (discount + bonusPercent) / 100;
             const maxPriceValue = totalCost * maxBuybackMultiplier / 100;
 
             return {
