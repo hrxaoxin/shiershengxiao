@@ -648,37 +648,52 @@
 
                 if (tokenId) {
                     try {
-                        console.log(`[BUYBACK] Getting nftData contract for weight calculation...`);
-                        let weightContract = nftDataContract;
-                        if (!weightContract) {
-                            weightContract = await window.ZODIAC_WEB3.getContract('nftData');
-                            console.log('[BUYBACK] Got nftData contract fresh:', weightContract ? 'success' : 'null');
+                        console.log(`[BUYBACK] Getting NFT weight for tokenId:`, tokenId);
+                        
+                        let nftWeightNum = 0;
+                        const nftInfo = selectedNft ? (selectedNft.nftInfo || window.ZODIAC_UTILS.getNFTInfo(selectedNft.type)) : null;
+                        const level = selectedNft ? selectedNft.level : 1;
+                        const isRare = nftInfo ? nftInfo.isRare : false;
+                        
+                        console.log(`[BUYBACK] Using level=${level}, isRare=${isRare} for weight calculation`);
+                        
+                        try {
+                            let weightContract = nftDataContract;
+                            if (!weightContract) {
+                                weightContract = await window.ZODIAC_WEB3.getContract('nftData');
+                            }
+                            if (weightContract && weightContract.methods.getWeightByLevel) {
+                                const weightResult = await weightContract.methods.getWeightByLevel(level, isRare).call();
+                                nftWeightNum = parseFloat(weightResult);
+                                nftWeight = String(nftWeightNum);
+                                console.log(`[BUYBACK] Weight from getWeightByLevel:`, nftWeightNum);
+                            } else {
+                                console.warn('[BUYBACK] getWeightByLevel method not available, using fallback calculation');
+                            }
+                        } catch (weightErr) {
+                            console.warn('[BUYBACK] getWeightByLevel failed:', weightErr.message);
                         }
                         
-                        if (weightContract) {
-                            const tokenIdStr = String(tokenId);
-                            console.log(`[BUYBACK] Calling calcNFTWeight with tokenId:`, tokenIdStr);
-                            nftWeight = await weightContract.methods.calcNFTWeight(tokenIdStr).call();
-                            console.log(`[BUYBACK] nftWeight result:`, nftWeight);
+                        if (nftWeightNum === 0) {
+                            const baseWeight = isRare ? 10 : 1;
+                            const levelMultiplier = Math.pow(2, level - 1);
+                            nftWeightNum = baseWeight * levelMultiplier;
+                            nftWeight = String(Math.floor(nftWeightNum));
+                            console.log(`[BUYBACK] Using fallback weight:`, nftWeightNum);
+                        }
                             
-                            const nftWeightEl = document.getElementById('balanceRatioNftWeight');
-                            if (nftWeightEl) {
-                                nftWeightEl.textContent = nftWeight;
-                            }
+                        const nftWeightEl = document.getElementById('balanceRatioNftWeight');
+                        if (nftWeightEl) {
+                            nftWeightEl.textContent = nftWeight;
+                        }
                             
-                            if (totalWeight && parseFloat(totalWeight) > 0 && nftWeight) {
-                                const nftWeightNum = parseFloat(nftWeight);
-                                const totalWeightNum = parseFloat(totalWeight);
-                                calculatedPrice = balanceNum * (nftWeightNum / totalWeightNum);
-                                console.log(`[BUYBACK] Calculated price: ${balanceNum} * (${nftWeightNum} / ${totalWeightNum}) = ${calculatedPrice}`);
-                                document.getElementById('finalBalanceRatioPrice').textContent = calculatedPrice.toFixed(4) + ' 代币';
-                            } else {
-                                console.log(`[BUYBACK] Cannot calculate price: totalWeight=${totalWeight}, nftWeight=${nftWeight}`);
-                                document.getElementById('finalBalanceRatioPrice').textContent = '-';
-                            }
+                        if (totalWeight && parseFloat(totalWeight) > 0 && nftWeightNum > 0) {
+                            const totalWeightNum = parseFloat(totalWeight);
+                            calculatedPrice = balanceNum * (nftWeightNum / totalWeightNum);
+                            console.log(`[BUYBACK] Calculated price: ${balanceNum} * (${nftWeightNum} / ${totalWeightNum}) = ${calculatedPrice}`);
+                            document.getElementById('finalBalanceRatioPrice').textContent = calculatedPrice.toFixed(4) + ' 代币';
                         } else {
-                            console.warn('[BUYBACK] nftDataContract is still null');
-                            document.getElementById('balanceRatioNftWeight').textContent = '-';
+                            console.log(`[BUYBACK] Cannot calculate price: totalWeight=${totalWeight}, nftWeightNum=${nftWeightNum}`);
                             document.getElementById('finalBalanceRatioPrice').textContent = '-';
                         }
                     } catch (e) {
@@ -1069,7 +1084,7 @@
             const actualBonusDays = Math.min(holdingDays, maxBonusDays);
             
             const bonusPercent = Math.floor((actualBonusDays * (100 - discount)) / daysToBreakEven);
-            const bonusAmount = basePriceValue * actualBonusDays / daysToBreakEven;
+            const bonusAmount = totalCost * bonusPercent / 100;
             const finalPriceValue = basePriceValue + bonusAmount;
             const maxPriceValue = totalCost * maxBuybackMultiplier / 100;
 

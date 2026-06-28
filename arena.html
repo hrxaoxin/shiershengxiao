@@ -2645,21 +2645,17 @@
                             console.log('[ARENA] Pre-check success:', dryResult);
                         }
                     } catch (preCheckError) {
-                        console.error('[ARENA] Pre-check failed:', preCheckError.message);
-                        let errorMsg = '发起挑战失败，请检查战队配置';
+                        console.warn('[ARENA] Pre-check warning:', preCheckError.message);
+                        let errorMsg = '';
                         if (preCheckError.message) {
                             const revertMatch = preCheckError.message.match(/revert[:\s]+(.+?)(?:\s+at\s+|\s*$|"|')/i);
                             if (revertMatch) {
                                 errorMsg = revertMatch[1].trim();
-                            } else if (preCheckError.message.length < 200) {
-                                errorMsg = preCheckError.message;
                             }
                         }
-                        ZODIAC_UI.hideLoading();
-                        ZODIAC_UI.showToast(errorMsg, 'error');
-                        if (btn) btn.disabled = false;
-                        if (mobileBtn) mobileBtn.disabled = false;
-                        return;
+                        if (errorMsg) {
+                            console.warn(`[ARENA] 预检查警告: ${errorMsg}，将继续尝试发起挑战`);
+                        }
                     }
                 }
 
