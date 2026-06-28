@@ -261,16 +261,6 @@
                     </div>
 
                     <div id="autoBuybackEnabled" class="hidden">
-                        <div id="fixedPriceDetails" class="bg-gradient-to-r from-green-50 to-teal-50 p-4 rounded-lg border-2 border-green-200 mb-6">
-                            <p class="text-center text-gray-500 mb-2">请在上方选择NFT</p>
-                            <div class="flex justify-between items-center">
-                                <div>
-                                    <p class="text-gray-500 text-sm">回购价格</p>
-                                    <p class="text-2xl font-bold text-red-600" id="finalFixedPrice">-</p>
-                                </div>
-                            </div>
-                        </div>
-
                         <button id="sellWithFixedBtn" class="btn-success w-full" disabled>
                             <i class="fa fa-arrow-right mr-2"></i>以固定价出售
                         </button>
@@ -608,33 +598,50 @@
         }
 
         async function loadBalanceRatioPrice(tokenId) {
-            if (!buybackContract) return;
+            console.log(`[BUYBACK] loadBalanceRatioPrice called with tokenId:`, tokenId);
+            if (!buybackContract) {
+                console.log('[BUYBACK] buybackContract is null');
+                return;
+            }
 
             try {
                 let result;
                 if (tokenId) {
+                    console.log(`[BUYBACK] Calling calculateBalanceRatioPrice with tokenId:`, tokenId);
                     result = await buybackContract.methods.calculateBalanceRatioPrice(tokenId).call();
                 } else {
+                    console.log(`[BUYBACK] Calling calculateBalanceRatioPrice with tokenId: 0`);
                     result = await buybackContract.methods.calculateBalanceRatioPrice(0).call();
                 }
+                console.log(`[BUYBACK] calculateBalanceRatioPrice result:`, result);
+                
                 const pricePerNFT = result.pricePerNFT || result['0'];
                 const balance = result.balance || result['1'];
                 const totalSupply = result.totalSupply || result['2'];
 
                 balanceRatioPrice = pricePerNFT;
+                console.log(`[BUYBACK] pricePerNFT:`, pricePerNFT, `balance:`, balance, `totalSupply:`, totalSupply);
 
                 document.getElementById('balanceRatioBalance').textContent = parseFloat(web3.utils.fromWei(balance, 'ether')).toFixed(4);
                 document.getElementById('balanceRatioTotalSupply').textContent = totalSupply;
                 document.getElementById('finalBalanceRatioPrice').textContent = formatPrice(pricePerNFT) + ' 代币';
+                console.log(`[BUYBACK] Updated finalBalanceRatioPrice to:`, formatPrice(pricePerNFT) + ' 代币');
 
                 const detailsEl = document.getElementById('balanceRatioPriceDetails');
+                const hintEl = detailsEl ? detailsEl.querySelector('p.text-center') : null;
                 if (detailsEl) {
                     if (tokenId) {
                         detailsEl.classList.remove('border-orange-200');
                         detailsEl.classList.add('border-orange-400');
+                        if (hintEl) {
+                            hintEl.style.display = 'none';
+                        }
                     } else {
                         detailsEl.classList.remove('border-orange-400');
                         detailsEl.classList.add('border-orange-200');
+                        if (hintEl) {
+                            hintEl.style.display = 'block';
+                        }
                     }
                 }
 
@@ -650,6 +657,7 @@
                             if (!nftDataContract) {
                                 try {
                                     nftDataContract = await window.ZODIAC_WEB3.getContract('nftData');
+                                    console.log('[BUYBACK] Successfully got nftDataContract');
                                 } catch (e) {
                                     console.warn('重新获取nftDataContract失败:', e.message);
                                 }
@@ -657,6 +665,7 @@
                             if (nftDataContract) {
                                 try {
                                     const nftWeight = await nftDataContract.methods.calcNFTWeight(tokenId).call();
+                                    console.log(`[BUYBACK] Got nftWeight for tokenId ${tokenId}:`, nftWeight);
                                     const nftWeightEl = document.getElementById('balanceRatioNftWeight');
                                     if (nftWeightEl) {
                                         nftWeightEl.textContent = nftWeight;
@@ -1055,15 +1064,16 @@
                 totalCost += upgradeCosts[i - 1] || 0;
             }
 
+            const basePriceValue = totalCost * discount / 100;
             const maxBonusPercent = maxBuybackMultiplier - discount;
             const actualBonusDays = Math.min(holdingDays, maxBonusPercent);
             
             const bonusPercent = actualBonusDays;
-            const finalPriceValue = totalCost * (discount + bonusPercent) / 100;
+            const finalPriceValue = basePriceValue * (100 + bonusPercent) / 100;
             const maxPriceValue = totalCost * maxBuybackMultiplier / 100;
 
             return {
-                basePrice: String(Math.floor(totalCost * discount / 100 * 10**18)),
+                basePrice: String(Math.floor(basePriceValue * 10**18)),
                 bonusPercent: bonusPercent,
                 finalPrice: String(Math.floor(finalPriceValue * 10**18)),
                 maxPrice: String(Math.floor(maxPriceValue * 10**18)),
