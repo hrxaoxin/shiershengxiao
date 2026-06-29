@@ -26720,6 +26720,7 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "receive"
 	}
 ],
+
 	battleSkillDataABI: [
 	{
 		"inputs": [],
