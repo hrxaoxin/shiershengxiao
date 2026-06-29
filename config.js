@@ -18760,8 +18760,8 @@ window.ZODIAC_CONFIG = (function() {
 		"outputs": [],
 		"stateMutability": "payable",
 		"type": "function"
-	}
-],
+	},
+	],
 		stakingLPABI: [
 	{
 		"inputs": [],

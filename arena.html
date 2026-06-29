@@ -2630,23 +2630,27 @@
                 const arenaBattleContract = await window.ZODIAC_WEB3.getContract('arenaBattle');
                 if (arenaBattleContract) {
                     console.log('[ARENA] arenaBattleContract exists:', arenaBattleContract);
-                    console.log('[ARENA] Pre-check: checking season status first...');
-                    console.log('[ARENA] currentSeason method exists:', !!arenaBattleContract.methods.currentSeason);
+                    console.log('[ARENA] Pre-check: checking season status from ArenaRankingManager...');
                     
                     try {
-                        const seasonInfo = await arenaBattleContract.methods.currentSeason().call();
-                        console.log('[ARENA] Season info:', seasonInfo);
-                        console.log('[ARENA] Season isActive:', seasonInfo.isActive);
-                        
-                        if (seasonInfo.isActive !== true && seasonInfo.isActive !== 'true') {
-                            ZODIAC_UI.showToast('赛季未激活，无法发起挑战', 'error');
-                            ZODIAC_UI.hideLoading();
-                            return;
+                        const rankingManagerContract = await window.ZODIAC_WEB3.getContract('arenaRankingManager');
+                        if (rankingManagerContract && rankingManagerContract.methods.getCurrentSeasonInfo) {
+                            const seasonInfo = await rankingManagerContract.methods.getCurrentSeasonInfo().call();
+                            console.log('[ARENA] Season info from RankingManager:', seasonInfo);
+                            
+                            const isActive = seasonInfo.isActive !== undefined ? seasonInfo.isActive : 
+                                           seasonInfo[3] !== undefined ? seasonInfo[3] : false;
+                            console.log('[ARENA] Season isActive:', isActive);
+                            
+                            if (isActive !== true && isActive !== 'true') {
+                                ZODIAC_UI.showToast('赛季未激活，无法发起挑战', 'error');
+                                ZODIAC_UI.hideLoading();
+                                return;
+                            }
                         }
                     } catch (seasonCheckError) {
                         console.error('[ARENA] Failed to check season status:', seasonCheckError);
                         console.error('[ARENA] Error message:', seasonCheckError.message);
-                        console.error('[ARENA] Error stack:', seasonCheckError.stack);
                     }
                     
                     console.log('[ARENA] Pre-check: calling ArenaBattle challenge methods with .call()...');

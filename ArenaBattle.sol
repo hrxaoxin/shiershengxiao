@@ -114,32 +114,6 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
     
     /**
-     * @dev 赛季信息结构体
-     * @param startTime 赛季开始时间
-     * @param endTime 赛季结束时间
-     * @param isActive 赛季是否进行中
-     * @param isSettled 赛季是否已结算
-     * @param totalPlayers 赛季总玩家数
-     * @param rewardPool 奖励池金额
-     */
-    struct SeasonInfo {
-        uint256 startTime;
-        uint256 endTime;
-        bool isActive;
-        bool isSettled;
-        uint256 totalPlayers;
-        uint256 rewardPool;
-    }
-    
-    /**
-     * @dev 当前赛季 ID
-     */
-    uint256 public currentSeasonId;
-    /**
-     * @dev 赛季信息映射
-     */
-    mapping(uint256 => SeasonInfo) public seasons;
-    /**
      * @dev 玩家记录映射
      */
     mapping(address => PlayerRecord) public players;
@@ -245,14 +219,12 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 玩家挑战模拟玩家，胜利获得积分，失败扣除积分
      */
     function challengeMockPlayer(uint256 mockIndex) external nonReentrant whenNotPaused returns (bool, uint256) {
-        SeasonInfo storage currentSeason = seasons[currentSeasonId];
-        require(currentSeason.isActive, "ArenaBattle: Season not active");
+        _checkSeasonActive();
         
         PlayerRecord storage record = players[msg.sender];
         _checkAndResetAttempts(msg.sender);
         require(record.remainingAttempts > 0, "ArenaBattle: No remaining attempts");
         
-        // 从 ArenaPlayer 检查是否有战斗队伍
         require(_hasBattleTeam(msg.sender), "ArenaBattle: No battle team set");
         
         record.remainingAttempts--;
@@ -271,8 +243,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function challengeRealPlayer(address challengedPlayer) external nonReentrant whenNotPaused returns (bool, uint256) {
-        SeasonInfo storage currentSeason = seasons[currentSeasonId];
-        require(currentSeason.isActive, "ArenaBattle: Season not active");
+        _checkSeasonActive();
         require(challengedPlayer != address(0), "ArenaBattle: Invalid challenged player");
         require(challengedPlayer != msg.sender, "ArenaBattle: Cannot challenge self");
         
@@ -282,7 +253,6 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         _checkAndResetAttempts(msg.sender);
         require(challengerRecord.remainingAttempts > 0, "ArenaBattle: No remaining attempts");
         
-        // 从 ArenaPlayer 检查双方是否有战斗队伍
         require(_hasBattleTeam(msg.sender), "ArenaBattle: Challenger has no battle team");
         require(_hasBattleTeam(challengedPlayer), "ArenaBattle: Challenged has no battle team");
         
@@ -302,6 +272,12 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         
         emit BattleExecuted(msg.sender, challengedPlayer, challengerVictory, battleIdCounter[msg.sender]);
         return (challengerVictory, 0);
+    }
+
+    function _checkSeasonActive() internal view {
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        require(arenaRankingManager != address(0), "ArenaBattle: Ranking manager not set");
+        require(IArenaRanking(arenaRankingManager).currentSeasonId() > 0, "ArenaBattle: Season not active");
     }
 
     function _executeMockBattle(uint256 mockIndex) internal view returns (bool) {
@@ -358,7 +334,9 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 胜利加25分，失败扣25分（最低0分），首次战斗初始化玩家数据
      */
     function _updateScore(address player, bool isWinner) internal {
-        SeasonInfo storage currentSeason = seasons[currentSeasonId];
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
+        
         PlayerRecord storage record = players[player];
         
         if (record.seasonId != currentSeasonId) {
@@ -370,14 +348,12 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             record.lastBattleTime = block.timestamp;
             record.lastResetTime = block.timestamp;
             record.remainingAttempts = DAILY_ATTEMPTS;
-            currentSeason.totalPlayers++;
         }
 
         if (isWinner) {
             record.score += 25;
             record.wins++;
         } else {
-            // 修复：使用 >= 确保当分数正好为25时也能正确扣除
             if (record.score >= 25) record.score -= 25;
             else record.score = 0;
             record.losses++;
