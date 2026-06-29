@@ -169,7 +169,7 @@ window.ZODIAC_CONFIG = (function() {
         arenaRankingQuery: getEnvContractAddress('arenaRankingQuery', '0xe3cb33e94c8dfB86900e450dab9652b1e133CAcA'),
         arenaReward: getEnvContractAddress('arenaReward', '0x53b7BC8630100172FE0BDb8169079b2130fF4aC3'),
         arenaRewardLP: getEnvContractAddress('arenaRewardLP', '0x7ADDd1318BBf399E08931B6bB85413725Ab8Bb9c'),
-        arenaLeaderboard: getEnvContractAddress('arenaLeaderboard', '0x734422854F237a8fe230E4B5E605f9dCe31cC9c6'),
+        arenaLeaderboard: getEnvContractAddress('arenaLeaderboard', '0x107871b5223808fc0E5648B40BCc7ED0D6BbA8Fc'),
         arenaPlayer: getEnvContractAddress('arenaPlayer', '0x83572c95cD940b792D189eF5B46873EE99125A42'),
         arenaBattle: getEnvContractAddress('arenaBattle', '0x0022ECBF5D59788bb43622Ba4Bb6211d87CA9FFc'),
         battle: getEnvContractAddress('battle', '0xC87bc65222D42787A9f33Bc5b17B8a4a304B5824'),
@@ -15962,19 +15962,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "currentSeasonId",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "endSeason",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -16724,50 +16711,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "",
 				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "seasons",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "startTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "endTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "isActive",
-				"type": "bool"
-			},
-			{
-				"internalType": "bool",
-				"name": "isSettled",
-				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalPlayers",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "rewardPool",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",

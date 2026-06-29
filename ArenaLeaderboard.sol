@@ -511,7 +511,9 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     ) {
         address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
         require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
-        return IArenaRanking(arenaRankingManager).getCurrentSeasonInfo();
+        uint256 totalPlayers;
+        uint256 rewardPool;
+        (seasonId, startTime, endTime, isActive, totalPlayers, rewardPool) = IArenaRanking(arenaRankingManager).getCurrentSeasonInfo();
     }
     
     function getPlayerChallengeStatus(address player) external view returns (
