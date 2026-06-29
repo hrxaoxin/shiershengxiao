@@ -1589,7 +1589,8 @@ window.ZODIAC_WEB3 = (function() {
                 const result = await contract.methods.challengeMockPlayer(mockIndexStr).call({ from: account });
                 console.log('[ZODIAC_WEB3] Dry-run succeeded:', result);
             } catch (dryRunError) {
-                console.warn('[ZODIAC_WEB3] Dry-run warning:', dryRunError.message);
+                console.error('[ZODIAC_WEB3] Dry-run failed:', dryRunError.message);
+                throw dryRunError;
             }
             
             const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [mockIndexStr], {
@@ -1618,7 +1619,8 @@ window.ZODIAC_WEB3 = (function() {
                 const result = await contract.methods.challengeRealPlayer(challengedPlayer).call({ from: account });
                 console.log('[ZODIAC_WEB3] Dry-run succeeded:', result);
             } catch (dryRunError) {
-                console.warn('[ZODIAC_WEB3] Dry-run warning:', dryRunError.message);
+                console.error('[ZODIAC_WEB3] Dry-run failed:', dryRunError.message);
+                throw dryRunError;
             }
             
             const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer], {
