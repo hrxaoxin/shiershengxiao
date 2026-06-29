@@ -878,7 +878,9 @@
                 const isOwned = ownedTypes.has(typeId);
                 const userToken = userTokens.find(t => t.typeId === typeId);
                 const count = userToken ? userToken.count : 0;
-                const displayGrowth = growth > 0 ? growth : (userToken && userToken.growth ? userToken.growth : 0);
+                
+                const displayLevel = level > 0 ? level : 1;
+                const displayGrowth = growth > 0 ? growth : (userToken && userToken.growth ? userToken.growth : 50);
                 
                 const element = nftInfo.elementKey || 'water';
                 let isRare = (element === 'light' || element === 'dark');
@@ -892,12 +894,12 @@
                 const rarityColor = isRare ? 'text-purple-600' : 'text-gray-600';
                 
                 // 从合约获取权重
-                let weight = level * (isRare ? 2 : 1);
-                if (level > 0) {
+                let weight = displayLevel * (isRare ? 2 : 1);
+                if (displayLevel > 0) {
                     try {
                         const nftDataContract = await window.ZODIAC_WEB3.getContract('nftData', false);
                         if (nftDataContract) {
-                            const realWeight = await nftDataContract.methods.getWeightByLevel(level, isRare).call();
+                            const realWeight = await nftDataContract.methods.getWeightByLevel(displayLevel, isRare).call();
                             if (realWeight && realWeight > 0) {
                                 weight = parseInt(realWeight, 10);
                             }
@@ -1013,10 +1015,10 @@
                     rarityBadge.className = `text-xs font-bold px-2 py-1 rounded ${isRare ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`;
                 }
                 
-                const attack = window.ZODIAC_UI.calculateAttack(level, displayGrowth);
-                const defense = window.ZODIAC_UI.calculateDefense(level, displayGrowth);
-                const speed = window.ZODIAC_UI.calculateSpeed(level, displayGrowth, nftInfo.zodiac);
-                const hp = window.ZODIAC_UI.calculateMaxHP(level, displayGrowth);
+                const attack = window.ZODIAC_UI.calculateAttack(displayLevel, displayGrowth);
+                const defense = window.ZODIAC_UI.calculateDefense(displayLevel, displayGrowth);
+                const speed = window.ZODIAC_UI.calculateSpeed(displayLevel, displayGrowth, nftInfo.zodiac);
+                const hp = window.ZODIAC_UI.calculateMaxHP(displayLevel, displayGrowth);
 
                 const statsDiv = document.getElementById('modalCardStats');
                 if (statsDiv) {
@@ -1032,7 +1034,7 @@
                             </div>
                             <div class="bg-yellow-50 rounded-lg p-3">
                                 <div class="text-xs text-gray-600 mb-1">当前等级</div>
-                                <div class="text-yellow-600 font-bold">${'⭐'.repeat(level)}</div>
+                                <div class="text-yellow-600 font-bold">${level > 0 ? '⭐'.repeat(level) : '未拥有'}</div>
                             </div>
                             <div class="bg-purple-50 rounded-lg p-3">
                                 <div class="text-xs text-gray-600 mb-1">成长值</div>

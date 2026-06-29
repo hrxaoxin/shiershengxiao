@@ -1449,6 +1449,7 @@
                 const rarityText = isRare ? '稀有' : '普通';
                 
                 const level = parseInt(nftLevel, 10);
+                const displayLevel = level > 0 ? level : 1;
                 
                 let weight = level * (isRare ? 2 : 1);
                 try {
@@ -1470,7 +1471,7 @@
                 const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
                 const zodiacName = nftInfo.zodiac !== undefined ? (ZODIAC_CONFIG && ZODIAC_CONFIG.ZODIAC_NAMES ? ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac] : zodiacNames[nftInfo.zodiac]) : '未知';
                 
-                const displayGrowth = parseInt(growth, 10);
+                const displayGrowth = parseInt(growth, 10) || 50;
                 
                 let skillInfo = '';
                 try {
@@ -1566,10 +1567,10 @@
                     rarityBadge.className = `text-xs font-bold px-2 py-1 rounded ${isRare ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`;
                 }
                 
-                const attack = window.ZODIAC_UI.calculateAttack(level, displayGrowth);
-                const defense = window.ZODIAC_UI.calculateDefense(level, displayGrowth);
-                const speed = window.ZODIAC_UI.calculateSpeed(level, displayGrowth, nftInfo.zodiac);
-                const hp = window.ZODIAC_UI.calculateMaxHP(level, displayGrowth);
+                const attack = window.ZODIAC_UI.calculateAttack(displayLevel, displayGrowth);
+                const defense = window.ZODIAC_UI.calculateDefense(displayLevel, displayGrowth);
+                const speed = window.ZODIAC_UI.calculateSpeed(displayLevel, displayGrowth, nftInfo.zodiac);
+                const hp = window.ZODIAC_UI.calculateMaxHP(displayLevel, displayGrowth);
 
                 const statsDiv = document.getElementById('modalCardStats');
                 if (statsDiv) {
