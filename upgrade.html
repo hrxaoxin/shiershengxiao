@@ -1668,10 +1668,10 @@
                             const battleContract = await window.ZODIAC_WEB3.getContract('battleSkillData');
                             if (battleContract) {
                                 const skill = await battleContract.methods.getSkill(nftType).call();
-                                const sType = skill.skillType !== undefined ? skill.skillType : (skill[1] !== undefined ? skill[1] : 0);
-                                const sDamage = skill.damage !== undefined ? skill.damage : (skill[2] !== undefined ? skill[2] : 0);
-                                const sCooldown = skill.cooldown !== undefined ? skill.cooldown : (skill[3] !== undefined ? skill[3] : 0);
-                                const sIsAoe = skill.isAoe !== undefined ? skill.isAoe : (skill[5] !== undefined ? skill[5] : false);
+                                const sType = skill[1] !== undefined ? skill[1] : (skill.skillType !== undefined ? skill.skillType : 0);
+                                const sDamage = skill[2] !== undefined ? skill[2] : (skill.damage !== undefined ? skill.damage : 0);
+                                const sCooldown = skill[3] !== undefined ? skill[3] : (skill.cooldown !== undefined ? skill.cooldown : 0);
+                                const sIsAoe = skill[5] !== undefined ? skill[5] : (skill.isAoe !== undefined ? skill.isAoe : false);
                                 const skillTypeName = getSkillTypeName(parseInt(sType));
                                 const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
                                 skillInfo = `

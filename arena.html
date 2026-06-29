@@ -1313,12 +1313,12 @@
                         } else {
                             const skillData = await battleSkillDataContract.methods.getSkill(tokenType).call();
                             skill = {
-                                name: skillData.skillId || skillData[0],
-                                type: SKILL_TYPE_MAP[skillData.skillType !== undefined ? skillData.skillType : skillData[1]],
-                                value: skillData.damage || skillData[2],
-                                cooldown: skillData.cooldown || skillData[3],
-                                duration: skillData.duration || skillData[4],
-                                isAoe: skillData.isAoe || skillData[5]
+                                name: skillData[0] !== undefined ? skillData[0] : (skillData.skillId !== undefined ? skillData.skillId : ''),
+                                type: SKILL_TYPE_MAP[skillData[1] !== undefined ? skillData[1] : (skillData.skillType !== undefined ? skillData.skillType : 0)],
+                                value: skillData[2] !== undefined ? skillData[2] : (skillData.damage !== undefined ? skillData.damage : 0),
+                                cooldown: skillData[3] !== undefined ? skillData[3] : (skillData.cooldown !== undefined ? skillData.cooldown : 0),
+                                duration: skillData[4] !== undefined ? skillData[4] : (skillData.duration !== undefined ? skillData.duration : 0),
+                                isAoe: skillData[5] !== undefined ? skillData[5] : (skillData.isAoe !== undefined ? skillData.isAoe : false)
                             };
                             skillCache[tokenType] = skill;
                         }
@@ -1895,12 +1895,12 @@
                             } else {
                                 const skillData = await battleSkillDataContract.methods.getSkill(tokenType).call();
                                 skill = {
-                                    name: skillData.skillId || skillData[0],
-                                    type: SKILL_TYPE_MAP[skillData.skillType !== undefined ? skillData.skillType : skillData[1]],
-                                    value: skillData.damage || skillData[2],
-                                    cooldown: skillData.cooldown || skillData[3],
-                                    duration: skillData.duration || skillData[4],
-                                    isAoe: skillData.isAoe || skillData[5]
+                                    name: skillData[0] !== undefined ? skillData[0] : (skillData.skillId !== undefined ? skillData.skillId : ''),
+                                    type: SKILL_TYPE_MAP[skillData[1] !== undefined ? skillData[1] : (skillData.skillType !== undefined ? skillData.skillType : 0)],
+                                    value: skillData[2] !== undefined ? skillData[2] : (skillData.damage !== undefined ? skillData.damage : 0),
+                                    cooldown: skillData[3] !== undefined ? skillData[3] : (skillData.cooldown !== undefined ? skillData.cooldown : 0),
+                                    duration: skillData[4] !== undefined ? skillData[4] : (skillData.duration !== undefined ? skillData.duration : 0),
+                                    isAoe: skillData[5] !== undefined ? skillData[5] : (skillData.isAoe !== undefined ? skillData.isAoe : false)
                                 };
                                 skillCache[tokenType] = skill;
                             }
