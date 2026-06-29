@@ -413,7 +413,7 @@ window.ZODIAC_UI = (function() {
         });
     }
 
-    function showNFTTooltip(event) {
+    async function showNFTTooltip(event) {
         const element = event.currentTarget;
         const typeId = element.getAttribute('data-nft-typeid');
         const tokenId = element.getAttribute('data-nft-tokenid');
@@ -432,6 +432,12 @@ window.ZODIAC_UI = (function() {
         }
 
         const skills = getSkillsForNFT(nftInfo.elementKey, nftInfo.zodiac);
+
+        const attack = calculateAttack(parseInt(level), parseInt(growth));
+        const defense = calculateDefense(parseInt(level), parseInt(growth));
+        const speed = calculateSpeed(parseInt(level), parseInt(growth), nftInfo.zodiac);
+        const hp = calculateMaxHP(parseInt(level), parseInt(growth));
+        const weight = await getWeight(level, nftInfo.isRare);
 
         nftTooltip.innerHTML = `
             <div class="nft-tooltip-content">
@@ -454,7 +460,32 @@ window.ZODIAC_UI = (function() {
                     </div>
                     <div class="nft-stat">
                         <span class="stat-label">权重</span>
-                        <span class="stat-value">${getWeight(level, nftInfo.isRare)}</span>
+                        <span class="stat-value">${weight}</span>
+                    </div>
+                </div>
+                <div class="nft-tooltip-attributes">
+                    <h5 class="attributes-title">属性</h5>
+                    <div class="attribute-grid">
+                        <div class="attribute-item">
+                            <span class="attribute-icon">⚔️</span>
+                            <span class="attribute-label">攻击</span>
+                            <span class="attribute-value">${attack}</span>
+                        </div>
+                        <div class="attribute-item">
+                            <span class="attribute-icon">🛡️</span>
+                            <span class="attribute-label">防御</span>
+                            <span class="attribute-value">${defense}</span>
+                        </div>
+                        <div class="attribute-item">
+                            <span class="attribute-icon">💨</span>
+                            <span class="attribute-label">速度</span>
+                            <span class="attribute-value">${speed}</span>
+                        </div>
+                        <div class="attribute-item">
+                            <span class="attribute-icon">❤️</span>
+                            <span class="attribute-label">生命</span>
+                            <span class="attribute-value">${hp}</span>
+                        </div>
                     </div>
                 </div>
                 <div class="nft-tooltip-skills">
@@ -567,6 +598,39 @@ window.ZODIAC_UI = (function() {
         return skills[element]?.default || skills.water.default;
     }
 
+    function calculatePower(level, growth) {
+        if (level == 0) return 0;
+        const basePower = level * 20;
+        const growthBonus = Math.floor((level - 1) * growth * 2 / 100);
+        return basePower + growthBonus;
+    }
+
+    function calculateAttack(level, growth) {
+        const power = calculatePower(level, growth);
+        return level * 30 + power * 3;
+    }
+
+    function calculateDefense(level, growth) {
+        const power = calculatePower(level, growth);
+        return level * 15 + power;
+    }
+
+    function calculateSpeed(level, growth, zodiac) {
+        const baseSpeed = 60;
+        const levelBonus = level * 5;
+        const growthBonus = Math.floor((level - 1) * growth * 3 / 100);
+        const zodiacSpeedBonus = [5, 25, 15, 5, 12, 8, 30, 20, 35, 5, 20, 22];
+        const zodiacBonus = zodiacSpeedBonus[zodiac] || 0;
+        return baseSpeed + levelBonus + growthBonus + zodiacBonus;
+    }
+
+    function calculateMaxHP(level, growth) {
+        const baseHp = 100;
+        const levelBonus = level * 30;
+        const growthBonus = Math.floor((level - 1) * growth * 20 / 100);
+        return baseHp + levelBonus + growthBonus;
+    }
+
     return {
         on,
         off,
@@ -582,6 +646,11 @@ window.ZODIAC_UI = (function() {
         handleError,
         handleTransaction,
         initGlobalErrorHandler,
-        initNFTTooltips
+        initNFTTooltips,
+        calculatePower,
+        calculateAttack,
+        calculateDefense,
+        calculateSpeed,
+        calculateMaxHP
     };
 })();

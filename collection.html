@@ -1013,6 +1013,11 @@
                     rarityBadge.className = `text-xs font-bold px-2 py-1 rounded ${isRare ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`;
                 }
                 
+                const attack = window.ZODIAC_UI.calculateAttack(level, displayGrowth);
+                const defense = window.ZODIAC_UI.calculateDefense(level, displayGrowth);
+                const speed = window.ZODIAC_UI.calculateSpeed(level, displayGrowth, nftInfo.zodiac);
+                const hp = window.ZODIAC_UI.calculateMaxHP(level, displayGrowth);
+
                 const statsDiv = document.getElementById('modalCardStats');
                 if (statsDiv) {
                     statsDiv.innerHTML = `
@@ -1036,6 +1041,31 @@
                             <div class="bg-red-50 rounded-lg p-3">
                                 <div class="text-xs text-gray-600 mb-1">持有数量</div>
                                 <div class="text-red-600 font-bold">${count} 张</div>
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <div class="text-xs text-gray-600 mb-2">战斗属性</div>
+                            <div class="grid grid-cols-4 gap-2">
+                                <div class="bg-red-50 rounded-lg p-2 text-center">
+                                    <div class="text-lg mb-1">⚔️</div>
+                                    <div class="text-xs text-gray-500">攻击</div>
+                                    <div class="text-sm font-bold text-red-600">${attack}</div>
+                                </div>
+                                <div class="bg-blue-50 rounded-lg p-2 text-center">
+                                    <div class="text-lg mb-1">🛡️</div>
+                                    <div class="text-xs text-gray-500">防御</div>
+                                    <div class="text-sm font-bold text-blue-600">${defense}</div>
+                                </div>
+                                <div class="bg-yellow-50 rounded-lg p-2 text-center">
+                                    <div class="text-lg mb-1">💨</div>
+                                    <div class="text-xs text-gray-500">速度</div>
+                                    <div class="text-sm font-bold text-yellow-600">${speed}</div>
+                                </div>
+                                <div class="bg-green-50 rounded-lg p-2 text-center">
+                                    <div class="text-lg mb-1">❤️</div>
+                                    <div class="text-xs text-gray-500">生命</div>
+                                    <div class="text-sm font-bold text-green-600">${hp}</div>
+                                </div>
                             </div>
                         </div>
                         <div class="mt-4">
