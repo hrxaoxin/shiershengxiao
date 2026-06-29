@@ -1035,14 +1035,14 @@
 
                 if (breedingCoreContract) {
                     const feeWei = await breedingCoreContract.methods.selfBreedingFee().call();
-                    if (parseInt(feeWei, 10) > 0) {
+                    if (BigInt(feeWei) > BigInt(0)) {
                         const tokenAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract;
                         if (tokenAddress) {
                             const tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
                             if (tokenContract) {
+                                const web3 = window.ZODIAC_WEB3.getWeb3();
                                 const balance = await tokenContract.methods.balanceOf(account).call();
-                                if (parseInt(balance, 10) < parseInt(feeWei, 10)) {
-                                    const web3 = window.ZODIAC_WEB3.getWeb3();
+                                if (BigInt(balance) < BigInt(feeWei)) {
                                     const fee = web3.utils.fromWei(feeWei, 'ether');
                                     const balanceFormatted = web3.utils.fromWei(balance, 'ether');
                                     ZODIAC_UI.showToast(`代币余额不足！需要 ${fee}，当前 ${balanceFormatted}`, 'error');
@@ -1050,10 +1050,11 @@
                                 }
 
                                 const allowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
-                                if (parseInt(allowance, 10) < parseInt(feeWei, 10)) {
+                                if (BigInt(allowance) < BigInt(feeWei)) {
+                                    const feeAmount = web3.utils.fromWei(feeWei, 'ether');
                                     const approveConfirm = await ZODIAC_UI.showConfirmModal(
                                         '需要授权代币',
-                                        `孕育需要支付 ${feeWei} 代币费用，请授权合约使用您的代币。`,
+                                        `孕育需要支付 ${feeAmount} 代币费用，请授权合约使用您的代币。`,
                                         { confirmText: '确认授权' }
                                     );
                                     if (!approveConfirm) {
@@ -1806,14 +1807,14 @@
 
             if (breedingCoreContract) {
                 const feeWei = await breedingCoreContract.methods.marketBreedingFee().call();
-                if (parseInt(feeWei, 10) > 0) {
+                if (BigInt(feeWei) > BigInt(0)) {
                     const tokenAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract;
                     if (tokenAddress) {
                         const tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
                         if (tokenContract) {
+                            const web3 = window.ZODIAC_WEB3.getWeb3();
                             const balance = await tokenContract.methods.balanceOf(account).call();
-                            if (parseInt(balance, 10) < parseInt(feeWei, 10)) {
-                                const web3 = window.ZODIAC_WEB3.getWeb3();
+                            if (BigInt(balance) < BigInt(feeWei)) {
                                 const fee = web3.utils.fromWei(feeWei, 'ether');
                                 const balanceFormatted = web3.utils.fromWei(balance, 'ether');
                                 ZODIAC_UI.showToast(`代币余额不足！需要 ${fee}，当前 ${balanceFormatted}`, 'error');
@@ -1821,10 +1822,11 @@
                             }
 
                             const allowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
-                            if (parseInt(allowance, 10) < parseInt(feeWei, 10)) {
+                            if (BigInt(allowance) < BigInt(feeWei)) {
+                                const feeAmount = web3.utils.fromWei(feeWei, 'ether');
                                 const approveConfirm = await ZODIAC_UI.showConfirmModal(
                                     '需要授权代币',
-                                    `孕育需要支付 ${feeWei} 代币费用，请授权合约使用您的代币。`,
+                                    `孕育需要支付 ${feeAmount} 代币费用，请授权合约使用您的代币。`,
                                     { confirmText: '确认授权' }
                                 );
                                 if (!approveConfirm) {
