@@ -950,8 +950,14 @@
             await updateHoldingDaysAndPrice(tokenId, mintTime);
 
             if (fixedBuybackOpen) {
-                document.getElementById('finalFixedPrice').textContent = formatPrice(fixedPrice) + ' 代币';
-                document.getElementById('sellWithFixedBtn').disabled = false;
+                const fixedPriceEl = document.getElementById('fixedBuybackPrice');
+                if (fixedPriceEl) {
+                    fixedPriceEl.textContent = formatPrice(fixedPrice) + ' 代币';
+                }
+                const sellFixedBtn = document.getElementById('sellWithFixedBtn');
+                if (sellFixedBtn) {
+                    sellFixedBtn.disabled = false;
+                }
             }
 
             await loadBalanceRatioPrice(tokenId, level, nftInfo.isRare);

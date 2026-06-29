@@ -2642,47 +2642,40 @@
                         }
                     } catch (preCheckError) {
                         console.warn('[ARENA] Pre-check warning:', preCheckError.message);
-                        let errorMsg = '';
-                        if (preCheckError.message) {
-                            const revertMatch = preCheckError.message.match(/reverted:\s*(.+?)(?:\s*:\s*0x|$)/);
-                            if (revertMatch) {
-                                errorMsg = revertMatch[1].trim();
-                            }
+                        const errMsg = preCheckError.message || '';
+                        
+                        let shouldStop = false;
+                        let toastMsg = '';
+                        
+                        if (errMsg.includes('Season not active')) {
+                            shouldStop = true;
+                            toastMsg = '赛季未激活，无法发起挑战';
+                        } else if (errMsg.includes('No remaining attempts')) {
+                            shouldStop = true;
+                            toastMsg = '挑战次数已用完';
+                        } else if (errMsg.includes('No battle team set')) {
+                            shouldStop = true;
+                            toastMsg = '请先设置战斗队伍';
+                        } else if (errMsg.includes('Challenger has no battle team')) {
+                            shouldStop = true;
+                            toastMsg = '挑战者没有设置战斗队伍';
+                        } else if (errMsg.includes('Challenged has no battle team')) {
+                            shouldStop = true;
+                            toastMsg = '对手没有设置战斗队伍';
+                        } else if (errMsg.includes('Invalid challenged player')) {
+                            shouldStop = true;
+                            toastMsg = '无效的对手地址';
+                        } else if (errMsg.includes('Cannot challenge self')) {
+                            shouldStop = true;
+                            toastMsg = '不能挑战自己';
                         }
                         
-                        if (errorMsg) {
-                            const userMsg = errorMsg.replace('ArenaBattle: ', '');
-                            if (userMsg === 'Season not active') {
-                                ZODIAC_UI.showToast('赛季未激活，无法发起挑战', 'error');
-                                ZODIAC_UI.hideLoading();
-                                return;
-                            } else if (userMsg === 'No remaining attempts') {
-                                ZODIAC_UI.showToast('挑战次数已用完', 'error');
-                                ZODIAC_UI.hideLoading();
-                                return;
-                            } else if (userMsg === 'No battle team set') {
-                                ZODIAC_UI.showToast('请先设置战斗队伍', 'error');
-                                ZODIAC_UI.hideLoading();
-                                return;
-                            } else if (userMsg === 'Challenger has no battle team') {
-                                ZODIAC_UI.showToast('挑战者没有设置战斗队伍', 'error');
-                                ZODIAC_UI.hideLoading();
-                                return;
-                            } else if (userMsg === 'Challenged has no battle team') {
-                                ZODIAC_UI.showToast('对手没有设置战斗队伍', 'error');
-                                ZODIAC_UI.hideLoading();
-                                return;
-                            } else if (userMsg === 'Invalid challenged player') {
-                                ZODIAC_UI.showToast('无效的对手地址', 'error');
-                                ZODIAC_UI.hideLoading();
-                                return;
-                            } else if (userMsg === 'Cannot challenge self') {
-                                ZODIAC_UI.showToast('不能挑战自己', 'error');
-                                ZODIAC_UI.hideLoading();
-                                return;
-                            } else {
-                                console.warn(`[ARENA] 预检查警告: ${errorMsg}，将继续尝试发起挑战`);
-                            }
+                        if (shouldStop) {
+                            ZODIAC_UI.showToast(toastMsg, 'error');
+                            ZODIAC_UI.hideLoading();
+                            return;
+                        } else {
+                            console.warn('[ARENA] 预检查警告，将继续尝试发起挑战');
                         }
                     }
                 }
