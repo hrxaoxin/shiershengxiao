@@ -63,15 +63,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @param tokenId NFT的唯一标识符
      * @param level NFT等级（1-5），等级越高属性越强
      * @param element 属性类型（0=水, 1=风, 2=火, 3=暗, 4=光）
-     * @param power 战力值，由等级和成长值计算得出
-     * @param growth 成长值（50-100），影响属性加成
+     * @param growth 成长值（50-100），直接影响属性加成
      * @param zodiac 生肖索引（0-11，对应鼠牛虎兔龙蛇马羊猴鸡狗猪）
      */
     struct NFTTraits {
         uint256 tokenId;
         uint8 level;
         uint8 element;
-        uint8 power;
         uint8 growth;
         uint8 zodiac;
     }
@@ -282,7 +280,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             traits.element = uint8(zodiacType / ZODIAC_TYPE_COUNT);
             traits.zodiac = uint8((zodiacType / GENDER_COUNT) % ZODIAC_COUNT);
             traits.growth = uint8(growth);
-            traits.power = _calculatePower(traits.level, traits.growth);
         } else {
             // 修复：在mock模式下验证tokenId有效性
             require(tokenId > 0, "Battle: Invalid tokenId in mock mode");
@@ -313,14 +310,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
                 traits.element = uint8(zodiacType / ZODIAC_TYPE_COUNT);
                 traits.zodiac = uint8((zodiacType / GENDER_COUNT) % ZODIAC_COUNT);
                 traits.growth = uint8(growth);
-                traits.power = _calculatePower(traits.level, traits.growth);
             } else {
                 uint256 zodiacType = tokenId % TOTAL_TYPE_COUNT;
                 traits.level = uint8((zodiacType / ZODIAC_TYPE_COUNT) + 1);
                 traits.element = uint8(zodiacType / ZODIAC_TYPE_COUNT);
                 traits.zodiac = uint8((zodiacType / GENDER_COUNT) % ZODIAC_COUNT);
                 traits.growth = uint8(MIN_GROWTH + (tokenId % GROWTH_RANGE));
-                traits.power = _calculatePower(traits.level, traits.growth);
             }
         }
         return traits;
@@ -356,19 +351,6 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         if (success && data.length >= 32) {
             growth = abi.decode(data, (uint256));
         }
-    }
-
-    /**
-     * @dev 计算NFT战力
-     * @param level 等级
-     * @param growth 成长值
-     * @return 战力值
-     */
-    function _calculatePower(uint256 level, uint256 growth) internal pure returns (uint8) {
-        if (level == 0) return 0;
-        uint256 basePower = level * 20;
-        uint256 growthBonus = (level - 1) * growth * 2 / 100;
-        return uint8(basePower + growthBonus);
     }
 
     /**
@@ -898,7 +880,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     function _calculateSpeed(NFTTraits memory traits) internal pure returns (uint256) {
         uint256 baseSpeed = 60;
         uint256 levelBonus = uint256(traits.level) * 5;
-        uint256 growthBonus = ((traits.level - 1) * uint256(traits.growth) * 3) / 100;
+        uint256 growthBonus = uint256(traits.level) * uint256(traits.growth) / 10;
 
         uint256[12] memory zodiacSpeedBonus = [
             uint256(5), 25, 15, 5, 12, 8, 30, 20, 35, 5, 20, 22
@@ -914,7 +896,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     function _calculateMaxHP(NFTTraits memory traits) internal pure returns (uint256) {
         uint256 baseHp = 100;
         uint256 levelBonus = uint256(traits.level) * 30;
-        uint256 growthBonus = ((traits.level - 1) * uint256(traits.growth) * 20) / 100;
+        uint256 growthBonus = uint256(traits.level) * uint256(traits.growth) * 2;
         return baseHp + levelBonus + growthBonus;
     }
 
@@ -1042,7 +1024,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @return 伤害值
      */
     function _calculateDamage(NFTTraits memory attacker, NFTTraits memory defender, uint256 seed) internal pure returns (uint) {
-        uint baseDamage = uint(attacker.level) * 30 + uint(attacker.power) * 3;
+        uint baseDamage = uint(attacker.level) * 30 + uint(attacker.level) * uint(attacker.growth) * 5 / 10;
 
         if (_checkAdvantage(attacker.element, defender.element)) {
             baseDamage = baseDamage * 130 / 100;
@@ -1064,7 +1046,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             return 0;
         }
 
-        uint256 defense = uint(defender.level) * 15 + uint(defender.power);
+        uint256 defense = uint(defender.level) * 15 + uint(defender.level) * uint(defender.growth) * 2 / 10;
         uint256 reduction = (defense * 50) / (100 + defense);
         baseDamage = baseDamage * (100 - reduction) / 100;
 

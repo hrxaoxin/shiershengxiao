@@ -598,27 +598,18 @@ window.ZODIAC_UI = (function() {
         return skills[element]?.default || skills.water.default;
     }
 
-    function calculatePower(level, growth) {
-        if (level == 0) return 0;
-        const basePower = level * 20;
-        const growthBonus = Math.floor((level - 1) * growth * 2 / 100);
-        return basePower + growthBonus;
-    }
-
     function calculateAttack(level, growth) {
-        const power = calculatePower(level, growth);
-        return level * 30 + power * 3;
+        return Math.floor(level * 30 + level * growth * 0.5);
     }
 
     function calculateDefense(level, growth) {
-        const power = calculatePower(level, growth);
-        return level * 15 + power;
+        return Math.floor(level * 15 + level * growth * 0.2);
     }
 
     function calculateSpeed(level, growth, zodiac) {
         const baseSpeed = 60;
         const levelBonus = level * 5;
-        const growthBonus = Math.floor((level - 1) * growth * 3 / 100);
+        const growthBonus = Math.floor(level * growth * 0.1);
         const zodiacSpeedBonus = [5, 25, 15, 5, 12, 8, 30, 20, 35, 5, 20, 22];
         const zodiacBonus = zodiacSpeedBonus[zodiac] || 0;
         return baseSpeed + levelBonus + growthBonus + zodiacBonus;
@@ -627,7 +618,7 @@ window.ZODIAC_UI = (function() {
     function calculateMaxHP(level, growth) {
         const baseHp = 100;
         const levelBonus = level * 30;
-        const growthBonus = Math.floor((level - 1) * growth * 20 / 100);
+        const growthBonus = Math.floor(level * growth * 2);
         return baseHp + levelBonus + growthBonus;
     }
 
@@ -647,7 +638,6 @@ window.ZODIAC_UI = (function() {
         handleTransaction,
         initGlobalErrorHandler,
         initNFTTooltips,
-        calculatePower,
         calculateAttack,
         calculateDefense,
         calculateSpeed,
