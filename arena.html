@@ -2633,11 +2633,13 @@
                     try {
                         if (selectedOpponent.isMock) {
                             const mockIndex = selectedOpponent.mockIndex !== undefined ? selectedOpponent.mockIndex : 1;
-                            const dryResult = await arenaBattleContract.methods.challengeMockPlayer(String(mockIndex)).call({ from: accounts[0] });
+                            const teamArray = playerTeam.map(id => String(id));
+                            const dryResult = await arenaBattleContract.methods.challengeMockPlayer(teamArray, String(mockIndex)).call({ from: accounts[0] });
                             console.log('[ARENA] Pre-check success (mock):', dryResult);
                         } else {
                             const defenderAddr = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
-                            const dryResult = await arenaBattleContract.methods.challengeRealPlayer(defenderAddr).call({ from: accounts[0] });
+                            const teamArray = playerTeam.map(id => String(id));
+                            const dryResult = await arenaBattleContract.methods.challengeRealPlayer(defenderAddr, teamArray).call({ from: accounts[0] });
                             console.log('[ARENA] Pre-check success (real):', dryResult);
                         }
                     } catch (preCheckError) {

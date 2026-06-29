@@ -709,10 +709,6 @@
                         console.log(`[BUYBACK] Cannot calculate price: totalWeight=${totalWeight}, nftWeightNum=${nftWeightNum}`);
                         if (priceEl) priceEl.textContent = '-';
                     }
-                } else {
-                    if (nftWeightEl) nftWeightEl.textContent = '-';
-                    const avgPrice = totalSupply > 0 ? balanceNum / parseInt(totalSupply, 10) : 0;
-                    if (priceEl) priceEl.textContent = avgPrice.toFixed(4) + ' 代币';
                 }
             } catch (error) {
                 console.error('[BUYBACK] 加载余额比例价格失败:', error);
