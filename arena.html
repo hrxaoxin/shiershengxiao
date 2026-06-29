@@ -2644,7 +2644,7 @@
                         console.warn('[ARENA] Pre-check warning:', preCheckError.message);
                         let errorMsg = '';
                         if (preCheckError.message) {
-                            const revertMatch = preCheckError.message.match(/revert[:\s]+(.+?)(?:\s+at\s+|\s*$|"|')/i);
+                            const revertMatch = preCheckError.message.match(/reverted:\s*(.+?)(?:\s*:\s*0x|$)/);
                             if (revertMatch) {
                                 errorMsg = revertMatch[1].trim();
                             }

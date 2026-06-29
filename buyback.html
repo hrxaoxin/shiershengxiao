@@ -664,38 +664,43 @@
                     
                     console.log(`[BUYBACK] Calculating weight: level=${nftLevel}, isRare=${nftIsRare}`);
                     
-                    let weightContract = null;
                     try {
-                        weightContract = nftDataContract;
+                        let weightContract = nftDataContract;
                         if (!weightContract) {
                             weightContract = await window.ZODIAC_WEB3.getContract('nftData');
                             console.log('[BUYBACK] Got nftData contract fresh:', !!weightContract);
                         }
-                    } catch (e) {
-                        console.warn('[BUYBACK] Failed to get nftData contract:', e.message);
-                    }
-                    
-                    if (weightContract && weightContract.methods) {
-                        try {
-                            if (typeof weightContract.methods.getWeightByLevel === 'function') {
-                                const weightResult = await weightContract.methods.getWeightByLevel(nftLevel, nftIsRare).call();
-                                nftWeightNum = parseFloat(weightResult);
-                                console.log(`[BUYBACK] Weight from getWeightByLevel(${nftLevel}, ${nftIsRare}):`, nftWeightNum);
-                            } else if (typeof weightContract.methods.calcNFTWeight === 'function') {
-                                const weightResult = await weightContract.methods.calcNFTWeight(String(tokenId)).call();
-                                nftWeightNum = parseFloat(weightResult);
-                                console.log(`[BUYBACK] Weight from calcNFTWeight(${tokenId}):`, nftWeightNum);
+                        
+                        if (weightContract && weightContract.methods) {
+                            console.log('[BUYBACK] nftData contract methods available:', Object.keys(weightContract.methods).slice(0, 10));
+                            
+                            if (weightContract.methods.getWeightByLevel) {
+                                try {
+                                    const weightResult = await weightContract.methods.getWeightByLevel(nftLevel, nftIsRare).call();
+                                    nftWeightNum = parseFloat(weightResult);
+                                    console.log(`[BUYBACK] Weight from getWeightByLevel(${nftLevel}, ${nftIsRare}):`, nftWeightNum);
+                                } catch (e) {
+                                    console.warn('[BUYBACK] getWeightByLevel call failed:', e.message);
+                                }
+                            } else if (weightContract.methods.calcNFTWeight) {
+                                try {
+                                    const weightResult = await weightContract.methods.calcNFTWeight(String(tokenId)).call();
+                                    nftWeightNum = parseFloat(weightResult);
+                                    console.log(`[BUYBACK] Weight from calcNFTWeight(${tokenId}):`, nftWeightNum);
+                                } catch (e) {
+                                    console.warn('[BUYBACK] calcNFTWeight call failed:', e.message);
+                                }
                             } else {
-                                console.warn('[BUYBACK] nftData contract methods not found:', Object.keys(weightContract.methods));
+                                console.warn('[BUYBACK] Neither getWeightByLevel nor calcNFTWeight found in contract methods');
                             }
-                        } catch (weightErr) {
-                            console.warn('[BUYBACK] Contract weight call failed:', weightErr.message);
+                        } else {
+                            console.warn('[BUYBACK] weightContract or methods is null/undefined');
                         }
-                    } else {
-                        console.warn('[BUYBACK] weightContract or methods is null/undefined');
+                    } catch (e) {
+                        console.warn('[BUYBACK] Weight calculation error:', e.message);
                     }
                     
-                    if (nftWeightNum === 0 || isNaN(nftWeightNum)) {
+                    if (!nftWeightNum || isNaN(nftWeightNum)) {
                         const baseWeight = nftIsRare ? 10 : 1;
                         const levelMultiplier = Math.pow(2, nftLevel - 1);
                         nftWeightNum = baseWeight * levelMultiplier;
