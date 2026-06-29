@@ -334,6 +334,10 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 胜利加25分，失败扣25分（最低0分），首次战斗初始化玩家数据
      */
     function _updateScore(address player, bool isWinner) internal {
+        if (_isMockPlayer(player)) {
+            return;
+        }
+        
         address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
         uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         

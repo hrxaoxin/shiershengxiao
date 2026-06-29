@@ -940,6 +940,56 @@
         let arenaUnsubscribeFunctions = [];
         let leaderboardRefreshTimer = null;
 
+        function calculateRankReward(rank, pool, totalRealPlayers) {
+            if (!totalRealPlayers || !pool || rank > totalRealPlayers) return 0;
+            
+            if (totalRealPlayers <= 3) {
+                if (totalRealPlayers === 1) {
+                    return pool;
+                } else if (totalRealPlayers === 2) {
+                    return rank === 1 ? pool * 0.6 : pool * 0.4;
+                } else {
+                    if (rank === 1) return pool * 0.45;
+                    if (rank === 2) return pool * 0.3;
+                    return pool * 0.25;
+                }
+            }
+            
+            if (totalRealPlayers <= 10) {
+                const ratios = [2000, 1500, 1200, 1000, 800, 700, 600, 500, 400, 300];
+                let sum = 0;
+                for (let i = 0; i < totalRealPlayers; i++) {
+                    sum += ratios[i];
+                }
+                return pool * ratios[rank - 1] / sum;
+            }
+            
+            const guaranteedPool = pool * 0.1;
+            const tierPool = pool * 0.9;
+            
+            const guaranteedReward = guaranteedPool / totalRealPlayers;
+            const tierReward = calculateTierBasedReward(rank, tierPool, totalRealPlayers);
+            
+            return guaranteedReward + tierReward;
+        }
+        
+        function calculateTierBasedReward(rank, pool, totalPlayers) {
+            if (rank <= 5) {
+                const tierRatios = [3000, 2000, 1500, 1000, 800];
+                let sum = 0;
+                for (let i = 0; i < 5; i++) {
+                    sum += tierRatios[i];
+                }
+                return pool * tierRatios[rank - 1] / sum;
+            } else if (rank <= 20) {
+                return pool * 300 / 10000;
+            } else if (rank <= 50) {
+                return pool * 150 / 10000;
+            } else {
+                return pool * 50 / 10000;
+            }
+        }
+
         function startLeaderboardRefresh() {
             if (leaderboardRefreshTimer) {
                 clearInterval(leaderboardRefreshTimer);
@@ -2222,7 +2272,7 @@
                             const opponent = mockOpponents[(rank - 1) % mockOpponents.length];
                             return {
                                 address: address,
-                                points: points,
+                                points: 0,
                                 wins: wins,
                                 losses: losses,
                                 rank: rank,
@@ -2301,7 +2351,7 @@
                         const opponent = mockOpponents[globalIndex % mockOpponents.length];
                         topPlayers.push({
                             address: `0x${(1234 + globalIndex).toString(16).padStart(8, '0')}...${(5678 + globalIndex).toString(16).padStart(4, '0')}`,
-                            points: Math.max(1000, 15000 - globalIndex * 150),
+                            points: 0,
                             wins: Math.max(1, 45 - Math.floor(globalIndex / 2) * 3),
                             losses: 12 + Math.floor(globalIndex / 3) * 2,
                             rank: globalIndex + 1,
@@ -2332,17 +2382,50 @@
                     }
                 }
                 
-                const rewardPromises = topPlayers.map(player => {
-                    if (arenaRewardContract && web3) {
-                        return arenaRewardContract.methods.getRewardForRank(player.rank).call()
-                            .then(wei => web3.utils.fromWei(wei, 'ether'))
-                            .catch(() => '0');
+                let rewards = [];
+                let rewardTypeLabel = 'Token';
+                
+                try {
+                    const arenaRewardLPContract = await window.ZODIAC_WEB3.getContract('arenaRewardLP');
+                    if (arenaRewardLPContract && web3) {
+                        const rewardType = await arenaRewardLPContract.methods.rewardType().call().catch(() => '1');
+                        let rewardPoolBalance = '0';
+                        
+                        if (rewardType === '0') {
+                            rewardPoolBalance = await arenaRewardLPContract.methods.lpRewardPoolBalance().call().catch(() => '0');
+                            rewardTypeLabel = 'LP';
+                        } else if (rewardType === '1') {
+                            rewardPoolBalance = await arenaRewardLPContract.methods.tokenRewardPoolBalance().call().catch(() => '0');
+                            rewardTypeLabel = 'Token';
+                        } else {
+                            rewardPoolBalance = await arenaRewardLPContract.methods.bnbRewardPoolBalance().call().catch(() => '0');
+                            rewardTypeLabel = 'BNB';
+                        }
+                        
+                        const balanceNum = parseFloat(web3.utils.fromWei(rewardPoolBalance, 'ether'));
+                        const totalRealPlayers = topPlayers.filter(p => !p.isMock).length;
+                        
+                        if (balanceNum > 0 && totalRealPlayers > 0) {
+                            rewards = topPlayers.map(player => {
+                                if (player.isMock) return '0';
+                                return String(calculateRankReward(player.rank, balanceNum, totalRealPlayers));
+                            });
+                        } else {
+                            rewards = topPlayers.map(() => '0');
+                        }
                     } else {
-                        const baseRewards = [5000, 3000, 2000, 1500, 1200, 1000, 900, 800, 700, 600];
-                        return Promise.resolve(player.rank <= 10 ? String(baseRewards[player.rank - 1]) : String(Math.max(50, 500 - (player.rank - 10) * 5)));
+                        rewards = topPlayers.map(player => {
+                            const baseRewards = [5000, 3000, 2000, 1500, 1200, 1000, 900, 800, 700, 600];
+                            return player.rank <= 10 ? String(baseRewards[player.rank - 1]) : String(Math.max(50, 500 - (player.rank - 10) * 5));
+                        });
                     }
-                });
-                const rewards = await Promise.all(rewardPromises);
+                } catch (e) {
+                    console.log('获取奖励信息失败:', e);
+                    rewards = topPlayers.map(player => {
+                        const baseRewards = [5000, 3000, 2000, 1500, 1200, 1000, 900, 800, 700, 600];
+                        return player.rank <= 10 ? String(baseRewards[player.rank - 1]) : String(Math.max(50, 500 - (player.rank - 10) * 5));
+                    });
+                }
                 
                 const leaderboard = document.getElementById('leaderboard');
                 leaderboard.innerHTML = topPlayers.map((player, index) => {
@@ -2369,7 +2452,7 @@
                             </div>
                         </div>
                         <div class="text-right ml-3 flex-shrink-0">
-                            <div class="text-yellow-400 text-sm font-bold">${parseFloat(rewards[index]) > 0 ? rewards[index] : '--'} <span class="text-xs text-yellow-600">Token</span></div>
+                            <div class="text-yellow-400 text-sm font-bold">${parseFloat(rewards[index]).toFixed(2)} <span class="text-xs text-yellow-600">${rewardTypeLabel}</span></div>
                             <div class="text-white/80 text-xs mt-0.5 flex items-center justify-end">
                                 <span class="${rankTextColor} font-semibold">${player.points}</span>
                                 <span class="text-gray-500 ml-1">积分</span>

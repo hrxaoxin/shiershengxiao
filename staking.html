@@ -376,6 +376,36 @@
         let tokenStakingLPContract;
         let selectedNFTs = [];
 
+        function getSkillTypeName(skillType) {
+            const types = [
+                '普攻强化',
+                '连击攻击',
+                '快速打击',
+                '范围爆发',
+                '治疗回复',
+                '持续伤害',
+                '力量增幅',
+                '防御削弱',
+                '群体攻击'
+            ];
+            return types[skillType] || '特殊技能';
+        }
+
+        function getSkillDescription(skillType, damage, isAoe) {
+            const desc = [
+                `强化普通攻击，造成${damage}%伤害`,
+                `连续攻击目标，造成${damage}%伤害`,
+                `快速出击，造成${damage}%伤害`,
+                `释放范围爆发技能${isAoe ? '攻击所有敌人' : '攻击单个目标'}，造成${damage}%伤害`,
+                `恢复自身生命值，同时造成${damage}%伤害`,
+                `施加持续伤害效果，造成${damage}%伤害`,
+                `临时提升攻击力，造成${damage}%伤害`,
+                `削弱敌人防御，造成${damage}%伤害`,
+                `发动群体攻击${isAoe ? '攻击所有敌人' : '攻击单个目标'}，造成${damage}%伤害`
+            ];
+            return desc[skillType] || `技能效果，造成${damage}%伤害${isAoe ? '（范围攻击）' : ''}`;
+        }
+
         document.addEventListener('DOMContentLoaded', async function() {
             particlesJS('particles-js', {
                 particles: {
@@ -1490,7 +1520,6 @@
                 
                 const level = parseInt(nftLevel, 10);
                 
-                // 从合约获取权重
                 let weight = level * (isRare ? 2 : 1);
                 try {
                     const nftDataContract = await window.ZODIAC_WEB3.getContract('nftData', false);
@@ -1512,6 +1541,34 @@
                 const zodiacName = nftInfo.zodiac !== undefined ? (ZODIAC_CONFIG && ZODIAC_CONFIG.ZODIAC_NAMES ? ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac] : zodiacNames[nftInfo.zodiac]) : '未知';
                 
                 const displayGrowth = parseInt(growth, 10);
+                
+                let skillInfo = '';
+                try {
+                    const battleContract = await window.ZODIAC_WEB3.getContract('battle');
+                    if (battleContract) {
+                        const skill = await battleContract.methods.getSkill(nftType).call();
+                        const skillTypeName = getSkillTypeName(skill.skillType_);
+                        const skillDesc = getSkillDescription(skill.skillType_, skill.damage, skill.isAoe);
+                        skillInfo = `
+                            <div class="mt-4">
+                                <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
+                                <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+                                    <div class="flex items-center justify-between mb-1">
+                                        <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
+                                        <span class="text-xs px-2 py-0.5 ${skill.isAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${skill.isAoe ? '范围攻击' : '单体攻击'}</span>
+                                    </div>
+                                    <div class="text-xs text-gray-500">${skillDesc}</div>
+                                    <div class="mt-2 flex gap-3 text-xs">
+                                        <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${skill.damage}%</span></span>
+                                        <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${skill.cooldown}回合</span></span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } catch (e) {
+                    console.warn('获取技能信息失败:', e.message);
+                }
                 
                 document.getElementById('modalCardImage').src = nftImage;
                 document.getElementById('modalCardName').textContent = nftName;
@@ -1554,6 +1611,7 @@
                                 <span class="px-2 py-1 bg-yellow-100 text-yellow-600 rounded text-xs">📊 分红</span>
                             </div>
                         </div>
+                        ${skillInfo}
                         <div class="mt-4 text-xs text-gray-500">
                             <p>💡 ${isRare ? '稀有属性' : '普通属性'}NFT，${isRare ? '权重更高' : '基础权重'}，适合参与各类游戏玩法。</p>
                         </div>
