@@ -2629,6 +2629,20 @@
 
                 const arenaBattleContract = await window.ZODIAC_WEB3.getContract('arenaBattle');
                 if (arenaBattleContract) {
+                    console.log('[ARENA] Pre-check: checking season status first...');
+                    try {
+                        const seasonInfo = await arenaBattleContract.methods.currentSeason().call();
+                        console.log('[ARENA] Season info:', seasonInfo);
+                        
+                        if (seasonInfo.isActive !== true && seasonInfo.isActive !== 'true') {
+                            ZODIAC_UI.showToast('赛季未激活，无法发起挑战', 'error');
+                            ZODIAC_UI.hideLoading();
+                            return;
+                        }
+                    } catch (seasonCheckError) {
+                        console.warn('[ARENA] Failed to check season status:', seasonCheckError.message);
+                    }
+                    
                     console.log('[ARENA] Pre-check: calling ArenaBattle challenge methods with .call()...');
                     try {
                         if (selectedOpponent.isMock) {
@@ -2642,33 +2656,41 @@
                         }
                     } catch (preCheckError) {
                         console.warn('[ARENA] Pre-check warning:', preCheckError.message);
-                        const errMsg = preCheckError.message || '';
+                        console.warn('[ARENA] Pre-check error object:', preCheckError);
+                        
+                        const msgStr = String(preCheckError.message || preCheckError.reason || preCheckError || '');
+                        console.warn('[ARENA] Pre-check msgStr:', msgStr);
                         
                         let shouldStop = false;
-                        let toastMsg = '';
+                        let toastMsg = '交易可能失败，请检查后重试';
                         
-                        if (errMsg.includes('Season not active')) {
+                        if (msgStr.indexOf('Season not active') >= 0) {
                             shouldStop = true;
                             toastMsg = '赛季未激活，无法发起挑战';
-                        } else if (errMsg.includes('No remaining attempts')) {
+                        } else if (msgStr.indexOf('No remaining attempts') >= 0) {
                             shouldStop = true;
                             toastMsg = '挑战次数已用完';
-                        } else if (errMsg.includes('No battle team set')) {
+                        } else if (msgStr.indexOf('No battle team set') >= 0) {
                             shouldStop = true;
                             toastMsg = '请先设置战斗队伍';
-                        } else if (errMsg.includes('Challenger has no battle team')) {
+                        } else if (msgStr.indexOf('Challenger has no battle team') >= 0) {
                             shouldStop = true;
                             toastMsg = '挑战者没有设置战斗队伍';
-                        } else if (errMsg.includes('Challenged has no battle team')) {
+                        } else if (msgStr.indexOf('Challenged has no battle team') >= 0) {
                             shouldStop = true;
                             toastMsg = '对手没有设置战斗队伍';
-                        } else if (errMsg.includes('Invalid challenged player')) {
+                        } else if (msgStr.indexOf('Invalid challenged player') >= 0) {
                             shouldStop = true;
                             toastMsg = '无效的对手地址';
-                        } else if (errMsg.includes('Cannot challenge self')) {
+                        } else if (msgStr.indexOf('Cannot challenge self') >= 0) {
                             shouldStop = true;
                             toastMsg = '不能挑战自己';
+                        } else if (msgStr.indexOf('reverted') >= 0) {
+                            shouldStop = true;
+                            toastMsg = '交易预检查失败，请稍后重试';
                         }
+                        
+                        console.warn(`[ARENA] Pre-check decision: shouldStop=${shouldStop}, toastMsg=${toastMsg}`);
                         
                         if (shouldStop) {
                             ZODIAC_UI.showToast(toastMsg, 'error');
