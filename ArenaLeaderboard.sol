@@ -40,7 +40,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     uint256 public constant MAX_LEADERBOARD_SIZE = 1000;
     
     /**
-     * @dev 赛季信息结构：
+     * @dev 赛季信息结构（仅用于返回值）：
      * @param startTime 赛季开始时间
      * @param endTime 赛季结束时间
      * @param isActive 赛季是否进行中
@@ -74,17 +74,9 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
     
     /**
-     * @dev 当前赛季 ID
-     */
-    uint256 public currentSeasonId;
-    /**
      * @dev 授权合约地址
      */
     address public authorizer;
-    /**
-     * @dev 赛季信息映射
-     */
-    mapping(uint256 => SeasonInfo) public seasons;
     /**
      * @dev 玩家记录映射
      */
@@ -141,7 +133,6 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         authorizer = _authorizerAddress;
-        _createSeason();
     }
     
     /**
@@ -159,34 +150,14 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
     
     /**
-     * @dev 内部函数：创建新赛季
-     */
-    function _createSeason() internal {
-        currentSeasonId++;
-        seasons[currentSeasonId] = SeasonInfo({
-            startTime: block.timestamp,
-            endTime: block.timestamp + 7 days,
-            isActive: true,
-            isSettled: false,
-            totalPlayers: 0,
-            rewardPool: 0
-        });
-        emit SeasonCreated(currentSeasonId, block.timestamp, block.timestamp + 7 days);
-    }
-    
-    /**
      * @dev 结束当前赛季（仅所有者）
-     */
-    /**
-     * @dev 结束当前赛季并创建新赛季
-     * @notice 仅限owner调用，结算当前赛季并自动开始新赛季
+     * @notice 赛季状态由 ArenaRankingManager 管理，此函数仅保留兼容性
      */
     function endSeason() external onlyOwner {
-        SeasonInfo storage season = seasons[currentSeasonId];
-        require(season.isActive, "ArenaLeaderboard: Season not active");
-        season.isActive = false;
-        season.isSettled = true;
-        _createSeason();
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
+        uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
+        require(currentSeasonId > 0, "ArenaLeaderboard: No active season");
     }
     
     /**
@@ -197,8 +168,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      * @notice 当玩家积分变化时调用，自动调整排行榜顺序
      */
     function updateRanking(address player, uint256 newScore, uint256 seasonId) external {
-        SeasonInfo storage season = seasons[seasonId];
-        require(season.isActive, "ArenaLeaderboard: Season not active");
+        _checkSeasonActive(seasonId);
         
         PlayerRecord storage record = players[player];
         
@@ -210,13 +180,18 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
             record.draws = 0;
             seasonRankings[seasonId].push(player);
             playerRankIndex[seasonId][player] = seasonRankings[seasonId].length - 1;
-            season.totalPlayers++;
         } else {
             record.score = newScore;
         }
         
         _updateRankingInternal(player, newScore, seasonId);
         emit ScoreUpdated(player, newScore, seasonId);
+    }
+
+    function _checkSeasonActive(uint256 seasonId) internal view {
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
+        require(IArenaRanking(arenaRankingManager).currentSeasonId() >= seasonId, "ArenaLeaderboard: Season not active");
     }
     
     function _updateRankingInternal(address player, uint256 newScore, uint256 seasonId) internal {
@@ -280,8 +255,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      * @notice 用于系统操作，将玩家插入到指定排名位置
      */
     function insertPlayerAtRank(address player, uint256 targetRank, uint256 seasonId) external {
-        SeasonInfo storage season = seasons[seasonId];
-        require(season.isActive, "ArenaLeaderboard: Season not active");
+        _checkSeasonActive(seasonId);
         
         PlayerRecord storage record = players[player];
         if (record.seasonId != seasonId) {
@@ -290,7 +264,6 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
             record.wins = 0;
             record.losses = 0;
             record.draws = 0;
-            season.totalPlayers++;
         }
         
         address[] storage rankings = seasonRankings[seasonId];
@@ -424,11 +397,25 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
     
     function getSeasonHistory(uint256 startSeasonId, uint256 count) external view returns (SeasonInfo[] memory) {
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
+        
         SeasonInfo[] memory result = new SeasonInfo[](count);
+        uint256 currentId = IArenaRanking(arenaRankingManager).currentSeasonId();
+        
         for (uint256 i = 0; i < count; i++) {
             uint256 seasonId = startSeasonId + i;
-            if (seasonId > currentSeasonId) break;
-            result[i] = seasons[seasonId];
+            if (seasonId > currentId) break;
+            
+            (uint256 st, uint256 et, bool active, bool settled, uint256 tp) = IArenaRanking(arenaRankingManager).getSeasonInfo(seasonId);
+            result[i] = SeasonInfo({
+                startTime: st,
+                endTime: et,
+                isActive: active,
+                isSettled: settled,
+                totalPlayers: tp,
+                rewardPool: 0
+            });
         }
         return result;
     }
@@ -439,10 +426,24 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      * @return 赛季信息数组（从最近到最早）
      */
     function getRecentSeasons(uint256 count) external view returns (SeasonInfo[] memory) {
-        uint256 size = count < currentSeasonId ? count : currentSeasonId;
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
+        
+        uint256 currentId = IArenaRanking(arenaRankingManager).currentSeasonId();
+        uint256 size = count < currentId ? count : currentId;
         SeasonInfo[] memory result = new SeasonInfo[](size);
+        
         for (uint256 i = 0; i < size; i++) {
-            result[i] = seasons[currentSeasonId - i];
+            uint256 seasonId = currentId - i;
+            (uint256 st, uint256 et, bool active, bool settled, uint256 tp) = IArenaRanking(arenaRankingManager).getSeasonInfo(seasonId);
+            result[i] = SeasonInfo({
+                startTime: st,
+                endTime: et,
+                isActive: active,
+                isSettled: settled,
+                totalPlayers: tp,
+                rewardPool: 0
+            });
         }
         return result;
     }
@@ -462,8 +463,9 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         bool isSettled,
         uint256 totalPlayers
     ) {
-        SeasonInfo storage s = seasons[seasonId];
-        return (s.startTime, s.endTime, s.isActive, s.isSettled, s.totalPlayers);
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
+        return IArenaRanking(arenaRankingManager).getSeasonInfo(seasonId);
     }
     
     /**
@@ -507,8 +509,9 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 endTime,
         bool isActive
     ) {
-        SeasonInfo storage s = seasons[currentSeasonId];
-        return (currentSeasonId, s.startTime, s.endTime, s.isActive);
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
+        return IArenaRanking(arenaRankingManager).getCurrentSeasonInfo();
     }
     
     function getPlayerChallengeStatus(address player) external view returns (
@@ -525,6 +528,9 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
     
     function getPlayerRank(address player) external view returns (uint256) {
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
+        uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         return playerRankIndex[currentSeasonId][player];
     }
     
@@ -534,7 +540,10 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      * @return 玩家数量
      */
     function getTotalPlayersInSeason(uint256 seasonId) external view returns (uint256) {
-        return seasons[seasonId].totalPlayers;
+        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
+        (, , , , uint256 totalPlayers) = IArenaRanking(arenaRankingManager).getSeasonInfo(seasonId);
+        return totalPlayers;
     }
     
     /**
