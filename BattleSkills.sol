@@ -194,6 +194,19 @@ library BattleSkills {
         if (z == 4 && g == 0) return 3;
         if (z == 4 && g == 1) return 8;
         if (z == 5 && g == 0) return 7;
+        if (z == 5 && g == 1) return 6;
+        if (z == 6 && g == 0) return 1;
+        if (z == 6 && g == 1) return 4;
+        if (z == 7 && g == 0) return 3;
+        if (z == 7 && g == 1) return 5;
+        if (z == 8 && g == 0) return 1;
+        if (z == 8 && g == 1) return 7;
+        if (z == 9 && g == 0) return 2;
+        if (z == 9 && g == 1) return 4;
+        if (z == 10 && g == 0) return 3;
+        if (z == 10 && g == 1) return 5;
+        if (z == 11 && g == 0) return 1;
+        if (z == 11 && g == 1) return 8;
         return 6;
     }
     

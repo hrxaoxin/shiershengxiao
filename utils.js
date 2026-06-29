@@ -75,6 +75,130 @@ window.ZODIAC_UTILS = (function() {
     }
 
     /**
+     * 获取本地技能数据（回退方案）
+     * @param typeId NFT类型ID
+     * @return { type, damage, cooldown, isAoe }
+     */
+    function getLocalSkill(typeId) {
+        const typedId = parseInt(typeId, 10);
+        if (isNaN(typedId) || typedId < 0 || typedId > 119) {
+            return { type: 0, damage: 100, cooldown: 3, isAoe: false };
+        }
+
+        const elementIndex = Math.floor(typedId / 24);
+        const remainder = typedId % 24;
+        const zodiacIndex = Math.floor(remainder / 2);
+        const gender = remainder % 2;
+
+        const getSkillType = function(z, g) {
+            if (z == 0 && g == 0) return 0;
+            if (z == 0 && g == 1) return 6;
+            if (z == 1 && g == 0) return 0;
+            if (z == 1 && g == 1) return 8;
+            if (z == 2 && g == 0) return 0;
+            if (z == 2 && g == 1) return 5;
+            if (z == 3 && g == 0) return 0;
+            if (z == 3 && g == 1) return 2;
+            if (z == 4 && g == 0) return 3;
+            if (z == 4 && g == 1) return 8;
+            if (z == 5 && g == 0) return 7;
+            if (z == 5 && g == 1) return 6;
+            if (z == 6 && g == 0) return 1;
+            if (z == 6 && g == 1) return 4;
+            if (z == 7 && g == 0) return 3;
+            if (z == 7 && g == 1) return 5;
+            if (z == 8 && g == 0) return 1;
+            if (z == 8 && g == 1) return 7;
+            if (z == 9 && g == 0) return 2;
+            if (z == 9 && g == 1) return 4;
+            if (z == 10 && g == 0) return 3;
+            if (z == 10 && g == 1) return 5;
+            if (z == 11 && g == 0) return 1;
+            if (z == 11 && g == 1) return 8;
+            return 6;
+        };
+
+        const skillData = {
+            0: {
+                0: { 0: { d: 125, cd: 3, aoe: false }, 1: { d: 110, cd: 4, aoe: false } },
+                1: { 0: { d: 145, cd: 5, aoe: false }, 1: { d: 95, cd: 4, aoe: true } },
+                2: { 0: { d: 165, cd: 5, aoe: false }, 1: { d: 85, cd: 4, aoe: true } },
+                3: { 0: { d: 130, cd: 3, aoe: false }, 1: { d: 80, cd: 3, aoe: false } },
+                4: { 0: { d: 185, cd: 5, aoe: true }, 1: { d: 100, cd: 4, aoe: true } },
+                5: { 0: { d: 115, cd: 4, aoe: false }, 1: { d: 125, cd: 4, aoe: false } },
+                6: { 0: { d: 125, cd: 3, aoe: false }, 1: { d: 110, cd: 4, aoe: false } },
+                7: { 0: { d: 145, cd: 5, aoe: false }, 1: { d: 115, cd: 4, aoe: true } },
+                8: { 0: { d: 165, cd: 5, aoe: false }, 1: { d: 85, cd: 4, aoe: true } },
+                9: { 0: { d: 130, cd: 3, aoe: false }, 1: { d: 80, cd: 3, aoe: false } },
+                10: { 0: { d: 185, cd: 5, aoe: true }, 1: { d: 100, cd: 4, aoe: true } },
+                11: { 0: { d: 140, cd: 5, aoe: false }, 1: { d: 150, cd: 4, aoe: true } }
+            },
+            1: {
+                0: { 0: { d: 135, cd: 3, aoe: false }, 1: { d: 115, cd: 4, aoe: false } },
+                1: { 0: { d: 130, cd: 5, aoe: false }, 1: { d: 105, cd: 4, aoe: true } },
+                2: { 0: { d: 155, cd: 5, aoe: false }, 1: { d: 90, cd: 4, aoe: true } },
+                3: { 0: { d: 140, cd: 3, aoe: false }, 1: { d: 100, cd: 3, aoe: false } },
+                4: { 0: { d: 180, cd: 5, aoe: true }, 1: { d: 95, cd: 4, aoe: true } },
+                5: { 0: { d: 125, cd: 4, aoe: false }, 1: { d: 120, cd: 4, aoe: false } },
+                6: { 0: { d: 135, cd: 3, aoe: false }, 1: { d: 115, cd: 4, aoe: false } },
+                7: { 0: { d: 150, cd: 5, aoe: false }, 1: { d: 125, cd: 4, aoe: true } },
+                8: { 0: { d: 155, cd: 5, aoe: false }, 1: { d: 90, cd: 4, aoe: true } },
+                9: { 0: { d: 140, cd: 3, aoe: false }, 1: { d: 100, cd: 3, aoe: false } },
+                10: { 0: { d: 180, cd: 5, aoe: true }, 1: { d: 95, cd: 4, aoe: true } },
+                11: { 0: { d: 145, cd: 5, aoe: false }, 1: { d: 140, cd: 4, aoe: true } }
+            },
+            2: {
+                0: { 0: { d: 120, cd: 3, aoe: false }, 1: { d: 105, cd: 4, aoe: false } },
+                1: { 0: { d: 140, cd: 5, aoe: false }, 1: { d: 110, cd: 4, aoe: true } },
+                2: { 0: { d: 160, cd: 5, aoe: false }, 1: { d: 85, cd: 4, aoe: true } },
+                3: { 0: { d: 145, cd: 3, aoe: false }, 1: { d: 95, cd: 3, aoe: false } },
+                4: { 0: { d: 170, cd: 5, aoe: true }, 1: { d: 95, cd: 4, aoe: true } },
+                5: { 0: { d: 120, cd: 4, aoe: false }, 1: { d: 115, cd: 4, aoe: false } },
+                6: { 0: { d: 120, cd: 3, aoe: false }, 1: { d: 105, cd: 4, aoe: false } },
+                7: { 0: { d: 145, cd: 5, aoe: false }, 1: { d: 130, cd: 4, aoe: true } },
+                8: { 0: { d: 160, cd: 5, aoe: false }, 1: { d: 85, cd: 4, aoe: true } },
+                9: { 0: { d: 145, cd: 3, aoe: false }, 1: { d: 95, cd: 3, aoe: false } },
+                10: { 0: { d: 170, cd: 5, aoe: true }, 1: { d: 95, cd: 4, aoe: true } },
+                11: { 0: { d: 140, cd: 5, aoe: false }, 1: { d: 135, cd: 4, aoe: true } }
+            },
+            3: {
+                0: { 0: { d: 145, cd: 3, aoe: false }, 1: { d: 135, cd: 4, aoe: false } },
+                1: { 0: { d: 150, cd: 5, aoe: false }, 1: { d: 115, cd: 4, aoe: true } },
+                2: { 0: { d: 165, cd: 5, aoe: false }, 1: { d: 90, cd: 4, aoe: true } },
+                3: { 0: { d: 160, cd: 3, aoe: false }, 1: { d: 100, cd: 3, aoe: false } },
+                4: { 0: { d: 220, cd: 5, aoe: true }, 1: { d: 125, cd: 4, aoe: true } },
+                5: { 0: { d: 145, cd: 4, aoe: false }, 1: { d: 130, cd: 4, aoe: false } },
+                6: { 0: { d: 145, cd: 3, aoe: false }, 1: { d: 135, cd: 4, aoe: false } },
+                7: { 0: { d: 160, cd: 5, aoe: false }, 1: { d: 135, cd: 4, aoe: true } },
+                8: { 0: { d: 165, cd: 5, aoe: false }, 1: { d: 90, cd: 4, aoe: true } },
+                9: { 0: { d: 160, cd: 3, aoe: false }, 1: { d: 100, cd: 3, aoe: false } },
+                10: { 0: { d: 220, cd: 5, aoe: true }, 1: { d: 125, cd: 4, aoe: true } },
+                11: { 0: { d: 155, cd: 5, aoe: false }, 1: { d: 150, cd: 4, aoe: true } }
+            },
+            4: {
+                0: { 0: { d: 150, cd: 3, aoe: false }, 1: { d: 140, cd: 4, aoe: false } },
+                1: { 0: { d: 155, cd: 5, aoe: false }, 1: { d: 110, cd: 4, aoe: true } },
+                2: { 0: { d: 170, cd: 5, aoe: false }, 1: { d: 100, cd: 4, aoe: true } },
+                3: { 0: { d: 165, cd: 3, aoe: false }, 1: { d: 105, cd: 3, aoe: false } },
+                4: { 0: { d: 230, cd: 5, aoe: true }, 1: { d: 120, cd: 4, aoe: true } },
+                5: { 0: { d: 150, cd: 4, aoe: false }, 1: { d: 135, cd: 4, aoe: false } },
+                6: { 0: { d: 150, cd: 3, aoe: false }, 1: { d: 140, cd: 4, aoe: false } },
+                7: { 0: { d: 165, cd: 5, aoe: false }, 1: { d: 130, cd: 4, aoe: true } },
+                8: { 0: { d: 170, cd: 5, aoe: false }, 1: { d: 100, cd: 4, aoe: true } },
+                9: { 0: { d: 165, cd: 3, aoe: false }, 1: { d: 105, cd: 3, aoe: false } },
+                10: { 0: { d: 230, cd: 5, aoe: true }, 1: { d: 120, cd: 4, aoe: true } },
+                11: { 0: { d: 160, cd: 5, aoe: false }, 1: { d: 155, cd: 4, aoe: true } }
+            }
+        };
+
+        const data = skillData[elementIndex] && skillData[elementIndex][zodiacIndex] && skillData[elementIndex][zodiacIndex][gender];
+        if (data) {
+            return { id: typeId, type: getSkillType(zodiacIndex, gender), damage: data.d, cooldown: data.cd, duration: 0, isAoe: data.aoe };
+        }
+        return { id: typeId, type: 0, damage: 100, cooldown: 3, duration: 0, isAoe: false };
+    }
+
+    /**
      * 输入验证工具
      */
     const Validation = {
@@ -205,6 +329,7 @@ window.ZODIAC_UTILS = (function() {
     return {
         getNFTInfo,
         getStars,
+        getLocalSkill,
         formatAddress,
         getZodiacName,
         getAttrName,

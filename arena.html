@@ -786,27 +786,27 @@
         const ELEMENTS = ['water', 'wind', 'fire', 'dark', 'light'];
 
         const SKILL_TYPE_MAP = {
-            '0': 'Attack',
-            '1': 'Defense',
-            '2': 'Heal',
-            '3': 'Special',
-            '4': 'Buff',
-            '5': 'Debuff',
-            '6': 'Counter',
-            '7': 'Lifesteal',
-            '8': 'Shield'
+            '0': '普攻强化',
+            '1': '连击攻击',
+            '2': '快速打击',
+            '3': '范围爆发',
+            '4': '治疗回复',
+            '5': '持续伤害',
+            '6': '力量增幅',
+            '7': '防御削弱',
+            '8': '群体攻击'
         };
 
         const SKILL_TYPE_LABELS = {
-            'Attack': '攻击',
-            'Defense': '防御',
-            'Heal': '治疗',
-            'Special': '特殊',
-            'Buff': '增益',
-            'Debuff': '减益',
-            'Counter': '反击',
-            'Lifesteal': '吸血',
-            'Shield': '护盾'
+            '普攻强化': '普攻强化',
+            '连击攻击': '连击攻击',
+            '快速打击': '快速打击',
+            '范围爆发': '范围爆发',
+            '治疗回复': '治疗回复',
+            '持续伤害': '持续伤害',
+            '力量增幅': '力量增幅',
+            '防御削弱': '防御削弱',
+            '群体攻击': '群体攻击'
         };
 
         async function init() {
@@ -1311,15 +1311,42 @@
                         if (skillCache[tokenType]) {
                             skill = skillCache[tokenType];
                         } else {
-                            const skillData = await battleSkillDataContract.methods.getSkill(tokenType).call();
-                            skill = {
-                                name: skillData[0] !== undefined ? skillData[0] : (skillData.skillId !== undefined ? skillData.skillId : ''),
-                                type: SKILL_TYPE_MAP[skillData[1] !== undefined ? skillData[1] : (skillData.skillType !== undefined ? skillData.skillType : 0)],
-                                value: skillData[2] !== undefined ? skillData[2] : (skillData.damage !== undefined ? skillData.damage : 0),
-                                cooldown: skillData[3] !== undefined ? skillData[3] : (skillData.cooldown !== undefined ? skillData.cooldown : 0),
-                                duration: skillData[4] !== undefined ? skillData[4] : (skillData.duration !== undefined ? skillData.duration : 0),
-                                isAoe: skillData[5] !== undefined ? skillData[5] : (skillData.isAoe !== undefined ? skillData.isAoe : false)
-                            };
+                            try {
+                                const isInitialized = await battleSkillDataContract.methods.skillsInitialized().call();
+                                if (!isInitialized) {
+                                    console.warn('技能数据尚未初始化，使用本地数据');
+                                    const localSkill = ZODIAC_UTILS.getLocalSkill(tokenType);
+                                    skill = {
+                                        name: localSkill.id.toString(),
+                                        type: SKILL_TYPE_MAP[localSkill.type] || '未知技能',
+                                        value: localSkill.damage,
+                                        cooldown: localSkill.cooldown,
+                                        duration: localSkill.duration,
+                                        isAoe: localSkill.isAoe
+                                    };
+                                } else {
+                                    const skillData = await battleSkillDataContract.methods.getSkill(tokenType).call();
+                                    skill = {
+                                        name: skillData[0] !== undefined ? skillData[0] : (skillData.skillId !== undefined ? skillData.skillId : ''),
+                                        type: SKILL_TYPE_MAP[skillData[1] !== undefined ? skillData[1] : (skillData.skillType !== undefined ? skillData.skillType : 0)],
+                                        value: skillData[2] !== undefined ? skillData[2] : (skillData.damage !== undefined ? skillData.damage : 0),
+                                        cooldown: skillData[3] !== undefined ? skillData[3] : (skillData.cooldown !== undefined ? skillData.cooldown : 0),
+                                        duration: skillData[4] !== undefined ? skillData[4] : (skillData.duration !== undefined ? skillData.duration : 0),
+                                        isAoe: skillData[5] !== undefined ? skillData[5] : (skillData.isAoe !== undefined ? skillData.isAoe : false)
+                                    };
+                                }
+                            } catch (e) {
+                                console.warn('获取技能信息失败，使用本地数据:', e.message);
+                                const localSkill = ZODIAC_UTILS.getLocalSkill(tokenType);
+                                skill = {
+                                    name: localSkill.id.toString(),
+                                    type: SKILL_TYPE_MAP[localSkill.type] || '未知技能',
+                                    value: localSkill.damage,
+                                    cooldown: localSkill.cooldown,
+                                    duration: localSkill.duration,
+                                    isAoe: localSkill.isAoe
+                                };
+                            }
                             skillCache[tokenType] = skill;
                         }
                         
@@ -1893,15 +1920,42 @@
                             if (skillCache[tokenType]) {
                                 skill = skillCache[tokenType];
                             } else {
-                                const skillData = await battleSkillDataContract.methods.getSkill(tokenType).call();
-                                skill = {
-                                    name: skillData[0] !== undefined ? skillData[0] : (skillData.skillId !== undefined ? skillData.skillId : ''),
-                                    type: SKILL_TYPE_MAP[skillData[1] !== undefined ? skillData[1] : (skillData.skillType !== undefined ? skillData.skillType : 0)],
-                                    value: skillData[2] !== undefined ? skillData[2] : (skillData.damage !== undefined ? skillData.damage : 0),
-                                    cooldown: skillData[3] !== undefined ? skillData[3] : (skillData.cooldown !== undefined ? skillData.cooldown : 0),
-                                    duration: skillData[4] !== undefined ? skillData[4] : (skillData.duration !== undefined ? skillData.duration : 0),
-                                    isAoe: skillData[5] !== undefined ? skillData[5] : (skillData.isAoe !== undefined ? skillData.isAoe : false)
-                                };
+                                try {
+                                    const isInitialized = await battleSkillDataContract.methods.skillsInitialized().call();
+                                    if (!isInitialized) {
+                                        console.warn('技能数据尚未初始化，使用本地数据');
+                                        const localSkill = ZODIAC_UTILS.getLocalSkill(tokenType);
+                                        skill = {
+                                            name: localSkill.id.toString(),
+                                            type: SKILL_TYPE_MAP[localSkill.type] || '未知技能',
+                                            value: localSkill.damage,
+                                            cooldown: localSkill.cooldown,
+                                            duration: localSkill.duration,
+                                            isAoe: localSkill.isAoe
+                                        };
+                                    } else {
+                                        const skillData = await battleSkillDataContract.methods.getSkill(tokenType).call();
+                                        skill = {
+                                            name: skillData[0] !== undefined ? skillData[0] : (skillData.skillId !== undefined ? skillData.skillId : ''),
+                                            type: SKILL_TYPE_MAP[skillData[1] !== undefined ? skillData[1] : (skillData.skillType !== undefined ? skillData.skillType : 0)],
+                                            value: skillData[2] !== undefined ? skillData[2] : (skillData.damage !== undefined ? skillData.damage : 0),
+                                            cooldown: skillData[3] !== undefined ? skillData[3] : (skillData.cooldown !== undefined ? skillData.cooldown : 0),
+                                            duration: skillData[4] !== undefined ? skillData[4] : (skillData.duration !== undefined ? skillData.duration : 0),
+                                            isAoe: skillData[5] !== undefined ? skillData[5] : (skillData.isAoe !== undefined ? skillData.isAoe : false)
+                                        };
+                                    }
+                                } catch (e) {
+                                    console.warn('获取技能信息失败，使用本地数据:', e.message);
+                                    const localSkill = ZODIAC_UTILS.getLocalSkill(tokenType);
+                                    skill = {
+                                        name: localSkill.id.toString(),
+                                        type: SKILL_TYPE_MAP[localSkill.type] || '未知技能',
+                                        value: localSkill.damage,
+                                        cooldown: localSkill.cooldown,
+                                        duration: localSkill.duration,
+                                        isAoe: localSkill.isAoe
+                                    };
+                                }
                                 skillCache[tokenType] = skill;
                             }
                             

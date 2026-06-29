@@ -462,6 +462,125 @@
             return types[skillType] || '特殊技能';
         }
 
+        function getLocalSkill(typeId) {
+            const typedId = parseInt(typeId, 10);
+            if (isNaN(typedId) || typedId < 0 || typedId > 119) {
+                return { type: 0, damage: 100, cooldown: 3, isAoe: false };
+            }
+
+            const elementIndex = Math.floor(typedId / 24);
+            const remainder = typedId % 24;
+            const zodiacIndex = Math.floor(remainder / 2);
+            const gender = remainder % 2;
+
+            const getSkillType = function(z, g) {
+                if (z == 0 && g == 0) return 0;
+                if (z == 0 && g == 1) return 6;
+                if (z == 1 && g == 0) return 0;
+                if (z == 1 && g == 1) return 8;
+                if (z == 2 && g == 0) return 0;
+                if (z == 2 && g == 1) return 5;
+                if (z == 3 && g == 0) return 0;
+                if (z == 3 && g == 1) return 2;
+                if (z == 4 && g == 0) return 3;
+                if (z == 4 && g == 1) return 8;
+                if (z == 5 && g == 0) return 7;
+                if (z == 5 && g == 1) return 6;
+                if (z == 6 && g == 0) return 1;
+                if (z == 6 && g == 1) return 4;
+                if (z == 7 && g == 0) return 3;
+                if (z == 7 && g == 1) return 5;
+                if (z == 8 && g == 0) return 1;
+                if (z == 8 && g == 1) return 7;
+                if (z == 9 && g == 0) return 2;
+                if (z == 9 && g == 1) return 4;
+                if (z == 10 && g == 0) return 3;
+                if (z == 10 && g == 1) return 5;
+                if (z == 11 && g == 0) return 1;
+                if (z == 11 && g == 1) return 8;
+                return 6;
+            };
+
+            const skillData = {
+                0: {
+                    0: { 0: { d: 125, cd: 3, aoe: false }, 1: { d: 110, cd: 4, aoe: false } },
+                    1: { 0: { d: 145, cd: 5, aoe: false }, 1: { d: 95, cd: 4, aoe: true } },
+                    2: { 0: { d: 165, cd: 5, aoe: false }, 1: { d: 85, cd: 4, aoe: true } },
+                    3: { 0: { d: 130, cd: 3, aoe: false }, 1: { d: 80, cd: 3, aoe: false } },
+                    4: { 0: { d: 185, cd: 5, aoe: true }, 1: { d: 100, cd: 4, aoe: true } },
+                    5: { 0: { d: 115, cd: 4, aoe: false }, 1: { d: 125, cd: 4, aoe: false } },
+                    6: { 0: { d: 125, cd: 3, aoe: false }, 1: { d: 110, cd: 4, aoe: false } },
+                    7: { 0: { d: 145, cd: 5, aoe: false }, 1: { d: 115, cd: 4, aoe: true } },
+                    8: { 0: { d: 165, cd: 5, aoe: false }, 1: { d: 85, cd: 4, aoe: true } },
+                    9: { 0: { d: 130, cd: 3, aoe: false }, 1: { d: 80, cd: 3, aoe: false } },
+                    10: { 0: { d: 185, cd: 5, aoe: true }, 1: { d: 100, cd: 4, aoe: true } },
+                    11: { 0: { d: 140, cd: 5, aoe: false }, 1: { d: 150, cd: 4, aoe: true } }
+                },
+                1: {
+                    0: { 0: { d: 135, cd: 3, aoe: false }, 1: { d: 115, cd: 4, aoe: false } },
+                    1: { 0: { d: 130, cd: 5, aoe: false }, 1: { d: 105, cd: 4, aoe: true } },
+                    2: { 0: { d: 155, cd: 5, aoe: false }, 1: { d: 90, cd: 4, aoe: true } },
+                    3: { 0: { d: 140, cd: 3, aoe: false }, 1: { d: 100, cd: 3, aoe: false } },
+                    4: { 0: { d: 180, cd: 5, aoe: true }, 1: { d: 95, cd: 4, aoe: true } },
+                    5: { 0: { d: 125, cd: 4, aoe: false }, 1: { d: 120, cd: 4, aoe: false } },
+                    6: { 0: { d: 135, cd: 3, aoe: false }, 1: { d: 115, cd: 4, aoe: false } },
+                    7: { 0: { d: 150, cd: 5, aoe: false }, 1: { d: 125, cd: 4, aoe: true } },
+                    8: { 0: { d: 155, cd: 5, aoe: false }, 1: { d: 90, cd: 4, aoe: true } },
+                    9: { 0: { d: 140, cd: 3, aoe: false }, 1: { d: 100, cd: 3, aoe: false } },
+                    10: { 0: { d: 180, cd: 5, aoe: true }, 1: { d: 95, cd: 4, aoe: true } },
+                    11: { 0: { d: 145, cd: 5, aoe: false }, 1: { d: 140, cd: 4, aoe: true } }
+                },
+                2: {
+                    0: { 0: { d: 120, cd: 3, aoe: false }, 1: { d: 105, cd: 4, aoe: false } },
+                    1: { 0: { d: 140, cd: 5, aoe: false }, 1: { d: 110, cd: 4, aoe: true } },
+                    2: { 0: { d: 160, cd: 5, aoe: false }, 1: { d: 85, cd: 4, aoe: true } },
+                    3: { 0: { d: 145, cd: 3, aoe: false }, 1: { d: 95, cd: 3, aoe: false } },
+                    4: { 0: { d: 170, cd: 5, aoe: true }, 1: { d: 95, cd: 4, aoe: true } },
+                    5: { 0: { d: 120, cd: 4, aoe: false }, 1: { d: 115, cd: 4, aoe: false } },
+                    6: { 0: { d: 120, cd: 3, aoe: false }, 1: { d: 105, cd: 4, aoe: false } },
+                    7: { 0: { d: 145, cd: 5, aoe: false }, 1: { d: 130, cd: 4, aoe: true } },
+                    8: { 0: { d: 160, cd: 5, aoe: false }, 1: { d: 85, cd: 4, aoe: true } },
+                    9: { 0: { d: 145, cd: 3, aoe: false }, 1: { d: 95, cd: 3, aoe: false } },
+                    10: { 0: { d: 170, cd: 5, aoe: true }, 1: { d: 95, cd: 4, aoe: true } },
+                    11: { 0: { d: 140, cd: 5, aoe: false }, 1: { d: 135, cd: 4, aoe: true } }
+                },
+                3: {
+                    0: { 0: { d: 145, cd: 3, aoe: false }, 1: { d: 135, cd: 4, aoe: false } },
+                    1: { 0: { d: 150, cd: 5, aoe: false }, 1: { d: 115, cd: 4, aoe: true } },
+                    2: { 0: { d: 165, cd: 5, aoe: false }, 1: { d: 90, cd: 4, aoe: true } },
+                    3: { 0: { d: 160, cd: 3, aoe: false }, 1: { d: 100, cd: 3, aoe: false } },
+                    4: { 0: { d: 220, cd: 5, aoe: true }, 1: { d: 125, cd: 4, aoe: true } },
+                    5: { 0: { d: 145, cd: 4, aoe: false }, 1: { d: 130, cd: 4, aoe: false } },
+                    6: { 0: { d: 145, cd: 3, aoe: false }, 1: { d: 135, cd: 4, aoe: false } },
+                    7: { 0: { d: 160, cd: 5, aoe: false }, 1: { d: 135, cd: 4, aoe: true } },
+                    8: { 0: { d: 165, cd: 5, aoe: false }, 1: { d: 90, cd: 4, aoe: true } },
+                    9: { 0: { d: 160, cd: 3, aoe: false }, 1: { d: 100, cd: 3, aoe: false } },
+                    10: { 0: { d: 220, cd: 5, aoe: true }, 1: { d: 125, cd: 4, aoe: true } },
+                    11: { 0: { d: 155, cd: 5, aoe: false }, 1: { d: 150, cd: 4, aoe: true } }
+                },
+                4: {
+                    0: { 0: { d: 150, cd: 3, aoe: false }, 1: { d: 140, cd: 4, aoe: false } },
+                    1: { 0: { d: 155, cd: 5, aoe: false }, 1: { d: 110, cd: 4, aoe: true } },
+                    2: { 0: { d: 170, cd: 5, aoe: false }, 1: { d: 100, cd: 4, aoe: true } },
+                    3: { 0: { d: 165, cd: 3, aoe: false }, 1: { d: 105, cd: 3, aoe: false } },
+                    4: { 0: { d: 230, cd: 5, aoe: true }, 1: { d: 120, cd: 4, aoe: true } },
+                    5: { 0: { d: 150, cd: 4, aoe: false }, 1: { d: 135, cd: 4, aoe: false } },
+                    6: { 0: { d: 150, cd: 3, aoe: false }, 1: { d: 140, cd: 4, aoe: false } },
+                    7: { 0: { d: 165, cd: 5, aoe: false }, 1: { d: 130, cd: 4, aoe: true } },
+                    8: { 0: { d: 170, cd: 5, aoe: false }, 1: { d: 100, cd: 4, aoe: true } },
+                    9: { 0: { d: 165, cd: 3, aoe: false }, 1: { d: 105, cd: 3, aoe: false } },
+                    10: { 0: { d: 230, cd: 5, aoe: true }, 1: { d: 120, cd: 4, aoe: true } },
+                    11: { 0: { d: 160, cd: 5, aoe: false }, 1: { d: 155, cd: 4, aoe: true } }
+                }
+            };
+
+            const data = skillData[elementIndex] && skillData[elementIndex][zodiacIndex] && skillData[elementIndex][zodiacIndex][gender];
+            if (data) {
+                return { type: getSkillType(zodiacIndex, gender), damage: data.d, cooldown: data.cd, isAoe: data.aoe };
+            }
+            return { type: 0, damage: 100, cooldown: 3, isAoe: false };
+        }
+
         function getSkillDescription(skillType, damage, isAoe) {
             const desc = [
                 `强化普通攻击，造成${damage}%伤害`,
@@ -1354,36 +1473,87 @@
                 const displayGrowth = parseInt(growth, 10);
                 
                 let skillInfo = '';
-                        try {
-                            const battleContract = await window.ZODIAC_WEB3.getContract('battleSkillData');
-                            if (battleContract) {
-                                const skill = await battleContract.methods.getSkill(nftType).call();
-                                const sType = skill[1] !== undefined ? skill[1] : (skill.skillType !== undefined ? skill.skillType : 0);
-                                const sDamage = skill[2] !== undefined ? skill[2] : (skill.damage !== undefined ? skill.damage : 0);
-                                const sCooldown = skill[3] !== undefined ? skill[3] : (skill.cooldown !== undefined ? skill.cooldown : 0);
-                                const sIsAoe = skill[5] !== undefined ? skill[5] : (skill.isAoe !== undefined ? skill.isAoe : false);
-                                const skillTypeName = getSkillTypeName(parseInt(sType));
-                                const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
-                                skillInfo = `
-                                    <div class="mt-4">
-                                        <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
-                                        <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
-                                            <div class="flex items-center justify-between mb-1">
-                                                <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
-                                                <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
-                                            </div>
-                                            <div class="text-xs text-gray-500">${skillDesc}</div>
-                                            <div class="mt-2 flex gap-3 text-xs">
-                                                <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
-                                                <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
-                                            </div>
+                try {
+                    const battleContract = await window.ZODIAC_WEB3.getContract('battleSkillData');
+                    if (battleContract) {
+                        const isInitialized = await battleContract.methods.skillsInitialized().call();
+                        if (!isInitialized) {
+                            console.warn('技能数据尚未初始化，使用本地数据');
+                            const localSkill = getLocalSkill(nftType);
+                            const sType = localSkill.type;
+                            const sDamage = localSkill.damage;
+                            const sCooldown = localSkill.cooldown;
+                            const sIsAoe = localSkill.isAoe;
+                            const skillTypeName = getSkillTypeName(parseInt(sType));
+                            const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
+                            skillInfo = `
+                                <div class="mt-4">
+                                    <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
+                                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
+                                            <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500">${skillDesc}</div>
+                                        <div class="mt-2 flex gap-3 text-xs">
+                                            <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
+                                            <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
                                         </div>
                                     </div>
-                                `;
-                            }
-                        } catch (e) {
-                            console.warn('获取技能信息失败:', e.message);
+                                </div>
+                            `;
+                        } else {
+                            const skill = await battleContract.methods.getSkill(nftType).call();
+                            const sType = skill[1] !== undefined ? skill[1] : (skill.skillType !== undefined ? skill.skillType : 0);
+                            const sDamage = skill[2] !== undefined ? skill[2] : (skill.damage !== undefined ? skill.damage : 0);
+                            const sCooldown = skill[3] !== undefined ? skill[3] : (skill.cooldown !== undefined ? skill.cooldown : 0);
+                            const sIsAoe = skill[5] !== undefined ? skill[5] : (skill.isAoe !== undefined ? skill.isAoe : false);
+                            const skillTypeName = getSkillTypeName(parseInt(sType));
+                            const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
+                            skillInfo = `
+                                <div class="mt-4">
+                                    <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
+                                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
+                                            <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500">${skillDesc}</div>
+                                        <div class="mt-2 flex gap-3 text-xs">
+                                            <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
+                                            <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
                         }
+                    }
+                } catch (e) {
+                    console.warn('获取技能信息失败:', e.message);
+                    const localSkill = getLocalSkill(nftType);
+                    const sType = localSkill.type;
+                    const sDamage = localSkill.damage;
+                    const sCooldown = localSkill.cooldown;
+                    const sIsAoe = localSkill.isAoe;
+                    const skillTypeName = getSkillTypeName(parseInt(sType));
+                    const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
+                    skillInfo = `
+                        <div class="mt-4">
+                            <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
+                            <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
+                                    <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
+                                </div>
+                                <div class="text-xs text-gray-500">${skillDesc}</div>
+                                <div class="mt-2 flex gap-3 text-xs">
+                                    <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
+                                    <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
                 
                 document.getElementById('modalCardImage').src = nftImage;
                 document.getElementById('modalCardName').textContent = nftName;

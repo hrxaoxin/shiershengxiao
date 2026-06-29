@@ -1644,36 +1644,87 @@
                 const displayGrowth = parseInt(growth, 10);
                 
                 let skillInfo = '';
-                        try {
-                            const battleContract = await window.ZODIAC_WEB3.getContract('battleSkillData');
-                            if (battleContract) {
-                                const skill = await battleContract.methods.getSkill(nftType).call();
-                                const sType = skill[1] !== undefined ? skill[1] : (skill.skillType !== undefined ? skill.skillType : 0);
-                                const sDamage = skill[2] !== undefined ? skill[2] : (skill.damage !== undefined ? skill.damage : 0);
-                                const sCooldown = skill[3] !== undefined ? skill[3] : (skill.cooldown !== undefined ? skill.cooldown : 0);
-                                const sIsAoe = skill[5] !== undefined ? skill[5] : (skill.isAoe !== undefined ? skill.isAoe : false);
-                                const skillTypeName = getSkillTypeName(parseInt(sType));
-                                const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
-                                skillInfo = `
-                                    <div class="mt-4">
-                                        <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
-                                        <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
-                                            <div class="flex items-center justify-between mb-1">
-                                                <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
-                                                <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
-                                            </div>
-                                            <div class="text-xs text-gray-500">${skillDesc}</div>
-                                            <div class="mt-2 flex gap-3 text-xs">
-                                                <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
-                                                <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
-                                            </div>
+                try {
+                    const battleContract = await window.ZODIAC_WEB3.getContract('battleSkillData');
+                    if (battleContract) {
+                        const isInitialized = await battleContract.methods.skillsInitialized().call();
+                        if (!isInitialized) {
+                            console.warn('技能数据尚未初始化，使用本地数据');
+                            const localSkill = window.ZODIAC_UTILS.getLocalSkill(nftType);
+                            const sType = localSkill.type;
+                            const sDamage = localSkill.damage;
+                            const sCooldown = localSkill.cooldown;
+                            const sIsAoe = localSkill.isAoe;
+                            const skillTypeName = getSkillTypeName(parseInt(sType));
+                            const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
+                            skillInfo = `
+                                <div class="mt-4">
+                                    <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
+                                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
+                                            <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500">${skillDesc}</div>
+                                        <div class="mt-2 flex gap-3 text-xs">
+                                            <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
+                                            <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
                                         </div>
                                     </div>
-                                `;
-                            }
-                        } catch (e) {
-                            console.warn('获取技能信息失败:', e.message);
+                                </div>
+                            `;
+                        } else {
+                            const skill = await battleContract.methods.getSkill(nftType).call();
+                            const sType = skill[1] !== undefined ? skill[1] : (skill.skillType !== undefined ? skill.skillType : 0);
+                            const sDamage = skill[2] !== undefined ? skill[2] : (skill.damage !== undefined ? skill.damage : 0);
+                            const sCooldown = skill[3] !== undefined ? skill[3] : (skill.cooldown !== undefined ? skill.cooldown : 0);
+                            const sIsAoe = skill[5] !== undefined ? skill[5] : (skill.isAoe !== undefined ? skill.isAoe : false);
+                            const skillTypeName = getSkillTypeName(parseInt(sType));
+                            const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
+                            skillInfo = `
+                                <div class="mt-4">
+                                    <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
+                                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+                                        <div class="flex items-center justify-between mb-1">
+                                            <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
+                                            <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
+                                        </div>
+                                        <div class="text-xs text-gray-500">${skillDesc}</div>
+                                        <div class="mt-2 flex gap-3 text-xs">
+                                            <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
+                                            <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
                         }
+                    }
+                } catch (e) {
+                    console.warn('获取技能信息失败:', e.message);
+                    const localSkill = window.ZODIAC_UTILS.getLocalSkill(nftType);
+                    const sType = localSkill.type;
+                    const sDamage = localSkill.damage;
+                    const sCooldown = localSkill.cooldown;
+                    const sIsAoe = localSkill.isAoe;
+                    const skillTypeName = getSkillTypeName(parseInt(sType));
+                    const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
+                    skillInfo = `
+                        <div class="mt-4">
+                            <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
+                            <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
+                                    <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
+                                </div>
+                                <div class="text-xs text-gray-500">${skillDesc}</div>
+                                <div class="mt-2 flex gap-3 text-xs">
+                                    <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
+                                    <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
                 
                 document.getElementById('modalCardImage').src = nftImage;
                 document.getElementById('modalCardName').textContent = nftName;
