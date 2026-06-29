@@ -1014,6 +1014,20 @@
                         ZODIAC_UI.showToast('母NFT正在冷却中', 'warning');
                         return;
                     }
+                    
+                    const stakingContract = await window.ZODIAC_WEB3.getContract('staking', false);
+                    if (stakingContract) {
+                        const maleStakingInfo = await stakingContract.methods.stakingInfo(selectedMaleNFT.id).call();
+                        if (maleStakingInfo[0] !== '0x0000000000000000000000000000000000000000') {
+                            ZODIAC_UI.showToast('公NFT正在质押中，请先解除质押', 'warning');
+                            return;
+                        }
+                        const femaleStakingInfo = await stakingContract.methods.stakingInfo(selectedFemaleNFT.id).call();
+                        if (femaleStakingInfo[0] !== '0x0000000000000000000000000000000000000000') {
+                            ZODIAC_UI.showToast('母NFT正在质押中，请先解除质押', 'warning');
+                            return;
+                        }
+                    }
                 }
 
                 if (nftContract) {

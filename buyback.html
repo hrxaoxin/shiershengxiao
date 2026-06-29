@@ -1250,7 +1250,7 @@
             }
 
             const basePriceValue = totalCost * discount / 100;
-            const maxBonusPercent = maxBuybackMultiplier - 100;
+            const maxBonusPercent = maxBuybackMultiplier - discount;
             const maxBonusDays = (maxBonusPercent * daysToBreakEven) / (100 - discount);
             const actualBonusDays = Math.min(holdingDays, maxBonusDays);
             

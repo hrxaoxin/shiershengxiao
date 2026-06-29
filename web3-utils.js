@@ -84,7 +84,17 @@ window.ZODIAC_WEB3 = (function() {
 
         try {
             web3 = new window.Web3(window.ethereum);
-            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            
+            let accounts = [];
+            try {
+                accounts = await window.ethereum.request({ method: 'eth_accounts' });
+            } catch (e) {
+                console.warn('[ZODIAC_WEB3] eth_accounts failed:', e);
+            }
+            
+            if (!accounts || accounts.length === 0) {
+                accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+            }
 
             if (accounts && accounts.length > 0) {
                 account = accounts[0];
