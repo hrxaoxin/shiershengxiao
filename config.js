@@ -171,7 +171,7 @@ window.ZODIAC_CONFIG = (function() {
         arenaRewardLP: getEnvContractAddress('arenaRewardLP', '0x7ADDd1318BBf399E08931B6bB85413725Ab8Bb9c'),
         arenaLeaderboard: getEnvContractAddress('arenaLeaderboard', '0x734422854F237a8fe230E4B5E605f9dCe31cC9c6'),
         arenaPlayer: getEnvContractAddress('arenaPlayer', '0x83572c95cD940b792D189eF5B46873EE99125A42'),
-        arenaBattle: getEnvContractAddress('arenaBattle', '0xF9E513648b0A917FC5c7fFec1939758541D3e9bA'),
+        arenaBattle: getEnvContractAddress('arenaBattle', '0x0022ECBF5D59788bb43622Ba4Bb6211d87CA9FFc'),
         battle: getEnvContractAddress('battle', '0xC87bc65222D42787A9f33Bc5b17B8a4a304B5824'),
         battleSkillData: getEnvContractAddress('battleSkillData', '0xC5EE15366A0e4502727574eD9cacE27725dD621C'),
         battleHistory: getEnvContractAddress('battleHistory', '0x771991ce91611EfEfb6f412F3004Bf9f5fBbdF07'),
@@ -18152,19 +18152,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "baseRewardPerWin",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -18229,19 +18216,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "currentSeasonId",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -18619,50 +18593,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "seasons",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "startTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "endTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "isActive",
-				"type": "bool"
-			},
-			{
-				"internalType": "bool",
-				"name": "isSettled",
-				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalPlayers",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "rewardPool",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
@@ -18760,8 +18690,8 @@ window.ZODIAC_CONFIG = (function() {
 		"outputs": [],
 		"stateMutability": "payable",
 		"type": "function"
-	},
-	],
+	}
+],
 		stakingLPABI: [
 	{
 		"inputs": [],
