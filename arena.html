@@ -1307,7 +1307,7 @@
                             const skillData = await battleContract.methods.getSkill(tokenType).call();
                             skill = {
                                 name: skillData.skillId || skillData[0],
-                                type: SKILL_TYPE_MAP[skillData.skillType || skillData[1]],
+                                type: SKILL_TYPE_MAP[skillData.skillType_ !== undefined ? skillData.skillType_ : skillData[1]],
                                 value: skillData.damage || skillData[2],
                                 cooldown: skillData.cooldown || skillData[3],
                                 duration: skillData.duration || skillData[4],
@@ -1889,7 +1889,7 @@
                                 const skillData = await battleContract.methods.getSkill(tokenType).call();
                                 skill = {
                                     name: skillData.skillId || skillData[0],
-                                    type: SKILL_TYPE_MAP[skillData.skillType || skillData[1]],
+                                    type: SKILL_TYPE_MAP[skillData.skillType_ !== undefined ? skillData.skillType_ : skillData[1]],
                                     value: skillData.damage || skillData[2],
                                     cooldown: skillData.cooldown || skillData[3],
                                     duration: skillData.duration || skillData[4],

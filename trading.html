@@ -1644,32 +1644,36 @@
                 const displayGrowth = parseInt(growth, 10);
                 
                 let skillInfo = '';
-                try {
-                    const battleContract = await window.ZODIAC_WEB3.getContract('battle');
-                    if (battleContract) {
-                        const skill = await battleContract.methods.getSkill(nftType).call();
-                        const skillTypeName = getSkillTypeName(skill.skillType);
-                        const skillDesc = getSkillDescription(skill.skillType, skill.damage, skill.isAoe);
-                        skillInfo = `
-                            <div class="mt-4">
-                                <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
-                                <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
-                                    <div class="flex items-center justify-between mb-1">
-                                        <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
-                                        <span class="text-xs px-2 py-0.5 ${skill.isAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${skill.isAoe ? '范围攻击' : '单体攻击'}</span>
+                        try {
+                            const battleContract = await window.ZODIAC_WEB3.getContract('battle');
+                            if (battleContract) {
+                                const skill = await battleContract.methods.getSkill(nftType).call();
+                                const sType = skill.skillType_ !== undefined ? skill.skillType_ : (skill[1] !== undefined ? skill[1] : 0);
+                                const sDamage = skill.damage !== undefined ? skill.damage : (skill[2] !== undefined ? skill[2] : 0);
+                                const sCooldown = skill.cooldown !== undefined ? skill.cooldown : (skill[3] !== undefined ? skill[3] : 0);
+                                const sIsAoe = skill.isAoe !== undefined ? skill.isAoe : (skill[5] !== undefined ? skill[5] : false);
+                                const skillTypeName = getSkillTypeName(parseInt(sType));
+                                const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
+                                skillInfo = `
+                                    <div class="mt-4">
+                                        <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
+                                        <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+                                            <div class="flex items-center justify-between mb-1">
+                                                <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
+                                                <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
+                                            </div>
+                                            <div class="text-xs text-gray-500">${skillDesc}</div>
+                                            <div class="mt-2 flex gap-3 text-xs">
+                                                <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
+                                                <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="text-xs text-gray-500">${skillDesc}</div>
-                                    <div class="mt-2 flex gap-3 text-xs">
-                                        <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${skill.damage}%</span></span>
-                                        <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${skill.cooldown}回合</span></span>
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }
-                } catch (e) {
-                    console.warn('获取技能信息失败:', e.message);
-                }
+                                `;
+                            }
+                        } catch (e) {
+                            console.warn('获取技能信息失败:', e.message);
+                        }
                 
                 document.getElementById('modalCardImage').src = nftImage;
                 document.getElementById('modalCardName').textContent = nftName;
