@@ -294,7 +294,35 @@ window.ZODIAC_WEB3 = (function() {
         
         if (contracts[name]) return contracts[name];
 
-        const abi = ABI_MAP[name];
+        const currentABIS = (window.ZODIAC_CONFIG || {}).ABIS || {};
+        const dynamicABI_MAP = {
+            'nftMint': currentABIS.nftMintABI,
+            'breedingCore': currentABIS.breedingCoreABI,
+            'breedingMarket': currentABIS.breedingMarketABI,
+            'rewardManager': currentABIS.rewardManagerABI,
+            'dividendManager': currentABIS.dividendManagerABI,
+            'dividendManagerLP': currentABIS.dividendManagerLPABI,
+            'tokenBurner': currentABIS.tokenBurnerABI,
+            'nftUpdate': currentABIS.nftUpdateABI,
+            'battle': currentABIS.battleABI,
+            'battleSkillData': currentABIS.battleSkillDataABI,
+            'arena': currentABIS.arenaABI,
+            'arenaRankingManager': currentABIS.arenaRankingManagerABI,
+            'arenaReward': currentABIS.arenaRewardLPABI,
+            'arenaRewardLP': currentABIS.arenaRewardLPABI,
+            'arenaLeaderboard': currentABIS.arenaLeaderboardABI,
+            'arenaPlayer': currentABIS.arenaPlayerABI,
+            'arenaBattle': currentABIS.arenaBattleABI,
+            'priceOracle': currentABIS.priceOracleABI,
+            'buyback': currentABIS.buybackABI,
+            'nftData': currentABIS.nftDataABI,
+            'authorizer': currentABIS.authorizerABI,
+            'tokenContract': currentABIS.tokenABI,
+            'staking': currentABIS.stakingABI,
+            'tokenStakingLP': currentABIS.tokenStakingLPABI
+        };
+        
+        const abi = dynamicABI_MAP[name];
         if (!abi) throw new Error(`[ZODIAC_WEB3] No ABI for contract: ${name}`);
         
         // tokenContract 从 authorizer 动态获取
