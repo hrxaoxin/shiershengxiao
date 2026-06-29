@@ -171,7 +171,7 @@ window.ZODIAC_CONFIG = (function() {
         arenaRewardLP: getEnvContractAddress('arenaRewardLP', '0x7ADDd1318BBf399E08931B6bB85413725Ab8Bb9c'),
         arenaLeaderboard: getEnvContractAddress('arenaLeaderboard', '0x107871b5223808fc0E5648B40BCc7ED0D6BbA8Fc'),
         arenaPlayer: getEnvContractAddress('arenaPlayer', '0x83572c95cD940b792D189eF5B46873EE99125A42'),
-        arenaBattle: getEnvContractAddress('arenaBattle', '0x0022ECBF5D59788bb43622Ba4Bb6211d87CA9FFc'),
+        arenaBattle: getEnvContractAddress('arenaBattle', '0xFC234EDe2729f28f32283a2568db2629ddeDFac0'),
         battle: getEnvContractAddress('battle', '0xC87bc65222D42787A9f33Bc5b17B8a4a304B5824'),
         battleSkillData: getEnvContractAddress('battleSkillData', '0xC5EE15366A0e4502727574eD9cacE27725dD621C'),
         battleHistory: getEnvContractAddress('battleHistory', '0x771991ce91611EfEfb6f412F3004Bf9f5fBbdF07'),
