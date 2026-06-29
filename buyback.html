@@ -709,6 +709,9 @@
                         console.log(`[BUYBACK] Cannot calculate price: totalWeight=${totalWeight}, nftWeightNum=${nftWeightNum}`);
                         if (priceEl) priceEl.textContent = '-';
                     }
+                } else {
+                    if (nftWeightEl) nftWeightEl.textContent = '-';
+                    if (priceEl) priceEl.textContent = '-';
                 }
             } catch (error) {
                 console.error('[BUYBACK] 加载余额比例价格失败:', error);
