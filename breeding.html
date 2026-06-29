@@ -356,6 +356,51 @@
             SELF: '0',
             MARKET: '1'
         };
+
+        const BREEDING_ERROR_CODES = {
+            'BC: NCS': 'NFT铸造合约未设置',
+            'BC: IF': '无效的父亲ID',
+            'BC: IM': '无效的母亲ID',
+            'BC: CSB': '父亲和母亲不能是同一张NFT',
+            'BC: MP': '繁殖配对数量已达上限',
+            'BC: FS': '公NFT正在质押中，无法参与孕育',
+            'BC: MS': '母NFT正在质押中，无法参与孕育',
+            'BC: NFO': '您不是公NFT的所有者',
+            'BC: NMO': '您不是母NFT的所有者',
+            'BC: NCO': '您不是合作方NFT的所有者',
+            'BC: COB': '合作方NFT正在孕育中',
+            'BC: COC': '合作方NFT正在冷却中',
+            'BC: COZ': '合作方NFT生肖不匹配',
+            'BC: L5': 'NFT等级不足，需要5阶或以上',
+            'BC: DZ': '父母NFT生肖不匹配',
+            'BC: SG': '父母NFT性别相同',
+            'BC: FC': '公NFT正在冷却中',
+            'BC: MC': '母NFT正在冷却中',
+            'BC: FB': '公NFT正在孕育中',
+            'BC: MB': '母NFT正在孕育中',
+            'BC: PAE': '这对NFT已经在孕育配对中',
+            'BC: FTF': '公NFT转移失败，请检查授权',
+            'BC: MTF': '母NFT转移失败，请检查授权',
+            'BC: TNS': '代币合约未设置',
+            'BM: NFT contract not set': 'NFT铸造合约未设置',
+            'BM: Breeding core not set': '繁殖核心合约未设置',
+            'BM: Not token owner': '您不是NFT的所有者',
+            'BM: Already listed': 'NFT已经在市场上挂牌',
+            'BM: NFT in cooldown': 'NFT正在冷却中',
+            'BM: NFT in active breeding': 'NFT正在孕育中',
+            'BM: Level too low': 'NFT等级不足，需要5阶或以上'
+        };
+
+        function parseBreedingError(error) {
+            if (!error) return '孕育失败';
+            const message = error.message || error.toString();
+            for (const [code, description] of Object.entries(BREEDING_ERROR_CODES)) {
+                if (message.includes(code)) {
+                    return description;
+                }
+            }
+            return window.ZODIAC_WEB3 ? window.ZODIAC_WEB3.parseErrorMessage ? window.ZODIAC_WEB3.parseErrorMessage(error) : message : message;
+        }
         
         let nftContract, breedingCoreContract, breedingMarketContract, tokenContract;
         let account = null;
@@ -945,29 +990,108 @@
             btn.disabled = true;
             btn.textContent = '处理中...';
 
-        try {
-            await ZODIAC_WEB3.createSelfBreedingPair(selectedMaleNFT.id, selectedFemaleNFT.id, 0);
-            
-            ZODIAC_UI.showToast('自我孕育已开始！等待完成。', 'success');
-            await loadNFTs();
-            await checkActiveSelfOrder();
-            selectedMaleNFT = null;
-            selectedFemaleNFT = null;
-            updateSelectedPair();
-        } catch (error) {
-            console.error('开始自我孕育失败:', error);
-            ZODIAC_UI.handleError(error, '开始自我孕育');
-            selectedMaleNFT = null;
-            selectedFemaleNFT = null;
-            updateSelectedPair();
-            renderMaleNFTs();
-            renderFemaleNFTs();
-        } finally {
-            isTransactionInProgress = false;
-            btn.disabled = false;
-            btn.textContent = '开始自我孕育';
+            try {
+                const account = getAccount();
+                if (!account) {
+                    ZODIAC_UI.showToast('请先连接钱包', 'warning');
+                    return;
+                }
+
+                const breedingCoreAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.breedingCore;
+                if (!breedingCoreAddress) {
+                    ZODIAC_UI.showToast('孕育合约地址未配置', 'error');
+                    return;
+                }
+
+                if (breedingCoreContract) {
+                    const maleInCooldown = await breedingCoreContract.methods.isInCooldown(selectedMaleNFT.id).call();
+                    if (maleInCooldown) {
+                        ZODIAC_UI.showToast('公NFT正在冷却中', 'warning');
+                        return;
+                    }
+                    const femaleInCooldown = await breedingCoreContract.methods.isInCooldown(selectedFemaleNFT.id).call();
+                    if (femaleInCooldown) {
+                        ZODIAC_UI.showToast('母NFT正在冷却中', 'warning');
+                        return;
+                    }
+                }
+
+                if (nftContract) {
+                    const isApproved = await nftContract.methods.isApprovedForAll(account, breedingCoreAddress).call();
+                    if (!isApproved) {
+                        const approveConfirm = await ZODIAC_UI.showConfirmModal(
+                            '需要授权',
+                            '孕育合约需要管理您的NFT，请先授权。授权后可以进行自我孕育操作。',
+                            { confirmText: '确认授权' }
+                        );
+                        if (!approveConfirm) {
+                            return;
+                        }
+                        btn.textContent = '正在授权...';
+                        await ZODIAC_WEB3.setNFTApprovalForAll(breedingCoreAddress, true);
+                        ZODIAC_UI.showToast('授权成功！', 'success');
+                    }
+                }
+
+                if (breedingCoreContract) {
+                    const feeWei = await breedingCoreContract.methods.selfBreedingFee().call();
+                    if (parseInt(feeWei, 10) > 0) {
+                        const tokenAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract;
+                        if (tokenAddress) {
+                            const tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
+                            if (tokenContract) {
+                                const balance = await tokenContract.methods.balanceOf(account).call();
+                                if (parseInt(balance, 10) < parseInt(feeWei, 10)) {
+                                    const web3 = window.ZODIAC_WEB3.getWeb3();
+                                    const fee = web3.utils.fromWei(feeWei, 'ether');
+                                    const balanceFormatted = web3.utils.fromWei(balance, 'ether');
+                                    ZODIAC_UI.showToast(`代币余额不足！需要 ${fee}，当前 ${balanceFormatted}`, 'error');
+                                    return;
+                                }
+
+                                const allowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
+                                if (parseInt(allowance, 10) < parseInt(feeWei, 10)) {
+                                    const approveConfirm = await ZODIAC_UI.showConfirmModal(
+                                        '需要授权代币',
+                                        `孕育需要支付 ${feeWei} 代币费用，请授权合约使用您的代币。`,
+                                        { confirmText: '确认授权' }
+                                    );
+                                    if (!approveConfirm) {
+                                        return;
+                                    }
+                                    btn.textContent = '正在授权代币...';
+                                    await ZODIAC_WEB3.approveToken(breedingCoreAddress, feeWei);
+                                    ZODIAC_UI.showToast('代币授权成功！', 'success');
+                                }
+                            }
+                        }
+                    }
+                }
+
+                btn.textContent = '正在孕育...';
+                await ZODIAC_WEB3.createSelfBreedingPair(selectedMaleNFT.id, selectedFemaleNFT.id, 0);
+                
+                ZODIAC_UI.showToast('自我孕育已开始！等待完成。', 'success');
+                await loadNFTs();
+                await checkActiveSelfOrder();
+                selectedMaleNFT = null;
+                selectedFemaleNFT = null;
+                updateSelectedPair();
+            } catch (error) {
+                console.error('开始自我孕育失败:', error);
+                const errorMessage = parseBreedingError(error);
+                ZODIAC_UI.showToast(errorMessage, 'error');
+                selectedMaleNFT = null;
+                selectedFemaleNFT = null;
+                updateSelectedPair();
+                renderMaleNFTs();
+                renderFemaleNFTs();
+            } finally {
+                isTransactionInProgress = false;
+                btn.disabled = false;
+                btn.textContent = '开始自我孕育';
+            }
         }
-    }
 
         async function checkActiveSelfOrder() {
             try {
@@ -1651,6 +1775,71 @@
         btn.textContent = '处理中...';
 
         try {
+            const account = getAccount();
+            if (!account) {
+                ZODIAC_UI.showToast('请先连接钱包', 'warning');
+                return;
+            }
+
+            const breedingCoreAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.breedingCore;
+            if (!breedingCoreAddress) {
+                ZODIAC_UI.showToast('孕育合约地址未配置', 'error');
+                return;
+            }
+
+            if (nftContract) {
+                const isApproved = await nftContract.methods.isApprovedForAll(account, breedingCoreAddress).call();
+                if (!isApproved) {
+                    const approveConfirm = await ZODIAC_UI.showConfirmModal(
+                        '需要授权',
+                        '孕育合约需要管理您的NFT，请先授权。授权后可以进行市场孕育操作。',
+                        { confirmText: '确认授权' }
+                    );
+                    if (!approveConfirm) {
+                        return;
+                    }
+                    btn.textContent = '正在授权...';
+                    await ZODIAC_WEB3.setNFTApprovalForAll(breedingCoreAddress, true);
+                    ZODIAC_UI.showToast('授权成功！', 'success');
+                }
+            }
+
+            if (breedingCoreContract) {
+                const feeWei = await breedingCoreContract.methods.marketBreedingFee().call();
+                if (parseInt(feeWei, 10) > 0) {
+                    const tokenAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract;
+                    if (tokenAddress) {
+                        const tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
+                        if (tokenContract) {
+                            const balance = await tokenContract.methods.balanceOf(account).call();
+                            if (parseInt(balance, 10) < parseInt(feeWei, 10)) {
+                                const web3 = window.ZODIAC_WEB3.getWeb3();
+                                const fee = web3.utils.fromWei(feeWei, 'ether');
+                                const balanceFormatted = web3.utils.fromWei(balance, 'ether');
+                                ZODIAC_UI.showToast(`代币余额不足！需要 ${fee}，当前 ${balanceFormatted}`, 'error');
+                                return;
+                            }
+
+                            const allowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
+                            if (parseInt(allowance, 10) < parseInt(feeWei, 10)) {
+                                const approveConfirm = await ZODIAC_UI.showConfirmModal(
+                                    '需要授权代币',
+                                    `孕育需要支付 ${feeWei} 代币费用，请授权合约使用您的代币。`,
+                                    { confirmText: '确认授权' }
+                                );
+                                if (!approveConfirm) {
+                                    return;
+                                }
+                                btn.textContent = '正在授权代币...';
+                                await ZODIAC_WEB3.approveToken(breedingCoreAddress, feeWei);
+                                ZODIAC_UI.showToast('代币授权成功！', 'success');
+                            }
+                        }
+                    }
+                }
+            }
+
+            btn.textContent = '正在孕育...';
             const fatherId = orderGender === 0 ? selectedJoinOrderId : selectedJoinNFT.id;
             const motherId = orderGender === 0 ? selectedJoinNFT.id : selectedJoinOrderId;
             
@@ -1664,7 +1853,8 @@
             await checkActivePairOrders();
         } catch (error) {
             console.error('加入孕育失败:', error);
-            ZODIAC_UI.handleError(error, '加入孕育');
+            const errorMessage = parseBreedingError(error);
+            ZODIAC_UI.showToast(errorMessage, 'error');
         }
 
         btn.disabled = false;
