@@ -551,6 +551,15 @@
                 await updateWalletStatus();
                 await loadMarketplace();
                 await setupMarketplaceEventListeners();
+                
+                const listSection = document.getElementById('listSection');
+                if (listSection && !listSection.classList.contains('hidden')) {
+                    loadUserNftsForListing();
+                }
+                const myListingsSection = document.getElementById('myListingsSection');
+                if (myListingsSection && !myListingsSection.classList.contains('hidden')) {
+                    loadMyListings();
+                }
             }
         }
         

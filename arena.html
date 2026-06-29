@@ -2005,7 +2005,12 @@
 
         async function loadRemainingAttempts() {
             try {
-                const attempts = await arenaPlayerContract.methods.getRemainingAttempts(accounts[0]).call();
+                let attempts = 0;
+                if (arenaBattleContract) {
+                    attempts = await arenaBattleContract.methods.getRemainingAttempts(accounts[0]).call();
+                } else if (arenaPlayerContract) {
+                    attempts = await arenaPlayerContract.methods.getRemainingAttempts(accounts[0]).call();
+                }
                 document.getElementById('remainingAttempts').textContent = attempts;
             } catch (error) {
                 console.error('加载挑战次数失败:', error);

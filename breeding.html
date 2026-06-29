@@ -1084,6 +1084,19 @@
                 }
 
                 btn.textContent = '正在孕育...';
+                
+                try {
+                    await breedingCoreContract.methods.createSelfBreedingPair(selectedMaleNFT.id, selectedFemaleNFT.id, 0).call({ from: account });
+                } catch (preCheckError) {
+                    console.warn('孕育预检查失败:', preCheckError);
+                    const errorMessage = parseBreedingError(preCheckError);
+                    ZODIAC_UI.showToast(errorMessage, 'error');
+                    btn.textContent = '开始自我孕育';
+                    btn.disabled = false;
+                    isTransactionInProgress = false;
+                    return;
+                }
+                
                 await ZODIAC_WEB3.createSelfBreedingPair(selectedMaleNFT.id, selectedFemaleNFT.id, 0);
                 
                 ZODIAC_UI.showToast('自我孕育已开始！等待完成。', 'success');
