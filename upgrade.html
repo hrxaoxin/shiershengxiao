@@ -1668,8 +1668,8 @@
                     const battleContract = await window.ZODIAC_WEB3.getContract('battle');
                     if (battleContract) {
                         const skill = await battleContract.methods.getSkill(nftType).call();
-                        const skillTypeName = getSkillTypeName(skill.skillType_);
-                        const skillDesc = getSkillDescription(skill.skillType_, skill.damage, skill.isAoe);
+                        const skillTypeName = getSkillTypeName(skill.skillType);
+                        const skillDesc = getSkillDescription(skill.skillType, skill.damage, skill.isAoe);
                         skillInfo = `
                             <div class="mt-4">
                                 <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
