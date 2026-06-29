@@ -1570,12 +1570,6 @@ window.ZODIAC_WEB3 = (function() {
     }
 
     async function challengeMockPlayer(playerTeam, mockIndex) {
-        if (!playerTeam || !Array.isArray(playerTeam)) {
-            throw new Error('[ZODIAC_WEB3] challengeMockPlayer requires an array of team tokenIds');
-        }
-        if (playerTeam.length !== 6) {
-            throw new Error(`[ZODIAC_WEB3] challengeMockPlayer requires exactly 6 NFTs, got ${playerTeam.length}`);
-        }
         if (mockIndex === undefined || mockIndex === null) {
             throw new Error('[ZODIAC_WEB3] Invalid mock player index');
         }
@@ -1583,48 +1577,22 @@ window.ZODIAC_WEB3 = (function() {
             throw new Error('[ZODIAC_WEB3] Invalid mock player index, must be >= 1');
         }
         try {
-            const contract = await getContract('arenaRankingManager');
-            const teamStrings = playerTeam.map(id => {
-                if (typeof id === 'number') {
-                    if (id < 0 || isNaN(id)) {
-                        throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
-                    }
-                    return String(id);
-                }
-                if (typeof id === 'string') {
-                    const num = parseInt(id, 10);
-                    if (isNaN(num) || num < 0) {
-                        throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
-                    }
-                    return id;
-                }
-                if (id && id.toString) {
-                    return id.toString();
-                }
-                throw new Error(`[ZODIAC_WEB3] Invalid tokenId type: ${typeof id}`);
-            });
+            const contract = await getContract('arenaBattle');
+            if (!contract) {
+                throw new Error('[ZODIAC_WEB3] ArenaBattle contract not available');
+            }
             const mockIndexStr = typeof mockIndex === 'number' ? String(mockIndex) : mockIndex;
-            console.log(`[ZODIAC_WEB3] challengeMockPlayer params: team=${JSON.stringify(teamStrings)}, mockIndex=${mockIndexStr}`);
+            console.log(`[ZODIAC_WEB3] challengeMockPlayer (direct ArenaBattle): mockIndex=${mockIndexStr}`);
             
-            console.log('[ZODIAC_WEB3] Performing dry-run call to estimate error...');
+            console.log('[ZODIAC_WEB3] Performing dry-run call...');
             try {
-                const result = await contract.methods.challengeMockPlayer(teamStrings, mockIndexStr).call({ from: account });
+                const result = await contract.methods.challengeMockPlayer(mockIndexStr).call({ from: account });
                 console.log('[ZODIAC_WEB3] Dry-run succeeded:', result);
             } catch (dryRunError) {
-                console.error('[ZODIAC_WEB3] Dry-run failed:', dryRunError.message);
-                let reason = '未知错误';
-                if (dryRunError.message) {
-                    const match = dryRunError.message.match(/revert[:\s]+(.+?)(?:\s+at\s+|\s*$|"|')/i);
-                    if (match) {
-                        reason = match[1].trim();
-                    } else if (dryRunError.message.includes('revert')) {
-                        reason = dryRunError.message.substring(0, 200);
-                    }
-                }
-                console.error(`[ZODIAC_WEB3] Dry-run reason: ${reason}`);
+                console.warn('[ZODIAC_WEB3] Dry-run warning:', dryRunError.message);
             }
             
-            const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [teamStrings, mockIndexStr], {
+            const receipt = await sendAndTrackTransaction(contract, 'challengeMockPlayer', [mockIndexStr], {
                 gas: 3000000
             });
             return receipt;
@@ -1638,45 +1606,22 @@ window.ZODIAC_WEB3 = (function() {
         if (!challengedPlayer || challengedPlayer === '0x0000000000000000000000000000000000000000') {
             throw new Error('[ZODIAC_WEB3] Invalid challenged player address');
         }
-        if (!playerTeam || !Array.isArray(playerTeam)) {
-            throw new Error('[ZODIAC_WEB3] challengeRealPlayer requires an array of team tokenIds');
-        }
-        if (playerTeam.length !== 6) {
-            throw new Error(`[ZODIAC_WEB3] challengeRealPlayer requires exactly 6 NFTs, got ${playerTeam.length}`);
-        }
         try {
-            const contract = await getContract('arenaRankingManager');
-            const teamStrings = playerTeam.map(id => {
-                if (typeof id === 'number') {
-                    if (id < 0 || isNaN(id)) {
-                        throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
-                    }
-                    return String(id);
-                }
-                if (typeof id === 'string') {
-                    const num = parseInt(id, 10);
-                    if (isNaN(num) || num < 0) {
-                        throw new Error(`[ZODIAC_WEB3] Invalid tokenId: ${id}`);
-                    }
-                    return id;
-                }
-                if (id && id.toString) {
-                    return id.toString();
-                }
-                throw new Error(`[ZODIAC_WEB3] Invalid tokenId type: ${typeof id}`);
-            });
-            console.log(`[ZODIAC_WEB3] challengeRealPlayer params: challengedPlayer=${challengedPlayer}, team=${JSON.stringify(teamStrings)}`);
+            const contract = await getContract('arenaBattle');
+            if (!contract) {
+                throw new Error('[ZODIAC_WEB3] ArenaBattle contract not available');
+            }
+            console.log(`[ZODIAC_WEB3] challengeRealPlayer (direct ArenaBattle): challengedPlayer=${challengedPlayer}`);
             
             console.log('[ZODIAC_WEB3] Performing dry-run call...');
             try {
-                const result = await contract.methods.challengeRealPlayer(challengedPlayer, teamStrings).call({ from: account });
+                const result = await contract.methods.challengeRealPlayer(challengedPlayer).call({ from: account });
                 console.log('[ZODIAC_WEB3] Dry-run succeeded:', result);
             } catch (dryRunError) {
-                console.error('[ZODIAC_WEB3] Dry-run failed:', dryRunError.message);
-                console.error('[ZODIAC_WEB3] Dry-run full error:', JSON.stringify(dryRunError, Object.getOwnPropertyNames(dryRunError), 2));
+                console.warn('[ZODIAC_WEB3] Dry-run warning:', dryRunError.message);
             }
             
-            const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer, teamStrings], {
+            const receipt = await sendAndTrackTransaction(contract, 'challengeRealPlayer', [challengedPlayer], {
                 gas: 3000000
             });
             return receipt;

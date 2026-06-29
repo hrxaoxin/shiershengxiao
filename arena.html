@@ -2219,7 +2219,7 @@
                         const rank = startRank + i;
                         
                         if (isMock) {
-                            const opponent = mockOpponents[rank % mockOpponents.length];
+                            const opponent = mockOpponents[(rank - 1) % mockOpponents.length];
                             return {
                                 address: address,
                                 points: points,
@@ -2227,7 +2227,7 @@
                                 losses: losses,
                                 rank: rank,
                                 isMock: true,
-                                mockIndex: (rank % mockOpponents.length) + 1,
+                                mockIndex: rank,
                                 team: opponent.team
                             };
                         }
@@ -2306,7 +2306,7 @@
                             losses: 12 + Math.floor(globalIndex / 3) * 2,
                             rank: globalIndex + 1,
                             isMock: true,
-                            mockIndex: (globalIndex % mockOpponents.length) + 1,
+                            mockIndex: globalIndex + 1,
                             team: opponent.team
                         });
                     }
@@ -2469,7 +2469,7 @@
 
             selectedOpponent = opponents[index % opponents.length];
             if (selectedOpponent.isMock && selectedOpponent.mockIndex === undefined) {
-                selectedOpponent.mockIndex = (index % mockOpponents.length) + 1;
+                selectedOpponent.mockIndex = index + 1;
             }
             updateChallengeBtn();
             showOpponentTeam(selectedOpponent);
@@ -2627,22 +2627,18 @@
 
                 console.log(`[ARENA] executeRealChallenge: opponent=${selectedOpponent.address}, isMock=${selectedOpponent.isMock}, team=${JSON.stringify(playerTeam)}`);
 
-                const arenaRankingContract = await window.ZODIAC_WEB3.getContract('arenaRankingManager');
-                if (arenaRankingContract) {
-                    console.log('[ARENA] Pre-check: calling challengeMockPlayer with .call()...');
+                const arenaBattleContract = await window.ZODIAC_WEB3.getContract('arenaBattle');
+                if (arenaBattleContract) {
+                    console.log('[ARENA] Pre-check: calling ArenaBattle challenge methods with .call()...');
                     try {
-                        const mockIndex = selectedOpponent.isMock 
-                            ? (selectedOpponent.mockIndex !== undefined ? selectedOpponent.mockIndex : 1)
-                            : 1;
-                        const teamStr = playerTeam.map(id => String(id));
-                        
                         if (selectedOpponent.isMock) {
-                            const dryResult = await arenaRankingContract.methods.challengeMockPlayer(teamStr, String(mockIndex)).call({ from: accounts[0] });
-                            console.log('[ARENA] Pre-check success:', dryResult);
+                            const mockIndex = selectedOpponent.mockIndex !== undefined ? selectedOpponent.mockIndex : 1;
+                            const dryResult = await arenaBattleContract.methods.challengeMockPlayer(String(mockIndex)).call({ from: accounts[0] });
+                            console.log('[ARENA] Pre-check success (mock):', dryResult);
                         } else {
                             const defenderAddr = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
-                            const dryResult = await arenaRankingContract.methods.challengeRealPlayer(defenderAddr, teamStr).call({ from: accounts[0] });
-                            console.log('[ARENA] Pre-check success:', dryResult);
+                            const dryResult = await arenaBattleContract.methods.challengeRealPlayer(defenderAddr).call({ from: accounts[0] });
+                            console.log('[ARENA] Pre-check success (real):', dryResult);
                         }
                     } catch (preCheckError) {
                         console.warn('[ARENA] Pre-check warning:', preCheckError.message);
@@ -2663,17 +2659,23 @@
                 let challengeTx = null;
                 if (selectedOpponent.isMock) {
                     const mockIndex = selectedOpponent.mockIndex !== undefined ? selectedOpponent.mockIndex : 1;
-                    console.log(`[ARENA] Calling challengeMockPlayer with mockIndex=${mockIndex}`);
+                    console.log(`[ARENA] Calling ArenaBattle.challengeMockPlayer with mockIndex=${mockIndex}`);
                     challengeTx = await ZODIAC_WEB3.challengeMockPlayer(playerTeam, mockIndex);
-                    victory = challengeTx.events?.ChallengeResult?.returnValues?.isVictory;
+                    victory = challengeTx.events?.BattleExecuted?.returnValues?.isVictory;
+                    if (victory === undefined && challengeTx.events?.ChallengeResult) {
+                        victory = challengeTx.events.ChallengeResult.returnValues?.isVictory;
+                    }
                     if (victory === undefined) {
                         victory = selectedOpponent.points < getPlayerPoints();
                     }
                 } else {
                     const defenderAddress = selectedOpponent.address.startsWith('0x') ? selectedOpponent.address : '0x0000000000000000000000000000000000000000';
-                    console.log(`[ARENA] Calling challengeRealPlayer with defender=${defenderAddress}`);
+                    console.log(`[ARENA] Calling ArenaBattle.challengeRealPlayer with defender=${defenderAddress}`);
                     challengeTx = await ZODIAC_WEB3.challengeRealPlayer(defenderAddress, playerTeam);
-                    victory = challengeTx.events?.ChallengeResult?.returnValues?.isVictory;
+                    victory = challengeTx.events?.BattleExecuted?.returnValues?.isVictory;
+                    if (victory === undefined && challengeTx.events?.ChallengeResult) {
+                        victory = challengeTx.events.ChallengeResult.returnValues?.isVictory;
+                    }
                     if (victory === undefined) {
                         victory = selectedOpponent.points < getPlayerPoints();
                     }

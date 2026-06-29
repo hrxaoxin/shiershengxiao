@@ -597,12 +597,15 @@
             }
         }
 
-        async function loadBalanceRatioPrice(tokenId) {
-            console.log(`[BUYBACK] loadBalanceRatioPrice called with tokenId:`, tokenId, `type:`, typeof tokenId);
+        async function loadBalanceRatioPrice(tokenId, level, isRare) {
+            console.log(`[BUYBACK] loadBalanceRatioPrice called: tokenId=${tokenId}, level=${level}, isRare=${isRare}`);
             if (!buybackContract) {
                 console.log('[BUYBACK] buybackContract is null');
                 return;
             }
+
+            const hasValidTokenId = tokenId !== undefined && tokenId !== null && tokenId !== 0 && !isNaN(tokenId);
+            console.log(`[BUYBACK] hasValidTokenId: ${hasValidTokenId}`);
 
             try {
                 const balanceWei = await tokenContract.methods.balanceOf(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftBuyback).call();
@@ -615,22 +618,27 @@
 
                 const detailsEl = document.getElementById('balanceRatioPriceDetails');
                 const hintEl = detailsEl ? detailsEl.querySelector('p.text-center') : null;
+                console.log(`[BUYBACK] detailsEl=${!!detailsEl}, hintEl=${!!hintEl}`);
                 
                 if (detailsEl) {
-                    if (tokenId) {
+                    if (hasValidTokenId) {
                         detailsEl.classList.remove('border-orange-200');
                         detailsEl.classList.add('border-orange-400');
-                        if (hintEl) hintEl.style.display = 'none';
+                        if (hintEl) {
+                            hintEl.style.display = 'none';
+                            console.log('[BUYBACK] Hint hidden');
+                        }
                     } else {
                         detailsEl.classList.remove('border-orange-400');
                         detailsEl.classList.add('border-orange-200');
-                        if (hintEl) hintEl.style.display = 'block';
+                        if (hintEl) {
+                            hintEl.style.display = 'block';
+                            console.log('[BUYBACK] Hint shown');
+                        }
                     }
                 }
 
                 let totalWeight = '0';
-                let nftWeight = '0';
-                let calculatedPrice = '0';
                 
                 try {
                     const dividendManagerAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.dividendManager;
@@ -646,65 +654,65 @@
                     document.getElementById('balanceRatioTotalWeight').textContent = '-';
                 }
 
-                if (tokenId) {
+                const nftWeightEl = document.getElementById('balanceRatioNftWeight');
+                const priceEl = document.getElementById('finalBalanceRatioPrice');
+
+                if (hasValidTokenId) {
+                    let nftWeightNum = 0;
+                    const nftLevel = level || (selectedNft ? selectedNft.level : 1);
+                    const nftIsRare = isRare !== undefined ? isRare : (selectedNft && selectedNft.nftInfo ? selectedNft.nftInfo.isRare : false);
+                    
+                    console.log(`[BUYBACK] Calculating weight: level=${nftLevel}, isRare=${nftIsRare}`);
+                    
                     try {
-                        console.log(`[BUYBACK] Getting NFT weight for tokenId:`, tokenId);
-                        
-                        let nftWeightNum = 0;
-                        const nftInfo = selectedNft ? (selectedNft.nftInfo || window.ZODIAC_UTILS.getNFTInfo(selectedNft.type)) : null;
-                        const level = selectedNft ? selectedNft.level : 1;
-                        const isRare = nftInfo ? nftInfo.isRare : false;
-                        
-                        console.log(`[BUYBACK] Using level=${level}, isRare=${isRare} for weight calculation`);
-                        
-                        try {
-                            let weightContract = nftDataContract;
-                            if (!weightContract) {
-                                weightContract = await window.ZODIAC_WEB3.getContract('nftData');
-                            }
-                            if (weightContract && weightContract.methods.getWeightByLevel) {
-                                const weightResult = await weightContract.methods.getWeightByLevel(level, isRare).call();
+                        let weightContract = nftDataContract;
+                        if (!weightContract) {
+                            weightContract = await window.ZODIAC_WEB3.getContract('nftData');
+                            console.log('[BUYBACK] Got nftData contract fresh:', !!weightContract);
+                        }
+                        if (weightContract) {
+                            if (weightContract.methods && weightContract.methods.getWeightByLevel) {
+                                const weightResult = await weightContract.methods.getWeightByLevel(nftLevel, nftIsRare).call();
                                 nftWeightNum = parseFloat(weightResult);
-                                nftWeight = String(nftWeightNum);
-                                console.log(`[BUYBACK] Weight from getWeightByLevel:`, nftWeightNum);
-                            } else {
-                                console.warn('[BUYBACK] getWeightByLevel method not available, using fallback calculation');
+                                console.log(`[BUYBACK] Weight from getWeightByLevel(${nftLevel}, ${nftIsRare}):`, nftWeightNum);
+                            } else if (weightContract.methods && weightContract.methods.calcNFTWeight) {
+                                const weightResult = await weightContract.methods.calcNFTWeight(String(tokenId)).call();
+                                nftWeightNum = parseFloat(weightResult);
+                                console.log(`[BUYBACK] Weight from calcNFTWeight(${tokenId}):`, nftWeightNum);
                             }
-                        } catch (weightErr) {
-                            console.warn('[BUYBACK] getWeightByLevel failed:', weightErr.message);
                         }
+                    } catch (weightErr) {
+                        console.warn('[BUYBACK] Contract weight call failed:', weightErr.message);
+                    }
+                    
+                    if (nftWeightNum === 0 || isNaN(nftWeightNum)) {
+                        const baseWeight = nftIsRare ? 10 : 1;
+                        const levelMultiplier = Math.pow(2, nftLevel - 1);
+                        nftWeightNum = baseWeight * levelMultiplier;
+                        console.log(`[BUYBACK] Using fallback weight (baseWeight=${baseWeight}, levelMult=${levelMultiplier}):`, nftWeightNum);
+                    }
                         
-                        if (nftWeightNum === 0) {
-                            const baseWeight = isRare ? 10 : 1;
-                            const levelMultiplier = Math.pow(2, level - 1);
-                            nftWeightNum = baseWeight * levelMultiplier;
-                            nftWeight = String(Math.floor(nftWeightNum));
-                            console.log(`[BUYBACK] Using fallback weight:`, nftWeightNum);
+                    if (nftWeightEl) {
+                        nftWeightEl.textContent = String(Math.floor(nftWeightNum));
+                        console.log('[BUYBACK] Set weight display to:', nftWeightEl.textContent);
+                    }
+                        
+                    if (totalWeight && parseFloat(totalWeight) > 0 && nftWeightNum > 0) {
+                        const totalWeightNum = parseFloat(totalWeight);
+                        const calculatedPrice = balanceNum * (nftWeightNum / totalWeightNum);
+                        console.log(`[BUYBACK] Calculated price: ${balanceNum} * (${nftWeightNum} / ${totalWeightNum}) = ${calculatedPrice}`);
+                        if (priceEl) {
+                            priceEl.textContent = calculatedPrice.toFixed(4) + ' 代币';
+                            console.log('[BUYBACK] Set price display to:', priceEl.textContent);
                         }
-                            
-                        const nftWeightEl = document.getElementById('balanceRatioNftWeight');
-                        if (nftWeightEl) {
-                            nftWeightEl.textContent = nftWeight;
-                        }
-                            
-                        if (totalWeight && parseFloat(totalWeight) > 0 && nftWeightNum > 0) {
-                            const totalWeightNum = parseFloat(totalWeight);
-                            calculatedPrice = balanceNum * (nftWeightNum / totalWeightNum);
-                            console.log(`[BUYBACK] Calculated price: ${balanceNum} * (${nftWeightNum} / ${totalWeightNum}) = ${calculatedPrice}`);
-                            document.getElementById('finalBalanceRatioPrice').textContent = calculatedPrice.toFixed(4) + ' 代币';
-                        } else {
-                            console.log(`[BUYBACK] Cannot calculate price: totalWeight=${totalWeight}, nftWeightNum=${nftWeightNum}`);
-                            document.getElementById('finalBalanceRatioPrice').textContent = '-';
-                        }
-                    } catch (e) {
-                        console.warn('[BUYBACK] 获取NFT权重失败:', e.message, e.stack);
-                        document.getElementById('balanceRatioNftWeight').textContent = '-';
-                        document.getElementById('finalBalanceRatioPrice').textContent = '-';
+                    } else {
+                        console.log(`[BUYBACK] Cannot calculate price: totalWeight=${totalWeight}, nftWeightNum=${nftWeightNum}`);
+                        if (priceEl) priceEl.textContent = '-';
                     }
                 } else {
-                    document.getElementById('balanceRatioNftWeight').textContent = '-';
+                    if (nftWeightEl) nftWeightEl.textContent = '-';
                     const avgPrice = totalSupply > 0 ? balanceNum / parseInt(totalSupply, 10) : 0;
-                    document.getElementById('finalBalanceRatioPrice').textContent = avgPrice.toFixed(4) + ' 代币';
+                    if (priceEl) priceEl.textContent = avgPrice.toFixed(4) + ' 代币';
                 }
             } catch (error) {
                 console.error('[BUYBACK] 加载余额比例价格失败:', error);
@@ -932,7 +940,7 @@
                 document.getElementById('sellWithFixedBtn').disabled = false;
             }
 
-            await loadBalanceRatioPrice(tokenId);
+            await loadBalanceRatioPrice(tokenId, level, nftInfo.isRare);
             document.getElementById('sellWithBalanceRatioBtn').disabled = !balanceRatioBuybackOpen;
 
             holdingDaysRefreshInterval = setInterval(() => {
