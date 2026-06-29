@@ -255,7 +255,7 @@
                     <span id="modalCardRarity" class="text-xs font-bold px-2 py-1 rounded bg-gray-100 text-gray-600">普通</span>
                 </div>
                 <p id="modalCardDesc" class="text-gray-600 text-sm mb-2">描述</p>
-                <p class="text-sm text-gray-500 mb-4">Token ID: <span id="modalCardId"></span></p>
+                <p class="text-sm text-gray-500 mb-4"><span id="modalCardId"></span></p>
             </div>
             
             <div id="modalCardStats" class="mb-4">
@@ -344,6 +344,7 @@
                 const typeId = nftType.typeId;
                 const isOwned = ownedTypes.has(typeId);
                 const userToken = userTokens.find(t => t.typeId === typeId);
+                const firstToken = allUserTokens.find(t => t.typeId === typeId);
                 const nftInfo = window.ZODIAC_UTILS.getNFTInfo(typeId);
                 const level = userToken ? userToken.level : 0;
                 const growth = userToken ? userToken.growth : 0;
@@ -351,7 +352,7 @@
                 
                 html += `
                     <div class="zodiac-card nft-card-hover ${isOwned ? 'has-item cursor-pointer' : 'locked'}" 
-                         data-nft-typeid="${typeId}" data-nft-level="${level}" data-nft-growth="${growth}">
+                         data-nft-typeid="${typeId}" data-nft-tokenid="${firstToken ? firstToken.tokenId : ''}" data-nft-level="${level}" data-nft-growth="${growth}">
                         ${count > 1 ? '<span class="collection-badge">x' + count + '</span>' : ''}
                         <img class="lazy-image" data-src="${nftInfo.imagePath}" alt="${nftInfo.name}" src="" onerror="this.src='images/fu-cards/shuishu_1.png'">
                         <h4>${nftInfo.name}</h4>

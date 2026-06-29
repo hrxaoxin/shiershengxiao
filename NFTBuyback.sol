@@ -383,7 +383,11 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 totalCost = getNFTMintCost(level, isRare);
         uint256 discount = getBuybackDiscount(level);
         uint256 basePrice = (totalCost * discount) / 100;
-        uint256 daysToMax = getDaysToBreakEven(level);
+        uint256 daysToBreakEven = getDaysToBreakEven(level);
+        uint256 daysToMax = 0;
+        if (maxBuybackMultiplier > 100 && discount < 100) {
+            daysToMax = (maxBuybackMultiplier - 100) * daysToBreakEven / (100 - discount);
+        }
 
         uint256 mintTime = _getMintTime(tokenId);
 
@@ -391,7 +395,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             return (basePrice, 0, basePrice, daysToMax);
         }
 
-        return _calculateWithBonus(mintTime, totalCost, discount, basePrice, daysToMax);
+        return _calculateWithBonus(mintTime, totalCost, discount, basePrice, daysToBreakEven, daysToMax);
     }
 
     function _getMintTime(uint256 tokenId) private view returns (uint256) {
@@ -450,10 +454,11 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 totalCost,
         uint256 discount,
         uint256 basePrice,
-        uint256 daysToBreakEven
+        uint256 daysToBreakEven,
+        uint256 daysToMax
     ) internal view returns (uint256, uint256, uint256, uint256) {
         if (mintTime >= block.timestamp || daysToBreakEven == 0 || maxBuybackMultiplier <= 100 || discount >= 100) {
-            return (basePrice, 0, basePrice, daysToBreakEven);
+            return (basePrice, 0, basePrice, daysToMax);
         }
         uint256 bonusDays = ((block.timestamp - mintTime) / 1 days);
         {
@@ -482,7 +487,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             }
         }
 
-        return (basePrice, bonusPercent, finalPrice, daysToBreakEven);
+        return (basePrice, bonusPercent, finalPrice, daysToMax);
     }
 
     /**

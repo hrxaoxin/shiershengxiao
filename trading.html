@@ -557,12 +557,12 @@
         async function setupMarketplaceEventListeners() {
             try {
                 if (typeof window.ZODIAC_WEB3 !== 'undefined') {
-                    await window.ZODIAC_WEB3.listenToEvent('nftTrading', 'ListingCreated', async () => {
+                    await window.ZODIAC_WEB3.listenToEvent('nftTrading', 'MarketListingCreated', async () => {
                         console.log('[TRADING] Listing created, refreshing marketplace...');
                         await loadMarketplace();
                     });
                     
-                    await window.ZODIAC_WEB3.listenToEvent('nftTrading', 'ListingRemoved', async () => {
+                    await window.ZODIAC_WEB3.listenToEvent('nftTrading', 'MarketListingRemoved', async () => {
                         console.log('[TRADING] Listing removed, refreshing marketplace...');
                         await loadMarketplace();
                     });

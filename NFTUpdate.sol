@@ -335,9 +335,25 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(newLevel >= 1 && newLevel <= 5, "NFTUpdate: Invalid level");
         IAuthorizer auth = IAuthorizer(authorizer);
         address nftAddr = auth.getNFTMintCore();
+        address dividendAddr = auth.getDividendManager();
         require(nftAddr != address(0), "NFTUpdate: NFT contract not set");
         INFTMint nft = INFTMint(nftAddr);
+        
+        address owner = nft.ownerOf(tokenId);
+        uint8 oldLevel = nft.tokenLevel(tokenId);
+        uint256 tokenType = nft.tokenType(tokenId);
+        NFTDataTypes.ElementType element = NFTDataTypes.ElementType(tokenType / 24);
+        
+        if (oldLevel >= 1 && oldLevel <= 5 && dividendAddr != address(0)) {
+            _updateUserWeight(owner, oldLevel, false, element, dividendAddr);
+        }
+        
         nft.adminSetNFTLevel(tokenId, newLevel);
+        
+        if (dividendAddr != address(0)) {
+            _updateUserWeight(owner, newLevel, true, element, dividendAddr);
+        }
+        
         emit AdminLevelSet(tokenId, newLevel);
     }
 

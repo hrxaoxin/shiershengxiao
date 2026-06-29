@@ -1210,25 +1210,19 @@
                     return calculateGrowthPriceFallback(level, isRare, holdingDays);
                 }
                 
-                const fallback = calculateGrowthPriceFallback(level, isRare, holdingDays);
-                
-                if (bonusPercent === 0 && holdingDays > 0) {
-                    console.log(`[BUYBACK] Contract returned 0% bonus but holdingDays=${holdingDays}, using fallback calculation`);
-                    return {
-                        basePrice: basePrice,
-                        bonusPercent: fallback.bonusPercent,
-                        finalPrice: fallback.finalPrice,
-                        maxPrice: fallback.maxPrice,
-                        daysToMax: daysToMax,
-                        holdingDays: holdingDays
-                    };
-                }
+                const maxBuybackMultiplier = 110;
+                const discountRates = { 1: 10, 2: 15, 3: 20, 4: 25, 5: 30 };
+                const discount = discountRates[level] || 10;
+                const basePriceNum = parseFloat(web3.utils.fromWei(basePrice, 'ether'));
+                const totalCost = basePriceNum * 100 / discount;
+                const maxPriceNum = totalCost * maxBuybackMultiplier / 100;
+                const maxPrice = web3.utils.toWei(maxPriceNum.toString(), 'ether');
 
                 return {
                     basePrice: basePrice,
                     bonusPercent: bonusPercent,
                     finalPrice: finalPrice,
-                    maxPrice: fallback.maxPrice,
+                    maxPrice: maxPrice,
                     daysToMax: daysToMax,
                     holdingDays: holdingDays
                 };
