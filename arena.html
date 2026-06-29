@@ -743,6 +743,7 @@
         let web3;
         let accounts = [];
         let battleContract;
+        let battleSkillDataContract;
         let arenaContract;
         let arenaRankingManagerContract;
         let arenaPlayerContract;
@@ -1182,6 +1183,12 @@
             } catch (e) { console.warn('Failed to init battleContract:', e.message); }
             
             try {
+                if (config.ABIS.battleSkillDataABI && config.CONTRACT_ADDRESSES.battleSkillData) {
+                    battleSkillDataContract = new web3.eth.Contract(config.ABIS.battleSkillDataABI, config.CONTRACT_ADDRESSES.battleSkillData);
+                }
+            } catch (e) { console.warn('Failed to init battleSkillDataContract:', e.message); }
+            
+            try {
                 if (config.ABIS.arenaABI && config.CONTRACT_ADDRESSES.arena) {
                     arenaContract = new web3.eth.Contract(config.ABIS.arenaABI, config.CONTRACT_ADDRESSES.arena);
                 }
@@ -1304,7 +1311,7 @@
                         if (skillCache[tokenType]) {
                             skill = skillCache[tokenType];
                         } else {
-                            const skillData = await battleContract.methods.getSkill(tokenType).call();
+                            const skillData = await battleSkillDataContract.methods.getSkill(tokenType).call();
                             skill = {
                                 name: skillData.skillId || skillData[0],
                                 type: SKILL_TYPE_MAP[skillData.skillType_ !== undefined ? skillData.skillType_ : skillData[1]],
@@ -1886,7 +1893,7 @@
                             if (skillCache[tokenType]) {
                                 skill = skillCache[tokenType];
                             } else {
-                                const skillData = await battleContract.methods.getSkill(tokenType).call();
+                                const skillData = await battleSkillDataContract.methods.getSkill(tokenType).call();
                                 skill = {
                                     name: skillData.skillId || skillData[0],
                                     type: SKILL_TYPE_MAP[skillData.skillType_ !== undefined ? skillData.skillType_ : skillData[1]],

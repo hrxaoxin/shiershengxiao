@@ -199,6 +199,7 @@ window.ZODIAC_WEB3 = (function() {
         'tokenBurner': ABIS.tokenBurnerABI,
         'nftUpdate': ABIS.nftUpdateABI,
         'battle': ABIS.battleABI,
+        'battleSkillData': ABIS.battleSkillDataABI,
         'arena': ABIS.arenaABI,
         'arenaRankingManager': ABIS.arenaRankingManagerABI,
         'arenaReward': ABIS.arenaRewardABI,

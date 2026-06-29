@@ -1665,7 +1665,7 @@
                 
                 let skillInfo = '';
                         try {
-                            const battleContract = await window.ZODIAC_WEB3.getContract('battle');
+                            const battleContract = await window.ZODIAC_WEB3.getContract('battleSkillData');
                             if (battleContract) {
                                 const skill = await battleContract.methods.getSkill(nftType).call();
                                 const sType = skill.skillType_ !== undefined ? skill.skillType_ : (skill[1] !== undefined ? skill[1] : 0);
