@@ -705,15 +705,53 @@
             return parseInt(tokenType, 10) >= 72;
         }
 
+        let isLoadingStakingNFTs = false;
+        let pendingLoadStakingNFTs = false;
+
         async function loadEligibleNFTs() {
+            if (isLoadingStakingNFTs) {
+                pendingLoadStakingNFTs = true;
+                return;
+            }
+            
+            isLoadingStakingNFTs = true;
             ZODIAC_UI.showLoading('加载NFT中...');
             const eligibleNFTs = document.getElementById('eligibleNFTs');
 
             try {
                 const tokenIds = await nftContract.methods.getTokenIdsByOwner(account).call();
                 
+                let minLevel = 1;
+                try {
+                    minLevel = parseInt(await stakingContract.methods.minStakingLevel().call());
+                } catch (e) {
+                    console.warn('获取最低质押等级失败:', e);
+                }
+                
                 const nftPromises = tokenIds.map(tokenId => {
-                    return loadSingleStakingNFT(tokenId);
+                    return Promise.all([
+                        nftContract.methods.getNFTData(tokenId).call().catch(e => ({ tokenType_: '0', level: '1' })),
+                        nftContract.methods.tokenGrowth(tokenId).call().catch(() => '0'),
+                        stakingContract.methods.getStakingInfo(tokenId).call().catch(() => ({ owner: '0x0000000000000000000000000000000000000000' }))
+                    ]).then(([nftData, growth, stakeInfo]) => {
+                        const tokenType = (nftData.tokenType_ !== undefined ? nftData.tokenType_ : (nftData[0] || '0')).toString();
+                        const tokenLevel = (nftData.level !== undefined ? nftData.level : (nftData[1] || '1')).toString();
+                        
+                        if (tokenType === '0') {
+                            return null;
+                        }
+                        
+                        return {
+                            tokenId: tokenId.toString(),
+                            level: tokenLevel,
+                            type: tokenType,
+                            growth: parseInt(growth),
+                            stakeInfo: stakeInfo
+                        };
+                    }).catch(e => {
+                        console.warn(`获取NFT ${tokenId} 详情失败:`, e);
+                        return null;
+                    });
                 });
 
                 const results = await Promise.all(nftPromises);
@@ -721,7 +759,7 @@
 
                 const eligible = [];
                 for (const nft of nfts) {
-                    if (await isNFTLevelEligible(nft.level)) {
+                    if (parseInt(nft.level) >= minLevel) {
                         if (nft.stakeInfo.owner === '0x0000000000000000000000000000000000000000') {
                             const nftInfo = getNFTInfo(nft.type);
                             const isRare = isNFTRare(nft.type);
@@ -767,8 +805,14 @@
                 console.error('加载NFT失败:', error);
                 eligibleNFTs.innerHTML = '<div class="col-span-full text-center text-gray-500 py-8">加载失败，请重试</div>';
                 ZODIAC_UI.showToast('加载NFT失败: ' + error.message, 'error');
+            } finally {
+                ZODIAC_UI.hideLoading();
+                isLoadingStakingNFTs = false;
+                if (pendingLoadStakingNFTs) {
+                    pendingLoadStakingNFTs = false;
+                    setTimeout(loadEligibleNFTs, 100);
+                }
             }
-            ZODIAC_UI.hideLoading();
         }
 
         async function loadSingleStakingNFT(tokenId) {
@@ -843,16 +887,19 @@
                 const stakePromises = tokenIds.map(tokenId => {
                     return Promise.all([
                         stakingContract.methods.getStakingInfo(tokenId).call(),
-                        nftContract.methods.tokenType(tokenId).call(),
-                        nftContract.methods.tokenLevel(tokenId).call(),
-                        nftContract.methods.tokenGrowth(tokenId).call()
-                    ]).then(([stakeInfo, tokenType, tokenLevel, growth]) => ({
-                        tokenId: tokenId.toString(),
-                        stakeInfo: stakeInfo,
-                        type: tokenType.toString(),
-                        level: tokenLevel.toString(),
-                        growth: parseInt(growth, 10)
-                    })).catch(e => {
+                        nftContract.methods.getNFTData(tokenId).call().catch(e => ({ tokenType_: '0', level: '1' })),
+                        nftContract.methods.tokenGrowth(tokenId).call().catch(() => '0')
+                    ]).then(([stakeInfo, nftData, growth]) => {
+                        const tokenType = (nftData.tokenType_ !== undefined ? nftData.tokenType_ : (nftData[0] || '0')).toString();
+                        const tokenLevel = (nftData.level !== undefined ? nftData.level : (nftData[1] || '1')).toString();
+                        return {
+                            tokenId: tokenId.toString(),
+                            stakeInfo: stakeInfo,
+                            type: tokenType,
+                            level: tokenLevel,
+                            growth: parseInt(growth, 10)
+                        };
+                    }).catch(e => {
                         console.warn(`获取质押NFT ${tokenId} 详情失败:`, e);
                         return null;
                     });

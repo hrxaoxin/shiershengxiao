@@ -862,11 +862,12 @@
         }
 
         async function loadSingleNFT(tokenId) {
-            const [tokenType, tokenLevel, tokenGrowth] = await Promise.all([
-                nftContract.methods.tokenType(tokenId).call(),
-                nftContract.methods.tokenLevel(tokenId).call(),
-                nftContract.methods.tokenGrowth(tokenId).call()
+            const [nftData, tokenGrowth] = await Promise.all([
+                nftContract.methods.getNFTData(tokenId).call().catch(e => ({ tokenType_: '0', level: '1' })),
+                nftContract.methods.tokenGrowth(tokenId).call().catch(() => '0')
             ]);
+            const tokenType = nftData.tokenType_ !== undefined ? nftData.tokenType_ : (nftData[0] || '0');
+            const tokenLevel = nftData.level !== undefined ? nftData.level : (nftData[1] || '1');
             
             const nftInfo = window.ZODIAC_UTILS.getNFTInfo(tokenType);
             
