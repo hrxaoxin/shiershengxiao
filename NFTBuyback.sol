@@ -390,7 +390,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             return (basePrice, 0, basePrice, daysToMax);
         }
 
-        return _calculateWithBonus(mintTime, totalCost, discount, basePrice, daysToBreakEven, daysToMax);
+        return _calculateWithBonus(mintTime, totalCost, discount, basePrice, daysToMax);
     }
 
     function _getMintTime(uint256 tokenId) private view returns (uint256) {
@@ -449,36 +449,29 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 totalCost,
         uint256 discount,
         uint256 basePrice,
-        uint256 daysToBreakEven,
         uint256 daysToMax
     ) internal view returns (uint256, uint256, uint256, uint256) {
         if (mintTime >= block.timestamp || maxBuybackMultiplier <= 100 || discount >= 100) {
             return (basePrice, 0, basePrice, daysToMax);
         }
-        uint256 holdingDays = ((block.timestamp - mintTime) / 1 days);
         
         uint256 maxBonusDays = maxBuybackMultiplier - discount;
-        uint256 bonusDays = holdingDays > maxBonusDays ? maxBonusDays : holdingDays;
-
-        uint256 bonusPercent = bonusDays;
-        if (bonusPercent > (maxBuybackMultiplier - discount)) {
-            bonusPercent = maxBuybackMultiplier - discount;
+        uint256 bonusDays = ((block.timestamp - mintTime) / 1 days);
+        if (bonusDays > maxBonusDays) {
+            bonusDays = maxBonusDays;
         }
 
         uint256 finalPrice = basePrice;
         if (bonusDays > 0) {
-            uint256 bonusAmount = (totalCost * bonusPercent) / 100;
-            finalPrice = basePrice + bonusAmount;
+            finalPrice = basePrice + (totalCost * bonusDays) / 100;
         }
         
-        {
-            uint256 maxPrice = (totalCost * maxBuybackMultiplier) / 100;
-            if (finalPrice > maxPrice) {
-                finalPrice = maxPrice;
-            }
+        uint256 maxPrice = (totalCost * maxBuybackMultiplier) / 100;
+        if (finalPrice > maxPrice) {
+            finalPrice = maxPrice;
         }
 
-        return (basePrice, bonusPercent, finalPrice, maxBonusDays);
+        return (basePrice, bonusDays, finalPrice, maxBonusDays);
     }
 
     /**
