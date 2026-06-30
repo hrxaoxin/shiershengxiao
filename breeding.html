@@ -1094,37 +1094,47 @@
                 btn.textContent = '正在孕育...';
                 
                 try {
-                    const nftContract = await window.ZODIAC_WEB3.getContract('nftContract');
-                    if (nftContract) {
-                        const fatherLevel = await nftContract.methods.tokenLevel(selectedMaleNFT.id).call();
-                        const motherLevel = await nftContract.methods.tokenLevel(selectedFemaleNFT.id).call();
-                        if (fatherLevel < 5 || motherLevel < 5) {
-                            ZODIAC_UI.showToast('NFT等级不足，需要5级以上才能孕育', 'error');
-                            btn.textContent = '开始自我孕育';
-                            btn.disabled = false;
-                            isTransactionInProgress = false;
-                            return;
-                        }
-                        
-                        const fatherType = await nftContract.methods.tokenType(selectedMaleNFT.id).call();
-                        const motherType = await nftContract.methods.tokenType(selectedFemaleNFT.id).call();
-                        if ((fatherType / 2) % 12 !== (motherType / 2) % 12) {
-                            ZODIAC_UI.showToast('两个NFT必须是同一生肖', 'error');
-                            btn.textContent = '开始自我孕育';
-                            btn.disabled = false;
-                            isTransactionInProgress = false;
-                            return;
-                        }
-                        if ((fatherType % 2) === (motherType % 2)) {
-                            ZODIAC_UI.showToast('两个NFT必须是不同性别', 'error');
-                            btn.textContent = '开始自我孕育';
-                            btn.disabled = false;
-                            isTransactionInProgress = false;
-                            return;
-                        }
+                    if (!nftContract) {
+                        ZODIAC_UI.showToast('NFT合约未初始化，请刷新页面重试', 'error');
+                        btn.textContent = '开始自我孕育';
+                        btn.disabled = false;
+                        isTransactionInProgress = false;
+                        return;
+                    }
+                    
+                    const fatherLevel = await nftContract.methods.tokenLevel(selectedMaleNFT.id).call();
+                    const motherLevel = await nftContract.methods.tokenLevel(selectedFemaleNFT.id).call();
+                    if (fatherLevel < 5 || motherLevel < 5) {
+                        ZODIAC_UI.showToast('NFT等级不足，需要5级以上才能孕育', 'error');
+                        btn.textContent = '开始自我孕育';
+                        btn.disabled = false;
+                        isTransactionInProgress = false;
+                        return;
+                    }
+                    
+                    const fatherType = await nftContract.methods.tokenType(selectedMaleNFT.id).call();
+                    const motherType = await nftContract.methods.tokenType(selectedFemaleNFT.id).call();
+                    if ((fatherType / 2) % 12 !== (motherType / 2) % 12) {
+                        ZODIAC_UI.showToast('两个NFT必须是同一生肖', 'error');
+                        btn.textContent = '开始自我孕育';
+                        btn.disabled = false;
+                        isTransactionInProgress = false;
+                        return;
+                    }
+                    if ((fatherType % 2) === (motherType % 2)) {
+                        ZODIAC_UI.showToast('两个NFT必须是不同性别', 'error');
+                        btn.textContent = '开始自我孕育';
+                        btn.disabled = false;
+                        isTransactionInProgress = false;
+                        return;
                     }
                 } catch (preCheckError) {
-                    console.warn('孕育预检查失败:', preCheckError);
+                    console.error('孕育预检查失败:', preCheckError);
+                    ZODIAC_UI.showToast('孕育预检查失败: ' + (preCheckError.message || '未知错误'), 'error');
+                    btn.textContent = '开始自我孕育';
+                    btn.disabled = false;
+                    isTransactionInProgress = false;
+                    return;
                 }
                 
                 if (!breedingCoreContract) {
