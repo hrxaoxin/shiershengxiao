@@ -1475,203 +1475,180 @@
             }
         }
 
-        async function showNFTModal(nftId, nftType, nftLevel, nftName, nftImage) {
+        function showNFTModal(nftId, nftType, nftLevel, nftName, nftImage) {
+            const nftInfo = window.ZODIAC_UTILS.getNFTInfo(nftType);
+            const isRare = nftInfo.isRare;
+            const rarityText = isRare ? '稀有' : '普通';
+            
+            const level = parseInt(nftLevel, 10);
+            const displayLevel = level > 0 ? level : 1;
+            
+            const canBreed = level >= 5;
+            const canBattle = level >= 1;
+            const canStake = level >= 1;
+            
+            const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+            const zodiacName = nftInfo.zodiac !== undefined ? (ZODIAC_CONFIG && ZODIAC_CONFIG.ZODIAC_NAMES ? ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac] : zodiacNames[nftInfo.zodiac]) : '未知';
+            
+            const localSkill = getLocalSkill(nftType);
+            const sType = localSkill.type;
+            const sDamage = localSkill.damage;
+            const sCooldown = localSkill.cooldown;
+            const sIsAoe = localSkill.isAoe;
+            const skillTypeName = getSkillTypeName(parseInt(sType));
+            const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
+            
+            const skillInfo = `
+                <div class="mt-4">
+                    <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
+                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
+                            <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
+                        </div>
+                        <div class="text-xs text-gray-500">${skillDesc}</div>
+                        <div class="mt-2 flex gap-3 text-xs">
+                            <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
+                            <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modalCardImage').src = nftImage;
+            document.getElementById('modalCardName').textContent = nftName;
+            document.getElementById('modalCardDesc').textContent = `${nftInfo.attrName || '未知'}属性生肖·${zodiacName}·${nftInfo.genderName || '未知'}`;
+            document.getElementById('modalCardId').textContent = nftId;
+            
+            const rarityBadge = document.getElementById('modalCardRarity');
+            if (rarityBadge) {
+                rarityBadge.textContent = rarityText;
+                rarityBadge.className = `text-xs font-bold px-2 py-1 rounded ${isRare ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`;
+            }
+            
+            let weight = level * (isRare ? 2 : 1);
             try {
-                const isRare = await nftMintContract.methods.isRare(nftId).call();
-                const growth = await nftMintContract.methods.tokenGrowth(nftId).call();
-                
-                const nftInfo = window.ZODIAC_UTILS.getNFTInfo(nftType);
-                const rarityText = isRare ? '稀有' : '普通';
-                
-                const level = parseInt(nftLevel, 10);
-                const displayLevel = level > 0 ? level : 1;
-                
-                let weight = level * (isRare ? 2 : 1);
-                try {
-                    const nftDataContract = await window.ZODIAC_WEB3.getContract('nftData', false);
-                    if (nftDataContract) {
-                        const realWeight = await nftDataContract.methods.getWeightByLevel(level, isRare).call();
-                        if (realWeight && realWeight > 0) {
-                            weight = parseInt(realWeight, 10);
-                        }
+                const weightsConfig = ZODIAC_CONFIG && ZODIAC_CONFIG.WEIGHTS;
+                if (weightsConfig) {
+                    const weightTable = isRare ? weightsConfig.rare : weightsConfig.normal;
+                    if (weightTable && weightTable[level]) {
+                        weight = weightTable[level];
                     }
-                } catch (e) {
-                    console.warn('获取NFT权重失败，使用简化计算:', e.message);
                 }
+            } catch (e) {}
+            
+            const statsDiv = document.getElementById('modalCardStats');
+            if (statsDiv) {
+                statsDiv.innerHTML = `
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-blue-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-600 mb-1">稀有度</div>
+                            <div class="${isRare ? 'text-purple-600' : 'text-gray-600'} font-bold">${rarityText}</div>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-600 mb-1">分红权重</div>
+                            <div class="text-green-600 font-bold">${weight}x</div>
+                        </div>
+                        <div class="bg-yellow-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-600 mb-1">当前等级</div>
+                            <div class="text-yellow-600 font-bold">${'⭐'.repeat(level)}</div>
+                        </div>
+                        <div class="bg-purple-50 rounded-lg p-3">
+                            <div class="text-xs text-gray-600 mb-1">成长值</div>
+                            <div class="text-purple-600 font-bold">计算中...</div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="text-xs text-gray-600 mb-2">战斗属性</div>
+                        <div class="grid grid-cols-4 gap-2">
+                            <div class="bg-red-50 rounded-lg p-2 text-center">
+                                <div class="text-lg mb-1">⚔️</div>
+                                <div class="text-xs text-gray-500">攻击</div>
+                                <div class="text-sm font-bold text-red-600">计算中...</div>
+                            </div>
+                            <div class="bg-blue-50 rounded-lg p-2 text-center">
+                                <div class="text-lg mb-1">🛡️</div>
+                                <div class="text-xs text-gray-500">防御</div>
+                                <div class="text-sm font-bold text-blue-600">计算中...</div>
+                            </div>
+                            <div class="bg-yellow-50 rounded-lg p-2 text-center">
+                                <div class="text-lg mb-1">💨</div>
+                                <div class="text-xs text-gray-500">速度</div>
+                                <div class="text-sm font-bold text-yellow-600">计算中...</div>
+                            </div>
+                            <div class="bg-green-50 rounded-lg p-2 text-center">
+                                <div class="text-lg mb-1">❤️</div>
+                                <div class="text-xs text-gray-500">生命</div>
+                                <div class="text-sm font-bold text-green-600">计算中...</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="text-xs text-gray-600 mb-2">可用功能</div>
+                        <div class="flex gap-2 flex-wrap">
+                            ${canBattle ? '<span class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs">⚔️ 战斗</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">⚔️ 战斗</span>'}
+                            ${canStake ? '<span class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs">💰 质押</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">💰 质押</span>'}
+                            ${canBreed ? '<span class="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs">🧬 孕育</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">🧬 孕育</span>'}
+                            <span class="px-2 py-1 bg-yellow-100 text-yellow-600 rounded text-xs">📊 分红</span>
+                        </div>
+                    </div>
+                    ${skillInfo}
+                    <div class="mt-4 text-xs text-gray-500">
+                        <p>💡 ${isRare ? '稀有属性' : '普通属性'}NFT，${isRare ? '权重更高' : '基础权重'}，适合参与各类游戏玩法。</p>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('cardModal').classList.remove('hidden');
+            
+            loadNFTChainData(nftId, nftType, level, isRare);
+        }
+        
+        async function loadNFTChainData(nftId, nftType, level, isRare) {
+            try {
+                if (!nftMintContract) return;
                 
-                const canBreed = level >= 5;
-                const canBattle = level >= 1;
-                const canStake = level >= 1;
-                
-                const zodiacNames = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
-                const zodiacName = nftInfo.zodiac !== undefined ? (ZODIAC_CONFIG && ZODIAC_CONFIG.ZODIAC_NAMES ? ZODIAC_CONFIG.ZODIAC_NAMES[nftInfo.zodiac] : zodiacNames[nftInfo.zodiac]) : '未知';
+                const [growth, realWeight] = await Promise.all([
+                    nftMintContract.methods.tokenGrowth(nftId).call().catch(() => 50),
+                    (async () => {
+                        try {
+                            const nftDataContract = await window.ZODIAC_WEB3.getContract('nftData', false);
+                            if (nftDataContract) {
+                                const w = await nftDataContract.methods.getWeightByLevel(level, isRare).call();
+                                return w && w > 0 ? parseInt(w, 10) : level * (isRare ? 2 : 1);
+                            }
+                        } catch (e) {}
+                        return level * (isRare ? 2 : 1);
+                    })()
+                ]);
                 
                 const displayGrowth = parseInt(growth, 10) || 50;
+                const displayWeight = realWeight;
                 
-                let skillInfo = '';
-                try {
-                    const battleContract = await window.ZODIAC_WEB3.getContract('battleSkillData');
-                    if (battleContract) {
-                        const isInitialized = await battleContract.methods.skillsInitialized().call();
-                        if (!isInitialized) {
-                            console.warn('技能数据尚未初始化，使用本地数据');
-                            const localSkill = getLocalSkill(nftType);
-                            const sType = localSkill.type;
-                            const sDamage = localSkill.damage;
-                            const sCooldown = localSkill.cooldown;
-                            const sIsAoe = localSkill.isAoe;
-                            const skillTypeName = getSkillTypeName(parseInt(sType));
-                            const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
-                            skillInfo = `
-                                <div class="mt-4">
-                                    <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
-                                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
-                                        <div class="flex items-center justify-between mb-1">
-                                            <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
-                                            <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
-                                        </div>
-                                        <div class="text-xs text-gray-500">${skillDesc}</div>
-                                        <div class="mt-2 flex gap-3 text-xs">
-                                            <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
-                                            <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        } else {
-                            const skill = await battleContract.methods.getSkill(nftType).call();
-                            const sType = skill[1] !== undefined ? skill[1] : (skill.skillType !== undefined ? skill.skillType : 0);
-                            const sDamage = skill[2] !== undefined ? skill[2] : (skill.damage !== undefined ? skill.damage : 0);
-                            const sCooldown = skill[3] !== undefined ? skill[3] : (skill.cooldown !== undefined ? skill.cooldown : 0);
-                            const sIsAoe = skill[5] !== undefined ? skill[5] : (skill.isAoe !== undefined ? skill.isAoe : false);
-                            const skillTypeName = getSkillTypeName(parseInt(sType));
-                            const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
-                            skillInfo = `
-                                <div class="mt-4">
-                                    <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
-                                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
-                                        <div class="flex items-center justify-between mb-1">
-                                            <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
-                                            <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
-                                        </div>
-                                        <div class="text-xs text-gray-500">${skillDesc}</div>
-                                        <div class="mt-2 flex gap-3 text-xs">
-                                            <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
-                                            <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            `;
-                        }
-                    }
-                } catch (e) {
-                    console.warn('获取技能信息失败:', e.message);
-                    const localSkill = getLocalSkill(nftType);
-                    const sType = localSkill.type;
-                    const sDamage = localSkill.damage;
-                    const sCooldown = localSkill.cooldown;
-                    const sIsAoe = localSkill.isAoe;
-                    const skillTypeName = getSkillTypeName(parseInt(sType));
-                    const skillDesc = getSkillDescription(parseInt(sType), parseInt(sDamage), sIsAoe);
-                    skillInfo = `
-                        <div class="mt-4">
-                            <div class="text-xs text-gray-600 mb-2">⚔️ 战斗技能</div>
-                            <div class="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
-                                <div class="flex items-center justify-between mb-1">
-                                    <span class="text-sm font-bold text-blue-700">${skillTypeName}</span>
-                                    <span class="text-xs px-2 py-0.5 ${sIsAoe ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'} rounded">${sIsAoe ? '范围攻击' : '单体攻击'}</span>
-                                </div>
-                                <div class="text-xs text-gray-500">${skillDesc}</div>
-                                <div class="mt-2 flex gap-3 text-xs">
-                                    <span class="text-gray-500">伤害倍率: <span class="text-purple-600 font-bold">${parseInt(sDamage)}%</span></span>
-                                    <span class="text-gray-500">冷却: <span class="text-orange-600 font-bold">${parseInt(sCooldown)}回合</span></span>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }
+                const nftInfo = window.ZODIAC_UTILS.getNFTInfo(nftType);
+                const attack = window.ZODIAC_UI.calculateAttack(level, displayGrowth);
+                const defense = window.ZODIAC_UI.calculateDefense(level, displayGrowth);
+                const speed = window.ZODIAC_UI.calculateSpeed(level, displayGrowth, nftInfo.zodiac);
+                const hp = window.ZODIAC_UI.calculateMaxHP(level, displayGrowth);
                 
-                document.getElementById('modalCardImage').src = nftImage;
-                document.getElementById('modalCardName').textContent = nftName;
-                document.getElementById('modalCardDesc').textContent = `${nftInfo.attrName || '未知'}属性生肖·${zodiacName}·${nftInfo.genderName || '未知'}`;
-                document.getElementById('modalCardId').textContent = nftId;
-                
-                const rarityBadge = document.getElementById('modalCardRarity');
-                if (rarityBadge) {
-                    rarityBadge.textContent = rarityText;
-                    rarityBadge.className = `text-xs font-bold px-2 py-1 rounded ${isRare ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'}`;
-                }
-                
-                const attack = window.ZODIAC_UI.calculateAttack(displayLevel, displayGrowth);
-                const defense = window.ZODIAC_UI.calculateDefense(displayLevel, displayGrowth);
-                const speed = window.ZODIAC_UI.calculateSpeed(displayLevel, displayGrowth, nftInfo.zodiac);
-                const hp = window.ZODIAC_UI.calculateMaxHP(displayLevel, displayGrowth);
-
                 const statsDiv = document.getElementById('modalCardStats');
                 if (statsDiv) {
-                    statsDiv.innerHTML = `
-                        <div class="grid grid-cols-2 gap-3">
-                            <div class="bg-blue-50 rounded-lg p-3">
-                                <div class="text-xs text-gray-600 mb-1">稀有度</div>
-                                <div class="${isRare ? 'text-purple-600' : 'text-gray-600'} font-bold">${rarityText}</div>
-                            </div>
-                            <div class="bg-green-50 rounded-lg p-3">
-                                <div class="text-xs text-gray-600 mb-1">分红权重</div>
-                                <div class="text-green-600 font-bold">${weight}x</div>
-                            </div>
-                            <div class="bg-yellow-50 rounded-lg p-3">
-                                <div class="text-xs text-gray-600 mb-1">当前等级</div>
-                                <div class="text-yellow-600 font-bold">${'⭐'.repeat(level)}</div>
-                            </div>
-                            <div class="bg-purple-50 rounded-lg p-3">
-                                <div class="text-xs text-gray-600 mb-1">成长值</div>
-                                <div class="text-purple-600 font-bold">${displayGrowth}</div>
-                            </div>
-                        </div>
-                        <div class="mt-4">
-                            <div class="text-xs text-gray-600 mb-2">战斗属性</div>
-                            <div class="grid grid-cols-4 gap-2">
-                                <div class="bg-red-50 rounded-lg p-2 text-center">
-                                    <div class="text-lg mb-1">⚔️</div>
-                                    <div class="text-xs text-gray-500">攻击</div>
-                                    <div class="text-sm font-bold text-red-600">${attack}</div>
-                                </div>
-                                <div class="bg-blue-50 rounded-lg p-2 text-center">
-                                    <div class="text-lg mb-1">🛡️</div>
-                                    <div class="text-xs text-gray-500">防御</div>
-                                    <div class="text-sm font-bold text-blue-600">${defense}</div>
-                                </div>
-                                <div class="bg-yellow-50 rounded-lg p-2 text-center">
-                                    <div class="text-lg mb-1">💨</div>
-                                    <div class="text-xs text-gray-500">速度</div>
-                                    <div class="text-sm font-bold text-yellow-600">${speed}</div>
-                                </div>
-                                <div class="bg-green-50 rounded-lg p-2 text-center">
-                                    <div class="text-lg mb-1">❤️</div>
-                                    <div class="text-xs text-gray-500">生命</div>
-                                    <div class="text-sm font-bold text-green-600">${hp}</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="mt-4">
-                            <div class="text-xs text-gray-600 mb-2">可用功能</div>
-                            <div class="flex gap-2 flex-wrap">
-                                ${canBattle ? '<span class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs">⚔️ 战斗</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">⚔️ 战斗</span>'}
-                                ${canStake ? '<span class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs">💰 质押</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">💰 质押</span>'}
-                                ${canBreed ? '<span class="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs">🧬 孕育</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-400 rounded text-xs">🧬 孕育</span>'}
-                                <span class="px-2 py-1 bg-yellow-100 text-yellow-600 rounded text-xs">📊 分红</span>
-                            </div>
-                        </div>
-                        ${skillInfo}
-                        <div class="mt-4 text-xs text-gray-500">
-                            <p>💡 ${isRare ? '稀有属性' : '普通属性'}NFT，${isRare ? '权重更高' : '基础权重'}，适合参与各类游戏玩法。</p>
-                        </div>
-                    `;
+                    const weightEl = statsDiv.querySelector('.text-green-600.font-bold');
+                    if (weightEl) weightEl.textContent = `${displayWeight}x`;
+                    
+                    const growthEl = statsDiv.querySelectorAll('.bg-purple-50 .text-purple-600.font-bold')[0];
+                    if (growthEl) growthEl.textContent = displayGrowth;
+                    
+                    const statValues = statsDiv.querySelectorAll('.grid-cols-4 .font-bold');
+                    if (statValues.length >= 4) {
+                        statValues[0].textContent = attack;
+                        statValues[1].textContent = defense;
+                        statValues[2].textContent = speed;
+                        statValues[3].textContent = hp;
+                    }
                 }
-                
-                document.getElementById('cardModal').classList.remove('hidden');
-            } catch (error) {
-                console.error('Failed to show NFT modal:', error);
+            } catch (e) {
+                console.warn('加载链上NFT数据失败:', e.message);
             }
         }
 
