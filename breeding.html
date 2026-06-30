@@ -1065,12 +1065,15 @@
 
                 const feeWei = await breedingCoreContract.methods.selfBreedingFee().call();
                 if (BigInt(feeWei) > BigInt(0)) {
-                    const tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
-                    if (!tokenContract) {
-                        throw new Error('代币合约未初始化');
+                    const web3 = window.ZODIAC_WEB3.getWeb3();
+                    const authorizerContract = await window.ZODIAC_WEB3.getContract('authorizer');
+                    if (!authorizerContract) {
+                        throw new Error('授权合约未初始化');
                     }
                     
-                    const web3 = window.ZODIAC_WEB3.getWeb3();
+                    const tokenAddress = await authorizerContract.methods.getToken().call();
+                    const tokenContract = new web3.eth.Contract(ZODIAC_CONFIG.ABI_MAP.tokenContract, tokenAddress);
+                    
                     const balance = await tokenContract.methods.balanceOf(account).call();
                     if (BigInt(balance) < BigInt(feeWei)) {
                         const fee = web3.utils.fromWei(feeWei, 'ether');
