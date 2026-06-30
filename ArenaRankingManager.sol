@@ -408,6 +408,54 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
+     * @dev 获取当前赛季待发放的模拟玩家奖励
+     * @param seasonId 赛季 ID
+     * @return 待发放奖励金额
+     */
+    function getPendingMockReward(uint256 seasonId) external view returns (uint256) {
+        address arenaReward = IAuthorizer(authorizer).getArenaReward();
+        if (arenaReward == address(0)) {
+            return 0;
+        }
+        (uint256 rewardPool, , ) = this.getSeasonRewardData(seasonId);
+        return IArenaReward(arenaReward).calculateSeasonRewardsMock(seasonId, rewardPool);
+    }
+
+    /**
+     * @dev 发放模拟玩家奖励（循环使用接收地址）
+     * @param seasonId 赛季 ID
+     * @param amount 发放金额
+     */
+    function distributeMockReward(uint256 seasonId, uint256 amount) external onlyOwner {
+        require(mockRewardRecipients.length > 0, "ArenaRankingManager: No reward recipients set");
+        require(amount > 0, "ArenaRankingManager: Amount must be > 0");
+        
+        address arenaReward = IAuthorizer(authorizer).getArenaReward();
+        require(arenaReward != address(0), "ArenaRankingManager: ArenaReward contract not set");
+        
+        address wbnb = IAuthorizer(authorizer).getWBNB();
+        require(wbnb != address(0), "ArenaRankingManager: WBNB contract not set");
+        
+        uint256 balance = IERC20(wbnb).balanceOf(arenaReward);
+        require(balance >= amount, "ArenaRankingManager: Insufficient balance");
+        
+        uint256 remaining = amount;
+        uint256 count = mockRewardRecipients.length;
+        
+        while (remaining > 0) {
+            address recipient = mockRewardRecipients[mockRewardIndex];
+            uint256 toDistribute = count > 1 ? remaining / count : remaining;
+            
+            IERC20(wbnb).transferFrom(arenaReward, recipient, toDistribute);
+            emit MockRewardDistributed(recipient, toDistribute, seasonId);
+            
+            remaining -= toDistribute;
+            mockRewardIndex = (mockRewardIndex + 1) % mockRewardRecipients.length;
+            count--;
+        }
+    }
+
+    /**
      * @dev 设置模式控制类型
      * @param controlType 控制类型：0 = 禁用, 1 = 手动, 2 = 自动
      */

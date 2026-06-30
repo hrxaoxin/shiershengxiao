@@ -203,6 +203,16 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     /**
+     * @dev 计算模拟玩家奖励（外部调用）
+     * @param seasonId 赛季 ID
+     * @param totalReward 总奖励金额
+     * @return 模拟玩家奖励总额
+     */
+    function calculateSeasonRewardsMock(uint256 seasonId, uint256 totalReward) external view returns (uint256) {
+        return _calculateMockRewards(seasonId, totalReward);
+    }
+
+    /**
      * @dev 内部函数：计算真实玩家奖励
      * @param seasonId 赛季 ID
      * @param totalReward 总奖励金额

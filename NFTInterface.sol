@@ -426,6 +426,7 @@ interface IArenaBattle {
  */
 interface IArenaReward {
     function calculateSeasonRewards(uint256 seasonId) external;
+    function calculateSeasonRewardsMock(uint256 seasonId, uint256 totalReward) external view returns (uint256);
     function getPendingRewardsByPlayer(address player, uint256 seasonId) external view returns (uint256);
     function getPendingRewardsBySeason(uint256 seasonId) external view returns (uint256);
     function getTotalPendingRewards(address player) external view returns (uint256);

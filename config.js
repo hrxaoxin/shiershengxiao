@@ -165,13 +165,13 @@ window.ZODIAC_CONFIG = (function() {
         stakingLP: getEnvContractAddress('stakingLP', '0x37D92e6786efb1e2674192E0785733dfa5A06a5c'),
         tokenStaking: getEnvContractAddress('tokenStaking', '0x7B77DE8A352A8A1fd04dc20e8e5713C02Fd864E1'),
         tokenStakingLP: getEnvContractAddress('tokenStakingLP', '0x7D49C01EA53B056513da95A5c18913A03bfAe83B'),
-        arenaRankingManager: getEnvContractAddress('arenaRankingManager', '0xb971056fF50AD3Cf23AcCf1B6FCF1D3dF1e3A425'),
-        arenaRankingQuery: getEnvContractAddress('arenaRankingQuery', '0xd278A5870d50CF4f86606196ecd9f817eEa5bC6c'),
-        arenaReward: getEnvContractAddress('arenaReward', '0x53b7BC8630100172FE0BDb8169079b2130fF4aC3'),
+        arenaRankingManager: getEnvContractAddress('arenaRankingManager', '0x22e86392ba7514993F3Aa0DBCA4a97576573981D'),
+        arenaRankingQuery: getEnvContractAddress('arenaRankingQuery', '0x031749dc2EFb941e76F0BcA64C910a346BD999B4'),
+        arenaReward: getEnvContractAddress('arenaReward', '0x4BF5eCD0bbA02929b7E33643D50751801a408ab3'),
         arenaRewardLP: getEnvContractAddress('arenaRewardLP', '0x7ADDd1318BBf399E08931B6bB85413725Ab8Bb9c'),
         arenaLeaderboard: getEnvContractAddress('arenaLeaderboard', '0x107871b5223808fc0E5648B40BCc7ED0D6BbA8Fc'),
-        arenaPlayer: getEnvContractAddress('arenaPlayer', '0xD1910FF0bF553c1F933597398941b395f939F736'),
-        arenaBattle: getEnvContractAddress('arenaBattle', '0xFC234EDe2729f28f32283a2568db2629ddeDFac0'),
+        arenaPlayer: getEnvContractAddress('arenaPlayer', '0xA708576bB9DB6EF59EE613582144eee750d6CCf5'),
+        arenaBattle: getEnvContractAddress('arenaBattle', '0x7A66840FEFFeF90bf273b218864A7278c2BEb13A'),
         battle: getEnvContractAddress('battle', '0xeAFe7247Bf21818286e572764cEF904c510A1551'),
         battleSkillData: getEnvContractAddress('battleSkillData', '0x3d8AF81EB2516a9ac064e264c3657250e21153a9'),
         battleHistory: getEnvContractAddress('battleHistory', '0x771991ce91611EfEfb6f412F3004Bf9f5fBbdF07'),
@@ -13120,18 +13120,18 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"indexed": false,
-				"internalType": "address",
-				"name": "oldAddress",
-				"type": "address"
+				"internalType": "address[]",
+				"name": "oldAddresses",
+				"type": "address[]"
 			},
 			{
 				"indexed": false,
-				"internalType": "address",
-				"name": "newAddress",
-				"type": "address"
+				"internalType": "address[]",
+				"name": "newAddresses",
+				"type": "address[]"
 			}
 		],
-		"name": "MockRewardRecipientUpdated",
+		"name": "MockRewardRecipientsUpdated",
 		"type": "event"
 	},
 	{
@@ -13400,19 +13400,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "DAILY_ATTEMPTS",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "MAX_LEADERBOARD_SIZE",
 		"outputs": [
 			{
@@ -13491,19 +13478,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "RECHARGE_ATTEMPTS",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "TEAM_SIZE",
 		"outputs": [
 			{
@@ -13518,6 +13492,19 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "acceptOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "recipient",
+				"type": "address"
+			}
+		],
+		"name": "addMockRewardRecipient",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -13711,6 +13698,24 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "distributeMockReward",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
 			}
@@ -13736,6 +13741,38 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "getCurrentRewardPool",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getMockRewardRecipientCount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			}
+		],
+		"name": "getPendingMockReward",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -13822,7 +13859,26 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "mockRewardRecipient",
+		"name": "mockRewardIndex",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "mockRewardRecipients",
 		"outputs": [
 			{
 				"internalType": "address",
@@ -13991,6 +14047,19 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "index",
+				"type": "uint256"
+			}
+		],
+		"name": "removeMockRewardRecipient",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "renounceOwnership",
 		"outputs": [],
@@ -14153,12 +14222,12 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "recipient",
-				"type": "address"
+				"internalType": "address[]",
+				"name": "recipients",
+				"type": "address[]"
 			}
 		],
-		"name": "setMockRewardRecipient",
+		"name": "setMockRewardRecipients",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -14469,19 +14538,6 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"name": "Upgraded",
 		"type": "event"
-	},
-	{
-		"inputs": [],
-		"name": "DAILY_ATTEMPTS",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
 	},
 	{
 		"inputs": [],
@@ -17024,6 +17080,25 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "address",
+				"name": "player",
+				"type": "address"
+			}
+		],
+		"name": "decrementAttempts",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "uint256",
 				"name": "seed",
 				"type": "uint256"
@@ -17844,19 +17919,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "BATTLE_COOLDOWN",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "DAILY_ATTEMPTS",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -25755,7 +25817,617 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "receive"
 	}
 ],
-
+	arenaRewardABI: [
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "previousAdmin",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "newAdmin",
+				"type": "address"
+			}
+		],
+		"name": "AdminChanged",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "beacon",
+				"type": "address"
+			}
+		],
+		"name": "BeaconUpgraded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint8",
+				"name": "version",
+				"type": "uint8"
+			}
+		],
+		"name": "Initialized",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferStarted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferred",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "Paused",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "RewardAdded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "totalReward",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "distributed",
+				"type": "uint256"
+			}
+		],
+		"name": "SeasonRewardsCalculated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "Unpaused",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "implementation",
+				"type": "address"
+			}
+		],
+		"name": "Upgraded",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "acceptOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "addRewardToPool",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "authorizer",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "rank",
+				"type": "uint256"
+			}
+		],
+		"name": "calculateRewardForRank",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			}
+		],
+		"name": "calculateSeasonRewards",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "totalReward",
+				"type": "uint256"
+			}
+		],
+		"name": "calculateSeasonRewardsMock",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "claimedRewards",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "emergencyWithdrawWBNB",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "player",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			}
+		],
+		"name": "getPendingRewardsByPlayer",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			}
+		],
+		"name": "getPendingRewardsBySeason",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "rank",
+				"type": "uint256"
+			}
+		],
+		"name": "getRewardForRank",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "player",
+				"type": "address"
+			}
+		],
+		"name": "getTotalPendingRewards",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
+			}
+		],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "player",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			}
+		],
+		"name": "isRewardClaimed",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "player",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			}
+		],
+		"name": "markRewardClaimed",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "pause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "paused",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "pendingOwner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "playerSeasonRewards",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "proxiableUUID",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "seasonRewards",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "rewardPool",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenRewardPool",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pendingRewards",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "rewardCalculated",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "totalDistributed",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
+			}
+		],
+		"name": "setAuthorizer",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "unpause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			}
+		],
+		"name": "upgradeTo",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	}
+],
 	// ArenaRewardLP ABI
 	arenaRewardLPABI: [
 	{
