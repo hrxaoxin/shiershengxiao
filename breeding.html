@@ -1135,14 +1135,8 @@
                     throw new Error('两个NFT必须是不同性别');
                 }
                 
-                // Check NFT approvals for BreedingCore
-                const fatherApproved = await nftContract.methods.getApproved(selectedMaleNFT.id).call();
-                const motherApproved = await nftContract.methods.getApproved(selectedFemaleNFT.id).call();
-                const fatherIsApprovedForAll = await nftContract.methods.isApprovedForAll(account, breedingCoreAddress).call();
-                const motherIsApprovedForAll = await nftContract.methods.isApprovedForAll(account, breedingCoreAddress).call();
-                
-                if ((fatherApproved !== breedingCoreAddress && !fatherIsApprovedForAll) || 
-                    (motherApproved !== breedingCoreAddress && !motherIsApprovedForAll)) {
+                const isApprovedForAll = await nftContract.methods.isApprovedForAll(account, breedingCoreAddress).call();
+                if (!isApprovedForAll) {
                     const approveNFTConfirm = await ZODIAC_UI.showConfirmModal(
                         '需要授权NFT',
                         '孕育需要将NFT授权给孕育合约，请确认授权。',
@@ -1152,13 +1146,7 @@
                         throw new Error('用户取消了NFT授权');
                     }
                     btn.textContent = '正在授权NFT...';
-                    
-                    if (fatherApproved !== breedingCoreAddress && !fatherIsApprovedForAll) {
-                        await nftContract.methods.approve(breedingCoreAddress, selectedMaleNFT.id).send({ from: account });
-                    }
-                    if (motherApproved !== breedingCoreAddress && !motherIsApprovedForAll) {
-                        await nftContract.methods.approve(breedingCoreAddress, selectedFemaleNFT.id).send({ from: account });
-                    }
+                    await nftContract.methods.setApprovalForAll(breedingCoreAddress, true).send({ from: account });
                     ZODIAC_UI.showToast('NFT授权成功！', 'success');
                 }
                 
