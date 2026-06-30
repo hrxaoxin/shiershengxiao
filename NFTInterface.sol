@@ -391,8 +391,10 @@ interface IArenaPlayer {
     function rechargeChallengeAttempts() external payable;
     function getRemainingAttempts(address player) external view returns (uint256);
     function getPlayerChallengeStatus(address player) external view returns (uint256, uint256, bool);
-    function setMaxRechargeAttempts(uint256 _maxRechargeAttempts) external;
     function setRechargeCost(uint256 _rechargeCost) external;
+    function setRechargeAttempts(uint256 _rechargeAttempts) external;
+    function rechargeCost() external view returns (uint256);
+    function rechargeAttempts() external view returns (uint256);
     function updatePlayerBattleTime(address player, uint256 timestamp) external;
     function updatePlayerAttempts(address player, uint256 attempts) external;
     function updatePlayerResetTime(address player, uint256 timestamp) external;

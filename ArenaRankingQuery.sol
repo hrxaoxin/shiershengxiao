@@ -483,9 +483,13 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
 
     /**
      * @dev 获取充值挑战次数的成本
-     * @return 代币数量（wei单位，888 * 10^18）
+     * @return 代币数量（wei单位）
      */
-    function rechargeCost() external pure returns (uint256) {
+    function rechargeCost() external view returns (uint256) {
+        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        if (arenaPlayer != address(0)) {
+            return IArenaPlayer(arenaPlayer).rechargeCost();
+        }
         return 888 * 10**18;
     }
 

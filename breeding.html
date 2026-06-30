@@ -388,7 +388,9 @@
             'BM: Already listed': 'NFT已经在市场上挂牌',
             'BM: NFT in cooldown': 'NFT正在冷却中',
             'BM: NFT in active breeding': 'NFT正在孕育中',
-            'BM: Level too low': 'NFT等级不足，需要5阶或以上'
+            'BM: Level too low': 'NFT等级不足，需要5阶或以上',
+            'transfer amount exceeds balance': '代币余额不足，请先充值',
+            'ERC20: transfer amount exceeds balance': '代币余额不足，请先充值'
         };
 
         function parseBreedingError(error) {
@@ -1050,8 +1052,7 @@
                 if (breedingCoreContract) {
                     const feeWei = await breedingCoreContract.methods.selfBreedingFee().call();
                     if (BigInt(feeWei) > BigInt(0)) {
-                        const tokenAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract;
-                        if (tokenAddress) {
+                        try {
                             const tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
                             if (tokenContract) {
                                 const web3 = window.ZODIAC_WEB3.getWeb3();
@@ -1079,6 +1080,8 @@
                                     ZODIAC_UI.showToast('代币授权成功！', 'success');
                                 }
                             }
+                        } catch (e) {
+                            console.warn('获取代币合约失败，跳过余额检查:', e);
                         }
                     }
                 }

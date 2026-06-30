@@ -175,10 +175,6 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      */
     uint256 public constant DAILY_ATTEMPTS = 3;
     /**
-     * @dev 最大充值次数上限
-     */
-    uint256 public constant MAX_RECHARGE_ATTEMPTS = 50;
-    /**
      * @dev 战斗冷却时间（两次战斗间隔）
      */
     uint256 public constant BATTLE_COOLDOWN = 30 seconds;
@@ -186,10 +182,6 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @dev 战斗队伍规模（最多6个NFT）
      */
     uint256 public constant TEAM_SIZE = 6;
-    /**
-     * @dev 充值挑战次数的代币消耗
-     */
-    uint256 public constant RECHARGE_COST = 888;
     /**
      * @dev 每次充值获得的挑战次数
      */
@@ -220,10 +212,6 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     uint256 public constant MAX_MOCK_PLAYERS_COUNT = 1000;
     
     /**
-     * @dev 单用户最大充值次数限制（可配置，默认为无限制）
-     */
-    uint256 public maxRechargeAttempts = type(uint256).max;
-    /**
      * @dev 赛季奖励比例（万分比）
      */
     uint256 public seasonRewardRate;
@@ -232,18 +220,10 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      */
     mapping(address => uint256) public lastBattleTime;
     /**
-     * @dev 玩家充值次数映射（当日充值计数）
-     */
-    mapping(address => uint256) public rechargeCount;
-    /**
      * @dev 战斗ID计数器（用于生成唯一战斗记录ID）
      */
     uint256 public battleIdCounter;
 
-    /**
-     * @dev 充值限制更新事件
-     */
-    event RechargeLimitUpdated(uint256 newLimit);
     /**
      * @dev 奖励类型更新事件
      */
@@ -427,16 +407,6 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev 设置最大充值次数限制
-     * @param _limit 最大充值次数（1-10）
-     */
-    function setMaxRechargeAttempts(uint256 _limit) external onlyOwner {
-        require(_limit >= 1 && _limit <= MAX_RECHARGE_ATTEMPTS, "ArenaRankingManager: Invalid limit");
-        maxRechargeAttempts = _limit;
-        emit RechargeLimitUpdated(_limit);
-    }
-
-    /**
      * @dev 设置奖励类型
      * @param _rewardType 奖励类型：LP = 0, TOKEN = 1, BNB = 2
      */
@@ -469,7 +439,6 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         PlayerRecord storage record = players[player];
         if (record.lastResetTime == 0 || block.timestamp > record.lastResetTime + 24 hours) {
             _resetAttempts(player);
-            rechargeCount[player] = 0;
         }
     }
 

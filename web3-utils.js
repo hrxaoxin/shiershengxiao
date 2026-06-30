@@ -307,6 +307,7 @@ window.ZODIAC_WEB3 = (function() {
         const currentABIS = (window.ZODIAC_CONFIG || {}).ABIS || {};
         const dynamicABI_MAP = {
             'nftMint': currentABIS.nftMintABI,
+            'nftTrading': currentABIS.NFTTradingABI,
             'breedingCore': currentABIS.breedingCoreABI,
             'breedingMarket': currentABIS.breedingMarketABI,
             'rewardManager': currentABIS.rewardManagerABI,

@@ -1251,21 +1251,16 @@
             try {
                 const config = ZODIAC_CONFIG;
                 
-                // 从合约读取充值费用
+                // 从合约读取充值费用和每次充值获得的次数
                 try {
                     const rechargeCost = await arenaPlayerContract.methods.rechargeCost().call();
                     const cost = (parseInt(rechargeCost) / 10**18).toFixed(0);
                     document.getElementById('rechargeCostDisplay').textContent = cost;
+                    
+                    const rechargeAttemptsNum = await arenaPlayerContract.methods.rechargeAttempts().call();
+                    document.getElementById('rechargeAttempts').textContent = rechargeAttemptsNum || '3';
                 } catch (e) {
-                    console.warn('Failed to load recharge cost:', e);
-                }
-                
-                // 从配置读取免费挑战次数和充值次数（这些通常在配置中）
-                try {
-                    document.getElementById('freeChallenges').textContent = config.freeChallenges || '3';
-                    document.getElementById('rechargeAttempts').textContent = config.rechargeAttempts || '3';
-                } catch (e) {
-                    console.warn('Failed to load challenge config:', e);
+                    console.warn('Failed to load recharge config:', e);
                 }
                 
                 // 从合约读取属性克制加成
@@ -1828,7 +1823,7 @@
                 }
                 
                 // 从合约获取每次充值获得的挑战次数
-                const rechargeAttemptsNum = await arenaPlayerContract.methods.RECHARGE_ATTEMPTS().call();
+                const rechargeAttemptsNum = await arenaPlayerContract.methods.rechargeAttempts().call();
                 
                 await ZODIAC_UI.handleTransaction(
                     () => arenaPlayerContract.methods.rechargeChallengeAttempts().send({ from: accounts[0] }),

@@ -54,11 +54,10 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 模拟玩家索引偏移量
      */
     uint256 public constant MOCK_PLAYER_INDEX_OFFSET = 1000000;
-    
     /**
-     * @dev 最大充值次数限制
+     * @dev 每日免费挑战次数
      */
-    uint256 public maxRechargeAttempts = 5;
+    uint256 public constant DAILY_ATTEMPTS = 3;
     /**
      * @dev 充值成本（代币，wei单位）
      */
@@ -88,23 +87,11 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 玩家上次重置时间
      */
     mapping(address => uint256) public playerLastResetTime;
-    /**
-     * @dev 玩家充值次数
-     */
-    mapping(address => uint256) public rechargeCount;
     
-    /**
-     * @dev 每日挑战次数默认值
-     */
-    uint256 public constant DAILY_ATTEMPTS = 3;
     /**
      * @dev 每次充值获得的挑战次数
      */
-    uint256 public constant RECHARGE_ATTEMPTS = 3;
-    /**
-     * @dev 充值挑战次数的成本（代币）
-     */
-    uint256 public constant RECHARGE_COST = 888;
+    uint256 public rechargeAttempts;
     
     /**
      * @dev 战斗队伍设置事件
@@ -157,8 +144,8 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         __Pausable_init();
         authorizer = _authorizerAddress;
         
-        maxRechargeAttempts = 5;
         rechargeCost = 888 * 10**18;
+        rechargeAttempts = 3;
     }
     
     /**
@@ -211,7 +198,6 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function _checkAndResetAttempts(address player) internal {
         if (playerLastResetTime[player] == 0 || block.timestamp > playerLastResetTime[player] + 24 hours) {
             _resetAttempts(player);
-            rechargeCount[player] = 0;
         }
     }
 
@@ -340,7 +326,6 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(IArenaRanking(arenaRankingManager).currentSeasonId() > 0, "ArenaPlayer: No active season");
         
         _checkAndResetAttempts(msg.sender);
-        require(rechargeCount[msg.sender] < maxRechargeAttempts, "ArenaPlayer: Max recharge attempts reached");
         
         // 获取代币合约地址
         address tokenContract = IAuthorizer(authorizer).getToken();
@@ -349,9 +334,8 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         // 从用户账户转移代币到合约
         IERC20(tokenContract).safeTransferFrom(msg.sender, address(this), rechargeCost);
 
-        uint256 newAttempts = RECHARGE_ATTEMPTS;
+        uint256 newAttempts = rechargeAttempts;
         playerRemainingAttempts[msg.sender] += newAttempts;
-        rechargeCount[msg.sender]++;
 
         emit ChallengeAttemptsRecharged(msg.sender, newAttempts);
     }
@@ -386,12 +370,13 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         hasTeam = playerBattleTeams[player].length > 0;
     }
 
-    function setMaxRechargeAttempts(uint256 _maxRechargeAttempts) external onlyOwner {
-        maxRechargeAttempts = _maxRechargeAttempts;
-    }
-
     function setRechargeCost(uint256 _rechargeCost) external onlyOwner {
         rechargeCost = _rechargeCost;
+    }
+
+    function setRechargeAttempts(uint256 _rechargeAttempts) external onlyOwner {
+        require(_rechargeAttempts > 0, "ArenaPlayer: Recharge attempts must be greater than 0");
+        rechargeAttempts = _rechargeAttempts;
     }
 
     /**

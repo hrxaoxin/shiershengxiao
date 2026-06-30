@@ -165,12 +165,12 @@ window.ZODIAC_CONFIG = (function() {
         stakingLP: getEnvContractAddress('stakingLP', '0x37D92e6786efb1e2674192E0785733dfa5A06a5c'),
         tokenStaking: getEnvContractAddress('tokenStaking', '0x7B77DE8A352A8A1fd04dc20e8e5713C02Fd864E1'),
         tokenStakingLP: getEnvContractAddress('tokenStakingLP', '0x7D49C01EA53B056513da95A5c18913A03bfAe83B'),
-        arenaRankingManager: getEnvContractAddress('arenaRankingManager', '0x7dE5978f9FE2863e561C4208Aa91945e8aB30d9F'),
-        arenaRankingQuery: getEnvContractAddress('arenaRankingQuery', '0xe3cb33e94c8dfB86900e450dab9652b1e133CAcA'),
+        arenaRankingManager: getEnvContractAddress('arenaRankingManager', '0xb971056fF50AD3Cf23AcCf1B6FCF1D3dF1e3A425'),
+        arenaRankingQuery: getEnvContractAddress('arenaRankingQuery', '0xd278A5870d50CF4f86606196ecd9f817eEa5bC6c'),
         arenaReward: getEnvContractAddress('arenaReward', '0x53b7BC8630100172FE0BDb8169079b2130fF4aC3'),
         arenaRewardLP: getEnvContractAddress('arenaRewardLP', '0x7ADDd1318BBf399E08931B6bB85413725Ab8Bb9c'),
         arenaLeaderboard: getEnvContractAddress('arenaLeaderboard', '0x107871b5223808fc0E5648B40BCc7ED0D6BbA8Fc'),
-        arenaPlayer: getEnvContractAddress('arenaPlayer', '0x83572c95cD940b792D189eF5B46873EE99125A42'),
+        arenaPlayer: getEnvContractAddress('arenaPlayer', '0x98Cdc63732ce4b78a336913573Fc3df9a81f3afc'),
         arenaBattle: getEnvContractAddress('arenaBattle', '0xFC234EDe2729f28f32283a2568db2629ddeDFac0'),
         battle: getEnvContractAddress('battle', '0xeAFe7247Bf21818286e572764cEF904c510A1551'),
         battleSkillData: getEnvContractAddress('battleSkillData', '0x3d8AF81EB2516a9ac064e264c3657250e21153a9'),
@@ -13208,19 +13208,6 @@ window.ZODIAC_CONFIG = (function() {
 		"anonymous": false,
 		"inputs": [
 			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "newLimit",
-				"type": "uint256"
-			}
-		],
-		"name": "RechargeLimitUpdated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
 				"indexed": true,
 				"internalType": "address",
 				"name": "player",
@@ -13465,19 +13452,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "MAX_RECHARGE_ATTEMPTS",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "MAX_SEASONS_TO_KEEP",
 		"outputs": [
 			{
@@ -13518,19 +13492,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "RECHARGE_ATTEMPTS",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "RECHARGE_COST",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -13623,6 +13584,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256[6]",
+				"name": "playerTeam",
+				"type": "uint256[6]"
+			},
+			{
 				"internalType": "uint256",
 				"name": "mockIndex",
 				"type": "uint256"
@@ -13632,13 +13598,8 @@ window.ZODIAC_CONFIG = (function() {
 		"outputs": [
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "success",
 				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -13650,19 +13611,19 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "challengedPlayer",
 				"type": "address"
+			},
+			{
+				"internalType": "uint256[6]",
+				"name": "playerTeam",
+				"type": "uint256[6]"
 			}
 		],
 		"name": "challengeRealPlayer",
 		"outputs": [
 			{
 				"internalType": "bool",
-				"name": "",
+				"name": "success",
 				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "nonpayable",
@@ -13861,19 +13822,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "maxRechargeAttempts",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "mockRewardRecipient",
 		"outputs": [
 			{
@@ -14043,25 +13991,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "rechargeCount",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"name": "renounceOwnership",
 		"outputs": [],
@@ -14217,19 +14146,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setBaseRewardPerWin",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_limit",
-				"type": "uint256"
-			}
-		],
-		"name": "setMaxRechargeAttempts",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -15579,7 +15495,7 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "pure",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -16799,13 +16715,6 @@ window.ZODIAC_CONFIG = (function() {
 ],
 		arenaPlayerABI: [
 	{
-		"inputs": [],
-		"name": "acceptOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -16900,26 +16809,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "clearBattleTeam",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_authorizerAddress",
-				"type": "address"
-			}
-		],
-		"name": "initialize",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -16990,40 +16879,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "operator",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "from",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bytes",
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"name": "onERC721Received",
-		"outputs": [
-			{
-				"internalType": "bytes4",
-				"name": "",
-				"type": "bytes4"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -17062,13 +16917,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "pause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -17080,105 +16928,6 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"name": "Paused",
 		"type": "event"
-	},
-	{
-		"inputs": [],
-		"name": "rechargeChallengeAttempts",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "renounceOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_authorizerAddress",
-				"type": "address"
-			}
-		],
-		"name": "setAuthorizer",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256[6]",
-				"name": "tokenIds",
-				"type": "uint256[6]"
-			}
-		],
-		"name": "setBattleTeam",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_maxRechargeAttempts",
-				"type": "uint256"
-			}
-		],
-		"name": "setMaxRechargeAttempts",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_rechargeCost",
-				"type": "uint256"
-			}
-		],
-		"name": "setRechargeCost",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256[]",
-				"name": "tokenIds",
-				"type": "uint256[]"
-			}
-		],
-		"name": "stakeNFTs",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "transferOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "unpause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
 	},
 	{
 		"anonymous": false,
@@ -17194,73 +16943,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "uint256[]",
-				"name": "tokenIds",
-				"type": "uint256[]"
-			}
-		],
-		"name": "unstakeNFTs",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "player",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "attempts",
-				"type": "uint256"
-			}
-		],
-		"name": "updatePlayerAttempts",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "player",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "timestamp",
-				"type": "uint256"
-			}
-		],
-		"name": "updatePlayerBattleTime",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "player",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "timestamp",
-				"type": "uint256"
-			}
-		],
-		"name": "updatePlayerResetTime",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -17274,34 +16956,49 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "DAILY_ATTEMPTS",
+		"outputs": [
 			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
-		"name": "upgradeTo",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "MAX_TEAM_SIZE",
+		"outputs": [
 			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
-			},
-			{
-				"internalType": "bytes",
-				"name": "data",
-				"type": "bytes"
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
-		"name": "upgradeToAndCall",
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MOCK_PLAYER_INDEX_OFFSET",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "acceptOwnership",
 		"outputs": [],
-		"stateMutability": "payable",
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -17319,15 +17016,9 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "DAILY_ATTEMPTS",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
+		"name": "clearBattleTeam",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -17457,6 +17148,19 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
+			}
+		],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "uint256",
 				"name": "tokenId",
 				"type": "uint256"
@@ -17468,45 +17172,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "bool",
 				"name": "",
 				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "MAX_TEAM_SIZE",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "maxRechargeAttempts",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "MOCK_PLAYER_INDEX_OFFSET",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -17532,6 +17197,40 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "from",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "onERC721Received",
+		"outputs": [
+			{
+				"internalType": "bytes4",
+				"name": "",
+				"type": "bytes4"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "owner",
 		"outputs": [
@@ -17542,6 +17241,13 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "pause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -17666,7 +17372,7 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "RECHARGE_ATTEMPTS",
+		"name": "rechargeAttempts",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -17679,15 +17385,9 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "RECHARGE_COST",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
+		"name": "rechargeChallengeAttempts",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -17704,22 +17404,193 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "",
+				"name": "_authorizerAddress",
 				"type": "address"
 			}
 		],
-		"name": "rechargeCount",
-		"outputs": [
+		"name": "setAuthorizer",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256[6]",
+				"name": "tokenIds",
+				"type": "uint256[6]"
+			}
+		],
+		"name": "setBattleTeam",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "_rechargeAttempts",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
+		"name": "setRechargeAttempts",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_rechargeCost",
+				"type": "uint256"
+			}
+		],
+		"name": "setRechargeCost",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "tokenIds",
+				"type": "uint256[]"
+			}
+		],
+		"name": "stakeNFTs",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "unpause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "tokenIds",
+				"type": "uint256[]"
+			}
+		],
+		"name": "unstakeNFTs",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "player",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "attempts",
+				"type": "uint256"
+			}
+		],
+		"name": "updatePlayerAttempts",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "player",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"name": "updatePlayerBattleTime",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "player",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"name": "updatePlayerResetTime",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			}
+		],
+		"name": "upgradeTo",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
