@@ -398,6 +398,7 @@ interface IArenaPlayer {
     function updatePlayerBattleTime(address player, uint256 timestamp) external;
     function updatePlayerAttempts(address player, uint256 attempts) external;
     function updatePlayerResetTime(address player, uint256 timestamp) external;
+    function decrementAttempts(address player) external returns (uint256);
     function generateMockTeam(uint256 seed) external view returns (uint256[6] memory);
     function isNFTStaked(uint256 tokenId) external view returns (bool);
     function getNFTStakedOwner(uint256 tokenId) external view returns (address);

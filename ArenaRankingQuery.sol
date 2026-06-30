@@ -146,10 +146,6 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     address public authorizer;
     
     /**
-     * @dev 每日挑战次数默认值
-     */
-    uint256 public constant DAILY_ATTEMPTS = 3;
-    /**
      * @dev 模拟玩家基础地址
      */
     address public constant MOCK_PLAYER_BASE = address(0x000000000000000000000000000000000000dEaD);
@@ -448,14 +444,15 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 剩余挑战次数
      */
     function getRemainingAttempts(address player) external view returns (uint256) {
-        PlayerRecord memory p = players[player];
-        if (p.lastResetTime == 0) {
-            return DAILY_ATTEMPTS;
+        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        if (arenaPlayerContract == address(0)) {
+            PlayerRecord memory p = players[player];
+            if (p.lastResetTime == 0 || block.timestamp > p.lastResetTime + 24 hours) {
+                return 3;
+            }
+            return p.remainingAttempts;
         }
-        if (block.timestamp > p.lastResetTime + 24 hours) {
-            return DAILY_ATTEMPTS;
-        }
-        return p.remainingAttempts;
+        return IArenaPlayer(arenaPlayerContract).getRemainingAttempts(player);
     }
 
     /**
@@ -564,7 +561,12 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         bool hasTeam
     ) {
         PlayerRecord memory p = players[player];
-        remainingAttempts = p.remainingAttempts > 0 ? p.remainingAttempts : DAILY_ATTEMPTS;
+        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        if (arenaPlayerContract != address(0)) {
+            remainingAttempts = IArenaPlayer(arenaPlayerContract).getRemainingAttempts(player);
+        } else {
+            remainingAttempts = p.remainingAttempts > 0 ? p.remainingAttempts : 3;
+        }
         lastBattleTime = p.lastBattleTime;
         hasTeam = p.hasTeam;
     }

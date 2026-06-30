@@ -397,6 +397,13 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         playerLastResetTime[player] = timestamp;
     }
 
+    function decrementAttempts(address player) external onlyOwnerOrAuthorizer returns (uint256) {
+        _checkAndResetAttempts(player);
+        require(playerRemainingAttempts[player] > 0, "ArenaPlayer: No remaining attempts");
+        playerRemainingAttempts[player]--;
+        return playerRemainingAttempts[player];
+    }
+
     /**
      * @dev 生成模拟队伍
      * @param seed 随机种子

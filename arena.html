@@ -2851,7 +2851,9 @@
                         
                         if (shouldStop) {
                             ZODIAC_UI.showToast(toastMsg, 'error');
-                            ZODIAC_UI.hideLoading();
+                            setTimeout(() => {
+                                ZODIAC_UI.hideLoading();
+                            }, 100);
                             return;
                         } else {
                             console.warn('[ARENA] 预检查警告，将继续尝试发起挑战');

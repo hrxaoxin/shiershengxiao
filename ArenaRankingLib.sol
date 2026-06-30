@@ -16,7 +16,7 @@ pragma solidity ^0.8.20;
  * - 模拟玩家的等级、成长值、稀有属性数量随索引变化
  * 
  * 每日挑战次数：
- * - DAILY_ATTEMPTS = 5：每日最多挑战5次
+ * - DAILY_ATTEMPTS = 3：每日最多挑战3次
  * - INITIAL_SCORE = 1000：初始积分
  * 
  * 奖励分配规则：
@@ -28,7 +28,7 @@ library ArenaRankingLib {
     /**
      * @dev 每日挑战次数限制
      */
-    uint256 public constant DAILY_ATTEMPTS = 5;
+    uint256 public constant DAILY_ATTEMPTS = 3;
     /**
      * @dev 初始积分
      */

@@ -166,14 +166,14 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      */
     uint8 public lastSeasonMode = 1;
     /**
-     * @dev 模拟玩家奖励接收地址（从玩家挑战模拟玩家获得的奖励）
+     * @dev 模拟玩家奖励接收地址列表（循环发放奖励）
      */
-    address public mockRewardRecipient;
-    
+    address[] public mockRewardRecipients;
     /**
-     * @dev 每日挑战次数限制
+     * @dev 当前发放奖励的索引（用于循环发放）
      */
-    uint256 public constant DAILY_ATTEMPTS = 3;
+    uint256 public mockRewardIndex;
+    
     /**
      * @dev 战斗冷却时间（两次战斗间隔）
      */
@@ -182,10 +182,6 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @dev 战斗队伍规模（最多6个NFT）
      */
     uint256 public constant TEAM_SIZE = 6;
-    /**
-     * @dev 每次充值获得的挑战次数
-     */
-    uint256 public constant RECHARGE_ATTEMPTS = 3;
     /**
      * @dev 排行榜最大显示数量
      */
@@ -243,7 +239,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     /**
      * @dev 模拟玩家奖励接收地址更新事件
      */
-    event MockRewardRecipientUpdated(address oldAddress, address newAddress);
+    event MockRewardRecipientsUpdated(address[] oldAddresses, address[] newAddresses);
     /**
      * @dev 模拟玩家奖励分发事件
      */
@@ -366,14 +362,49 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev 设置模拟玩家奖励接收地址
+     * @dev 设置模拟玩家奖励接收地址列表
+     * @param recipients 奖励接收地址列表
+     */
+    function setMockRewardRecipients(address[] calldata recipients) external onlyOwner {
+        address[] memory oldRecipients = mockRewardRecipients;
+        mockRewardRecipients = recipients;
+        mockRewardIndex = 0;
+        emit MockRewardRecipientsUpdated(oldRecipients, recipients);
+    }
+
+    /**
+     * @dev 添加模拟玩家奖励接收地址
      * @param recipient 奖励接收地址
      */
-    function setMockRewardRecipient(address recipient) external onlyOwner {
+    function addMockRewardRecipient(address recipient) external onlyOwner {
         require(recipient != address(0), "ArenaRankingManager: Invalid recipient");
-        address oldRecipient = mockRewardRecipient;
-        mockRewardRecipient = recipient;
-        emit MockRewardRecipientUpdated(oldRecipient, recipient);
+        for (uint256 i = 0; i < mockRewardRecipients.length; i++) {
+            require(mockRewardRecipients[i] != recipient, "ArenaRankingManager: Recipient already exists");
+        }
+        mockRewardRecipients.push(recipient);
+    }
+
+    /**
+     * @dev 移除模拟玩家奖励接收地址
+     * @param index 地址索引
+     */
+    function removeMockRewardRecipient(uint256 index) external onlyOwner {
+        require(index < mockRewardRecipients.length, "ArenaRankingManager: Invalid index");
+        if (index < mockRewardRecipients.length - 1) {
+            mockRewardRecipients[index] = mockRewardRecipients[mockRewardRecipients.length - 1];
+        }
+        mockRewardRecipients.pop();
+        if (mockRewardIndex >= mockRewardRecipients.length) {
+            mockRewardIndex = 0;
+        }
+    }
+
+    /**
+     * @dev 获取模拟玩家奖励接收地址数量
+     * @return 地址数量
+     */
+    function getMockRewardRecipientCount() external view returns (uint256) {
+        return mockRewardRecipients.length;
     }
 
     /**
@@ -421,26 +452,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         emit RewardTypeUpdated(uint8(oldRewardType), uint8(_rewardType));
     }
 
-    /**
-     * @dev 内部函数：重置玩家的挑战次数
-     * @param player 玩家地址
-     */
-    function _resetAttempts(address player) internal {
-        PlayerRecord storage record = players[player];
-        record.lastResetTime = block.timestamp;
-        record.remainingAttempts = DAILY_ATTEMPTS;
-    }
 
-    /**
-     * @dev 内部函数：检查并重置玩家挑战次数（每日重置）
-     * @param player 玩家地址
-     */
-    function _checkAndResetAttempts(address player) internal {
-        PlayerRecord storage record = players[player];
-        if (record.lastResetTime == 0 || block.timestamp > record.lastResetTime + 24 hours) {
-            _resetAttempts(player);
-        }
-    }
 
     /**
      * @dev 内部函数：验证队伍 NFT 所有权
@@ -466,13 +478,12 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external nonReentrant whenNotPaused returns (bool success) {
         address arenaBattle = IAuthorizer(authorizer).getArenaBattle();
         require(arenaBattle != address(0), "ArenaRankingManager: ArenaBattle contract not set");
+        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer contract not set");
         require(mockIndex > 0, "ArenaRankingManager: Invalid mock index");
-        _checkAndResetAttempts(msg.sender);
-        PlayerRecord storage record = players[msg.sender];
+        IArenaPlayer(arenaPlayer).decrementAttempts(msg.sender);
         require(_hasBattleTeam(msg.sender), "ArenaRankingManager: Must set battle team first");
-        require(record.remainingAttempts > 0, "ArenaRankingManager: No remaining attempts");
         _validateTeamOwnership(msg.sender, playerTeam);
-        record.remainingAttempts--;
         (bool ok, uint256 winner, ) = IArenaBattle(arenaBattle).executeMockBattle(playerTeam, mockIndex);
         require(ok, "ArenaRankingManager: Challenge mock player failed");
         emit ChallengeResult(msg.sender, address(0), winner == 1, currentSeasonId);
@@ -488,14 +499,13 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external nonReentrant whenNotPaused returns (bool success) {
         address arenaBattle = IAuthorizer(authorizer).getArenaBattle();
         require(arenaBattle != address(0), "ArenaRankingManager: ArenaBattle contract not set");
+        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer contract not set");
         require(challengedPlayer != address(0), "ArenaRankingManager: Zero challenged player");
         require(challengedPlayer != msg.sender, "ArenaRankingManager: Cannot challenge self");
-        _checkAndResetAttempts(msg.sender);
-        PlayerRecord storage challengerRecord = players[msg.sender];
+        IArenaPlayer(arenaPlayer).decrementAttempts(msg.sender);
         require(_hasBattleTeam(msg.sender), "ArenaRankingManager: Must set battle team first");
-        require(challengerRecord.remainingAttempts > 0, "ArenaRankingManager: No remaining attempts");
         _validateTeamOwnership(msg.sender, playerTeam);
-        challengerRecord.remainingAttempts--;
         require(_hasBattleTeam(challengedPlayer), "ArenaRankingManager: Challenged player has no team");
         uint256[6] memory defenderTeam = _getBattleTeam(challengedPlayer);
         (bool ok, uint256 winner, ) = IArenaBattle(arenaBattle).executeRealBattle(

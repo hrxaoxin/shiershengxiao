@@ -65,10 +65,6 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     uint256 public constant MOCK_ID_MULTIPLIER = 1000;
     /**
-     * @dev 每日挑战次数
-     */
-    uint256 public constant DAILY_ATTEMPTS = 3;
-    /**
      * @dev 最大模拟玩家数量
      */
     uint256 public constant MAX_MOCK_PLAYERS_COUNT = 1000;
@@ -221,13 +217,14 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function challengeMockPlayer(uint256 mockIndex) external nonReentrant whenNotPaused returns (bool, uint256) {
         _checkSeasonActive();
         
-        PlayerRecord storage record = players[msg.sender];
-        _checkAndResetAttempts(msg.sender);
-        require(record.remainingAttempts > 0, "ArenaBattle: No remaining attempts");
+        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        require(arenaPlayerContract != address(0), "ArenaBattle: Player contract not set");
+        
+        IArenaPlayer(arenaPlayerContract).decrementAttempts(msg.sender);
         
         require(_hasBattleTeam(msg.sender), "ArenaBattle: No battle team set");
         
-        record.remainingAttempts--;
+        PlayerRecord storage record = players[msg.sender];
         record.lastBattleTime = block.timestamp;
         
         bool isVictory = _executeMockBattle(mockIndex);
@@ -247,16 +244,17 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(challengedPlayer != address(0), "ArenaBattle: Invalid challenged player");
         require(challengedPlayer != msg.sender, "ArenaBattle: Cannot challenge self");
         
-        PlayerRecord storage challengerRecord = players[msg.sender];
-        PlayerRecord storage challengedRecord = players[challengedPlayer];
+        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        require(arenaPlayerContract != address(0), "ArenaBattle: Player contract not set");
         
-        _checkAndResetAttempts(msg.sender);
-        require(challengerRecord.remainingAttempts > 0, "ArenaBattle: No remaining attempts");
+        IArenaPlayer(arenaPlayerContract).decrementAttempts(msg.sender);
         
         require(_hasBattleTeam(msg.sender), "ArenaBattle: Challenger has no battle team");
         require(_hasBattleTeam(challengedPlayer), "ArenaBattle: Challenged has no battle team");
         
-        challengerRecord.remainingAttempts--;
+        PlayerRecord storage challengerRecord = players[msg.sender];
+        PlayerRecord storage challengedRecord = players[challengedPlayer];
+        
         challengerRecord.lastBattleTime = block.timestamp;
         challengedRecord.lastBattleTime = block.timestamp;
         
@@ -351,7 +349,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             record.draws = 0;
             record.lastBattleTime = block.timestamp;
             record.lastResetTime = block.timestamp;
-            record.remainingAttempts = DAILY_ATTEMPTS;
+            record.remainingAttempts = 3;
         }
 
         if (isWinner) {
@@ -371,14 +369,6 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         emit ScoreUpdated(player, record.score, currentSeasonId);
     }
 
-    function _checkAndResetAttempts(address player) internal {
-        PlayerRecord storage record = players[player];
-        if (block.timestamp > record.lastResetTime + 24 hours) {
-            record.lastResetTime = block.timestamp;
-            record.remainingAttempts = DAILY_ATTEMPTS;
-        }
-    }
-
     function _isMockPlayer(address player) internal pure returns (bool) {
         uint256 playerAddress = uint256(uint160(player));
         uint256 baseAddress = uint256(uint160(MOCK_PLAYER_BASE));
@@ -387,10 +377,9 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function getRemainingAttempts(address player) external view returns (uint256) {
-        if (block.timestamp > players[player].lastResetTime + 24 hours) {
-            return DAILY_ATTEMPTS;
-        }
-        return players[player].remainingAttempts;
+        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        require(arenaPlayerContract != address(0), "ArenaBattle: Player contract not set");
+        return IArenaPlayer(arenaPlayerContract).getRemainingAttempts(player);
     }
 
     /**
