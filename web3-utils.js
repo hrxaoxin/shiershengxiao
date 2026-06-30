@@ -194,6 +194,7 @@ window.ZODIAC_WEB3 = (function() {
     // --- Contract Management ---
     const ABI_MAP = {
         'nftMint': ABIS.nftMintABI,
+        'nftContract': ABIS.nftMintABI,
         'tokenContract': ABIS.tokenABI,
         'nftTrading': ABIS.NFTTradingABI,
         'staking': ABIS.stakingABI,
@@ -307,6 +308,7 @@ window.ZODIAC_WEB3 = (function() {
         const currentABIS = (window.ZODIAC_CONFIG || {}).ABIS || {};
         const dynamicABI_MAP = {
             'nftMint': currentABIS.nftMintABI,
+            'nftContract': currentABIS.nftMintABI,
             'nftTrading': currentABIS.NFTTradingABI,
             'breedingCore': currentABIS.breedingCoreABI,
             'breedingMarket': currentABIS.breedingMarketABI,

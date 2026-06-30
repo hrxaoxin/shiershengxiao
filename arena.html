@@ -1470,16 +1470,17 @@
             
             const team = selectedSlot.teamType === 'battle' ? battleTeam : battleTeam;
             
-            const sortedNfts = [...myNfts].sort((a, b) => b.level - a.level);
+            const sortedNfts = [...myNfts].map((nft, originalIndex) => ({ ...nft, originalIndex })).sort((a, b) => b.level - a.level);
             
-            nftList.innerHTML = sortedNfts.map((nft, index) => {
+            nftList.innerHTML = sortedNfts.map((item, index) => {
+                const nft = item;
                 const isInTeam = team.some(t => t && t.tokenId === nft.tokenId && team.indexOf(t) !== selectedSlot.index);
                 const isDisabled = isInTeam || nft.isStaked;
                 const isCurrent = team[selectedSlot.index] && team[selectedSlot.index].tokenId === nft.tokenId;
                 
                 return `
                     <div class="nft-card nft-card-hover bg-white/5 rounded-lg p-3 border-2 cursor-pointer transition-all ${isDisabled ? 'opacity-50 cursor-not-allowed border-gray-600 grayscale' : isCurrent ? 'border-green-500' : 'hover:border-blue-500'}" 
-                         onclick="${isDisabled ? '' : `selectNftForSlot(${index})`}"
+                         onclick="${isDisabled ? '' : `selectNftForSlot(${item.originalIndex})`}"
                          data-nft-typeid="${nft.tokenType}" data-nft-tokenid="${nft.tokenId}" data-nft-level="${nft.level}">
                         <div class="flex flex-col items-center text-center">
                             <div class="relative">
