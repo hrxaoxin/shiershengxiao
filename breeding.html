@@ -1094,7 +1094,7 @@
                 btn.textContent = '正在孕育...';
                 
                 try {
-                    const nftContract = await window.ZODIAC_WEB3.getContract('nftContract');
+                    const nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
                     if (nftContract) {
                         const fatherLevel = await nftContract.methods.tokenLevel(selectedMaleNFT.id).call();
                         const motherLevel = await nftContract.methods.tokenLevel(selectedFemaleNFT.id).call();
