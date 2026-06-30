@@ -625,7 +625,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
     
     function isRare(uint256 tokenId) external view returns (bool) {
-        return tokenType[tokenId] >= 72;
+        uint256 t = tokenType[tokenId];
+        return (t / 24 == 3 || t / 24 == 4);
     }
 
     /**

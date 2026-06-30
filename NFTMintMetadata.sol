@@ -179,7 +179,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256 finalSpeed = zodiacBonus >= 0 ? speed + uint256(zodiacBonus) : 
                              (speed > uint256(-zodiacBonus) ? speed - uint256(-zodiacBonus) : 0);
         
-        bool isRare = t >= 72;
+        bool isRare = (t / 24 == 3 || t / 24 == 4);
         string memory imageBase = isRare ? ipfsBaseRare : ipfsBaseNormal;
         string memory imageUrl = NFTLib.buildImagePath(imageBase, t);
         
@@ -207,7 +207,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256 element = tokenType_ / 24;
         uint256 zodiac = (tokenType_ % 24 / 2) % 12;
         bool isMale = tokenType_ % 2 == 1;
-        bool isRare = tokenType_ >= 72;
+        bool isRare = (element == 3 || element == 4);
         
         string memory imageBase = isRare ? ipfsBaseRare : ipfsBaseNormal;
         string memory imagePath = NFTLib.buildImagePath(imageBase, tokenType_);

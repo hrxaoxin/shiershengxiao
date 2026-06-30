@@ -1020,6 +1020,44 @@
                     console.log('[COLLECTION] Modal shown successfully');
                 }
 
+                // 输出完整NFT元数据日志
+                const nftMetadata = {
+                    tokenId: tokenId,
+                    typeId: typeId,
+                    name: nftInfo.name,
+                    element: nftInfo.elementKey,
+                    attrName: nftInfo.attrName,
+                    zodiac: nftInfo.zodiac,
+                    zodiacName: zodiacName,
+                    gender: nftInfo.gender,
+                    genderName: nftInfo.genderName,
+                    level: displayLevel,
+                    growth: displayGrowth,
+                    isRare: isRare,
+                    rarityText: rarityText,
+                    weight: weight,
+                    attack: attack,
+                    defense: defense,
+                    speed: speed,
+                    hp: hp,
+                    skill: {
+                        type: sType,
+                        typeName: skillTypeName,
+                        damage: sDamage,
+                        cooldown: sCooldown,
+                        isAoe: sIsAoe,
+                        description: skillDesc
+                    },
+                    canBattle: canBattle,
+                    canStake: canStake,
+                    canBreed: canBreed,
+                    isOwned: isOwned,
+                    count: count,
+                    imagePath: nftInfo.imagePath
+                };
+                console.log('[COLLECTION] NFT完整元数据:', nftMetadata);
+                console.table && console.table(nftMetadata);
+
                 asyncLoadModalData(typeId, displayLevel, isRare);
             } catch (error) {
                 console.error('[COLLECTION] showCardModal error:', error);
