@@ -485,6 +485,36 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         rateStep = _rateStep;
     }
 
+    // ============================================================
+    //  紧急取款函数（仅所有者）
+    // ============================================================
+
+    /**
+     * @dev 提取指定代币（仅owner）
+     * @param token 代币地址
+     * @param to 接收地址
+     */
+    function withdrawToken(address token, address to) external onlyOwner {
+        require(token != address(0), "StakingLP: Invalid token");
+        require(to != address(0), "StakingLP: Invalid recipient");
+        uint256 balance = IERC20(token).balanceOf(address(this));
+        if (balance > 0) {
+            IERC20(token).transfer(to, balance);
+        }
+    }
+
+    /**
+     * @dev 提取BNB（仅owner）
+     * @param to 接收地址
+     */
+    function withdrawBNB(address to) external onlyOwner {
+        require(to != address(0), "StakingLP: Invalid recipient");
+        uint256 balance = address(this).balance;
+        if (balance > 0) {
+            payable(to).transfer(balance);
+        }
+    }
+
     /**
      * @dev Fallback函数
      */

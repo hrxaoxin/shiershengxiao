@@ -1090,40 +1090,31 @@
                     const allowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
                     console.log('[BREEDING] Current allowance:', web3.utils.fromWei(allowance, 'ether'));
                     
-                    if (BigInt(allowance) < BigInt(feeWei)) {
-                        const feeAmount = web3.utils.fromWei(feeWei, 'ether');
-                        const approveConfirm = await ZODIAC_UI.showConfirmModal(
-                            '需要授权代币',
-                            `孕育需要支付 ${feeAmount} 代币费用，请授权合约使用您的代币。`,
-                            { confirmText: '确认授权' }
-                        );
-                        if (!approveConfirm) {
-                            return;
+                    // Always re-approve to ensure the allowance is correct
+                    const feeAmount = web3.utils.fromWei(feeWei, 'ether');
+                    btn.textContent = '正在授权代币...';
+                    
+                    try {
+                        const currentAllowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
+                        if (BigInt(currentAllowance) > BigInt(0)) {
+                            console.log('[BREEDING] Resetting allowance to 0...');
+                            const resetTx = tokenContract.methods.approve(breedingCoreAddress, 0);
+                            await resetTx.send({ from: account });
+                            console.log('[BREEDING] Allowance reset complete');
                         }
-                        btn.textContent = '正在授权代币...';
                         
-                        try {
-                            const currentAllowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
-                            if (BigInt(currentAllowance) > BigInt(0)) {
-                                console.log('[BREEDING] Resetting allowance to 0...');
-                                const resetTx = tokenContract.methods.approve(breedingCoreAddress, 0);
-                                await resetTx.send({ from: account });
-                                console.log('[BREEDING] Allowance reset complete');
-                            }
-                            
-                            console.log('[BREEDING] Approving', feeAmount, 'tokens...');
-                            const approveTx = tokenContract.methods.approve(breedingCoreAddress, feeWei);
-                            await approveTx.send({ from: account });
-                            console.log('[BREEDING] Approval complete');
-                            
-                            const newAllowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
-                            console.log('[BREEDING] New allowance:', web3.utils.fromWei(newAllowance, 'ether'));
-                            
-                            ZODIAC_UI.showToast('代币授权成功！', 'success');
-                        } catch (approveError) {
-                            console.error('[BREEDING] Approval failed:', approveError);
-                            throw new Error('代币授权失败: ' + (approveError.message || '未知错误'));
-                        }
+                        console.log('[BREEDING] Approving', feeAmount, 'tokens...');
+                        const approveTx = tokenContract.methods.approve(breedingCoreAddress, feeWei);
+                        await approveTx.send({ from: account });
+                        console.log('[BREEDING] Approval complete');
+                        
+                        const newAllowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
+                        console.log('[BREEDING] New allowance:', web3.utils.fromWei(newAllowance, 'ether'));
+                        
+                        ZODIAC_UI.showToast('代币授权成功！', 'success');
+                    } catch (approveError) {
+                        console.error('[BREEDING] Approval failed:', approveError);
+                        throw new Error('代币授权失败: ' + (approveError.message || '未知错误'));
                     }
                 }
 
@@ -1142,6 +1133,33 @@
                 }
                 if ((fatherType % 2) === (motherType % 2)) {
                     throw new Error('两个NFT必须是不同性别');
+                }
+                
+                // Check NFT approvals for BreedingCore
+                const fatherApproved = await nftContract.methods.getApproved(selectedMaleNFT.id).call();
+                const motherApproved = await nftContract.methods.getApproved(selectedFemaleNFT.id).call();
+                const fatherIsApprovedForAll = await nftContract.methods.isApprovedForAll(account, breedingCoreAddress).call();
+                const motherIsApprovedForAll = await nftContract.methods.isApprovedForAll(account, breedingCoreAddress).call();
+                
+                if ((fatherApproved !== breedingCoreAddress && !fatherIsApprovedForAll) || 
+                    (motherApproved !== breedingCoreAddress && !motherIsApprovedForAll)) {
+                    const approveNFTConfirm = await ZODIAC_UI.showConfirmModal(
+                        '需要授权NFT',
+                        '孕育需要将NFT授权给孕育合约，请确认授权。',
+                        { confirmText: '确认授权' }
+                    );
+                    if (!approveNFTConfirm) {
+                        throw new Error('用户取消了NFT授权');
+                    }
+                    btn.textContent = '正在授权NFT...';
+                    
+                    if (fatherApproved !== breedingCoreAddress && !fatherIsApprovedForAll) {
+                        await nftContract.methods.approve(breedingCoreAddress, selectedMaleNFT.id).send({ from: account });
+                    }
+                    if (motherApproved !== breedingCoreAddress && !motherIsApprovedForAll) {
+                        await nftContract.methods.approve(breedingCoreAddress, selectedFemaleNFT.id).send({ from: account });
+                    }
+                    ZODIAC_UI.showToast('NFT授权成功！', 'success');
                 }
                 
                 await ZODIAC_WEB3.createSelfBreedingPair(selectedMaleNFT.id, selectedFemaleNFT.id, 0);
