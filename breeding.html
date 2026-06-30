@@ -1061,6 +1061,9 @@
                                     const fee = web3.utils.fromWei(feeWei, 'ether');
                                     const balanceFormatted = web3.utils.fromWei(balance, 'ether');
                                     ZODIAC_UI.showToast(`代币余额不足！需要 ${fee}，当前 ${balanceFormatted}`, 'error');
+                                    btn.textContent = '开始自我孕育';
+                                    btn.disabled = false;
+                                    isTransactionInProgress = false;
                                     return;
                                 }
 
@@ -1073,6 +1076,9 @@
                                         { confirmText: '确认授权' }
                                     );
                                     if (!approveConfirm) {
+                                        btn.textContent = '开始自我孕育';
+                                        btn.disabled = false;
+                                        isTransactionInProgress = false;
                                         return;
                                     }
                                     btn.textContent = '正在授权代币...';
@@ -1089,6 +1095,12 @@
                             return;
                         }
                     }
+                } else {
+                    ZODIAC_UI.showToast('孕育合约未初始化，请刷新页面重试', 'error');
+                    btn.textContent = '开始自我孕育';
+                    btn.disabled = false;
+                    isTransactionInProgress = false;
+                    return;
                 }
 
                 btn.textContent = '正在孕育...';
