@@ -566,20 +566,32 @@
         async function setupMarketplaceEventListeners() {
             try {
                 if (typeof window.ZODIAC_WEB3 !== 'undefined') {
-                    await window.ZODIAC_WEB3.listenToEvent('nftTrading', 'MarketListingCreated', async () => {
-                        console.log('[TRADING] Listing created, refreshing marketplace...');
-                        await loadMarketplace();
-                    });
+                    try {
+                        await window.ZODIAC_WEB3.listenToEvent('nftTrading', 'MarketListingCreated', async () => {
+                            console.log('[TRADING] Listing created, refreshing marketplace...');
+                            await loadMarketplace();
+                        });
+                    } catch (e) {
+                        console.warn('[TRADING] Event MarketListingCreated not found on nftTrading contract');
+                    }
                     
-                    await window.ZODIAC_WEB3.listenToEvent('nftTrading', 'MarketListingRemoved', async () => {
-                        console.log('[TRADING] Listing removed, refreshing marketplace...');
-                        await loadMarketplace();
-                    });
+                    try {
+                        await window.ZODIAC_WEB3.listenToEvent('nftTrading', 'MarketListingRemoved', async () => {
+                            console.log('[TRADING] Listing removed, refreshing marketplace...');
+                            await loadMarketplace();
+                        });
+                    } catch (e) {
+                        console.warn('[TRADING] Event MarketListingRemoved not found on nftTrading contract');
+                    }
                     
-                    await window.ZODIAC_WEB3.listenToEvent('nftTrading', 'NFTBought', async () => {
-                        console.log('[TRADING] NFT bought, refreshing marketplace...');
-                        await loadMarketplace();
-                    });
+                    try {
+                        await window.ZODIAC_WEB3.listenToEvent('nftTrading', 'NFTBought', async () => {
+                            console.log('[TRADING] NFT bought, refreshing marketplace...');
+                            await loadMarketplace();
+                        });
+                    } catch (e) {
+                        console.warn('[TRADING] Event NFTBought not found on nftTrading contract');
+                    }
                 }
             } catch (error) {
                 console.warn('[TRADING] Failed to setup marketplace event listeners:', error);

@@ -739,12 +739,28 @@ window.ZODIAC_WEB3 = (function() {
                     }
                 }
                 
-                if (!contract.events || !contract.events[eventName]) {
-                    console.warn(`[ZODIAC_WEB3] Event "${eventName}" not found on contract "${contractName}" ABI`);
+                if (!contract.events) {
+                    console.warn(`[ZODIAC_WEB3] Contract "${contractName}" has no events. Check ABI.`);
                     return;
                 }
-
-                const subscription = contract.events[eventName](eventOptions, callback);
+                
+                let eventNameToUse = eventName;
+                if (!contract.events[eventNameToUse]) {
+                    const camelCaseName = eventName.charAt(0).toLowerCase() + eventName.slice(1);
+                    if (contract.events[camelCaseName]) {
+                        eventNameToUse = camelCaseName;
+                    } else {
+                        const pascalCaseName = eventName.charAt(0).toUpperCase() + eventName.slice(1);
+                        if (contract.events[pascalCaseName]) {
+                            eventNameToUse = pascalCaseName;
+                        } else {
+                            console.warn(`[ZODIAC_WEB3] Event "${eventName}" not found on contract "${contractName}" ABI. Available events:`, Object.keys(contract.events));
+                            return;
+                        }
+                    }
+                }
+                
+                const subscription = contract.events[eventNameToUse](eventOptions, callback);
                 
                 subscription.on('error', (error) => {
                     console.error(`[ZODIAC_WEB3] Event subscription error for ${contractName}.${eventName}:`, error);

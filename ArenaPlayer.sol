@@ -61,7 +61,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     /**
      * @dev 充值成本（代币，wei单位）
      */
-    uint256 public rechargeCost = 888 * 10**18; // 888 代币
+    uint256 public rechargeCost = 1 * 10**18; // 1 代币
     
     /**
      * @dev 玩家战斗队伍映射
@@ -144,7 +144,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         __Pausable_init();
         authorizer = _authorizerAddress;
         
-        rechargeCost = 888 * 10**18;
+        rechargeCost = 1 * 10**18;
         rechargeAttempts = 3;
     }
     

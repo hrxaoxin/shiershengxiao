@@ -2001,10 +2001,10 @@
         async function loadRemainingAttempts() {
             try {
                 let attempts = 0;
-                if (arenaBattleContract) {
-                    attempts = await arenaBattleContract.methods.getRemainingAttempts(accounts[0]).call();
-                } else if (arenaPlayerContract) {
+                if (arenaPlayerContract) {
                     attempts = await arenaPlayerContract.methods.getRemainingAttempts(accounts[0]).call();
+                } else if (arenaBattleContract) {
+                    attempts = await arenaBattleContract.methods.getRemainingAttempts(accounts[0]).call();
                 }
                 document.getElementById('remainingAttempts').textContent = attempts;
             } catch (error) {

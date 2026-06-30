@@ -1234,11 +1234,9 @@
 
         function calculateGrowthPriceFallback(level, isRare, holdingDays) {
             const discountRates = { 1: 10, 2: 15, 3: 20, 4: 25, 5: 30 };
-            const breakEvenDays = { 1: 90, 2: 85, 3: 80, 4: 75, 5: 70 };
             const maxBuybackMultiplier = 110;
 
             const discount = discountRates[level] || 10;
-            const daysToBreakEven = breakEvenDays[level] || 90;
 
             const normalMintCost = 1;
             const rareMintCost = 10;
@@ -1251,10 +1249,10 @@
 
             const basePriceValue = totalCost * discount / 100;
             const maxBonusPercent = maxBuybackMultiplier - discount;
-            const maxBonusDays = (maxBonusPercent * daysToBreakEven) / (100 - discount);
+            const maxBonusDays = maxBonusPercent;
             const actualBonusDays = Math.min(holdingDays, maxBonusDays);
             
-            const bonusPercent = Math.floor((actualBonusDays * (100 - discount)) / daysToBreakEven);
+            const bonusPercent = actualBonusDays;
             const bonusAmount = totalCost * bonusPercent / 100;
             const finalPriceValue = basePriceValue + bonusAmount;
             const maxPriceValue = totalCost * maxBuybackMultiplier / 100;
