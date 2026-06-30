@@ -1180,9 +1180,18 @@
 
             const requiredNFTs = parseInt(selectedNft.level, 10);
             const nftId = parseInt(selectedNft.id, 10);
-            
-            // 检查NFT数量
+
+            const confirmed = await ZODIAC_UI.showConfirmModal(
+                '使用NFT升阶确认',
+                '确认使用NFT升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗 ' + requiredNFTs + ' 张相同类型的NFT',
+                { confirmText: '使用NFT升阶' }
+            );
+
+            if (!confirmed) return;
+
             try {
+                ZODIAC_UI.showLoading('检查NFT数量...');
+                
                 const userTokens = await nftContract.methods.getTokenIdsByOwner(account).call();
                 let sameLevelCount = 0;
                 for (const tid of userTokens) {
@@ -1196,20 +1205,16 @@
                 }
                 
                 if (sameLevelCount < requiredNFTs + 1) {
+                    ZODIAC_UI.hideLoading();
                     ZODIAC_UI.showToast('NFT数量不足！需要 ' + (requiredNFTs + 1) + ' 张同类型同级NFT', 'error');
                     return;
                 }
             } catch (e) {
+                ZODIAC_UI.hideLoading();
                 console.error('检查NFT数量失败:', e);
+                ZODIAC_UI.showToast('检查NFT数量失败，请重试', 'error');
+                return;
             }
-
-            const confirmed = await ZODIAC_UI.showConfirmModal(
-                '使用NFT升阶确认',
-                '确认使用NFT升阶？\n\nNFT ID: ' + nftId + '\n当前等级: ' + selectedNft.level + ' → ' + (parseInt(selectedNft.level) + 1) + '\n将消耗 ' + requiredNFTs + ' 张相同类型的NFT',
-                { confirmText: '使用NFT升阶' }
-            );
-
-            if (!confirmed) return;
 
             try {
                 ZODIAC_UI.showLoading('检查授权...');
