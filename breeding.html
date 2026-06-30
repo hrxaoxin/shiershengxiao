@@ -1081,7 +1081,12 @@
                                 }
                             }
                         } catch (e) {
-                            console.warn('获取代币合约失败，跳过余额检查:', e);
+                            console.error('获取代币合约失败:', e);
+                            ZODIAC_UI.showToast('无法检查代币余额，请稍后重试', 'error');
+                            btn.textContent = '开始自我孕育';
+                            btn.disabled = false;
+                            isTransactionInProgress = false;
+                            return;
                         }
                     }
                 }

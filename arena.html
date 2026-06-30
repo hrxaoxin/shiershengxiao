@@ -1380,11 +1380,14 @@
             const battleSlots = document.querySelectorAll('#battleTeamSlots .team-slot');
             
             battleSlots.forEach((slot, index) => {
-                slot.addEventListener('click', () => openNftSelectModal('battle', index));
+                slot.onclick = () => openNftSelectModal('battle', index);
             });
             
-            document.getElementById('closeNftModal').addEventListener('click', closeNftSelectModal);
-            document.getElementById('clearSlotBtn').addEventListener('click', clearSelectedSlot);
+            const closeModalBtn = document.getElementById('closeNftModal');
+            if (closeModalBtn) closeModalBtn.onclick = closeNftSelectModal;
+            
+            const clearSlotBtn = document.getElementById('clearSlotBtn');
+            if (clearSlotBtn) clearSlotBtn.onclick = clearSelectedSlot;
         }
 
         function openNftSelectModal(teamType, slotIndex) {
@@ -2001,10 +2004,10 @@
         async function loadRemainingAttempts() {
             try {
                 let attempts = 0;
-                if (arenaPlayerContract) {
-                    attempts = await arenaPlayerContract.methods.getRemainingAttempts(accounts[0]).call();
-                } else if (arenaBattleContract) {
+                if (arenaBattleContract) {
                     attempts = await arenaBattleContract.methods.getRemainingAttempts(accounts[0]).call();
+                } else if (arenaPlayerContract) {
+                    attempts = await arenaPlayerContract.methods.getRemainingAttempts(accounts[0]).call();
                 }
                 document.getElementById('remainingAttempts').textContent = attempts;
             } catch (error) {

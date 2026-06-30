@@ -1342,6 +1342,20 @@
                     await approveNFT();
                 }
 
+                const buybackPriceWei = price.finalPrice;
+                const tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
+                if (tokenContract) {
+                    const contractBalance = await tokenContract.methods.balanceOf(buybackContract.options.address).call();
+                    if (BigInt(contractBalance) < BigInt(buybackPriceWei)) {
+                        const contractBalanceFormatted = web3.utils.fromWei(contractBalance, 'ether');
+                        const priceFormatted = web3.utils.fromWei(buybackPriceWei, 'ether');
+                        ZODIAC_UI.showToast(`合约余额不足！需要 ${priceFormatted}，当前 ${contractBalanceFormatted}`, 'error');
+                        btn.innerHTML = '<i class="fa fa-arrow-right mr-2"></i>以成长价出售';
+                        btn.disabled = false;
+                        return;
+                    }
+                }
+
                 await ZODIAC_WEB3.sellNFTWithGrowthPrice(selectedNft.tokenId);
 
                 ZODIAC_UI.showToast('出售成功！', 'success');
