@@ -1076,7 +1076,7 @@
                     console.log('[BREEDING] BreedingCore address:', breedingCoreAddress);
                     console.log('[BREEDING] Fee:', web3.utils.fromWei(feeWei, 'ether'));
                     
-                    const tokenContract = new web3.eth.Contract(ZODIAC_CONFIG.ABI_MAP.tokenContract, tokenAddress);
+                    const tokenContract = new web3.eth.Contract(ZODIAC_CONFIG.ABIS.tokenABI, tokenAddress);
                     
                     const balance = await tokenContract.methods.balanceOf(account).call();
                     console.log('[BREEDING] User balance:', web3.utils.fromWei(balance, 'ether'));
