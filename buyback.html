@@ -1319,42 +1319,71 @@
         async function sellWithGrowthPrice() {
             if (!selectedNft || !buybackContract) return;
 
-            const nftLevel = selectedNft.level || 1;
-            const isRare = selectedNft.nftInfo ? selectedNft.nftInfo.isRare : false;
-            const price = await calculateGrowthPrice(selectedNft.tokenId, nftLevel, isRare, selectedNft.mintTime);
-            const finalPrice = web3.utils.fromWei(price.finalPrice, 'ether');
-
-            const confirm = await ZODIAC_UI.showConfirmModal(
-                '确认以成长价出售',
-                `将NFT #${selectedNft.tokenId} 以 ${finalPrice} 代币的价格出售给回购合约，确定继续？`,
-                { confirmText: '以成长价出售' }
-            );
-
-            if (!confirm) return;
-
             const btn = document.getElementById('sellWithGrowthBtn');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 出售中...';
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 检查中...';
             btn.disabled = true;
 
             try {
-                const isApproved = await checkApproval();
-                if (!isApproved) {
-                    await approveNFT();
+                const growthBuybackOpen = await buybackContract.methods.growthBuybackOpen().call();
+                if (!growthBuybackOpen) {
+                    ZODIAC_UI.showToast('成长价回购功能未开启', 'error');
+                    btn.innerHTML = '<i class="fa fa-arrow-right mr-2"></i>以成长价出售';
+                    btn.disabled = false;
+                    return;
                 }
 
-                const buybackPriceWei = price.finalPrice;
-                const tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
-                if (tokenContract) {
-                    const contractBalance = await tokenContract.methods.balanceOf(buybackContract.options.address).call();
-                    if (BigInt(contractBalance) < BigInt(buybackPriceWei)) {
-                        const contractBalanceFormatted = web3.utils.fromWei(contractBalance, 'ether');
-                        const priceFormatted = web3.utils.fromWei(buybackPriceWei, 'ether');
-                        ZODIAC_UI.showToast(`合约余额不足！需要 ${priceFormatted}，当前 ${contractBalanceFormatted}`, 'error');
+                const stakingContract = await window.ZODIAC_WEB3.getContract('staking', false);
+                if (stakingContract) {
+                    const stakingInfo = await stakingContract.methods.stakingInfo(selectedNft.tokenId).call();
+                    if (stakingInfo[0] !== '0x0000000000000000000000000000000000000000') {
+                        ZODIAC_UI.showToast('NFT正在质押中，请先解除质押', 'error');
                         btn.innerHTML = '<i class="fa fa-arrow-right mr-2"></i>以成长价出售';
                         btn.disabled = false;
                         return;
                     }
                 }
+
+                const isApproved = await checkApproval();
+                if (!isApproved) {
+                    await approveNFT();
+                    const reApproved = await checkApproval();
+                    if (!reApproved) {
+                        btn.innerHTML = '<i class="fa fa-arrow-right mr-2"></i>以成长价出售';
+                        btn.disabled = false;
+                        return;
+                    }
+                }
+
+                const nftLevel = selectedNft.level || 1;
+                const isRare = selectedNft.nftInfo ? selectedNft.nftInfo.isRare : false;
+                const price = await calculateGrowthPrice(selectedNft.tokenId, nftLevel, isRare, selectedNft.mintTime);
+                const finalPrice = web3.utils.fromWei(price.finalPrice, 'ether');
+
+                const tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
+                if (tokenContract) {
+                    const contractBalance = await tokenContract.methods.balanceOf(buybackContract.options.address).call();
+                    if (BigInt(contractBalance) < BigInt(price.finalPrice)) {
+                        const contractBalanceFormatted = web3.utils.fromWei(contractBalance, 'ether');
+                        ZODIAC_UI.showToast(`合约余额不足！需要 ${finalPrice}，当前 ${contractBalanceFormatted}`, 'error');
+                        btn.innerHTML = '<i class="fa fa-arrow-right mr-2"></i>以成长价出售';
+                        btn.disabled = false;
+                        return;
+                    }
+                }
+
+                const confirm = await ZODIAC_UI.showConfirmModal(
+                    '确认以成长价出售',
+                    `将NFT #${selectedNft.tokenId} 以 ${finalPrice} 代币的价格出售给回购合约，确定继续？`,
+                    { confirmText: '以成长价出售' }
+                );
+
+                if (!confirm) {
+                    btn.innerHTML = '<i class="fa fa-arrow-right mr-2"></i>以成长价出售';
+                    btn.disabled = false;
+                    return;
+                }
+
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> 出售中...';
 
                 await ZODIAC_WEB3.sellNFTWithGrowthPrice(selectedNft.tokenId);
 

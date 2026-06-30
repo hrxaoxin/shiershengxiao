@@ -1127,6 +1127,14 @@
                     console.warn('孕育预检查失败:', preCheckError);
                 }
                 
+                if (!breedingCoreContract) {
+                    ZODIAC_UI.showToast('孕育合约未初始化，请刷新页面重试', 'error');
+                    btn.textContent = '开始自我孕育';
+                    btn.disabled = false;
+                    isTransactionInProgress = false;
+                    return;
+                }
+                
                 await ZODIAC_WEB3.createSelfBreedingPair(selectedMaleNFT.id, selectedFemaleNFT.id, 0);
                 
                 ZODIAC_UI.showToast('自我孕育已开始！等待完成。', 'success');
