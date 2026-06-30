@@ -1072,9 +1072,15 @@
                     }
                     
                     const tokenAddress = await authorizerContract.methods.getToken().call();
+                    console.log('[BREEDING] Token address from Authorizer:', tokenAddress);
+                    console.log('[BREEDING] BreedingCore address:', breedingCoreAddress);
+                    console.log('[BREEDING] Fee:', web3.utils.fromWei(feeWei, 'ether'));
+                    
                     const tokenContract = new web3.eth.Contract(ZODIAC_CONFIG.ABI_MAP.tokenContract, tokenAddress);
                     
                     const balance = await tokenContract.methods.balanceOf(account).call();
+                    console.log('[BREEDING] User balance:', web3.utils.fromWei(balance, 'ether'));
+                    
                     if (BigInt(balance) < BigInt(feeWei)) {
                         const fee = web3.utils.fromWei(feeWei, 'ether');
                         const balanceFormatted = web3.utils.fromWei(balance, 'ether');
@@ -1082,6 +1088,8 @@
                     }
 
                     const allowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
+                    console.log('[BREEDING] Current allowance:', web3.utils.fromWei(allowance, 'ether'));
+                    
                     if (BigInt(allowance) < BigInt(feeWei)) {
                         const feeAmount = web3.utils.fromWei(feeWei, 'ether');
                         const approveConfirm = await ZODIAC_UI.showConfirmModal(
@@ -1093,8 +1101,29 @@
                             return;
                         }
                         btn.textContent = '正在授权代币...';
-                        await ZODIAC_WEB3.approveToken(breedingCoreAddress, feeWei);
-                        ZODIAC_UI.showToast('代币授权成功！', 'success');
+                        
+                        try {
+                            const currentAllowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
+                            if (BigInt(currentAllowance) > BigInt(0)) {
+                                console.log('[BREEDING] Resetting allowance to 0...');
+                                const resetTx = tokenContract.methods.approve(breedingCoreAddress, 0);
+                                await resetTx.send({ from: account });
+                                console.log('[BREEDING] Allowance reset complete');
+                            }
+                            
+                            console.log('[BREEDING] Approving', feeAmount, 'tokens...');
+                            const approveTx = tokenContract.methods.approve(breedingCoreAddress, feeWei);
+                            await approveTx.send({ from: account });
+                            console.log('[BREEDING] Approval complete');
+                            
+                            const newAllowance = await tokenContract.methods.allowance(account, breedingCoreAddress).call();
+                            console.log('[BREEDING] New allowance:', web3.utils.fromWei(newAllowance, 'ether'));
+                            
+                            ZODIAC_UI.showToast('代币授权成功！', 'success');
+                        } catch (approveError) {
+                            console.error('[BREEDING] Approval failed:', approveError);
+                            throw new Error('代币授权失败: ' + (approveError.message || '未知错误'));
+                        }
                     }
                 }
 
