@@ -1103,9 +1103,9 @@
                     throw new Error('NFT等级不足，需要5级以上才能孕育');
                 }
                 
-                const fatherType = await nftContract.methods.tokenType(selectedMaleNFT.id).call();
-                const motherType = await nftContract.methods.tokenType(selectedFemaleNFT.id).call();
-                if ((fatherType / 2) % 12 !== (motherType / 2) % 12) {
+                const fatherType = parseInt(await nftContract.methods.tokenType(selectedMaleNFT.id).call(), 10);
+                const motherType = parseInt(await nftContract.methods.tokenType(selectedFemaleNFT.id).call(), 10);
+                if (Math.floor(fatherType / 2) !== Math.floor(motherType / 2)) {
                     throw new Error('两个NFT必须是同一生肖');
                 }
                 if ((fatherType % 2) === (motherType % 2)) {
