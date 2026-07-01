@@ -41,45 +41,29 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     /** @dev 奖励精度缩放因子（1e18），用于避免 dailyRewardPerToken 整数截断 */
     uint256 private constant REWARD_PRECISION = 1e18;
     
-    /** @dev 授权合约地址 */
     address public authorizer;
     
-    /** @dev 当前奖励类型 */
-    RewardType public rewardType;
+    RewardType private rewardType;
     
-    /** @dev LP奖励池余额 */
-    uint256 public lpRewardPoolBalance;
-    /** @dev 代币奖励池余额 */
-    uint256 public tokenRewardPoolBalance;
-    /** @dev BNB奖励池余额 */
-    uint256 public bnbRewardPoolBalance;
+    uint256 private lpRewardPoolBalance;
+    uint256 private tokenRewardPoolBalance;
+    uint256 private bnbRewardPoolBalance;
     
-    /** @dev 每日释放比例（万分比，默认1% = 100/10000） */
-    uint256 public rewardRate = 100;
-    /** @dev 最大每日释放比例（万分比） */
-    uint256 public maxRewardRate = 500;
-    /** @dev 每日最大释放百分比（10% = 100/1000） */
-    uint256 public maxDailyRewardPercent = 100;
-    /** @dev 奖励率调整步长（万分比，10 = 0.1%） */
-    uint256 public rateStep = 10;
+    uint256 private rewardRate = 100;
+    uint256 private maxRewardRate = 500;
+    uint256 private maxDailyRewardPercent = 100;
+    uint256 private rateStep = 10;
     
-    /** @dev 今日开始时间 */
-    uint256 public todayStart;
-    /** @dev 今日已释放奖励金额 */
-    uint256 public todayRewardAmount;
-    /** @dev 今日流入代币数量 */
-    uint256 public todayIncomingTokens;
+    uint256 private todayStart;
+    uint256 private todayRewardAmount;
+    uint256 private todayIncomingTokens;
     
-    /** @dev 全局奖励累积值（每单位质押代币的奖励） */
-    uint256 public dailyRewardPerToken;
+    uint256 private dailyRewardPerToken;
     
     /** @dev 用户奖励快照累积率映射（地址 => 用户上次领取时的累积率） */
     mapping(address => uint256) public lastRewardAccumulatedRate;
 
-    /** @dev 质押奖励精度缩放因子（1e18） */
-    uint256 public constant STAKING_REWARD_PRECISION = 1e18;
-    /** @dev 奖励比例精度（万分比） */
-    uint256 public constant DAILY_REWARD_PRECISION = 10000;
+    uint256 private constant DAILY_REWARD_PRECISION = 10000;
 
     /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[48] private __gap;
@@ -89,6 +73,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     error NotAuthorized();
     error AmountZero();
     error InvalidToken();
+    error InvalidRecipient();
     error ArraysLengthMismatch();
     error NoStakedTokens();
     error InsufficientLP();
@@ -274,7 +259,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         state.tokenRewardPoolBalance = tokenRewardPoolBalance;
         state.bnbRewardPoolBalance = bnbRewardPoolBalance;
         state.rewardType = rewardType;
-        state.stakingRewardPrecision = STAKING_REWARD_PRECISION;
+        state.stakingRewardPrecision = REWARD_PRECISION;
     }
 
     function _setSimplePoolState(TokenStakingLPLib.RewardPoolState memory state) internal {
@@ -284,23 +269,9 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     }
 
     function _updateRewardPerToken(uint256 lpBefore, uint256 tokenBefore, TokenStakingLPLib.RewardPoolState memory state) internal {
-        if (rewardType == RewardType.LP || rewardType == RewardType.TOKEN) {
-            address tokenStaking = IAuthorizer(authorizer).getTokenStaking();
-            uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
-            
-            if (totalStaked > 0) {
-                uint256 addedAmount = 0;
-                if (rewardType == RewardType.LP) {
-                    addedAmount = state.lpRewardPoolBalance - lpBefore;
-                } else if (rewardType == RewardType.TOKEN) {
-                    addedAmount = state.tokenRewardPoolBalance - tokenBefore;
-                }
-                
-                if (addedAmount > 0) {
-                    uint256 increment = (addedAmount * REWARD_PRECISION) / totalStaked;
-                    dailyRewardPerToken += increment;
-                }
-            }
+        uint256 increment = TokenStakingLPLib.calculateRewardPerTokenIncrement(state, lpBefore, tokenBefore, IAuthorizer(authorizer), REWARD_PRECISION);
+        if (increment > 0) {
+            dailyRewardPerToken += increment;
         }
     }
 
@@ -457,17 +428,6 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         maxDailyRewardPercent = _percent;
     }
 
-    /**
-     * @dev 检查是否应该计算每日奖励
-     */
-    function shouldCalculateDailyReward() public view returns (bool) {
-        uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
-        return currentDayStart > todayStart;
-    }
-
-    /**
-     * @dev 计算并释放每日奖励
-     */
     function calculateDailyReward() external whenNotPaused {
         uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
         if (currentDayStart <= todayStart) return;
@@ -496,7 +456,22 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         }
 
         uint256 expectedDailyReward = poolBalance * rewardRate / DAILY_REWARD_PRECISION;
-        _adjustRewardRate(expectedDailyReward);
+        
+        if (expectedDailyReward > 0 && todayIncomingTokens > expectedDailyReward) {
+            uint256 multiple = todayIncomingTokens / expectedDailyReward;
+            uint256 steps = multiple - 1;
+            uint256 maxSteps = (maxRewardRate - rewardRate) / rateStep;
+
+            if (steps > maxSteps) {
+                steps = maxSteps;
+            }
+
+            uint256 newRate = rewardRate + (steps * rateStep);
+            if (newRate != rewardRate) {
+                rewardRate = newRate;
+                emit RewardRateUpdated(rewardRate);
+            }
+        }
 
         uint256 dailyReward = poolBalance * rewardRate / DAILY_REWARD_PRECISION;
         uint256 maxDailyReward = poolBalance * maxDailyRewardPercent / 1000;
@@ -506,7 +481,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         }
 
         if (dailyReward > 0) {
-            uint256 increment = (dailyReward * STAKING_REWARD_PRECISION) / totalStaked;
+            uint256 increment = (dailyReward * REWARD_PRECISION) / totalStaked;
             dailyRewardPerToken += increment;
             todayRewardAmount = dailyReward;
             
@@ -522,33 +497,6 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         }
 
         todayIncomingTokens = 0;
-    }
-
-    /**
-     * @dev 动态调整奖励率
-     * 规则：当日流入量超过预计释放量的倍数，每增加1倍，奖励率上调10（万分比）
-     * 奖励率不会超过maxRewardRate
-     * @param expectedDailyReward 当日预计释放量
-     */
-    function _adjustRewardRate(uint256 expectedDailyReward) internal {
-        if (expectedDailyReward == 0) return;
-        
-        if (todayIncomingTokens > expectedDailyReward) {
-            uint256 multiple = todayIncomingTokens / expectedDailyReward;
-            uint256 steps = multiple - 1;
-            uint256 maxSteps = (maxRewardRate - rewardRate) / rateStep;
-
-            if (steps > maxSteps) {
-                steps = maxSteps;
-            }
-
-            uint256 newRate = rewardRate + (steps * rateStep);
-
-            if (newRate != rewardRate) {
-                rewardRate = newRate;
-                emit RewardRateUpdated(rewardRate);
-            }
-        }
     }
 
     /**
@@ -577,26 +525,17 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     //  紧急取款函数（仅所有者）
     // ============================================================
 
-    /**
-     * @dev 提取指定代币（仅owner）
-     * @param token 代币地址
-     * @param to 接收地址
-     */
     function withdrawToken(address token, address to) external onlyOwner {
-        require(token != address(0), "TokenStakingLP: Invalid token");
-        require(to != address(0), "TokenStakingLP: Invalid recipient");
+        if (token == address(0)) revert InvalidToken();
+        if (to == address(0)) revert InvalidRecipient();
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
             IERC20(token).transfer(to, balance);
         }
     }
 
-    /**
-     * @dev 提取BNB（仅owner）
-     * @param to 接收地址
-     */
     function withdrawBNB(address to) external onlyOwner {
-        require(to != address(0), "TokenStakingLP: Invalid recipient");
+        if (to == address(0)) revert InvalidRecipient();
         uint256 balance = address(this).balance;
         if (balance > 0) {
             payable(to).transfer(balance);

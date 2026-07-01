@@ -516,4 +516,31 @@ library TokenStakingLPLib {
         (bool success, ) = payable(msg.sender).call{value: amount}("");
         require(success, "BNB transfer failed");
     }
+
+    function calculateRewardPerTokenIncrement(
+        RewardPoolState memory state,
+        uint256 lpBefore,
+        uint256 tokenBefore,
+        IAuthorizer authorizer,
+        uint256 rewardPrecision
+    ) internal view returns (uint256) {
+        if (state.rewardType == RewardType.LP || state.rewardType == RewardType.TOKEN) {
+            address tokenStaking = authorizer.getTokenStaking();
+            uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
+            
+            if (totalStaked > 0) {
+                uint256 addedAmount = 0;
+                if (state.rewardType == RewardType.LP) {
+                    addedAmount = state.lpRewardPoolBalance - lpBefore;
+                } else if (state.rewardType == RewardType.TOKEN) {
+                    addedAmount = state.tokenRewardPoolBalance - tokenBefore;
+                }
+                
+                if (addedAmount > 0) {
+                    return (addedAmount * rewardPrecision) / totalStaked;
+                }
+            }
+        }
+        return 0;
+    }
 }
