@@ -119,6 +119,13 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     event MockTeamGenerated(address indexed player, uint256[6] team);
 
     /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
+    /**
      * @dev 授权检查修饰器
      */
     modifier onlyOwnerOrAuthorizer() {
@@ -510,5 +517,20 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
                 // 忽略错误，不影响主流程
             }
         }
+    }
+
+    /**
+     * @dev 重置合约数据
+     * @notice 清空玩家战斗队伍和质押NFT数据，仅owner或authorizer可调用
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 重置充值成本和次数
+        rechargeCost = 1 * 10**18;
+        rechargeAttempts = 3;
+        // 注意：mapping无法完全清空，核心状态变量需要逐个处理
+        // playerBattleTeams、nftStakedOwner、userStakedNFTs等mapping中的数据
+        // 由于Solidity限制无法遍历mapping，这些数据需要通过其他方式清理
+        // 发出重置事件
+        emit ContractDataReset(msg.sender, block.timestamp);
     }
 }

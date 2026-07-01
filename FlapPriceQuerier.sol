@@ -39,6 +39,33 @@ contract FlapPriceQuerier {
     address public constant WBNB = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
     address public constant USDT = 0x55d398326f99059fF775485246999027B3197955;
 
+    address public owner;
+    address public authorizer;
+
+    constructor() {
+        owner = msg.sender;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    /**
+     * @dev 仅owner或authorizer的修饰符
+     */
+    modifier onlyOwnerOrAuthorizer() {
+        require(msg.sender == owner || msg.sender == authorizer, "Not authorized");
+        _;
+    }
+
+    /**
+     * @dev 设置授权合约地址（仅owner）
+     */
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        authorizer = _authorizer;
+    }
+
     // ==================== Flap 内盘查询 ====================
     function getFlapPriceInBNB(address token, uint256 amountInToken) external returns (uint256 amountOutBNB) {
         IFlapPortal.QuoteExactInputParams memory params = IFlapPortal.QuoteExactInputParams({
@@ -115,5 +142,21 @@ contract FlapPriceQuerier {
         } catch {}
 
         return 0;
+    }
+
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
+    /**
+     * @dev 重置合约核心数据（仅owner或authorizer）
+     * 注意：此合约主要为查询合约，无核心状态变量需要重置
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // FlapPriceQuerier主要为查询合约，无核心状态变量需要重置
+        emit ContractDataReset(msg.sender, block.timestamp);
     }
 }

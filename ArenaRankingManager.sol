@@ -278,6 +278,13 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
     /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
+    /**
      * @dev 初始化合约
      * @notice 初始化函数，设置授权者地址并启动第一个赛季
      * @param _authorizerAddress 授权合约地址
@@ -918,6 +925,33 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      */
     function setBaseRewardPerWin(uint256 _reward) external onlyOwner {
         baseRewardPerWin = _reward;
+    }
+
+    /**
+     * @dev 重置合约数据
+     * @notice 清空赛季数据，仅owner或authorizer可调用
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 重置当前赛季ID
+        currentSeasonId = 0;
+        // 重置赛季持续时间
+        seasonDuration = 1 days;
+        // 重置战斗ID计数器
+        battleIdCounter = 0;
+        // 重置模拟玩家奖励索引
+        mockRewardIndex = 0;
+        // 清空模拟玩家奖励接收地址列表
+        delete mockRewardRecipients;
+        // 重置竞技场模式
+        arenaMode = 1;
+        modeControlType = 0;
+        lastSeasonMode = 1;
+        // 重置基础奖励
+        baseRewardPerWin = 100;
+        // 注意：mapping无法完全清空，只能通过重新赋值来"清空"
+        // players、seasons等mapping中的数据需要通过逐个删除或重新初始化赛季来处理
+        // 发出重置事件
+        emit ContractDataReset(msg.sender, block.timestamp);
     }
 }
 

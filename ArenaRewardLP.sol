@@ -28,6 +28,13 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     event DailyRewardCalculated(uint256 dailyReward);
     event RewardRateUpdated(uint256 rewardRate);
 
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
     constructor() {
         _disableInitializers();
     }
@@ -177,5 +184,22 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         if (balance > 0) {
             payable(to).transfer(balance);
         }
+    }
+
+    /**
+     * @dev 重置合约数据
+     * @notice 清空LP奖励数据，仅owner或authorizer可调用
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 重置奖励池参数
+        _pool.rewardType = RewardType.BNB;
+        _pool.rewardRate = 100;
+        _pool.maxRewardRate = 500;
+        _pool.maxDailyRewardPercent = 100;
+        _pool.rateStep = 10;
+        _pool.rewardPrecision = 10000;
+        // 注意：RewardPool结构体中的其他mapping数据无法完全清空
+        // 发出重置事件
+        emit ContractDataReset(msg.sender, block.timestamp);
     }
 }

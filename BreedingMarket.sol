@@ -101,6 +101,9 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     /// @dev 市场挂牌移除事件
     event MarketListingRemoved(uint256 indexed tokenId, address indexed owner);
 
+    /// @dev 合约数据重置事件
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
     // ============================
     // 修饰器
     // ============================
@@ -300,4 +303,28 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     
     /// @dev 接收ETH转账（备用）
     fallback() external payable {}
+
+    // ============================
+    // 数据重置功能
+    // ============================
+
+    /**
+     * @dev 重置合约核心状态数据
+     * @notice 仅owner或授权合约可调用，用于紧急情况下的数据重置
+     * @dev 清空市场挂牌数组和重置暂停状态
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 清空挂牌数组
+        delete listedTokenIds;
+        delete activeListedTokenIds;
+
+        // 重置暂停状态
+        paused = false;
+        pauseReason = "";
+
+        // 注意：marketListings mapping无法遍历清空，
+        // 但通过清空数组，新数据会覆盖旧数据
+
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
 }

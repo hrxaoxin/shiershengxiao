@@ -732,7 +732,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function getUserNFTs(address user) external view returns (uint256[] memory) {
         return _getUserNFTs(user);
     }
-    
+
     /**
      * @dev 获取用户NFT列表（分页）
      * @param user 用户地址
@@ -744,21 +744,54 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function getUserNFTsPaginated(address user, uint256 offset, uint256 limit) external view returns (uint256[] memory nfts, uint256 total) {
         uint256[] storage allNFTs = _userNFTs[user];
         total = allNFTs.length;
-        
+
         if (offset >= total) {
             return (new uint256[](0), total);
         }
-        
+
         uint256 size = total - offset;
         if (size > limit) {
             size = limit;
         }
-        
+
         nfts = new uint256[](size);
         for (uint256 i = 0; i < size; i++) {
             nfts[i] = allNFTs[offset + i];
         }
     }
+
+    /**
+     * @dev 清空合约内部的所有数据
+     * 仅合约所有者和authorizer合约可调用
+     * 用于紧急情况下重置整个项目数据
+     * 注意：由于Solidity无法遍历mapping的所有键，此函数只重置核心状态变量
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 重置权重配置为默认值
+        normalWeights[0] = 1;
+        normalWeights[1] = 2;
+        normalWeights[2] = 6;
+        normalWeights[3] = 18;
+        normalWeights[4] = 66;
+
+        rareWeights[0] = 10;
+        rareWeights[1] = 12;
+        rareWeights[2] = 16;
+        rareWeights[3] = 28;
+        rareWeights[4] = 76;
+
+        emit WeightsUpdated(normalWeights, rareWeights, block.timestamp);
+
+        // 发出数据重置事件
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
+
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 执行重置的操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
 
     /**
      * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定

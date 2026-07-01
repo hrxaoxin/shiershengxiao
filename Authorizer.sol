@@ -597,4 +597,55 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     function getWBNB() external view returns (address) {
         return _addresses[keccak256("wbnb")];
     }
+
+    function resetAllContractData() external onlyOwner {
+        address[] memory contracts = new address[](30);
+        
+        contracts[0] = _addresses[keccak256("nftMintCore")];
+        contracts[1] = _addresses[keccak256("nftMintMetadata")];
+        contracts[2] = _addresses[keccak256("nftUpdate")];
+        contracts[3] = _addresses[keccak256("nftData")];
+        contracts[4] = _addresses[keccak256("tokenBurner")];
+        contracts[5] = _addresses[keccak256("nftTrading")];
+        contracts[6] = _addresses[keccak256("nftBuyback")];
+        contracts[7] = _addresses[keccak256("staking")];
+        contracts[8] = _addresses[keccak256("stakingLP")];
+        contracts[9] = _addresses[keccak256("tokenStaking")];
+        contracts[10] = _addresses[keccak256("tokenStakingLP")];
+        contracts[11] = _addresses[keccak256("rewardManager")];
+        contracts[12] = _addresses[keccak256("dividendManager")];
+        contracts[13] = _addresses[keccak256("dividendManagerLP")];
+        contracts[14] = _addresses[keccak256("poolManager")];
+        contracts[15] = _addresses[keccak256("priceOracle")];
+        contracts[16] = _addresses[keccak256("weightManager")];
+        contracts[17] = _addresses[keccak256("battle")];
+        contracts[18] = _addresses[keccak256("battleSkillData")];
+        contracts[19] = _addresses[keccak256("battleHistory")];
+        contracts[20] = _addresses[keccak256("breedingCore")];
+        contracts[21] = _addresses[keccak256("breedingMarket")];
+        contracts[22] = _addresses[keccak256("arenaRankingManager")];
+        contracts[23] = _addresses[keccak256("arenaPlayer")];
+        contracts[24] = _addresses[keccak256("arenaBattle")];
+        contracts[25] = _addresses[keccak256("arenaLeaderboard")];
+        contracts[26] = _addresses[keccak256("arenaReward")];
+        contracts[27] = _addresses[keccak256("arenaRewardLP")];
+        contracts[28] = _addresses[keccak256("FlapPricePay")];
+        contracts[29] = _addresses[keccak256("FlapPriceQuerier")];
+        
+        for (uint256 i = 0; i < contracts.length; i++) {
+            if (contracts[i] != address(0)) {
+                try IResetContractData(contracts[i]).resetContractData() {
+                    emit ContractResetSuccess(contracts[i]);
+                } catch {
+                    emit ContractResetFailed(contracts[i]);
+                }
+            }
+        }
+        
+        emit AllContractDataReset(msg.sender, block.timestamp);
+    }
+
+    event ContractResetSuccess(address indexed contractAddress);
+    event ContractResetFailed(address indexed contractAddress);
+    event AllContractDataReset(address indexed operator, uint256 timestamp);
 }

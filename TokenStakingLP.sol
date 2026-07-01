@@ -602,4 +602,28 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
             payable(to).transfer(balance);
         }
     }
+
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
+    /**
+     * @dev 重置合约核心数据（仅owner或authorizer）
+     * 注意：无法遍历mapping，只重置核心状态变量
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        lpRewardPoolBalance = 0;
+        tokenRewardPoolBalance = 0;
+        bnbRewardPoolBalance = 0;
+        dailyRewardPerToken = 0;
+        todayStart = 0;
+        todayRewardAmount = 0;
+        todayIncomingTokens = 0;
+        rewardRate = 100;
+        
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
 }

@@ -233,4 +233,27 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         require(_authorizerAddress != address(0), "NFTMintMetadata: Invalid authorizer address");
         authorizer = _authorizerAddress;
     }
+    
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 操作时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+    
+    /**
+     * @dev 重置合约核心数据
+     * 注意：此函数仅重置元数据配置，不会重置：
+     * - authorizer（授权合约地址，重置会导致合约无法正常工作）
+     * 
+     * 重置内容：
+     * - ipfsBaseNormal：普通NFT的IPFS基础URL（重置为空字符串）
+     * - ipfsBaseRare：稀有NFT的IPFS基础URL（重置为空字符串）
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        ipfsBaseNormal = "";
+        ipfsBaseRare = "";
+        
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
 }

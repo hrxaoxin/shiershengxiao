@@ -467,4 +467,27 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         SafeERC20Upgradeable.safeTransfer(token, owner(), amount);
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
     }
+
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
+    /**
+     * @dev 重置合约核心数据（仅owner或authorizer）
+     * 注意：无法遍历mapping，只重置核心状态变量
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        totalStakedTokens = 0;
+        dailyRewardPerToken = 0;
+        todayIncomingTokens = 0;
+        totalPendingRewards = 0;
+        lastRewardUpdate = block.timestamp;
+        dailyRewardDistributed = 0;
+        lastRewardCalculationTime = 0;
+        
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
 }

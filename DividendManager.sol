@@ -871,4 +871,46 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param operator 操作者地址
     /// @param timestamp 请求时间戳
     event EmergencyWithdrawRequested(address indexed operator, uint256 timestamp);
+
+    /**
+     * @dev 清空合约内部的所有数据
+     * 仅合约所有者和authorizer合约可调用
+     * 用于紧急情况下重置整个项目数据
+     * 注意：由于Solidity无法遍历mapping的所有键，此函数只重置核心状态变量
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 重置总权重
+        totalWeight = 0;
+
+        // 重置分红池余额
+        dividendPoolBalance = 0;
+        lastSyncedBalance = 0;
+        lastAutoSyncTime = 0;
+
+        // 重置累计分红
+        cumulativePerWeightDividend = 0;
+
+        // 清空快照数组
+        delete snapshots;
+        snapshotStartIndex = 0;
+        lastSnapshotTime = 0;
+
+        // 重置紧急提取状态
+        emergencyWithdrawRequested = false;
+        emergencyWithdrawRequestedAt = 0;
+
+        // 重置暂停状态
+        paused = false;
+        pauseReason = "";
+
+        // 发出数据重置事件
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
+
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 执行重置的操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
 }

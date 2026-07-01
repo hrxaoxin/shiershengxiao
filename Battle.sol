@@ -203,6 +203,13 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     );
 
     /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
+    /**
      * @notice 修饰器：仅所有者或授权器可调用
      * @dev 双重授权检查：owner或authorizer或authorizer认可的系统合约
      */
@@ -1317,4 +1324,17 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @dev Fallback 函数 - 处理未匹配的调用
      */
     fallback() external payable {}
+
+    /**
+     * @dev 重置合约数据
+     * @notice 清空战斗历史记录，仅owner或authorizer可调用
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 清空战斗历史数组
+        delete battleHistory;
+        // 重置战斗历史索引
+        battleHistoryIndex = 0;
+        // 发出重置事件
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
 }

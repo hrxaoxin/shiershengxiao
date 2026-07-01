@@ -195,6 +195,9 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /// @dev 繁殖取消事件
     event BreedingCancelled(uint256 indexed pairId, uint256 fatherId, uint256 motherId, address indexed canceller);
 
+    /// @dev 合约数据重置事件
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
     // ============================
     // 修饰器
     // ============================
@@ -1047,4 +1050,27 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     
     /// @dev 接收ETH转账（备用）
     fallback() external payable {}
+
+    // ============================
+    // 数据重置功能
+    // ============================
+
+    /**
+     * @dev 重置合约核心状态数据
+     * @notice 仅owner或授权合约可调用，用于紧急情况下的数据重置
+     * @dev 由于Solidity无法遍历mapping，只重置核心状态变量
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 重置计数器
+        breedingPairCount = 0;
+
+        // 重置暂停状态
+        paused = false;
+        pauseReason = "";
+
+        // 注意：mapping无法遍历清空，但通过重置计数器和标志位，
+        // 新的数据会覆盖旧数据，不会影响合约正常运行
+
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
 }

@@ -841,4 +841,37 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
                interfaceId == 0x5b5e139f || // ERC721Metadata
                interfaceId == 0x780e9d83;   // ERC721Enumerable
     }
+    
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 操作时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+    
+    /**
+     * @dev 重置合约核心数据
+     * 注意：此函数仅重置核心计数器和标志位，不会重置：
+     * - _nextCardId（tokenId计数器，重置会导致ID冲突）
+     * - paused（暂停状态，保持安全控制）
+     * - mapping类型数据（tokenType, tokenLevel, tokenGrowth等，Solidity无法遍历mapping）
+     * 
+     * 重置内容：
+     * - mintCounter：铸造计数器
+     * - lastMintBlock：上次铸造区块
+     * - mintCounterWarningTriggered：计数器警告标志
+     * - failedSyncCount：失败同步计数
+     * - syncFailureWarningTriggered：同步失败警告时间戳
+     * - allowPublicMinting：公开铸造标志
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        mintCounter = 0;
+        lastMintBlock = 0;
+        mintCounterWarningTriggered = false;
+        failedSyncCount = 0;
+        syncFailureWarningTriggered = 0;
+        allowPublicMinting = false;
+        
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
 }

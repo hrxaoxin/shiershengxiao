@@ -774,4 +774,18 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @param amount 提取数量
      */
     event EmergencyWBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        paused = false;
+        pauseReason = "";
+        maxBuybackMultiplier = 110;
+        fixedBuybackPrice = 0;
+        fixedBuybackOpen = false;
+        growthBuybackOpen = false;
+        balanceRatioBuybackOpen = false;
+        
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
+
+    event ContractDataReset(address indexed operator, uint256 timestamp);
 }

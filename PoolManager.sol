@@ -451,4 +451,32 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev Fallback 函数 - 处理未匹配的调用
      */
     fallback() external payable {}
+
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
+    /**
+     * @dev 重置合约核心数据（仅owner或authorizer）
+     * 注意：无法遍历mapping，只重置核心状态变量和数组
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 重置池子余额（需要手动处理每个池子）
+        poolBalances[POOL_NFT_STAKING] = 0;
+        poolBalances[POOL_TOKEN_STAKING] = 0;
+        poolBalances[POOL_ARENA_REWARD] = 0;
+        
+        totalDeposited = 0;
+        totalWithdrawn = 0;
+        paused = false;
+        
+        // 清空流动记录数组
+        delete flowRecords;
+        flowRecordsStartIndex = 0;
+        
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
 }

@@ -426,4 +426,15 @@ function burnAndMintTargeted(address user, uint8 zodiac) external nonReentrant w
      * @dev Fallback 函数 - 处理未匹配的调用
      */
     fallback() external payable {}
+
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        paused = false;
+        pauseReason = "";
+        normalMintCost = 8888 * 10**18;
+        rareMintCost = 88888 * 10**18;
+        
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
+
+    event ContractDataReset(address indexed operator, uint256 timestamp);
 }

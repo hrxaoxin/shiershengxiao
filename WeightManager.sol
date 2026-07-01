@@ -515,6 +515,41 @@ contract WeightManager is
     }
 
     /**
+     * @dev 清空合约内部的所有数据
+     * 仅合约所有者和authorizer合约可调用
+     * 用于紧急情况下重置整个项目数据
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 清空所有用户权重数据
+        // 注意：由于无法遍历所有mapping键，这里只清空核心状态变量
+        
+        // 清空缓存数据
+        weightCacheDuration = 15 minutes;
+        
+        // 重置合格用户链表
+        eligibleUserHead = address(0);
+        eligibleUserTail = address(0);
+        
+        // 重置暂停状态
+        paused = false;
+        pauseReason = "";
+        
+        // 重置权重参数
+        minOwnerWeight = 0;
+        ownerWeight = 100;
+        
+        // 发出数据重置事件
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
+
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 执行重置的操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
+    /**
      * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定
      */
     receive() external payable {}

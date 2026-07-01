@@ -906,6 +906,15 @@ interface IWeightManager {
 }
 
 /**
+ * @title IResetContractData
+ * @dev 合约数据重置接口，用于清空合约内部的所有数据
+ * 仅合约所有者和authorizer合约可调用
+ */
+interface IResetContractData {
+    function resetContractData() external;
+}
+
+/**
  * @title IWBNB
  * @dev WBNB 合约接口
  */

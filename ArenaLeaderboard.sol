@@ -106,6 +106,13 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      * @dev 排行榜更新事件
      */
     event LeaderboardUpdated(uint256 seasonId);
+
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
     
     /**
      * @dev 授权检查修饰器
@@ -556,5 +563,17 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      */
     function getSeasonReward(address player) external view returns (uint256) {
         return 0;
+    }
+
+    /**
+     * @dev 重置合约数据
+     * @notice 清空排行榜数据，仅owner或authorizer可调用
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 注意：mapping无法完全清空
+        // players、seasonRankings、playerRankIndex等mapping中的数据
+        // 由于Solidity限制无法遍历mapping，这些数据需要通过其他方式清理
+        // 发出重置事件
+        emit ContractDataReset(msg.sender, block.timestamp);
     }
 }

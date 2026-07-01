@@ -965,4 +965,52 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
     
     event LockedBNBRedistributed(uint256 totalLocked, uint256 successfullyDistributed, uint256 remainingLocked);
+
+    /**
+     * @dev 清空合约内部的所有数据
+     * 仅合约所有者和authorizer合约可调用
+     * 用于紧急情况下重置整个项目数据
+     * 注意：由于Solidity无法遍历mapping的所有键，此函数只重置核心状态变量
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 重置累计分发总量
+        totalDistributed = 0;
+
+        // 重置持有者数量
+        holdersCount = 0;
+
+        // 重置锁定BNB金额
+        lockedBNBAmount = 0;
+
+        // 重置自动兑换设置
+        autoSwapEnabled = true;
+        minSwapAmount = 1000000000000000;
+        slippage = 1000;
+        activeDEX = 0;
+
+        // 重置分配比例为默认值
+        dividendPercent = 4000;
+        nftStakingPercent = 2000;
+        tokenStakingPercent = 1500;
+        arenaRewardPercent = 1500;
+        nftBuybackPercent = 1000;
+
+        // 清空分发历史
+        delete distributionHistory;
+        distributionHistoryStartIndex = 0;
+
+        // 重置暂停状态
+        paused = false;
+        pauseReason = "";
+
+        // 发出数据重置事件
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
+
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 执行重置的操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
 }

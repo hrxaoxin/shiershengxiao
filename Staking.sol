@@ -769,7 +769,44 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function scheduleEmergencyWithdraw() external onlyOwner {
         emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
     }
-    
+
+    /**
+     * @dev 清空合约内部的所有数据
+     * 仅合约所有者和authorizer合约可调用
+     * 用于紧急情况下重置整个项目数据
+     * 注意：由于Solidity无法遍历mapping的所有键，此函数只重置核心状态变量
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 重置质押池统计
+        totalStakedNFTs = 0;
+        totalWeightedNFTs = 0;
+        todayIncomingTokens = 0;
+        globalRewardPerWeight = 0;
+
+        // 重置紧急提取时间锁
+        emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
+
+        // 重置最小质押等级
+        minStakingLevel = 1;
+
+        // 重置暂停状态
+        paused = false;
+        pauseReason = "";
+
+        // 清空质押用户列表
+        delete stakingUsers;
+
+        // 发出数据重置事件
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
+
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 执行重置的操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
     /**
      * @dev 同步权重到WeightManager和DividendManager（内部函数）
      * @param user 用户地址

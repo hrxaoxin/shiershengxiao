@@ -621,4 +621,22 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         IWeightManager(weightManager).syncUserWeight(from);
         IWeightManager(weightManager).syncUserWeight(to);
     }
+
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        uint256 len = listedNFTs.length;
+        for (uint256 i = 0; i < len; i++) {
+            delete listings[listedNFTs[i]];
+            delete listedNFTIndex[listedNFTs[i]];
+        }
+        delete listedNFTs;
+        
+        feePercent = 5;
+        totalVolume = 0;
+        paused = false;
+        pauseReason = "";
+        
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
+
+    event ContractDataReset(address indexed operator, uint256 timestamp);
 }

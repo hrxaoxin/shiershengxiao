@@ -792,4 +792,38 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev Fallback 函数 - 处理未匹配的调用
      */
     fallback() external payable {}
+    
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 操作时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+    
+    /**
+     * @dev 重置合约核心数据
+     * 注意：此函数仅重置升级费用配置，不会重置：
+     * - paused（暂停状态，保持安全控制）
+     * - authorizer（授权合约地址，重置会导致合约无法正常工作）
+     * 
+     * 重置内容：
+     * - pauseReason：暂停原因（重置为空字符串）
+     * - level1-4UpgradeCost：各级别代币升级费用（重置为0）
+     * - usdUpgradeHidden：USD升级隐藏标志（重置为默认值true）
+     * - level1-4USDUpgradeCost：各级别USD升级费用（重置为0）
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        pauseReason = "";
+        level1UpgradeCost = 0;
+        level2UpgradeCost = 0;
+        level3UpgradeCost = 0;
+        level4UpgradeCost = 0;
+        usdUpgradeHidden = true;
+        level1USDUpgradeCost = 0;
+        level2USDUpgradeCost = 0;
+        level3USDUpgradeCost = 0;
+        level4USDUpgradeCost = 0;
+        
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
 }

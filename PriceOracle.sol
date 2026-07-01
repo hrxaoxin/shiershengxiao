@@ -61,6 +61,14 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
 
     address public authorizer;
 
+    /**
+     * @dev 仅owner或authorizer的修饰符
+     */
+    modifier onlyOwnerOrAuthorizer() {
+        require(msg.sender == owner() || msg.sender == authorizer, "PriceOracle: Not authorized");
+        _;
+    }
+
     function initialize(address _authorizerAddress) external initializer {
         require(_authorizerAddress != address(0), "PriceOracle: Invalid authorizer address");
         __Ownable2Step_init();
@@ -152,5 +160,19 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
         return 0;
     }
 
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
 
+    /**
+     * @dev 重置合约核心数据（仅owner或authorizer）
+     * 注意：此合约主要为查询合约，无核心状态变量需要重置
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // PriceOracle主要为查询合约，无核心状态变量需要重置
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
 }

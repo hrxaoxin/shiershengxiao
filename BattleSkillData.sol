@@ -85,6 +85,13 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     bool public skillsInitializationPending;
 
     /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
+    /**
      * @notice 修饰器：仅所有者或授权器可调用
      * @dev 双重授权检查：owner或authorizer或authorizer认可的系统合约
      */
@@ -198,5 +205,19 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
             uint256(30)    // PIG (11) - 猪
         ];
         return speeds[zodiac];
+    }
+
+    /**
+     * @dev 重置合约数据
+     * @notice 清空技能数据，仅owner或authorizer可调用
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        // 重置技能初始化标志
+        skillsInitialized = false;
+        skillsInitializationPending = true;
+        // 注意：fullSkills mapping无法完全清空
+        // 由于Solidity限制无法遍历mapping，需要重新初始化技能数据
+        // 发出重置事件
+        emit ContractDataReset(msg.sender, block.timestamp);
     }
 }

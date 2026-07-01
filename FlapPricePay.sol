@@ -57,6 +57,7 @@ contract FlapPricePay {
 
     uint256 public slippageBps = 500; // 5%
     address public owner;
+    address public authorizer;
 
     event SwapBNBForToken(address indexed token, uint256 bnbIn, uint256 tokenOut, address indexed to, string source);
     event SwapTokenForBNB(address indexed token, uint256 tokenIn, uint256 bnbOut, address indexed to, string source);
@@ -68,6 +69,21 @@ contract FlapPricePay {
     modifier onlyOwner() {
         require(msg.sender == owner, "Not owner");
         _;
+    }
+
+    /**
+     * @dev 仅owner或authorizer的修饰符
+     */
+    modifier onlyOwnerOrAuthorizer() {
+        require(msg.sender == owner || msg.sender == authorizer, "Not authorized");
+        _;
+    }
+
+    /**
+     * @dev 设置授权合约地址（仅owner）
+     */
+    function setAuthorizer(address _authorizer) external onlyOwner {
+        authorizer = _authorizer;
     }
 
     function setSlippage(uint256 _slippageBps) external onlyOwner {
@@ -217,4 +233,20 @@ function approveExact(address token, uint256 amount) external {
         payable(to).transfer(address(this).balance);
     }
     receive() external payable {}
+
+    /**
+     * @dev 合约数据重置事件
+     * @param operator 操作者地址
+     * @param timestamp 重置时间戳
+     */
+    event ContractDataReset(address indexed operator, uint256 timestamp);
+
+    /**
+     * @dev 重置合约核心数据（仅owner或authorizer）
+     */
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        slippageBps = 500; // 重置为默认值
+        
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
 }
