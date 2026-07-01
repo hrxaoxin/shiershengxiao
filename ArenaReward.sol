@@ -67,15 +67,20 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     /**
      * @dev 赛季奖励信息映射
      */
-    mapping(uint256 => SeasonRewardInfo) public seasonRewards;
+    mapping(uint256 => mapping(uint256 => SeasonRewardInfo)) public seasonRewards;
     /**
      * @dev 玩家赛季奖励映射
      */
-    mapping(uint256 => mapping(address => uint256)) public playerSeasonRewards;
+    mapping(uint256 => mapping(uint256 => mapping(address => uint256))) public playerSeasonRewards;
     /**
      * @dev 玩家奖励领取状态映射
      */
-    mapping(uint256 => mapping(address => bool)) public claimedRewards;
+    mapping(uint256 => mapping(uint256 => mapping(address => bool))) public claimedRewards;
+    
+    /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
 
     /**
      * @dev 赛季奖励计算事件
@@ -91,7 +96,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @dev 授权检查修饰器
@@ -121,6 +126,11 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         __Pausable_init();
         
         authorizer = _authorizerAddress;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
     
     /**
@@ -156,12 +166,13 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param seasonId 赛季 ID
      */
     function calculateSeasonRewards(uint256 seasonId) external onlyOwnerOrAuthorizer whenNotPaused nonReentrant {
-        require(!seasonRewards[seasonId].rewardCalculated, "ArenaReward: Already calculated");
+        uint256 currentEpoch = _currentEpoch();
+        require(!seasonRewards[currentEpoch][seasonId].rewardCalculated, "ArenaReward: Already calculated");
         
         (uint256 rewardPool, uint256 tokenRewardPool, uint256 totalPlayers) = _getSeasonData(seasonId);
         require(rewardPool + tokenRewardPool > 0, "ArenaReward: No reward in pool");
         
-        SeasonRewardInfo storage seasonReward = seasonRewards[seasonId];
+        SeasonRewardInfo storage seasonReward = seasonRewards[currentEpoch][seasonId];
         seasonReward.rewardPool = rewardPool;
         seasonReward.tokenRewardPool = tokenRewardPool;
         
@@ -259,8 +270,9 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
                 continue;
             }
             uint256 rank = IArenaRanking(arenaRankingManager).getRealPlayerRank(seasonId, i);
+            uint256 currentEpoch = _currentEpoch();
             uint256 rankReward = ArenaRankingLib.calculateRankReward(rank, realPlayerRewardPool, totalRealPlayers);
-            playerSeasonRewards[seasonId][player] = rankReward;
+            playerSeasonRewards[currentEpoch][seasonId][player] = rankReward;
             distributed += rankReward;
         }
         return distributed;
@@ -272,9 +284,10 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 待领取奖励金额
      */
     function getPendingRewardsBySeason(uint256 seasonId) external view returns (uint256) {
-        if (!seasonRewards[seasonId].rewardCalculated) return 0;
-        if (claimedRewards[seasonId][msg.sender]) return 0;
-        return playerSeasonRewards[seasonId][msg.sender];
+        uint256 currentEpoch = _currentEpoch();
+        if (!seasonRewards[currentEpoch][seasonId].rewardCalculated) return 0;
+        if (claimedRewards[currentEpoch][seasonId][msg.sender]) return 0;
+        return playerSeasonRewards[currentEpoch][seasonId][msg.sender];
     }
 
     /**
@@ -284,9 +297,10 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 待领取奖励金额
      */
     function getPendingRewardsByPlayer(address player, uint256 seasonId) external view returns (uint256) {
-        if (!seasonRewards[seasonId].rewardCalculated) return 0;
-        if (claimedRewards[seasonId][player]) return 0;
-        return playerSeasonRewards[seasonId][player];
+        uint256 currentEpoch = _currentEpoch();
+        if (!seasonRewards[currentEpoch][seasonId].rewardCalculated) return 0;
+        if (claimedRewards[currentEpoch][seasonId][player]) return 0;
+        return playerSeasonRewards[currentEpoch][seasonId][player];
     }
 
     /**
@@ -295,13 +309,14 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 待领取奖励总额
      */
     function getTotalPendingRewards(address player) external view returns (uint256) {
+        uint256 currentEpoch = _currentEpoch();
         address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
         uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         uint256 total = 0;
         
         for (uint256 i = 1; i <= currentSeasonId; i++) {
-            if (seasonRewards[i].rewardCalculated && !claimedRewards[i][player]) {
-                total += playerSeasonRewards[i][player];
+            if (seasonRewards[currentEpoch][i].rewardCalculated && !claimedRewards[currentEpoch][i][player]) {
+                total += playerSeasonRewards[currentEpoch][i][player];
             }
         }
         
@@ -317,7 +332,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function isRewardClaimed(address player, uint256 seasonId) external view returns (bool) {
-        return claimedRewards[seasonId][player];
+        uint256 currentEpoch = _currentEpoch();
+        return claimedRewards[currentEpoch][seasonId][player];
     }
 
     /**
@@ -345,7 +361,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function markRewardClaimed(address player, uint256 seasonId) external {
         require(msg.sender == IAuthorizer(authorizer).getArenaRewardLP(), "ArenaReward: Only ArenaRewardLP can call");
-        claimedRewards[seasonId][player] = true;
+        uint256 currentEpoch = _currentEpoch();
+        claimedRewards[currentEpoch][seasonId][player] = true;
     }
 
     /**
@@ -368,10 +385,8 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 清空奖励数据，仅owner或authorizer可调用
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 注意：mapping无法完全清空
-        // seasonRewards、playerSeasonRewards、claimedRewards等mapping中的数据
-        // 由于Solidity限制无法遍历mapping，这些数据需要通过其他方式清理
-        // 发出重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        uint256 oldEpoch = epoch;
+        epoch++;
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

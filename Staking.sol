@@ -82,17 +82,20 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     /** @dev 紧急提取解锁时间戳，owner可在该时间后执行紧急提取 */
     uint256 public emergencyWithdrawUnlockTime;
 
-    /** @dev 用户待领取奖励映射（地址 => 待领取金额） */
-    mapping(address => uint256) public pendingRewards;
+    /** @dev 当前纪元 */
+    uint256 public epoch;
+    
+    /** @dev 用户待领取奖励映射（epoch => 地址 => 待领取金额） */
+    mapping(uint256 => mapping(address => uint256)) public pendingRewards;
     /** @dev 今日流入合约的代币数量（用于动态奖励率调整） */
     uint256 public todayIncomingTokens;
     /** @dev 全局累积奖励（每单位权重），用于O(1)奖励计算 */
     uint256 public globalRewardPerWeight;
 
-    /** @dev 用户质押的NFT总权重（地址 => 总权重），优化getPendingReward/claimReward的Gas消耗 */
-    mapping(address => uint256) public userStakedWeight;
-    /** @dev 用户级别累计快照权重（地址 => Σ(accumulatedReward * weight)），用于O(1)计算待领取奖励 */
-    mapping(address => uint256) private _userSnapshotWeight;
+    /** @dev 用户质押的NFT总权重（epoch => 地址 => 总权重），优化getPendingReward/claimReward的Gas消耗 */
+    mapping(uint256 => mapping(address => uint256)) public userStakedWeight;
+    /** @dev 用户级别累计快照权重（epoch => 地址 => Σ(accumulatedReward * weight)），用于O(1)计算待领取奖励 */
+    mapping(uint256 => mapping(address => uint256)) private _userSnapshotWeight;
     
     /** @dev 用户快照权重溢出保护阈值（约90%的uint256最大值），距离最大值的安全距离 */
     uint256 public constant USER_SNAPSHOT_OVERFLOW_THRESHOLD = 158456325028528675187087900672;
@@ -189,12 +192,16 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
         
-        // 初始化带默认值的参数
         minStakingDuration = 30 minutes;
         emergencyWithdrawTimelock = 48 hours;
         minStakingLevel = 1;
         
         emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     /**
@@ -290,12 +297,12 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             totalStakedNFTs++;
             uint256 weight = _getNFTWeight(tokenLevel, isRareToken);
             totalWeightedNFTs += weight;
-            // 更新用户级别累计跟踪
-            userStakedWeight[msg.sender] += weight;
+            uint256 currentEpoch = _currentEpoch();
+            userStakedWeight[currentEpoch][msg.sender] += weight;
             
             uint256 snapshotIncrement = globalRewardPerWeight * weight;
-            if (snapshotIncrement < USER_SNAPSHOT_OVERFLOW_THRESHOLD && _userSnapshotWeight[msg.sender] < USER_SNAPSHOT_OVERFLOW_THRESHOLD - snapshotIncrement) {
-                _userSnapshotWeight[msg.sender] += snapshotIncrement;
+            if (snapshotIncrement < USER_SNAPSHOT_OVERFLOW_THRESHOLD && _userSnapshotWeight[currentEpoch][msg.sender] < USER_SNAPSHOT_OVERFLOW_THRESHOLD - snapshotIncrement) {
+                _userSnapshotWeight[currentEpoch][msg.sender] += snapshotIncrement;
             }
             
             _syncWeight(msg.sender, tokenId, nftContract, true);
@@ -313,7 +320,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         require(nftContract != address(0), "Staking: NFT contract not set");
         INFT nft = INFT(nftContract);
 
-        uint256 totalWeightBefore = userStakedWeight[msg.sender];
+        uint256 currentEpoch = _currentEpoch();
+        uint256 totalWeightBefore = userStakedWeight[currentEpoch][msg.sender];
 
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
@@ -328,15 +336,12 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             _removeFromUserStakedNFTs(msg.sender, tokenId);
             totalStakedNFTs--;
             totalWeightedNFTs -= weight;
-            // 更新用户级别累计跟踪
-            userStakedWeight[msg.sender] -= weight;
+            userStakedWeight[currentEpoch][msg.sender] -= weight;
             uint256 snapshotDecrement = globalRewardPerWeight * weight;
-            // 修复：当 globalRewardPerWeight 重置为 0 时，先处理pendingRewards再重置快照
             if (globalRewardPerWeight == 0) {
-                // 先将pendingRewards转移到用户余额，确保不丢失
-                if (pendingRewards[msg.sender] > 0) {
-                    uint256 pending = pendingRewards[msg.sender];
-                    pendingRewards[msg.sender] = 0;
+                if (pendingRewards[currentEpoch][msg.sender] > 0) {
+                    uint256 pending = pendingRewards[currentEpoch][msg.sender];
+                    pendingRewards[currentEpoch][msg.sender] = 0;
                     address rewardTokenContract = IAuthorizer(authorizer).getToken();
                     if (rewardTokenContract != address(0)) {
                         IERC20 rewardToken = IERC20(rewardTokenContract);
@@ -344,15 +349,14 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
                             rewardToken.safeTransfer(msg.sender, pending);
                             emit RewardClaimed(msg.sender, pending);
                         } else {
-                            // 如果合约余额不足，恢复pendingRewards
-                            pendingRewards[msg.sender] = pending;
+                            pendingRewards[currentEpoch][msg.sender] = pending;
                         }
                     }
                 }
-                _userSnapshotWeight[msg.sender] = 0;
+                _userSnapshotWeight[currentEpoch][msg.sender] = 0;
             } else {
-                require(_userSnapshotWeight[msg.sender] >= snapshotDecrement, "Staking: Snapshot underflow");
-                _userSnapshotWeight[msg.sender] -= snapshotDecrement;
+                require(_userSnapshotWeight[currentEpoch][msg.sender] >= snapshotDecrement, "Staking: Snapshot underflow");
+                _userSnapshotWeight[currentEpoch][msg.sender] -= snapshotDecrement;
             }
 
             nft.safeTransferFrom(address(this), msg.sender, tokenId);
@@ -372,7 +376,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
                 require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance for unstake");
                 rewardToken.safeTransfer(msg.sender, totalClaimable);
                 emit RewardClaimed(msg.sender, totalClaimable);
-                pendingRewards[msg.sender] = 0;
+                pendingRewards[_currentEpoch()][msg.sender] = 0;
             }
         }
         emit Unstaked(msg.sender, tokenIds);
@@ -382,19 +386,18 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @dev 领取奖励函数（Gas优化：用户级别累计公式计算总量，避免逐NFT计算）
      */
     function claimReward() external whenNotPaused nonReentrant {
+        uint256 currentEpoch = _currentEpoch();
         uint256[] storage nfts = userStakedNFTs[msg.sender];
         require(nfts.length > 0, "Staking: No staked NFTs");
         address rewardTokenContract = IAuthorizer(authorizer).getToken();
         require(rewardTokenContract != address(0), "Staking: Reward token not set");
 
-        // O(1) 用户级别公式计算总量
         uint256 totalClaimable = _calcUserPending(msg.sender);
         require(totalClaimable > 0, "Staking: No pending reward");
 
         IERC20 rewardToken = IERC20(rewardTokenContract);
         require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance");
         
-        // 重置所有 NFT 的快照为当前全局值（必须遍历以更新 storage ）
         for (uint256 i = 0; i < nfts.length; i++) {
             StakingInfo storage info = stakingInfo[nfts[i]];
             if (info.owner == msg.sender) {
@@ -403,9 +406,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             }
         }
         
-        // 重置用户级别累计快照
-        _userSnapshotWeight[msg.sender] = globalRewardPerWeight * userStakedWeight[msg.sender];
-        pendingRewards[msg.sender] = 0;
+        _userSnapshotWeight[currentEpoch][msg.sender] = globalRewardPerWeight * userStakedWeight[currentEpoch][msg.sender];
+        pendingRewards[currentEpoch][msg.sender] = 0;
         
         rewardToken.safeTransfer(msg.sender, totalClaimable);
         
@@ -456,7 +458,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function _settleNFTReward(StakingInfo storage info) internal {
         uint256 reward = _calculatePendingForNFT(info);
         if (reward > 0) {
-            pendingRewards[info.owner] += reward;
+            pendingRewards[_currentEpoch()][info.owner] += reward;
             info.accumulatedReward = globalRewardPerWeight;
         }
     }
@@ -628,22 +630,21 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @return 用户总待领取奖励金额
      */
     function _calcUserPending(address user) internal view returns (uint256) {
-        uint256 totalWeight = userStakedWeight[user];
-        if (totalWeight == 0) return pendingRewards[user];
+        uint256 currentEpoch = _currentEpoch();
+        uint256 totalWeight = userStakedWeight[currentEpoch][user];
+        if (totalWeight == 0) return pendingRewards[currentEpoch][user];
 
-        uint256 snapshotBase = _userSnapshotWeight[user];
+        uint256 snapshotBase = _userSnapshotWeight[currentEpoch][user];
         
-        // 修复：添加乘法溢出检查
         require(globalRewardPerWeight == 0 || totalWeight <= type(uint256).max / globalRewardPerWeight, "Staking: Reward calculation overflow");
         uint256 rewardBase = globalRewardPerWeight * totalWeight;
 
-        if (rewardBase <= snapshotBase) return pendingRewards[user];
+        if (rewardBase <= snapshotBase) return pendingRewards[currentEpoch][user];
         
         uint256 earnedReward = (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
         
-        // 修复：添加加法溢出检查
-        require(earnedReward <= type(uint256).max - pendingRewards[user], "Staking: Pending rewards overflow");
-        return earnedReward + pendingRewards[user];
+        require(earnedReward <= type(uint256).max - pendingRewards[currentEpoch][user], "Staking: Pending rewards overflow");
+        return earnedReward + pendingRewards[currentEpoch][user];
     }
 
     /**
@@ -777,35 +778,28 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * 注意：由于Solidity无法遍历mapping的所有键，此函数只重置核心状态变量
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 重置质押池统计
+        require(totalStakedNFTs == 0, "Staking: Cannot reset with active stakes");
+        uint256 oldEpoch = epoch;
+        epoch++;
         totalStakedNFTs = 0;
         totalWeightedNFTs = 0;
         todayIncomingTokens = 0;
         globalRewardPerWeight = 0;
-
-        // 重置紧急提取时间锁
         emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
-
-        // 重置最小质押等级
         minStakingLevel = 1;
-
-        // 重置暂停状态
         paused = false;
         pauseReason = "";
-
-        // 清空质押用户列表
         delete stakingUsers;
-
-        // 发出数据重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
-    /**
-     * @dev 合约数据重置事件
+    /** @dev 合约数据重置事件
      * @param operator 执行重置的操作者地址
      * @param timestamp 重置时间戳
+     * @param oldEpoch 旧纪元
+     * @param newEpoch 新纪元
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @dev 同步权重到WeightManager和DividendManager（内部函数）

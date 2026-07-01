@@ -72,10 +72,15 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     address public authorizer;
 
     /**
-     * @dev 战斗历史映射
-     * battleId => SingleBattleResult
+     * @dev 当前纪元
      */
-    mapping(uint256 => BattleLib.SingleBattleResult) public battleHistory;
+    uint256 public epoch;
+    
+    /**
+     * @dev 战斗历史映射
+     * epoch => battleId => SingleBattleResult
+     */
+    mapping(uint256 => mapping(uint256 => BattleLib.SingleBattleResult)) public battleHistory;
     
     /**
      * @dev 最大战斗记录数限制（默认10000条）
@@ -94,20 +99,22 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     
     /**
      * @dev battleId到索引的映射（用于快速查找）
+     * epoch => battleId => index
      */
-    mapping(uint256 => uint256) public battleIdToIndex;
+    mapping(uint256 => mapping(uint256 => uint256)) public battleIdToIndex;
     
     /**
      * @dev 索引到battleId的映射（用于环形缓冲区）
+     * epoch => index => battleId
      */
-    mapping(uint256 => uint256) public indexToBattleId;
+    mapping(uint256 => mapping(uint256 => uint256)) public indexToBattleId;
 
     /**
      * @dev 合约数据重置事件
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @notice 仅允许战斗合约调用的修饰器
@@ -128,6 +135,11 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     /**
@@ -165,12 +177,13 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @param result 战斗结果
      */
     function addBattle(uint256 battleId, BattleLib.SingleBattleResult calldata result) external onlyBattleContract {
+        uint256 currentEpoch = _currentEpoch();
         if (battleCount >= MAX_BATTLE_RECORDS) {
-            uint256 oldestIndex = battleIdToIndex[earliestBattleId];
-            delete battleHistory[earliestBattleId];
-            delete battleIdToIndex[earliestBattleId];
+            uint256 oldestIndex = battleIdToIndex[currentEpoch][earliestBattleId];
+            delete battleHistory[currentEpoch][earliestBattleId];
+            delete battleIdToIndex[currentEpoch][earliestBattleId];
 
-            uint256 nextEarliestId = indexToBattleId[(oldestIndex + 1) % MAX_BATTLE_RECORDS];
+            uint256 nextEarliestId = indexToBattleId[currentEpoch][(oldestIndex + 1) % MAX_BATTLE_RECORDS];
             if (nextEarliestId > 0) {
                 earliestBattleId = nextEarliestId;
             }
@@ -178,22 +191,19 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             battleCount++;
         }
 
-        uint256 newIndex = battleIdToIndex[battleId];
+        uint256 newIndex = battleIdToIndex[currentEpoch][battleId];
         if (newIndex == 0) {
-            // 索引从1开始，0表示未分配
-            // 修复：当 battleId 未分配时，正确计算新索引
             if (battleCount == 0) {
                 newIndex = 1;
             } else {
                 newIndex = (battleCount % MAX_BATTLE_RECORDS) + 1;
-                // 防止新索引与现有索引冲突
                 if (newIndex == 0) newIndex = 1;
             }
         }
 
-        battleHistory[battleId] = result;
-        battleIdToIndex[battleId] = newIndex;
-        indexToBattleId[newIndex] = battleId;
+        battleHistory[currentEpoch][battleId] = result;
+        battleIdToIndex[currentEpoch][battleId] = newIndex;
+        indexToBattleId[currentEpoch][newIndex] = battleId;
 
         if (battleCount == 1 || battleId < earliestBattleId) {
             earliestBattleId = battleId;
@@ -206,7 +216,8 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @return 战斗结果记录
      */
     function getBattleHistoryById(uint256 battleId) external view returns (BattleLib.SingleBattleResult memory) {
-        return battleHistory[battleId];
+        uint256 currentEpoch = _currentEpoch();
+        return battleHistory[currentEpoch][battleId];
     }
 
     /**
@@ -214,15 +225,11 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @notice 清空战斗历史，仅owner或authorizer可调用
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 重置战斗计数
+        uint256 oldEpoch = epoch;
+        epoch++;
         battleCount = 0;
-        // 重置最早的战斗ID
         earliestBattleId = 0;
-        // 注意：mapping无法完全清空
-        // battleHistory、battleIdToIndex、indexToBattleId等mapping中的数据
-        // 由于Solidity限制无法遍历mapping，这些数据需要通过其他方式清理
-        // 发出重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
     /**

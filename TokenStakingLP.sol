@@ -60,8 +60,11 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     
     uint256 private dailyRewardPerToken;
     
-    /** @dev 用户奖励快照累积率映射（地址 => 用户上次领取时的累积率） */
-    mapping(address => uint256) public lastRewardAccumulatedRate;
+    /** @dev 当前纪元 */
+    uint256 public epoch;
+    
+    /** @dev 用户奖励快照累积率映射（epoch => 地址 => 用户上次领取时的累积率） */
+    mapping(uint256 => mapping(address => uint256)) public lastRewardAccumulatedRate;
 
     uint256 private constant DAILY_REWARD_PRECISION = 10000;
 
@@ -153,6 +156,11 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         todayRewardAmount = 0;
         todayIncomingTokens = 0;
         dailyRewardPerToken = 0;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
     
     /**
@@ -330,8 +338,9 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
             return;
         }
 
+        uint256 currentEpoch = _currentEpoch();
         uint256 currentRate = dailyRewardPerToken;
-        uint256 lastRate = lastRewardAccumulatedRate[msg.sender];
+        uint256 lastRate = lastRewardAccumulatedRate[currentEpoch][msg.sender];
         
         if (currentRate <= lastRate) {
             return;
@@ -352,7 +361,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
             emit TokenRewardsClaimed(msg.sender, reward);
         }
 
-        lastRewardAccumulatedRate[msg.sender] = currentRate;
+        lastRewardAccumulatedRate[currentEpoch][msg.sender] = currentRate;
     }
 
     /**
@@ -372,8 +381,9 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
             return bnbRewardPoolBalance * stake.amount / (totalStaked + 1);
         }
         
+        uint256 currentEpoch = _currentEpoch();
         uint256 currentRate = dailyRewardPerToken;
-        uint256 lastRate = lastRewardAccumulatedRate[user];
+        uint256 lastRate = lastRewardAccumulatedRate[currentEpoch][user];
         
         if (currentRate <= lastRate) {
             return 0;
@@ -547,13 +557,11 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
-    /**
-     * @dev 重置合约核心数据（仅owner或authorizer）
-     * 注意：无法遍历mapping，只重置核心状态变量
-     */
     function resetContractData() external onlyOwnerOrAuthorizer {
+        uint256 oldEpoch = epoch;
+        epoch++;
         lpRewardPoolBalance = 0;
         tokenRewardPoolBalance = 0;
         bnbRewardPoolBalance = 0;
@@ -563,6 +571,6 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         todayIncomingTokens = 0;
         rewardRate = 100;
         
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

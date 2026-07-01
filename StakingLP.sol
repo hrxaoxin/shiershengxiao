@@ -69,8 +69,11 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     
     /** @dev 全局奖励累积值（每单位权重的奖励）- 用于LP和TOKEN类型 */
     uint256 public globalRewardPerWeight;
-    /** @dev 用户奖励快照权重映射（地址 => 用户快照） */
-    mapping(address => uint256) public userRewardSnapshotWeight;
+    /** @dev 当前纪元 */
+    uint256 public epoch;
+    
+    /** @dev 用户奖励快照权重映射（epoch => 地址 => 用户快照） */
+    mapping(uint256 => mapping(address => uint256)) public userRewardSnapshotWeight;
     
     /** @dev 质押奖励精度缩放因子（1e18） */
     uint256 public constant STAKING_REWARD_PRECISION = 1e18;
@@ -149,6 +152,11 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         todayIncomingTokens = 0;
         globalRewardPerWeight = 0;
         totalWeightedNFTs = 0;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     /**
@@ -282,7 +290,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param snapshotWeight 用户快照权重
      */
     function syncUserWeight(address user, uint256 snapshotWeight) external onlyOwnerOrAuthorizer {
-        userRewardSnapshotWeight[user] = snapshotWeight;
+        userRewardSnapshotWeight[_currentEpoch()][user] = snapshotWeight;
     }
 
     /**
@@ -331,8 +339,9 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             return;
         }
 
+        uint256 currentEpoch = _currentEpoch();
         uint256 rewardBase = globalRewardPerWeight * userWeight;
-        uint256 snapshotBase = userRewardSnapshotWeight[msg.sender];
+        uint256 snapshotBase = userRewardSnapshotWeight[currentEpoch][msg.sender];
         
         if (rewardBase <= snapshotBase) {
             return;
@@ -353,7 +362,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             emit TokenRewardClaimed(msg.sender, reward);
         }
 
-        userRewardSnapshotWeight[msg.sender] = globalRewardPerWeight;
+        userRewardSnapshotWeight[currentEpoch][msg.sender] = globalRewardPerWeight;
     }
 
     /**
@@ -372,8 +381,9 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             return bnbRewardPoolBalance * userWeight / (totalWeightedNFTs + 1);
         }
         
+        uint256 currentEpoch = _currentEpoch();
         uint256 rewardBase = globalRewardPerWeight * userWeight;
-        uint256 snapshotBase = userRewardSnapshotWeight[user];
+        uint256 snapshotBase = userRewardSnapshotWeight[currentEpoch][user];
         
         if (rewardBase <= snapshotBase) {
             return 0;
@@ -515,18 +525,11 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         }
     }
 
-    /**
-     * @dev 合约数据重置事件
-     * @param operator 操作者地址
-     * @param timestamp 重置时间戳
-     */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
-    /**
-     * @dev 重置合约核心数据（仅owner或authorizer）
-     * 注意：无法遍历mapping，只重置核心状态变量
-     */
     function resetContractData() external onlyOwnerOrAuthorizer {
+        uint256 oldEpoch = epoch;
+        epoch++;
         lpRewardPoolBalance = 0;
         tokenRewardPoolBalance = 0;
         bnbRewardPoolBalance = 0;
@@ -538,7 +541,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         rewardRate = 100;
         slippage = 1000;
         
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
     /**

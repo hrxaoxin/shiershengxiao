@@ -80,15 +80,21 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     /**
      * @dev 玩家记录映射
      */
-    mapping(address => PlayerRecord) public players;
+    mapping(uint256 => mapping(address => PlayerRecord)) public players;
     /**
      * @dev 赛季排名数组
      */
-    mapping(uint256 => address[]) public seasonRankings;
+    mapping(uint256 => mapping(uint256 => address[])) public seasonRankings;
     /**
      * @dev 玩家在赛季中的排名索引
      */
-    mapping(uint256 => mapping(address => uint256)) public playerRankIndex;
+    mapping(uint256 => mapping(uint256 => mapping(address => uint256))) public playerRankIndex;
+    
+    /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     * @notice 初始值为1，每次重置时递增，旧数据自动失效
+     */
+    uint256 public epoch;
     
     /**
      * @dev 分数更新事件
@@ -111,8 +117,10 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      * @dev 合约数据重置事件
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
+     * @param oldEpoch 重置前的纪元号
+     * @param newEpoch 重置后的纪元号
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
     
     /**
      * @dev 授权检查修饰器
@@ -140,6 +148,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
     }
     
     /**
@@ -167,6 +176,10 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         require(currentSeasonId > 0, "ArenaLeaderboard: No active season");
     }
     
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
+    }
+    
     /**
      * @dev 更新玩家排名
      * @param player 玩家地址
@@ -177,7 +190,8 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     function updateRanking(address player, uint256 newScore, uint256 seasonId) external {
         _checkSeasonActive(seasonId);
         
-        PlayerRecord storage record = players[player];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord storage record = players[currentEpoch][player];
         
         if (record.seasonId != seasonId) {
             record.seasonId = seasonId;
@@ -185,8 +199,8 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
             record.wins = 0;
             record.losses = 0;
             record.draws = 0;
-            seasonRankings[seasonId].push(player);
-            playerRankIndex[seasonId][player] = seasonRankings[seasonId].length - 1;
+            seasonRankings[currentEpoch][seasonId].push(player);
+            playerRankIndex[currentEpoch][seasonId][player] = seasonRankings[currentEpoch][seasonId].length - 1;
         } else {
             record.score = newScore;
         }
@@ -202,8 +216,9 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
     
     function _updateRankingInternal(address player, uint256 newScore, uint256 seasonId) internal {
-        uint256 currentIndex = playerRankIndex[seasonId][player];
-        address[] storage rankings = seasonRankings[seasonId];
+        uint256 currentEpoch = _currentEpoch();
+        uint256 currentIndex = playerRankIndex[currentEpoch][seasonId][player];
+        address[] storage rankings = seasonRankings[currentEpoch][seasonId];
         
         if (currentIndex == 0 && rankings.length >= MAX_LEADERBOARD_SIZE) {
             return;
@@ -211,43 +226,43 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         
         if (currentIndex > 0) {
             address prevPlayer = rankings[currentIndex - 1];
-            if (players[prevPlayer].score >= newScore) {
+            if (players[currentEpoch][prevPlayer].score >= newScore) {
                 return;
             }
         }
         
         if (currentIndex < rankings.length - 1) {
             address nextPlayer = rankings[currentIndex + 1];
-            if (players[nextPlayer].score <= newScore) {
+            if (players[currentEpoch][nextPlayer].score <= newScore) {
                 return;
             }
         }
         
         while (currentIndex > 0) {
             address prevPlayer = rankings[currentIndex - 1];
-            if (players[prevPlayer].score >= newScore) break;
+            if (players[currentEpoch][prevPlayer].score >= newScore) break;
             
             rankings[currentIndex] = prevPlayer;
-            playerRankIndex[seasonId][prevPlayer] = currentIndex;
+            playerRankIndex[currentEpoch][seasonId][prevPlayer] = currentIndex;
             rankings[currentIndex - 1] = player;
-            playerRankIndex[seasonId][player] = currentIndex - 1;
+            playerRankIndex[currentEpoch][seasonId][player] = currentIndex - 1;
             currentIndex--;
         }
         
         while (currentIndex < rankings.length - 1 && currentIndex < MAX_LEADERBOARD_SIZE - 1) {
             address nextPlayer = rankings[currentIndex + 1];
-            if (players[nextPlayer].score <= newScore) break;
+            if (players[currentEpoch][nextPlayer].score <= newScore) break;
             
             rankings[currentIndex] = nextPlayer;
-            playerRankIndex[seasonId][nextPlayer] = currentIndex;
+            playerRankIndex[currentEpoch][seasonId][nextPlayer] = currentIndex;
             rankings[currentIndex + 1] = player;
-            playerRankIndex[seasonId][player] = currentIndex + 1;
+            playerRankIndex[currentEpoch][seasonId][player] = currentIndex + 1;
             currentIndex++;
         }
         
         if (rankings.length > MAX_LEADERBOARD_SIZE) {
             address removedPlayer = rankings[MAX_LEADERBOARD_SIZE];
-            playerRankIndex[seasonId][removedPlayer] = 0;
+            playerRankIndex[currentEpoch][seasonId][removedPlayer] = 0;
             rankings.pop();
         }
         
@@ -264,7 +279,8 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     function insertPlayerAtRank(address player, uint256 targetRank, uint256 seasonId) external {
         _checkSeasonActive(seasonId);
         
-        PlayerRecord storage record = players[player];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord storage record = players[currentEpoch][player];
         if (record.seasonId != seasonId) {
             record.seasonId = seasonId;
             record.score = 1000;
@@ -273,45 +289,46 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
             record.draws = 0;
         }
         
-        address[] storage rankings = seasonRankings[seasonId];
-        uint256 currentIndex = playerRankIndex[seasonId][player];
+        address[] storage rankings = seasonRankings[currentEpoch][seasonId];
+        uint256 currentIndex = playerRankIndex[currentEpoch][seasonId][player];
         
         // 先从当前位置移除（如果已经在排行榜中）
         if (currentIndex > 0 && currentIndex < rankings.length) {
             for (uint256 i = currentIndex; i + 1 < rankings.length; i++) {
                 rankings[i] = rankings[i + 1];
-                playerRankIndex[seasonId][rankings[i]] = i;
+                playerRankIndex[currentEpoch][seasonId][rankings[i]] = i;
             }
             rankings.pop();
-            playerRankIndex[seasonId][player] = 0;
+            playerRankIndex[currentEpoch][seasonId][player] = 0;
         }
         
         // 修复：确保 targetRank 在有效范围内
         if (targetRank >= rankings.length) {
             // 添加到末尾
             rankings.push(player);
-            playerRankIndex[seasonId][player] = rankings.length - 1;
+            playerRankIndex[currentEpoch][seasonId][player] = rankings.length - 1;
         } else {
             // 插入到指定位置
             rankings.push(address(0)); // 先扩展数组
             for (uint256 i = rankings.length - 1; i > targetRank; i--) {
                 rankings[i] = rankings[i - 1];
-                playerRankIndex[seasonId][rankings[i]] = i;
+                playerRankIndex[currentEpoch][seasonId][rankings[i]] = i;
             }
             rankings[targetRank] = player;
-            playerRankIndex[seasonId][player] = targetRank;
+            playerRankIndex[currentEpoch][seasonId][player] = targetRank;
         }
         
         emit RankingUpdated(player, targetRank + 1, seasonId);
     }
     
     function getLeaderboard(uint256 seasonId, uint256 limit) external view returns (LeaderboardEntry[] memory) {
-        address[] memory rankings = seasonRankings[seasonId];
+        uint256 currentEpoch = _currentEpoch();
+        address[] memory rankings = seasonRankings[currentEpoch][seasonId];
         uint256 size = limit < rankings.length ? limit : rankings.length;
         LeaderboardEntry[] memory result = new LeaderboardEntry[](size);
         for (uint256 i = 0; i < size; i++) {
             address player = rankings[i];
-            PlayerRecord storage record = players[player];
+            PlayerRecord storage record = players[currentEpoch][player];
             result[i] = LeaderboardEntry({
                 playerAddress: player,
                 points: record.score,
@@ -328,7 +345,8 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 totalPages,
         uint256 totalPlayers
     ) {
-        address[] memory rankings = seasonRankings[seasonId];
+        uint256 currentEpoch = _currentEpoch();
+        address[] memory rankings = seasonRankings[currentEpoch][seasonId];
         uint256 start = page * pageSize;
         if (start >= rankings.length) {
             return (new LeaderboardEntry[](0), 0, rankings.length);
@@ -340,7 +358,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         entries = new LeaderboardEntry[](end - start);
         for (uint256 i = start; i < end; i++) {
             address player = rankings[i];
-            PlayerRecord storage record = players[player];
+            PlayerRecord storage record = players[currentEpoch][player];
             entries[i - start] = LeaderboardEntry({
                 playerAddress: player,
                 points: record.score,
@@ -360,7 +378,8 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      * @return 总页数
      */
     function getLeaderboardPageCount(uint256 seasonId, uint256 pageSize) external view returns (uint256) {
-        address[] storage rankings = seasonRankings[seasonId];
+        uint256 currentEpoch = _currentEpoch();
+        address[] storage rankings = seasonRankings[currentEpoch][seasonId];
         return (rankings.length + pageSize - 1) / pageSize;
     }
     
@@ -368,7 +387,8 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         address[] memory playerAddrs,
         uint256[] memory scores
     ) {
-        address[] memory rankings = seasonRankings[seasonId];
+        uint256 currentEpoch = _currentEpoch();
+        address[] memory rankings = seasonRankings[currentEpoch][seasonId];
         if (startRank >= rankings.length) {
             return (new address[](0), new uint256[](0));
         }
@@ -377,7 +397,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         scores = new uint256[](end - startRank);
         for (uint256 i = startRank; i < end; i++) {
             playerAddrs[i - startRank] = rankings[i];
-            scores[i - startRank] = players[rankings[i]].score;
+            scores[i - startRank] = players[currentEpoch][rankings[i]].score;
         }
         return (playerAddrs, scores);
     }
@@ -392,13 +412,14 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         address[] memory playerAddrs,
         uint256[] memory scores
     ) {
-        address[] memory rankings = seasonRankings[seasonId];
+        uint256 currentEpoch = _currentEpoch();
+        address[] memory rankings = seasonRankings[currentEpoch][seasonId];
         uint256 size = count < rankings.length ? count : rankings.length;
         playerAddrs = new address[](size);
         scores = new uint256[](size);
         for (uint256 i = 0; i < size; i++) {
             playerAddrs[i] = rankings[i];
-            scores[i] = players[rankings[i]].score;
+            scores[i] = players[currentEpoch][rankings[i]].score;
         }
         return (playerAddrs, scores);
     }
@@ -488,11 +509,12 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 rank,
         bool rewardClaimed
     ) {
-        PlayerRecord storage record = players[player];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord storage record = players[currentEpoch][player];
         if (record.seasonId != seasonId) {
             return (0, 0, 0, 0, false);
         }
-        rank = playerRankIndex[seasonId][player];
+        rank = playerRankIndex[currentEpoch][seasonId][player];
         return (record.score, record.wins, record.losses, rank, false);
     }
     
@@ -502,7 +524,8 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 losses,
         uint256 seasonId
     ) {
-        PlayerRecord storage record = players[player];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord storage record = players[currentEpoch][player];
         return (record.score, record.wins, record.losses, record.seasonId);
     }
     
@@ -528,19 +551,19 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 lastBattleTime,
         bool hasTeam
     ) {
-        // 修复：返回值数量和类型需要与 IArenaPlayer 接口匹配
-        // remainingAttempts 和 lastBattleTime 在 ArenaLeaderboard 中不存储，返回 0
-        PlayerRecord storage record = players[player];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord storage record = players[currentEpoch][player];
         remainingAttempts = 0;
         lastBattleTime = 0;
         hasTeam = record.seasonId != 0;
     }
     
     function getPlayerRank(address player) external view returns (uint256) {
+        uint256 currentEpoch = _currentEpoch();
         address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
         require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
         uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
-        return playerRankIndex[currentSeasonId][player];
+        return playerRankIndex[currentEpoch][currentSeasonId][player];
     }
     
     /**
@@ -568,12 +591,11 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     /**
      * @dev 重置合约数据
      * @notice 清空排行榜数据，仅owner或authorizer可调用
+     * @dev 使用纪元模式实现O(1)重置，所有旧数据自动失效
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 注意：mapping无法完全清空
-        // players、seasonRankings、playerRankIndex等mapping中的数据
-        // 由于Solidity限制无法遍历mapping，这些数据需要通过其他方式清理
-        // 发出重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        uint256 oldEpoch = epoch;
+        epoch++;
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

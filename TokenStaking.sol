@@ -188,9 +188,13 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         lastRewardUpdate = block.timestamp;
         dailyRewardDistributed = 0;
         
-        // 初始化带默认值的参数
         maxTotalStaked = type(uint256).max;
         maxUserStaked = type(uint256).max;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
     
     /**
@@ -312,8 +316,11 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /** @dev 上次计算奖励的时间 */
     uint256 public lastRewardCalculationTime;
 
-    /** @dev 用户上次累积时使用的奖励率，防止重复累加（地址 => 上次累积率） */
-    mapping(address => uint256) private lastAccumulatedRate;
+    /** @dev 当前纪元 */
+    uint256 public epoch;
+    
+    /** @dev 用户上次累积时使用的奖励率，防止重复累加（epoch => 地址 => 上次累积率） */
+    mapping(uint256 => mapping(address => uint256)) private lastAccumulatedRate;
 
     /**
      * @dev 重置 dailyRewardPerToken（当接近溢出时调用）
@@ -365,25 +372,23 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @param user 用户地址
      */
     function _accumulateRewards(address user) internal {
+        uint256 currentEpoch = _currentEpoch();
         uint256 currentRate = dailyRewardPerToken;
-        uint256 lastRate = lastAccumulatedRate[user];
+        uint256 lastRate = lastAccumulatedRate[currentEpoch][user];
         uint256 stakedAmount = userStakes[user].amount;
 
         if (currentRate > lastRate && stakedAmount > 0) {
             uint256 newReward = stakedAmount * (currentRate - lastRate) / REWARD_PRECISION;
-            // 修复：添加溢出检查，防止 accumulatedRewards 溢出
             uint256 newAccumulated = userStakes[user].accumulatedRewards + newReward;
             require(newAccumulated >= userStakes[user].accumulatedRewards, "TokenStaking: Accumulated rewards overflow");
             userStakes[user].accumulatedRewards = newAccumulated;
             
-            // 修复：添加溢出检查，防止 totalPendingRewards 溢出
             uint256 newTotalPending = totalPendingRewards + newReward;
             require(newTotalPending >= totalPendingRewards, "TokenStaking: Total pending rewards overflow");
             totalPendingRewards = newTotalPending;
         }
 
-        // 更新用户上次累积的奖励率，防止重复累积
-        lastAccumulatedRate[user] = currentRate;
+        lastAccumulatedRate[currentEpoch][user] = currentRate;
     }
 
     /**
@@ -480,6 +485,9 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * 注意：无法遍历mapping，只重置核心状态变量
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
+        require(totalStakedTokens == 0, "TokenStaking: Cannot reset with active stakes");
+        uint256 oldEpoch = epoch;
+        epoch++;
         totalStakedTokens = 0;
         dailyRewardPerToken = 0;
         todayIncomingTokens = 0;
@@ -488,6 +496,6 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         dailyRewardDistributed = 0;
         lastRewardCalculationTime = 0;
         
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

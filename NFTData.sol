@@ -82,6 +82,11 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
     
     /**
+     * @dev 当前纪元
+     */
+    uint256 public epoch;
+    
+    /**
      * @dev NFT信息映射
      *
      * key: tokenId (从开始)
@@ -96,7 +101,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 用户拥有的NFT映射（用于权重计算）
      */
-    mapping(address => mapping(uint256 => uint256[])) internal _userNFTsByType; // user => zodiacType => tokenIds
+    mapping(uint256 => mapping(address => mapping(uint256 => uint256[]))) internal _userNFTsByType; // epoch => user => zodiacType => tokenIds
 
     /**
      * @dev 每种NFT类型的持有者列表
@@ -105,19 +110,19 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * key: nftType (0-119)
      * value: 持有者地址数组
      */
-    mapping(uint256 => address[]) internal _nftTypeOwners;
-    
+    mapping(uint256 => mapping(uint256 => address[])) internal _nftTypeOwners; // epoch => nftType => owners
+
     /**
      * @dev 类型所有者存在性映射（优化查询）
      * key: nftType => owner => 是否存在
      */
-    mapping(uint256 => mapping(address => bool)) internal _typeOwnerExists;
+    mapping(uint256 => mapping(uint256 => mapping(address => bool))) internal _typeOwnerExists; // epoch => nftType => owner => exists
 
     /**
      * @dev 类型所有者索引映射（优化删除）
      * key: nftType => owner => 在数组中的索引
      */
-    mapping(uint256 => mapping(address => uint256)) internal _typeOwnerIndex;
+    mapping(uint256 => mapping(uint256 => mapping(address => uint256))) internal _typeOwnerIndex; // epoch => nftType => owner => index
 
     /**
      * @dev 用户持有的NFT列表
@@ -126,7 +131,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * key: 用户地址
      * value: tokenId数组
      */
-    mapping(address => uint256[]) internal _userNFTs;
+    mapping(uint256 => mapping(address => uint256[])) internal _userNFTs; // epoch => user => tokenIds
 
     /**
      * @dev 用户的NFT数量
@@ -135,19 +140,19 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * key: 用户地址
      * value: NFT数量
      */
-    mapping(address => uint256) internal _userNFTCount;
+    mapping(uint256 => mapping(address => uint256)) internal _userNFTCount; // epoch => user => count
 
     /**
      * @dev 用户NFT存在性映射（优化查询）
      * key: user => tokenId => 是否存在
      */
-    mapping(address => mapping(uint256 => bool)) internal _userNFTExists;
+    mapping(uint256 => mapping(address => mapping(uint256 => bool))) internal _userNFTExists; // epoch => user => tokenId => exists
 
     /**
      * @dev 用户NFT索引映射（优化删除）
      * key: user => tokenId => 在数组中的索引
      */
-    mapping(address => mapping(uint256 => uint256)) internal _userNFTIndex;
+    mapping(uint256 => mapping(address => mapping(uint256 => uint256))) internal _userNFTIndex; // epoch => user => tokenId => index
 
     /**
      * @dev NFT信息结构体
@@ -201,6 +206,12 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         rareWeights[2] = 16;
         rareWeights[3] = 28;
         rareWeights[4] = 76;
+        
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     /**
@@ -416,20 +427,18 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param tokenId NFT ID
      */
     function _addUserNFT(address user, uint256 tokenId) internal {
-        // 修复：使用O(1)查找替代O(n)循环检查重复
-        if (_userNFTExists[user][tokenId]) {
-            return; // 已存在，不重复添加
+        uint256 currentEpoch = _currentEpoch();
+        if (_userNFTExists[currentEpoch][user][tokenId]) {
+            return;
         }
         
-        // 记录索引
-        _userNFTIndex[user][tokenId] = _userNFTs[user].length;
-        _userNFTs[user].push(tokenId);
-        _userNFTCount[user]++;
-        _userNFTExists[user][tokenId] = true;
+        _userNFTIndex[currentEpoch][user][tokenId] = _userNFTs[currentEpoch][user].length;
+        _userNFTs[currentEpoch][user].push(tokenId);
+        _userNFTCount[currentEpoch][user]++;
+        _userNFTExists[currentEpoch][user][tokenId] = true;
         
-        // 添加到按类型分组的用户NFT映射
         uint256 zodiacType = _nftInfo[tokenId].zodiacType;
-        _userNFTsByType[user][zodiacType].push(tokenId);
+        _userNFTsByType[currentEpoch][user][zodiacType].push(tokenId);
     }
 
     /**
@@ -439,32 +448,29 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @param tokenId NFT ID
      */
     function _removeUserNFT(address user, uint256 tokenId) internal {
-        // 修复：使用O(1)索引查找替代O(n)循环
-        if (!_userNFTExists[user][tokenId]) {
-            return; // 不存在，无需删除
+        uint256 currentEpoch = _currentEpoch();
+        if (!_userNFTExists[currentEpoch][user][tokenId]) {
+            return;
         }
         
         uint256 zodiacType = _nftInfo[tokenId].zodiacType;
-        uint256[] storage userTokens = _userNFTs[user];
-        uint256 index = _userNFTIndex[user][tokenId];
+        uint256[] storage userTokens = _userNFTs[currentEpoch][user];
+        uint256 index = _userNFTIndex[currentEpoch][user][tokenId];
         
-        // 使用交换删除法实现O(1)删除
         uint256 lastIndex = userTokens.length - 1;
         if (index != lastIndex) {
             uint256 lastTokenId = userTokens[lastIndex];
             userTokens[index] = lastTokenId;
-            _userNFTIndex[user][lastTokenId] = index;
+            _userNFTIndex[currentEpoch][user][lastTokenId] = index;
         }
         userTokens.pop();
-        _userNFTCount[user]--;
-        delete _userNFTIndex[user][tokenId];
-        _userNFTExists[user][tokenId] = false;
+        _userNFTCount[currentEpoch][user]--;
+        delete _userNFTIndex[currentEpoch][user][tokenId];
+        _userNFTExists[currentEpoch][user][tokenId] = false;
         
-        // 从按类型分组的用户NFT映射中移除
-        uint256[] storage typeTokens = _userNFTsByType[user][zodiacType];
+        uint256[] storage typeTokens = _userNFTsByType[currentEpoch][user][zodiacType];
         for (uint256 i = 0; i < typeTokens.length; i++) {
             if (typeTokens[i] == tokenId) {
-                // 使用交换删除法
                 uint256 lastIdx = typeTokens.length - 1;
                 if (i != lastIdx) {
                     typeTokens[i] = typeTokens[lastIdx];
@@ -482,69 +488,46 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @return uint256[] tokenId数组
      */
     function _getUserNFTs(address user) internal view returns (uint256[] memory) {
-        return _userNFTs[user];
+        return _userNFTs[_currentEpoch()][user];
     }
 
-    /**
-     * @dev 获取用户NFT数量
-     *
-     * @param user 用户地址
-     * @return uint256 NFT数量
-     */
     function _getUserNFTCount(address user) internal view returns (uint256) {
-        return _userNFTCount[user];
+        return _userNFTCount[_currentEpoch()][user];
     }
 
-    /**
-     * @dev 添加到类型持有者列表
-     *
-     * @param nftType 生肖类型
-     * @param owner 持有者地址
-     */
     function _addToTypeOwners(uint256 nftType, address owner) internal {
-        if (_typeOwnerExists[nftType][owner]) {
+        uint256 currentEpoch = _currentEpoch();
+        if (_typeOwnerExists[currentEpoch][nftType][owner]) {
             return;
         }
-        _typeOwnerIndex[nftType][owner] = _nftTypeOwners[nftType].length;
-        _nftTypeOwners[nftType].push(owner);
-        _typeOwnerExists[nftType][owner] = true;
+        _typeOwnerIndex[currentEpoch][nftType][owner] = _nftTypeOwners[currentEpoch][nftType].length;
+        _nftTypeOwners[currentEpoch][nftType].push(owner);
+        _typeOwnerExists[currentEpoch][nftType][owner] = true;
     }
 
-    /**
-     * @dev 从类型持有者列表移除
-     *
-     * @param nftType 生肖类型
-     * @param owner 持有者地址
-     */
     function _removeFromTypeOwners(uint256 nftType, address owner) internal {
-        if (!_typeOwnerExists[nftType][owner]) {
+        uint256 currentEpoch = _currentEpoch();
+        if (!_typeOwnerExists[currentEpoch][nftType][owner]) {
             return;
         }
         
-        delete _typeOwnerExists[nftType][owner];
+        delete _typeOwnerExists[currentEpoch][nftType][owner];
         
-        address[] storage owners = _nftTypeOwners[nftType];
-        uint256 index = _typeOwnerIndex[nftType][owner];
+        address[] storage owners = _nftTypeOwners[currentEpoch][nftType];
+        uint256 index = _typeOwnerIndex[currentEpoch][nftType][owner];
         uint256 lastIndex = owners.length - 1;
         
-        // 使用交换删除法实现O(1)删除
         if (index != lastIndex) {
             address lastOwner = owners[lastIndex];
             owners[index] = lastOwner;
-            _typeOwnerIndex[nftType][lastOwner] = index;
+            _typeOwnerIndex[currentEpoch][nftType][lastOwner] = index;
         }
         owners.pop();
-        delete _typeOwnerIndex[nftType][owner];
+        delete _typeOwnerIndex[currentEpoch][nftType][owner];
     }
 
-    /**
-     * @dev 获取类型持有者数量
-     *
-     * @param nftType 生肖类型
-     * @return uint256 持有者数量
-     */
     function _getTypeOwnerCount(uint256 nftType) internal view returns (uint256) {
-        return _nftTypeOwners[nftType].length;
+        return _nftTypeOwners[_currentEpoch()][nftType].length;
     }
 
     /**
@@ -631,7 +614,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @return uint256 用户权重
      */
     function calcUserWeight(address user) external view returns (uint256) {
-        uint256[] storage userTokens = _userNFTs[user];
+        uint256[] storage userTokens = _userNFTs[_currentEpoch()][user];
         uint256 totalWeight = 0;
         uint256 length = userTokens.length;
 
@@ -767,7 +750,9 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * 注意：由于Solidity无法遍历mapping的所有键，此函数只重置核心状态变量
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 重置权重配置为默认值
+        uint256 oldEpoch = epoch;
+        epoch++;
+        
         normalWeights[0] = 1;
         normalWeights[1] = 2;
         normalWeights[2] = 6;
@@ -781,17 +766,17 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         rareWeights[4] = 76;
 
         emit WeightsUpdated(normalWeights, rareWeights, block.timestamp);
-
-        // 发出数据重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
     /**
      * @dev 合约数据重置事件
      * @param operator 执行重置的操作者地址
      * @param timestamp 重置时间戳
+     * @param oldEpoch 旧纪元
+     * @param newEpoch 新纪元
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定

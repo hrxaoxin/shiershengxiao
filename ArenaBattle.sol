@@ -75,28 +75,19 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     
     /**
      * @dev NFT 战斗锁定映射
-     * tokenId => lockEndTime
      */
-    mapping(uint256 => uint256) public nftBattleLocked;
+    mapping(uint256 => mapping(uint256 => uint256)) public nftBattleLocked;
     /**
      * @dev 玩家战斗 ID 计数器
      */
-    mapping(address => uint256) public battleIdCounter;
+    mapping(uint256 => mapping(address => uint256)) public battleIdCounter;
     /**
      * @dev 玩家上次战斗时间
      */
-    mapping(address => uint256) public lastBattleTime;
+    mapping(uint256 => mapping(address => uint256)) public lastBattleTime;
     
     /**
      * @dev 玩家记录结构体
-     * @param score 玩家积分
-     * @param wins 胜利次数
-     * @param losses 失败次数
-     * @param draws 平局次数
-     * @param seasonId 当前赛季 ID
-     * @param lastBattleTime 上次战斗时间
-     * @param lastResetTime 上次重置时间
-     * @param remainingAttempts 剩余挑战次数
      */
     struct PlayerRecord {
         uint256 score;
@@ -112,7 +103,12 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     /**
      * @dev 玩家记录映射
      */
-    mapping(address => PlayerRecord) public players;
+    mapping(uint256 => mapping(address => PlayerRecord)) public players;
+    
+    /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
     
     /**
      * @dev 战斗执行事件
@@ -155,8 +151,10 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 合约数据重置事件
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
+     * @param oldEpoch 重置前的纪元版本号
+     * @param newEpoch 重置后的纪元版本号
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @dev 授权检查修饰器
@@ -185,6 +183,11 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         __ReentrancyGuard_init();
         __Pausable_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     /**
@@ -224,6 +227,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function challengeMockPlayer(uint256 mockIndex) external nonReentrant whenNotPaused returns (bool, uint256) {
         _checkSeasonActive();
         
+        uint256 currentEpoch = _currentEpoch();
         address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
         require(arenaPlayerContract != address(0), "ArenaBattle: Player contract not set");
         
@@ -231,7 +235,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         
         require(_hasBattleTeam(msg.sender), "ArenaBattle: No battle team set");
         
-        PlayerRecord storage record = players[msg.sender];
+        PlayerRecord storage record = players[currentEpoch][msg.sender];
         record.lastBattleTime = block.timestamp;
         
         bool isVictory = _executeMockBattle(mockIndex);
@@ -242,7 +246,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             _updateScore(msg.sender, false);
         }
         
-        emit BattleExecuted(msg.sender, address(0), isVictory, battleIdCounter[msg.sender]);
+        emit BattleExecuted(msg.sender, address(0), isVictory, battleIdCounter[currentEpoch][msg.sender]);
         return (isVictory, 0);
     }
 
@@ -251,6 +255,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(challengedPlayer != address(0), "ArenaBattle: Invalid challenged player");
         require(challengedPlayer != msg.sender, "ArenaBattle: Cannot challenge self");
         
+        uint256 currentEpoch = _currentEpoch();
         address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
         require(arenaPlayerContract != address(0), "ArenaBattle: Player contract not set");
         
@@ -259,8 +264,8 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(_hasBattleTeam(msg.sender), "ArenaBattle: Challenger has no battle team");
         require(_hasBattleTeam(challengedPlayer), "ArenaBattle: Challenged has no battle team");
         
-        PlayerRecord storage challengerRecord = players[msg.sender];
-        PlayerRecord storage challengedRecord = players[challengedPlayer];
+        PlayerRecord storage challengerRecord = players[currentEpoch][msg.sender];
+        PlayerRecord storage challengedRecord = players[currentEpoch][challengedPlayer];
         
         challengerRecord.lastBattleTime = block.timestamp;
         challengedRecord.lastBattleTime = block.timestamp;
@@ -275,7 +280,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             _updateScore(challengedPlayer, true);
         }
         
-        emit BattleExecuted(msg.sender, challengedPlayer, challengerVictory, battleIdCounter[msg.sender]);
+        emit BattleExecuted(msg.sender, challengedPlayer, challengerVictory, battleIdCounter[currentEpoch][msg.sender]);
         return (challengerVictory, 0);
     }
 
@@ -310,8 +315,9 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 根据双方积分差距调整胜率，积分高者胜率更高
      */
     function _executeRealBattle(address challenger, address challenged) internal view returns (bool) {
-        PlayerRecord storage challengerRecord = players[challenger];
-        PlayerRecord storage challengedRecord = players[challenged];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord storage challengerRecord = players[currentEpoch][challenger];
+        PlayerRecord storage challengedRecord = players[currentEpoch][challenged];
         
         uint256 challengerScore = challengerRecord.score;
         uint256 challengedScore = challengedRecord.score;
@@ -343,10 +349,11 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             return;
         }
         
+        uint256 currentEpoch = _currentEpoch();
         address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
         uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         
-        PlayerRecord storage record = players[player];
+        PlayerRecord storage record = players[currentEpoch][player];
         
         if (record.seasonId != currentSeasonId) {
             record.seasonId = currentSeasonId;
@@ -395,7 +402,8 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return score 积分, wins 胜利次数, losses 失败次数, seasonId 赛季 ID
      */
     function getPlayerRecord(address player) external view returns (uint256 score, uint256 wins, uint256 losses, uint256 seasonId) {
-        PlayerRecord memory p = players[player];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord memory p = players[currentEpoch][player];
         return (p.score, p.wins, p.losses, p.seasonId);
     }
 
@@ -413,10 +421,11 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         address battleContract = IAuthorizer(authorizer).getBattle();
         require(battleContract != address(0), "ArenaBattle: Battle contract not set");
         require(mockIndex < MAX_MOCK_RANKING, "ArenaBattle: Invalid mock player index");
-        require(block.timestamp >= lastBattleTime[msg.sender] + BATTLE_COOLDOWN, "ArenaBattle: Battle cooldown");
+        uint256 currentEpoch = _currentEpoch();
+        require(block.timestamp >= lastBattleTime[currentEpoch][msg.sender] + BATTLE_COOLDOWN, "ArenaBattle: Battle cooldown");
 
-        battleId = ++battleIdCounter[msg.sender];
-        lastBattleTime[msg.sender] = block.timestamp;
+        battleId = ++battleIdCounter[currentEpoch][msg.sender];
+        lastBattleTime[currentEpoch][msg.sender] = block.timestamp;
 
         _validateTeam(playerTeam);
 
@@ -454,12 +463,13 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(battleContract != address(0), "ArenaBattle: Battle contract not set");
         require(challengedPlayer != address(0), "ArenaBattle: Invalid challenged player");
         require(challengedPlayer != msg.sender, "ArenaBattle: Cannot challenge self");
-        require(block.timestamp >= lastBattleTime[msg.sender] + BATTLE_COOLDOWN, "ArenaBattle: Battle cooldown");
-        require(block.timestamp >= lastBattleTime[challengedPlayer] + BATTLE_COOLDOWN, "ArenaBattle: Target in battle cooldown");
+        uint256 currentEpoch = _currentEpoch();
+        require(block.timestamp >= lastBattleTime[currentEpoch][msg.sender] + BATTLE_COOLDOWN, "ArenaBattle: Battle cooldown");
+        require(block.timestamp >= lastBattleTime[currentEpoch][challengedPlayer] + BATTLE_COOLDOWN, "ArenaBattle: Target in battle cooldown");
 
-        battleId = ++battleIdCounter[msg.sender];
-        lastBattleTime[msg.sender] = block.timestamp;
-        lastBattleTime[challengedPlayer] = block.timestamp;
+        battleId = ++battleIdCounter[currentEpoch][msg.sender];
+        lastBattleTime[currentEpoch][msg.sender] = block.timestamp;
+        lastBattleTime[currentEpoch][challengedPlayer] = block.timestamp;
 
         _validateTeam(playerTeam);
         _validateTeam(challengedTeam);
@@ -514,9 +524,10 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function lockNFTsForBattle(uint256[6] calldata team, uint256 battleId) external onlyOwnerOrAuthorizer {
+        uint256 currentEpoch = _currentEpoch();
         for (uint256 i = 0; i < team.length; i++) {
             if (team[i] > 0) {
-                nftBattleLocked[team[i]] = battleId;
+                nftBattleLocked[currentEpoch][team[i]] = battleId;
             }
         }
     }
@@ -527,19 +538,22 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 仅限owner或authorizer调用，战斗结束后解除锁定
      */
     function unlockNFTsFromBattle(uint256[6] memory team) external onlyOwnerOrAuthorizer {
+        uint256 currentEpoch = _currentEpoch();
         for (uint256 i = 0; i < team.length; i++) {
             if (team[i] > 0) {
-                nftBattleLocked[team[i]] = 0;
+                nftBattleLocked[currentEpoch][team[i]] = 0;
             }
         }
     }
 
     function isNFTLocked(uint256 tokenId) external view returns (bool) {
-        return nftBattleLocked[tokenId] > 0;
+        uint256 currentEpoch = _currentEpoch();
+        return nftBattleLocked[currentEpoch][tokenId] > 0;
     }
 
     function getBattleIdCounter(address player) external view returns (uint256) {
-        return battleIdCounter[player];
+        uint256 currentEpoch = _currentEpoch();
+        return battleIdCounter[currentEpoch][player];
     }
 
     /**
@@ -548,7 +562,8 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 时间戳
      */
     function getLastBattleTime(address player) external view returns (uint256) {
-        return lastBattleTime[player];
+        uint256 currentEpoch = _currentEpoch();
+        return lastBattleTime[currentEpoch][player];
     }
 
     /**
@@ -586,11 +601,9 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 清空战斗锁定状态，仅owner或authorizer可调用
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 注意：mapping无法完全清空
-        // nftBattleLocked、battleIdCounter、lastBattleTime、players等mapping中的数据
-        // 由于Solidity限制无法遍历mapping，这些数据需要通过其他方式清理
-        // 发出重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }
 

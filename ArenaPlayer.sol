@@ -66,32 +66,37 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     /**
      * @dev 玩家战斗队伍映射
      */
-    mapping(address => uint256[]) public playerBattleTeams;
+    mapping(uint256 => mapping(address => uint256[])) public playerBattleTeams;
     /**
      * @dev NFT 质押所有者映射
      */
-    mapping(uint256 => address) public nftStakedOwner;
+    mapping(uint256 => mapping(uint256 => address)) public nftStakedOwner;
     /**
      * @dev 用户质押的 NFT 列表
      */
-    mapping(address => uint256[]) public userStakedNFTs;
+    mapping(uint256 => mapping(address => uint256[])) public userStakedNFTs;
     /**
      * @dev 玩家上次战斗时间
      */
-    mapping(address => uint256) public playerLastBattleTime;
+    mapping(uint256 => mapping(address => uint256)) public playerLastBattleTime;
     /**
      * @dev 玩家剩余挑战次数
      */
-    mapping(address => uint256) public playerRemainingAttempts;
+    mapping(uint256 => mapping(address => uint256)) public playerRemainingAttempts;
     /**
      * @dev 玩家上次重置时间
      */
-    mapping(address => uint256) public playerLastResetTime;
+    mapping(uint256 => mapping(address => uint256)) public playerLastResetTime;
     
     /**
      * @dev 每次充值获得的挑战次数
      */
     uint256 public rechargeAttempts;
+    
+    /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
     
     /**
      * @dev 战斗队伍设置事件
@@ -122,8 +127,10 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 合约数据重置事件
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
+     * @param oldEpoch 重置前的纪元号
+     * @param newEpoch 重置后的纪元号
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @dev 授权检查修饰器
@@ -153,6 +160,11 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         
         rechargeCost = 1 * 10**18;
         rechargeAttempts = 3;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
     
     /**
@@ -198,12 +210,14 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 将玩家剩余挑战次数重置为每日默认值
      */
     function _resetAttempts(address player) internal {
-        playerLastResetTime[player] = block.timestamp;
-        playerRemainingAttempts[player] = DAILY_ATTEMPTS;
+        uint256 currentEpoch = _currentEpoch();
+        playerLastResetTime[currentEpoch][player] = block.timestamp;
+        playerRemainingAttempts[currentEpoch][player] = DAILY_ATTEMPTS;
     }
 
     function _checkAndResetAttempts(address player) internal {
-        if (playerLastResetTime[player] == 0 || block.timestamp > playerLastResetTime[player] + 24 hours) {
+        uint256 currentEpoch = _currentEpoch();
+        if (playerLastResetTime[currentEpoch][player] == 0 || block.timestamp > playerLastResetTime[currentEpoch][player] + 24 hours) {
             _resetAttempts(player);
         }
     }
@@ -216,6 +230,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function stakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
         require(tokenIds.length > 0 && tokenIds.length <= 6, "ArenaPlayer: Invalid tokenIds count");
         
+        uint256 currentEpoch = _currentEpoch();
         address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "ArenaPlayer: NFT contract not set");
         INFT nft = INFT(nftContract);
@@ -223,18 +238,15 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId > 0, "ArenaPlayer: Invalid token ID");
-            // 检查NFT是否已被其他合约质押
-            require(nftStakedOwner[tokenId] == address(0), "ArenaPlayer: NFT already staked in this contract");
-            // 检查是否在其他质押合约中（需要上层合约配合检查）
+            require(nftStakedOwner[currentEpoch][tokenId] == address(0), "ArenaPlayer: NFT already staked in this contract");
             require(nft.ownerOf(tokenId) == msg.sender, "ArenaPlayer: Not owner of token");
             require(nft.isApprovedForAll(msg.sender, address(this)), "ArenaPlayer: Contract not approved for transfer");
             
             nft.safeTransferFrom(msg.sender, address(this), tokenId);
-            nftStakedOwner[tokenId] = msg.sender;
-            userStakedNFTs[msg.sender].push(tokenId);
+            nftStakedOwner[currentEpoch][tokenId] = msg.sender;
+            userStakedNFTs[currentEpoch][msg.sender].push(tokenId);
         }
         
-        // 修复：质押后同步权重数据
         _syncWeightAfterStake(msg.sender, tokenIds);
         
         emit NFTsStaked(msg.sender, tokenIds);
@@ -246,18 +258,19 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 玩家解除质押NFT，如果解除后无质押NFT则清空战斗队伍
      */
     function unstakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
+        uint256 currentEpoch = _currentEpoch();
         address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "ArenaPlayer: NFT contract not set");
         INFT nft = INFT(nftContract);
         
         bool shouldClearTeam = false;
-        uint256[] storage team = playerBattleTeams[msg.sender];
+        uint256[] storage team = playerBattleTeams[currentEpoch][msg.sender];
         
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId > 0, "ArenaPlayer: Invalid token ID");
-            require(nftStakedOwner[tokenId] != address(0), "ArenaPlayer: NFT not staked");
-            require(nftStakedOwner[tokenId] == msg.sender, "ArenaPlayer: Not owner of staked NFT");
+            require(nftStakedOwner[currentEpoch][tokenId] != address(0), "ArenaPlayer: NFT not staked");
+            require(nftStakedOwner[currentEpoch][tokenId] == msg.sender, "ArenaPlayer: Not owner of staked NFT");
             
             for (uint256 j = 0; j < team.length; j++) {
                 if (team[j] == tokenId) {
@@ -267,9 +280,9 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             }
             
             nft.safeTransferFrom(address(this), msg.sender, tokenId);
-            nftStakedOwner[tokenId] = address(0);
+            nftStakedOwner[currentEpoch][tokenId] = address(0);
             
-            uint256[] storage stakedList = userStakedNFTs[msg.sender];
+            uint256[] storage stakedList = userStakedNFTs[currentEpoch][msg.sender];
             for (uint256 j = 0; j < stakedList.length; j++) {
                 if (stakedList[j] == tokenId) {
                     stakedList[j] = stakedList[stakedList.length - 1];
@@ -279,21 +292,21 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             }
         }
         
-        if (shouldClearTeam || userStakedNFTs[msg.sender].length == 0) {
-            delete playerBattleTeams[msg.sender];
+        if (shouldClearTeam || userStakedNFTs[currentEpoch][msg.sender].length == 0) {
+            delete playerBattleTeams[currentEpoch][msg.sender];
         }
         
-        // 修复：解除质押后同步权重数据
         _syncWeightAfterUnstake(msg.sender, tokenIds);
         
         emit NFTsUnstaked(msg.sender, tokenIds);
     }
 
     function setBattleTeam(uint256[6] calldata tokenIds) external nonReentrant whenNotPaused {
+        uint256 currentEpoch = _currentEpoch();
         for (uint256 i = 0; i < 6; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId > 0, "ArenaPlayer: Invalid token ID");
-            require(nftStakedOwner[tokenId] == msg.sender, "ArenaPlayer: NFT not staked or not owner");
+            require(nftStakedOwner[currentEpoch][tokenId] == msg.sender, "ArenaPlayer: NFT not staked or not owner");
             
             for (uint256 j = i + 1; j < 6; j++) {
                 require(tokenIds[j] != tokenId, "ArenaPlayer: Duplicate token in team");
@@ -304,13 +317,14 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         for (uint256 i = 0; i < 6; i++) {
             teamArray[i] = tokenIds[i];
         }
-        playerBattleTeams[msg.sender] = teamArray;
+        playerBattleTeams[currentEpoch][msg.sender] = teamArray;
         
         emit BattleTeamSet(msg.sender, tokenIds);
     }
 
     function clearBattleTeam() external nonReentrant {
-        delete playerBattleTeams[msg.sender];
+        uint256 currentEpoch = _currentEpoch();
+        delete playerBattleTeams[currentEpoch][msg.sender];
         emit BattleTeamCleared(msg.sender);
     }
 
@@ -321,11 +335,13 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function getUserStakedNFTs(address user) external view returns (uint256[] memory) {
         require(user != address(0), "ArenaPlayer: Invalid user address");
-        return userStakedNFTs[user];
+        uint256 currentEpoch = _currentEpoch();
+        return userStakedNFTs[currentEpoch][user];
     }
 
     function getPlayerBattleTeam(address player) external view returns (uint256[] memory) {
-        return playerBattleTeams[player];
+        uint256 currentEpoch = _currentEpoch();
+        return playerBattleTeams[currentEpoch][player];
     }
 
     function rechargeChallengeAttempts() external nonReentrant whenNotPaused {
@@ -334,15 +350,14 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         
         _checkAndResetAttempts(msg.sender);
         
-        // 获取代币合约地址
         address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "ArenaPlayer: Token contract not set");
         
-        // 从用户账户转移代币到合约
         IERC20(tokenContract).safeTransferFrom(msg.sender, address(this), rechargeCost);
 
+        uint256 currentEpoch = _currentEpoch();
         uint256 newAttempts = rechargeAttempts;
-        playerRemainingAttempts[msg.sender] += newAttempts;
+        playerRemainingAttempts[currentEpoch][msg.sender] += newAttempts;
 
         emit ChallengeAttemptsRecharged(msg.sender, newAttempts);
     }
@@ -353,13 +368,14 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 剩余挑战次数
      */
     function getRemainingAttempts(address player) external view returns (uint256) {
-        if (playerLastResetTime[player] == 0) {
+        uint256 currentEpoch = _currentEpoch();
+        if (playerLastResetTime[currentEpoch][player] == 0) {
             return DAILY_ATTEMPTS;
         }
-        if (block.timestamp > playerLastResetTime[player] + 24 hours) {
+        if (block.timestamp > playerLastResetTime[currentEpoch][player] + 24 hours) {
             return DAILY_ATTEMPTS;
         }
-        return playerRemainingAttempts[player];
+        return playerRemainingAttempts[currentEpoch][player];
     }
 
     /**
@@ -372,9 +388,10 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 lastBattleTime,
         bool hasTeam
     ) {
-        remainingAttempts = playerRemainingAttempts[player];
-        lastBattleTime = playerLastBattleTime[player];
-        hasTeam = playerBattleTeams[player].length > 0;
+        uint256 currentEpoch = _currentEpoch();
+        remainingAttempts = playerRemainingAttempts[currentEpoch][player];
+        lastBattleTime = playerLastBattleTime[currentEpoch][player];
+        hasTeam = playerBattleTeams[currentEpoch][player].length > 0;
     }
 
     function setRechargeCost(uint256 _rechargeCost) external onlyOwner {
@@ -393,22 +410,26 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 仅限owner或authorizer调用
      */
     function updatePlayerBattleTime(address player, uint256 timestamp) external onlyOwnerOrAuthorizer {
-        playerLastBattleTime[player] = timestamp;
+        uint256 currentEpoch = _currentEpoch();
+        playerLastBattleTime[currentEpoch][player] = timestamp;
     }
 
     function updatePlayerAttempts(address player, uint256 attempts) external onlyOwnerOrAuthorizer {
-        playerRemainingAttempts[player] = attempts;
+        uint256 currentEpoch = _currentEpoch();
+        playerRemainingAttempts[currentEpoch][player] = attempts;
     }
 
     function updatePlayerResetTime(address player, uint256 timestamp) external onlyOwnerOrAuthorizer {
-        playerLastResetTime[player] = timestamp;
+        uint256 currentEpoch = _currentEpoch();
+        playerLastResetTime[currentEpoch][player] = timestamp;
     }
 
     function decrementAttempts(address player) external onlyOwnerOrAuthorizer returns (uint256) {
         _checkAndResetAttempts(player);
-        require(playerRemainingAttempts[player] > 0, "ArenaPlayer: No remaining attempts");
-        playerRemainingAttempts[player]--;
-        return playerRemainingAttempts[player];
+        uint256 currentEpoch = _currentEpoch();
+        require(playerRemainingAttempts[currentEpoch][player] > 0, "ArenaPlayer: No remaining attempts");
+        playerRemainingAttempts[currentEpoch][player]--;
+        return playerRemainingAttempts[currentEpoch][player];
     }
 
     /**
@@ -427,7 +448,8 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function isNFTStaked(uint256 tokenId) external view returns (bool) {
-        return nftStakedOwner[tokenId] != address(0);
+        uint256 currentEpoch = _currentEpoch();
+        return nftStakedOwner[currentEpoch][tokenId] != address(0);
     }
 
     /**
@@ -436,7 +458,8 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 质押所有者地址
      */
     function getNFTStakedOwner(uint256 tokenId) external view returns (address) {
-        return nftStakedOwner[tokenId];
+        uint256 currentEpoch = _currentEpoch();
+        return nftStakedOwner[currentEpoch][tokenId];
     }
 
     /**
@@ -524,13 +547,10 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 清空玩家战斗队伍和质押NFT数据，仅owner或authorizer可调用
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 重置充值成本和次数
         rechargeCost = 1 * 10**18;
         rechargeAttempts = 3;
-        // 注意：mapping无法完全清空，核心状态变量需要逐个处理
-        // playerBattleTeams、nftStakedOwner、userStakedNFTs等mapping中的数据
-        // 由于Solidity限制无法遍历mapping，这些数据需要通过其他方式清理
-        // 发出重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        uint256 oldEpoch = epoch;
+        epoch++;
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

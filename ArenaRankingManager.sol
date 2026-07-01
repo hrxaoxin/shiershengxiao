@@ -123,26 +123,31 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     }
 
     /**
-     * @dev 玩家记录映射（地址 -> 玩家记录）
+     * @dev 玩家记录映射（epoch -> 地址 -> 玩家记录）
      */
-    mapping(address => PlayerRecord) public players;
+    mapping(uint256 => mapping(address => PlayerRecord)) public players;
     /**
-     * @dev 赛季信息映射（赛季ID -> 赛季信息）
+     * @dev 赛季信息映射（epoch -> 赛季ID -> 赛季信息）
      */
-    mapping(uint256 => SeasonInfo) public seasons;
+    mapping(uint256 => mapping(uint256 => SeasonInfo)) public seasons;
     /**
-     * @dev 玩家赛季奖励映射（赛季ID -> 地址 -> 奖励金额）
+     * @dev 玩家赛季奖励映射（epoch -> 赛季ID -> 地址 -> 奖励金额）
      */
-    mapping(uint256 => mapping(address => uint256)) public playerSeasonRewards;
+    mapping(uint256 => mapping(uint256 => mapping(address => uint256))) public playerSeasonRewards;
     /**
-     * @dev 赛季奖励领取状态映射（赛季ID -> 地址 -> 是否已领取）
+     * @dev 赛季奖励领取状态映射（epoch -> 赛季ID -> 地址 -> 是否已领取）
      */
-    mapping(uint256 => mapping(address => bool)) public seasonRewardsClaimed;
+    mapping(uint256 => mapping(uint256 => mapping(address => bool))) public seasonRewardsClaimed;
     
     /**
      * @dev 当前赛季ID
      */
     uint256 public currentSeasonId;
+    
+    /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
     /**
      * @dev 赛季持续时间（默认1天）
      */
@@ -282,7 +287,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @dev 初始化合约
@@ -299,7 +304,12 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         __ReentrancyGuard_init();
         __Pausable_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
         _startNewSeason();
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     /**
@@ -576,7 +586,8 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @param player 玩家地址
      */
     function _clearSeasonData(address player) internal {
-        PlayerRecord storage record = players[player];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord storage record = players[currentEpoch][player];
         record.score = 0;
         record.wins = 0;
         record.losses = 0;
@@ -596,7 +607,8 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 检查当前赛季是否结束，然后结算、清理并启动新赛季
      */
     function _tryStartNewSeason() internal {
-        require(block.timestamp >= seasons[currentSeasonId].endTime, "ArenaRankingManager: Current season not ended");
+        uint256 currentEpoch = _currentEpoch();
+        require(block.timestamp >= seasons[currentEpoch][currentSeasonId].endTime, "ArenaRankingManager: Current season not ended");
         _settleCurrentSeason();
         _cleanupOldSeasons();
         _startNewSeason();
@@ -607,7 +619,8 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 如果当前赛季已结束，自动启动新赛季（任何人可调用）
      */
     function checkAndStartNewSeason() external whenNotPaused {
-        if (block.timestamp >= seasons[currentSeasonId].endTime) {
+        uint256 currentEpoch = _currentEpoch();
+        if (block.timestamp >= seasons[currentEpoch][currentSeasonId].endTime) {
             _tryStartNewSeason();
         }
     }
@@ -632,7 +645,8 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
             effectiveDuration = 1 hours;
         }
         
-        seasons[currentSeasonId] = SeasonInfo({
+        uint256 currentEpoch = _currentEpoch();
+        seasons[currentEpoch][currentSeasonId] = SeasonInfo({
             seasonId: currentSeasonId,
             startTime: block.timestamp,
             endTime: block.timestamp + effectiveDuration,
@@ -652,7 +666,8 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 标记当前赛季为已结束和已结算状态
      */
     function _settleCurrentSeason() internal {
-        SeasonInfo storage season = seasons[currentSeasonId];
+        uint256 currentEpoch = _currentEpoch();
+        SeasonInfo storage season = seasons[currentEpoch][currentSeasonId];
         season.isActive = false;
         season.isSettled = true;
         emit SeasonSettled(currentSeasonId, block.timestamp);
@@ -663,11 +678,12 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 保留最近的 MAX_SEASONS_TO_KEEP 个赛季数据，删除更早的赛季
      */
     function _cleanupOldSeasons() internal {
+        uint256 currentEpoch = _currentEpoch();
         uint256 seasonsToRemove = currentSeasonId > MAX_SEASONS_TO_KEEP ? 
             currentSeasonId - MAX_SEASONS_TO_KEEP : 0;
         
         for (uint256 i = 1; i <= seasonsToRemove; i++) {
-            delete seasons[i];
+            delete seasons[currentEpoch][i];
         }
     }
 
@@ -677,13 +693,14 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 由owner或授权者手动结算指定赛季，并计算奖励
      */
     function settleSeason(uint256 seasonId) external onlyOwnerOrAuthorizer {
+        uint256 currentEpoch = _currentEpoch();
         require(seasonId <= currentSeasonId, "ArenaRankingManager: Invalid season");
-        require(!seasons[seasonId].isSettled, "ArenaRankingManager: Already settled");
+        require(!seasons[currentEpoch][seasonId].isSettled, "ArenaRankingManager: Already settled");
         
         if (seasonId == currentSeasonId) {
-            seasons[seasonId].isActive = false;
+            seasons[currentEpoch][seasonId].isActive = false;
         }
-        seasons[seasonId].isSettled = true;
+        seasons[currentEpoch][seasonId].isSettled = true;
         
         _calculateSeasonRewardsInternal(seasonId);
         
@@ -727,13 +744,14 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 所有者或授权者向当前赛季奖励池添加BNB
      */
     function addRewardToPool() external payable onlyOwnerOrAuthorizer {
+        uint256 currentEpoch = _currentEpoch();
         require(msg.value > 0, "ArenaRankingManager: No BNB sent");
         _checkNewDay();
         address arenaReward = IAuthorizer(authorizer).getArenaReward();
         if (arenaReward != address(0)) {
             IArenaReward(arenaReward).updateTodayIncomingReward(msg.value);
         }
-        seasons[currentSeasonId].rewardPool += msg.value;
+        seasons[currentEpoch][currentSeasonId].rewardPool += msg.value;
     }
 
     /**
@@ -765,7 +783,8 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @return 当前赛季的奖励池金额（BNB）
      */
     function getCurrentRewardPool() external view returns (uint256) {
-        return seasons[currentSeasonId].rewardPool;
+        uint256 currentEpoch = _currentEpoch();
+        return seasons[currentEpoch][currentSeasonId].rewardPool;
     }
 
     /**
@@ -783,7 +802,8 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         bool isActive,
         uint256 rewardPool
     ) {
-        SeasonInfo storage season = seasons[currentSeasonId];
+        uint256 currentEpoch = _currentEpoch();
+        SeasonInfo storage season = seasons[currentEpoch][currentSeasonId];
         return (
             season.seasonId,
             season.startTime,
@@ -801,8 +821,9 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @return totalPlayers 总玩家数
      */
     function getSeasonRewardData(uint256 seasonId) external view returns (uint256 rewardPool, uint256 tokenRewardPool, uint256 totalPlayers) {
+        uint256 currentEpoch = _currentEpoch();
         require(seasonId > 0 && seasonId <= currentSeasonId, "ArenaRankingManager: Invalid season ID");
-        SeasonInfo storage season = seasons[seasonId];
+        SeasonInfo storage season = seasons[currentEpoch][seasonId];
         rewardPool = season.rewardPool;
         tokenRewardPool = season.tokenRewardPool;
         totalPlayers = season.totalPlayers;
@@ -932,26 +953,18 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 清空赛季数据，仅owner或authorizer可调用
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 重置当前赛季ID
+        uint256 oldEpoch = epoch;
+        epoch++;
         currentSeasonId = 0;
-        // 重置赛季持续时间
         seasonDuration = 1 days;
-        // 重置战斗ID计数器
         battleIdCounter = 0;
-        // 重置模拟玩家奖励索引
         mockRewardIndex = 0;
-        // 清空模拟玩家奖励接收地址列表
         delete mockRewardRecipients;
-        // 重置竞技场模式
         arenaMode = 1;
         modeControlType = 0;
         lastSeasonMode = 1;
-        // 重置基础奖励
         baseRewardPerWin = 100;
-        // 注意：mapping无法完全清空，只能通过重新赋值来"清空"
-        // players、seasons等mapping中的数据需要通过逐个删除或重新初始化赛季来处理
-        // 发出重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }
 
