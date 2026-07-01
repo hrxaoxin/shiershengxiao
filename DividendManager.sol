@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -8,6 +8,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
+import "./DividendManagerLib.sol";
 
 /**
  * @title DividendManager - NFT分红管理合约
@@ -16,6 +17,7 @@ import "./NFTInterface.sol";
  */
 contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
+    using DividendManagerLib for *;
 
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
@@ -223,7 +225,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     function addDividendPool(uint256 amount) external onlyOwner whenNotPaused {
         require(amount > 0, "DM: Invalid amount");
         _addToDividendPool(amount);
-        address tokenContract = IAuthorizer(authorizer).getToken();
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
         if (tokenContract != address(0)) {
             lastSyncedBalance = IERC20(tokenContract).balanceOf(address(this));
         }
@@ -233,7 +235,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 手动同步合约代币余额与分红池，更新新的分红
     /// @dev 仅管理员或授权者可调用
     function syncDividendPool() external onlyOwnerOrAuthorizer {
-        address tokenContract = IAuthorizer(authorizer).getToken();
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
         require(tokenContract != address(0), "DM: Token not set");
         IERC20 token = IERC20(tokenContract);
         uint256 currentBalance = token.balanceOf(address(this));
@@ -250,7 +252,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 自动同步分红池的内部函数
     /// @dev 当距离上次同步超过6小时时自动执行
     function _autoSyncDividendPool() internal {
-        address tokenContract = IAuthorizer(authorizer).getToken();
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
         if (tokenContract == address(0)) return;
         
         if (block.timestamp >= lastAutoSyncTime + AUTO_SYNC_INTERVAL) {
@@ -344,7 +346,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param logicalIndex 逻辑索引
     /// @return 实际数组索引
     function _getActualIndex(uint256 logicalIndex) internal view returns (uint256) {
-        return (snapshotStartIndex + logicalIndex) % snapshots.length;
+        return DividendManagerLib.getActualIndex(logicalIndex, snapshotStartIndex, snapshots.length);
     }
 
     // =========================================================================
@@ -365,11 +367,11 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
             emit DividendClaimWarning(msg.sender, block.timestamp - lastClaimTime[currentEpoch][msg.sender]);
         }
 
-        uint256 newDividend = 0;
-        if (userWeight > 0) {
-            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][msg.sender];
-            newDividend = (userWeight * cumulativeDiff) / 1e18;
-        }
+        uint256 newDividend = DividendManagerLib.calculatePendingDividend(
+            userWeight,
+            cumulativePerWeightDividend,
+            userCumulativeSnapshots[currentEpoch][msg.sender]
+        );
 
         uint256 totalDividend = pendingDividends[currentEpoch][msg.sender] + newDividend;
 
@@ -381,7 +383,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         }
         lastClaimTime[currentEpoch][msg.sender] = block.timestamp;
 
-        address tokenContract = IAuthorizer(authorizer).getToken();
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
         require(tokenContract != address(0), "DM: Token not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= totalDividend, "DM: Insufficient balance");
@@ -418,8 +420,11 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256 userWeight = userWeights[currentEpoch][user];
         if (userWeight == 0) return pendingDividends[currentEpoch][user];
         
-        uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][user];
-        uint256 newDividend = userWeight * cumulativeDiff / 1e18;
+        uint256 newDividend = DividendManagerLib.calculatePendingDividend(
+            userWeight,
+            cumulativePerWeightDividend,
+            userCumulativeSnapshots[currentEpoch][user]
+        );
         return pendingDividends[currentEpoch][user] + newDividend;
     }
 
@@ -530,7 +535,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     function syncUserWeight(address user) external onlyOwnerOrAuthorizer {
         uint256 currentEpoch = _currentEpoch();
         require(user != address(0), "DM: Zero user");
-        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(\"nftData\");
         if (nftDataContract == address(0)) return;
         
         INFTDataInterface nftData = INFTDataInterface(nftDataContract);
@@ -572,43 +577,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @return 计算得到的权重值
     function _calculateWeight(uint256 level, uint8 element) internal view returns (uint256) {
         bool isRare = (element == 3 || element == 4);
-        
-        if (level == 0) return 0;
-        
-        address nftDataAddr = IAuthorizer(authorizer).getNFTData();
-        if (nftDataAddr == address(0)) {
-            if (isRare) {
-                uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
-                if (level <= MAX_NFT_LEVEL) {
-                    return weights[level - 1];
-                }
-                return weights[MAX_NFT_LEVEL - 1];
-            } else {
-                uint256[5] memory weights = [uint256(1), 2, 6, 18, 66];
-                if (level <= MAX_NFT_LEVEL) {
-                    return weights[level - 1];
-                }
-                return weights[MAX_NFT_LEVEL - 1];
-            }
-        }
-        
-        try INFTData(nftDataAddr).getWeightByLevel(uint8(level), isRare) returns (uint256 w) {
-            return w > 0 ? w : 1;
-        } catch {
-            if (isRare) {
-                uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
-                if (level <= MAX_NFT_LEVEL) {
-                    return weights[level - 1];
-                }
-                return weights[MAX_NFT_LEVEL - 1];
-            } else {
-                uint256[5] memory weights = [uint256(1), 2, 6, 18, 66];
-                if (level <= MAX_NFT_LEVEL) {
-                    return weights[level - 1];
-                }
-                return weights[MAX_NFT_LEVEL - 1];
-            }
-        }
+        return DividendManagerLib.getWeightByConfig(level, isRare, authorizer);
     }
 
     /// @notice 获取指定等级和稀有度的NFT权重
@@ -616,36 +585,14 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param isRare 是否为稀有元素
     /// @return 权重值
     function getNFTWeight(uint256 level, bool isRare) external view returns (uint256) {
-        if (level == 0) return 0;
-        
-        address nftDataAddr = IAuthorizer(authorizer).getNFTData();
-        if (nftDataAddr != address(0)) {
-            try INFTData(nftDataAddr).getWeightByLevel(uint8(level), isRare) returns (uint256 w) {
-                if (w > 0) return w;
-            } catch {
-            }
-        }
-        
-        if (isRare) {
-            uint256[5] memory weights = [uint256(10), 12, 16, 28, 76];
-            if (level <= MAX_NFT_LEVEL) {
-                return weights[level - 1];
-            }
-            return weights[MAX_NFT_LEVEL - 1];
-        } else {
-            uint256[5] memory weights = [uint256(1), 2, 6, 18, 66];
-            if (level <= MAX_NFT_LEVEL) {
-                return weights[level - 1];
-            }
-            return weights[MAX_NFT_LEVEL - 1];
-        }
+        return DividendManagerLib.getWeightByConfig(level, isRare, authorizer);
     }
 
     /// @notice 获取权重配置
     /// @return normalWeights 普通元素各等级权重
     /// @return rareWeights 稀有元素各等级权重
     function getWeightConfig() external view returns (uint256[5] memory normalWeights, uint256[5] memory rareWeights) {
-        address nftDataAddr = IAuthorizer(authorizer).getNFTData();
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(\"nftData\");
         if (nftDataAddr != address(0)) {
             bool hasData = false;
             for (uint8 i = 0; i < 5; i++) {
@@ -815,7 +762,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256 snapshotCount,
         uint256 lastSnapshotTime
     ) {
-        address tokenContract = IAuthorizer(authorizer).getToken();
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
         if (tokenContract != address(0)) {
             currentPool = IERC20(tokenContract).balanceOf(address(this));
         }
@@ -871,7 +818,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         require(emergencyWithdrawRequested, "DM: Not requested");
         require(block.timestamp >= emergencyWithdrawRequestedAt + emergencyWithdrawTimelock, "DM: Timelock");
         require(amount > 0, "DM: Amount 0");
-        address tokenContract = IAuthorizer(authorizer).getToken();
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
         require(tokenContract != address(0), "DM: Token not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "DM: Insufficient token");
@@ -885,15 +832,15 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param timestamp 请求时间戳
     event EmergencyWithdrawRequested(address indexed operator, uint256 timestamp);
 
-    function userWeights(address user) external view returns (uint256) {
+    function getUserWeights(address user) external view returns (uint256) {
         return userWeights[_currentEpoch()][user];
     }
 
-    function pendingDividends(address user) external view returns (uint256) {
+    function getPendingDividends(address user) external view returns (uint256) {
         return pendingDividends[_currentEpoch()][user];
     }
 
-    function userCumulativeSnapshots(address user) external view returns (uint256) {
+    function getUserCumulativeSnapshots(address user) external view returns (uint256) {
         return userCumulativeSnapshots[_currentEpoch()][user];
     }
 
