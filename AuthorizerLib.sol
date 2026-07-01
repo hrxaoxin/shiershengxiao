@@ -24,6 +24,7 @@ library AuthorizerLib {
     struct ContractAddresses {
         address token;
         address usdt;
+        address wbnb;
         address nftMintCore;
         address nftMintMetadata;
         address nftUpdate;
@@ -57,7 +58,6 @@ library AuthorizerLib {
         address pancakeSwapRouter;
         address flapSwapRouter;
         address uniswapRouter;
-        address wbnb;
     }
 
     uint256 constant INDEX_TOKEN = 0;

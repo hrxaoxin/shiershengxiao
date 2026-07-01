@@ -126,6 +126,8 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         // 检查所有注册的合约地址
         return 
             addr == _addresses[keccak256("token")] ||
+            addr == _addresses[keccak256("usdt")] ||
+            addr == _addresses[keccak256("wbnb")] ||
             addr == _addresses[keccak256("nftMintCore")] ||
             addr == _addresses[keccak256("nftMintMetadata")] ||
             addr == _addresses[keccak256("nftUpdate")] ||
@@ -145,13 +147,20 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
             addr == _addresses[keccak256("breedingCore")] ||
             addr == _addresses[keccak256("breedingMarket")] ||
             addr == _addresses[keccak256("battle")] ||
-            addr == _addresses[keccak256("arena")] ||
+            addr == _addresses[keccak256("battleSkillData")] ||
+            addr == _addresses[keccak256("battleHistory")] ||
+            addr == _addresses[keccak256("arenaRankingManager")] ||
+            addr == _addresses[keccak256("arenaRankingQuery")] ||
             addr == _addresses[keccak256("arenaPlayer")] ||
             addr == _addresses[keccak256("arenaReward")] ||
             addr == _addresses[keccak256("arenaRewardLP")] ||
             addr == _addresses[keccak256("arenaLeaderboard")] ||
             addr == _addresses[keccak256("arenaBattle")] ||
-            addr == _addresses[keccak256("priceOracle")];
+            addr == _addresses[keccak256("priceOracle")] ||
+            addr == _addresses[keccak256("feeReceiver")] ||
+            addr == _addresses[keccak256("pancakeSwapRouter")] ||
+            addr == _addresses[keccak256("flapSwapRouter")] ||
+            addr == _addresses[keccak256("uniswapRouter")];
     }
 
     /**
