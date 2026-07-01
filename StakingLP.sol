@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -323,7 +323,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 领取奖励
      */
     function claimLPReward() external nonReentrant whenNotPaused {
-        address staking = IAuthorizer(authorizer).getStaking();
+        address staking = IAuthorizer(authorizer).getAddressByName(\"staking\");
         uint256 userWeight = IStaking(staking).userStakedWeight(msg.sender);
         if (userWeight == 0) revert NoStakedNFTs();
 
@@ -357,7 +357,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         } else if (currentType == RewardType.TOKEN) {
             if (reward > tokenRewardPoolBalance) revert InsufficientToken();
             tokenRewardPoolBalance -= reward;
-            IBEP20 token = IBEP20(IAuthorizer(authorizer).getToken());
+            IBEP20 token = IBEP20(IAuthorizer(authorizer).getAddressByName(\"token\"));
             token.transfer(msg.sender, reward);
             emit TokenRewardClaimed(msg.sender, reward);
         }
@@ -371,7 +371,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @return 待领取奖励金额
      */
     function getPendingLPReward(address user) external view returns (uint256) {
-        address staking = IAuthorizer(authorizer).getStaking();
+        address staking = IAuthorizer(authorizer).getAddressByName(\"staking\");
         uint256 userWeight = IStaking(staking).userStakedWeight(user);
         if (userWeight == 0) return 0;
 

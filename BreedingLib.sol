@@ -1,7 +1,9 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "./NFTInterface.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title BreedingLib
@@ -24,6 +26,24 @@ import "./NFTInterface.sol";
  * - 市场繁殖：24小时
  */
 library BreedingLib {
+    using SafeERC20 for IERC20;
+
+    struct BreedingPairData {
+        uint256 fatherId;
+        uint256 motherId;
+        address maleOwner;
+        address femaleOwner;
+        uint256 maleCoOwnerId;
+        uint256 femaleCoOwnerId;
+        uint256 startTime;
+        uint256 breedingType;
+        uint256 status;
+        uint256 childId;
+        uint256 maleChildId;
+        bool rewardsClaimed;
+        uint256 cancelledAt;
+    }
+
     function getChildZodiacType(uint256 fatherType, uint256 motherType, uint256 timestamp) internal pure returns (uint256) {
         uint256 fatherZodiac = (fatherType / 2) % 12;
         uint256 motherZodiac = (motherType / 2) % 12;
@@ -103,13 +123,147 @@ library BreedingLib {
         }
     }
 
+    function getBreedingPairData(
+        mapping(uint256 => mapping(uint256 => BreedingPairData)) storage breedingPairs,
+        uint256 currentEpoch,
+        uint256 pairId
+    ) internal view returns (BreedingPairData memory) {
+        return breedingPairs[currentEpoch][pairId];
+    }
+
+    function getUserActiveOrders(
+        mapping(uint256 => mapping(address => uint256[])) storage userActiveOrderIds,
+        mapping(uint256 => mapping(uint256 => BreedingPairData)) storage breedingPairs,
+        uint256 currentEpoch,
+        address user,
+        uint256 activeStatus
+    ) internal view returns (uint256[] memory) {
+        uint256[] storage orderIds = userActiveOrderIds[currentEpoch][user];
+        uint256 length = orderIds.length;
+        uint256[] memory result = new uint256[](length);
+        uint256 idx = 0;
+        for (uint256 i = 0; i < length; i++) {
+            if (breedingPairs[currentEpoch][orderIds[i]].status == activeStatus) {
+                result[idx] = orderIds[i];
+                idx++;
+            }
+        }
+        assembly {
+            mstore(result, idx)
+        }
+        return result;
+    }
+
+    function getUserBreedingStats(
+        mapping(uint256 => mapping(address => uint256[])) storage userAllOrderIds,
+        mapping(uint256 => mapping(uint256 => BreedingPairData)) storage breedingPairs,
+        uint256 currentEpoch,
+        address user,
+        address nftMintContract
+    ) internal view returns (uint256 totalPairs, uint256 activePairs, uint256 completedPairs, uint256 claimablePairs) {
+        uint256[] storage orderIds = userAllOrderIds[currentEpoch][user];
+        for (uint256 i = 0; i < orderIds.length; i++) {
+            BreedingPairData memory pair = breedingPairs[currentEpoch][orderIds[i]];
+            bool isRelated = (pair.maleOwner == user || pair.femaleOwner == user);
+            if (!isRelated && nftMintContract != address(0)) {
+                INFTMint nftMint = INFTMint(nftMintContract);
+                if (pair.maleCoOwnerId != 0 && nftMint.ownerOf(pair.maleCoOwnerId) == user) isRelated = true;
+                if (!isRelated && pair.femaleCoOwnerId != 0 && nftMint.ownerOf(pair.femaleCoOwnerId) == user) isRelated = true;
+            }
+
+            if (isRelated) {
+                totalPairs++;
+                if (pair.status == 0) activePairs++;
+                else if (pair.status == 1) {
+                    completedPairs++;
+                    if (!pair.rewardsClaimed) claimablePairs++;
+                }
+            }
+        }
+    }
+
+    function getBreedingPairWithCooldown(
+        uint256 fatherId,
+        uint256 motherId,
+        uint256 pairStatus,
+        uint256 pairStartTime,
+        mapping(uint256 => mapping(uint256 => uint256)) storage breedingCooldowns,
+        uint256 currentEpoch,
+        uint256 cooldown,
+        uint256 currentTimestamp
+    ) internal view returns (
+        uint256 fatherCooldown,
+        uint256 motherCooldown,
+        uint256 remainingTime
+    ) {
+        fatherCooldown = breedingCooldowns[currentEpoch][fatherId];
+        motherCooldown = breedingCooldowns[currentEpoch][motherId];
+        remainingTime = 0;
+        if (pairStatus == 0 && pairStartTime > 0) {
+            uint256 endTime = pairStartTime + cooldown;
+            if (currentTimestamp < endTime) {
+                remainingTime = endTime - currentTimestamp;
+            }
+        }
+    }
+
+    function calculateChildZodiacType(
+        INFTMint nftMint,
+        uint256 fatherId,
+        uint256 motherId,
+        uint256 randomSeed,
+        uint256 currentTimestamp,
+        address caller
+    ) internal view returns (uint256) {
+        uint256 fatherType = nftMint.tokenType(fatherId);
+        uint256 motherType = nftMint.tokenType(motherId);
+        uint256 fatherZodiac = (fatherType / 2) % 12;
+        uint256 motherZodiac = (motherType / 2) % 12;
+        require(fatherZodiac == motherZodiac, "BC: PZM");
+
+        uint256 seed = uint256(keccak256(abi.encodePacked(
+            fatherId,
+            motherId,
+            randomSeed,
+            currentTimestamp,
+            block.number,
+            block.prevrandao,
+            tx.gasprice,
+            caller
+        )));
+        uint256 fatherElement = fatherType / 24;
+        uint256 motherElement = motherType / 24;
+        uint256 inheritedElement = (seed % 2 == 0) ? fatherElement : motherElement;
+        uint256 inheritedGender = (seed / 2) % 2;
+        return inheritedElement * 24 + fatherZodiac * 2 + inheritedGender;
+    }
+
+    function burnFee(
+        uint256 breedingType,
+        address authorizer,
+        uint256 selfBreedingFee,
+        uint256 marketBreedingFee,
+        address blackHole
+    ) internal {
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
+        require(tokenContract != address(0), "BC: TNS");
+        uint256 fee = breedingType == 0 ? selfBreedingFee : marketBreedingFee;
+        if (fee == 0) return;
+
+        IERC20 token = IERC20(tokenContract);
+        uint256 contractBalance = token.balanceOf(address(this));
+        require(contractBalance >= fee, "BC: IBFB");
+
+        token.safeTransfer(blackHole, fee);
+    }
+
     function syncWeightAfterTransfer(
         address authorizer,
         address from,
         address to,
         uint256 tokenId
     ) internal {
-        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(\"nftData\");
         if (nftDataContract != address(0)) {
             try INFTDataInterface(nftDataContract).removeUserNFT(from, tokenId) {
             } catch {
@@ -118,8 +272,8 @@ library BreedingLib {
             } catch {
             }
         }
-        
-        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+
+        address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
         if (dividendManager != address(0)) {
             try IDividendManager(dividendManager).syncUserWeight(from) {
             } catch {
@@ -128,8 +282,8 @@ library BreedingLib {
             } catch {
             }
         }
-        
-        address weightManager = IAuthorizer(authorizer).getWeightManager();
+
+        address weightManager = IAuthorizer(authorizer).getAddressByName(\"weightManager\");
         if (weightManager != address(0)) {
             try IWeightManager(weightManager).syncUserWeight(from) {
             } catch {

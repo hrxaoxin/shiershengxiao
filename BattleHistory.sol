@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "./BattleLib.sol";
@@ -121,7 +121,7 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 防止外部账户或未授权合约篡改战斗历史
      */
     modifier onlyBattleContract() {
-        address battleContract = IAuthorizer(authorizer).getBattle();
+        address battleContract = IAuthorizer(authorizer).getAddressByName(\"battle\");
         require(msg.sender == battleContract, "BattleHistory: Only battle contract");
         _;
     }

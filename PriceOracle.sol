@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -85,7 +85,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
 
     function getTokenPriceUSD() external view returns (uint256) {
         IAuthorizer auth = IAuthorizer(authorizer);
-        address token = auth.getToken();
+        address token = auth.getAddressByName(\"token\");
         
         if (token == address(0)) return 0;
 
@@ -125,7 +125,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
 
     function getTokenPriceUSDV8() external view returns (uint256) {
         IAuthorizer auth = IAuthorizer(authorizer);
-        address token = auth.getToken();
+        address token = auth.getAddressByName(\"token\");
         
         if (token == address(0)) return 0;
 

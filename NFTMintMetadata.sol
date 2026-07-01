@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "./NFTLib.sol";
@@ -98,7 +98,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 修饰器：仅NFTMintCore合约可调用
      */
     modifier onlyMintCore() {
-        require(msg.sender == IAuthorizer(authorizer).getNFTMintCore(), "NFTMintMetadata: Only NFTMintCore");
+        require(msg.sender == IAuthorizer(authorizer).getAddressByName(\"nftMintCore\"), "NFTMintMetadata: Only NFTMintCore");
         _;
     }
     
@@ -160,7 +160,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @return TokenURI字符串
      */
     function tokenURI(uint256 tokenId) public view returns (string memory) {
-        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
+        address nftMintCore = IAuthorizer(authorizer).getAddressByName(\"nftMintCore\");
         require(INFTMintCore(nftMintCore)._exists(tokenId), "NFTMint: Token not exists");
         
         uint256 tokenType_ = INFTMintCore(nftMintCore).tokenType(tokenId);
@@ -176,7 +176,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @return NFTDataResult 包含NFT的所有属性信息
      */
     function getNFTData(uint256 tokenId) external view returns (NFTDataResult memory) {
-        address nftMintCore = IAuthorizer(authorizer).getNFTMintCore();
+        address nftMintCore = IAuthorizer(authorizer).getAddressByName(\"nftMintCore\");
         require(INFTMintCore(nftMintCore)._exists(tokenId), "NFTMint: Token not exists");
         
         uint256 t = INFTMintCore(nftMintCore).tokenType(tokenId);

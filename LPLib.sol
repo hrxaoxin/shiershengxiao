@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
@@ -33,23 +33,23 @@ library LPLib {
     function getConfig(IAuthorizer authorizer, uint8 dexType) internal view returns (LPConfig memory) {
         address router;
         if (dexType == 0) {
-            router = authorizer.getFlapSwapRouter();
+            router = authorizer.getAddressByName(\"flapSwapRouter\");
         } else if (dexType == 1) {
-            router = authorizer.getPancakeSwapRouter();
+            router = authorizer.getAddressByName(\"pancakeSwapRouter\");
         } else {
-            router = authorizer.getUniswapRouter();
+            router = authorizer.getAddressByName(\"uniswapRouter\");
         }
         
         address lpToken = address(0);
         if (router != address(0)) {
             try IDexRouter(router).factory() returns (address factory) {
-                lpToken = IDexFactory(factory).getPair(authorizer.getToken(), authorizer.getWBNB());
+                lpToken = IDexFactory(factory).getPair(authorizer.getAddressByName(\"token\"), authorizer.getAddressByName(\"wbnb\"));
             } catch {}
         }
         
         return LPConfig({
-            token: authorizer.getToken(),
-            wbnb: authorizer.getWBNB(),
+            token: authorizer.getAddressByName(\"token\"),
+            wbnb: authorizer.getAddressByName(\"wbnb\"),
             router: router,
             slippage: 1000,
             lpToken: lpToken
@@ -60,13 +60,13 @@ library LPLib {
         address lpToken = address(0);
         if (_router != address(0)) {
             try IDexRouter(_router).factory() returns (address factory) {
-                lpToken = IDexFactory(factory).getPair(authorizer.getToken(), authorizer.getWBNB());
+                lpToken = IDexFactory(factory).getPair(authorizer.getAddressByName(\"token\"), authorizer.getAddressByName(\"wbnb\"));
             } catch {}
         }
         
         return LPConfig({
-            token: authorizer.getToken(),
-            wbnb: authorizer.getWBNB(),
+            token: authorizer.getAddressByName(\"token\"),
+            wbnb: authorizer.getAddressByName(\"wbnb\"),
             router: _router,
             slippage: 1000,
             lpToken: lpToken
@@ -333,8 +333,8 @@ library LPLib {
     }
 
     function _transferRewards(IAuthorizer authorizer, address user, uint256 tokenAmount, uint256 wbnbAmount) internal {
-        address token = authorizer.getToken();
-        address wbnb = authorizer.getWBNB();
+        address token = authorizer.getAddressByName(\"token\");
+        address wbnb = authorizer.getAddressByName(\"wbnb\");
 
         if (tokenAmount > 0) {
             IERC20(token).transfer(user, tokenAmount);
@@ -348,7 +348,7 @@ library LPLib {
     }
 
     function compoundFees(IAuthorizer authorizer) internal {
-        address wbnb = authorizer.getWBNB();
+        address wbnb = authorizer.getAddressByName(\"wbnb\");
         uint256 balance = IWBNB(wbnb).balanceOf(address(this));
 
         if (balance >= 1000000000000000) {
@@ -358,7 +358,7 @@ library LPLib {
     }
 
     function emergencyWithdrawWBNB(IAuthorizer authorizer, uint256 amount) internal {
-        address wbnb = authorizer.getWBNB();
+        address wbnb = authorizer.getAddressByName(\"wbnb\");
         require(amount > 0, "LPLib: Amount must be > 0");
         require(IWBNB(wbnb).balanceOf(address(this)) >= amount, "LPLib: Insufficient WBNB");
 
@@ -428,7 +428,7 @@ library LPLib {
     }
 
     function _convertBNBToLPWithFallback(IAuthorizer authorizer, uint256 bnbAmount) internal returns (uint256) {
-        IWBNB(authorizer.getWBNB()).deposit{value: bnbAmount}();
+        IWBNB(authorizer.getAddressByName(\"wbnb\")).deposit{value: bnbAmount}();
         
         uint256 lpAmount;
         lpAmount = _tryConvertBNBToLP(authorizer, bnbAmount, 0);
@@ -440,7 +440,7 @@ library LPLib {
         lpAmount = _tryConvertBNBToLP(authorizer, bnbAmount, 2);
         if (lpAmount > 0) return lpAmount;
         
-        IWBNB(authorizer.getWBNB()).withdraw(bnbAmount);
+        IWBNB(authorizer.getAddressByName(\"wbnb\")).withdraw(bnbAmount);
         payable(msg.sender).transfer(bnbAmount);
         return 0;
     }
@@ -457,7 +457,7 @@ library LPLib {
     }
 
     function _convertWBNBToLPWithFallback(IAuthorizer authorizer, uint256 wbnbAmount) internal returns (uint256) {
-        IERC20(authorizer.getWBNB()).transferFrom(msg.sender, address(this), wbnbAmount);
+        IERC20(authorizer.getAddressByName(\"wbnb\")).transferFrom(msg.sender, address(this), wbnbAmount);
         
         uint256 lpAmount;
         lpAmount = _tryConvertWBNBToLP(authorizer, wbnbAmount, 0);
@@ -469,7 +469,7 @@ library LPLib {
         lpAmount = _tryConvertWBNBToLP(authorizer, wbnbAmount, 2);
         if (lpAmount > 0) return lpAmount;
         
-        IERC20(authorizer.getWBNB()).transfer(msg.sender, wbnbAmount);
+        IERC20(authorizer.getAddressByName(\"wbnb\")).transfer(msg.sender, wbnbAmount);
         return 0;
     }
 
@@ -495,7 +495,7 @@ library LPLib {
         lpAmount = _tryConvertTokenToLP(authorizer, tokenAmount, 2);
         if (lpAmount > 0) return lpAmount;
         
-        IERC20(authorizer.getToken()).transfer(msg.sender, tokenAmount);
+        IERC20(authorizer.getAddressByName(\"token\")).transfer(msg.sender, tokenAmount);
         return 0;
     }
 
@@ -693,8 +693,8 @@ library LPLib {
         address token,
         uint256 amount
     ) internal returns (RewardPoolState memory) {
-        address wbnb = authorizer.getWBNB();
-        address mainToken = authorizer.getToken();
+        address wbnb = authorizer.getAddressByName(\"wbnb\");
+        address mainToken = authorizer.getAddressByName(\"token\");
 
         if (token == wbnb) {
             if (rewardType == RewardType.LP) {

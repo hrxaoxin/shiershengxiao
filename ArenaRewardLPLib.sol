@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
@@ -93,8 +93,8 @@ library ArenaRewardLPLib {
         uint256 amount
     ) internal {
         RewardType currentType = pool.rewardType;
-        address wbnb = authorizer.getWBNB();
-        address mainToken = authorizer.getToken();
+        address wbnb = authorizer.getAddressByName(\"wbnb\");
+        address mainToken = authorizer.getAddressByName(\"token\");
 
         if (token == wbnb) {
             if (currentType == RewardType.LP) {
@@ -297,7 +297,7 @@ library ArenaRewardLPLib {
             authorizer.redeemLPToUser(reward, user);
             emit LPRewardClaimed(user, seasonId, reward);
         } else if (currentType == RewardType.TOKEN) {
-            IBEP20 token = IBEP20(authorizer.getToken());
+            IBEP20 token = IBEP20(authorizer.getAddressByName(\"token\"));
             token.transfer(user, reward);
             emit TokenRewardClaimed(user, seasonId, reward);
         } else if (currentType == RewardType.BNB) {

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -33,7 +33,6 @@ import "./LPLib.sol";
  * - onlyOwnerOrAuthorizer：管理权限控制
  */
 contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    using LPLib for IAuthorizer;
     
     /** @dev 授权合约地址 */
     address public authorizer;
@@ -203,12 +202,12 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         RewardType currentType = rewardType;
         
         if (currentType == RewardType.LP) {
-            uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(amount);
+            uint256 lpAmount = LPLib.convertBNBToLP(IAuthorizer(authorizer), amount);
             if (lpAmount > 0) {
                 _addToDividendPool(lpAmount, currentType);
             }
         } else if (currentType == RewardType.TOKEN) {
-            uint256 tokenAmount = IAuthorizer(authorizer).swapBNBToToken(amount);
+            uint256 tokenAmount = LPLib.swapBNBToToken(IAuthorizer(authorizer), amount);
             if (tokenAmount > 0) {
                 _addToDividendPool(tokenAmount, currentType);
             }
@@ -224,18 +223,18 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      */
     function _processIncomingToken(address token, uint256 amount) internal {
         RewardType currentType = rewardType;
-        address wbnb = IAuthorizer(authorizer).getWBNB();
-        address mainToken = IAuthorizer(authorizer).getToken();
+        address wbnb = IAuthorizer(authorizer).getAddressByName(\"wbnb\");
+        address mainToken = IAuthorizer(authorizer).getAddressByName(\"token\");
         
         if (token == wbnb) {
             if (currentType == RewardType.LP) {
                 IWBNB(wbnb).withdraw(amount);
-                uint256 lpAmount = IAuthorizer(authorizer).convertBNBToLP(amount);
+                uint256 lpAmount = LPLib.convertBNBToLP(IAuthorizer(authorizer), amount);
                 if (lpAmount > 0) {
                     _addToDividendPool(lpAmount, currentType);
                 }
             } else if (currentType == RewardType.TOKEN) {
-                uint256 tokenAmount = IAuthorizer(authorizer).swapWBNBToToken(amount);
+                uint256 tokenAmount = LPLib.swapWBNBToToken(IAuthorizer(authorizer), amount);
                 if (tokenAmount > 0) {
                     _addToDividendPool(tokenAmount, currentType);
                 }
@@ -245,20 +244,20 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (token == mainToken) {
             if (currentType == RewardType.LP) {
-                uint256 lpAmount = IAuthorizer(authorizer).convertTokenToLP(amount);
+                uint256 lpAmount = LPLib.convertTokenToLP(IAuthorizer(authorizer), amount);
                 if (lpAmount > 0) {
                     _addToDividendPool(lpAmount, currentType);
                 }
             } else if (currentType == RewardType.TOKEN) {
                 _addToDividendPool(amount, currentType);
             } else if (currentType == RewardType.BNB) {
-                uint256 bnbAmount = IAuthorizer(authorizer).swapTokenToBNB(amount);
+                uint256 bnbAmount = LPLib.swapTokenToBNB(IAuthorizer(authorizer), amount);
                 if (bnbAmount > 0) {
                     _addToDividendPool(bnbAmount, currentType);
                 }
             }
         } else {
-            uint256 bnbAmount = IAuthorizer(authorizer).swapTokenToBNB(amount);
+            uint256 bnbAmount = LPLib.swapTokenToBNB(IAuthorizer(authorizer), amount);
             if (bnbAmount > 0) {
                 _processIncomingBNB(bnbAmount);
             }
@@ -289,7 +288,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         }
 
         if (type_ == RewardType.LP || type_ == RewardType.TOKEN) {
-            address dividendManager = IAuthorizer(authorizer).getDividendManager();
+            address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
             uint256 totalWeight = IDividendManager(dividendManager).getTotalWeight();
             
             if (totalWeight > 0) {
@@ -323,10 +322,9 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @param toType 目标奖励类型
      */
     function _convertPoolAssets(RewardType fromType, RewardType toType) internal {
-        IAuthorizer auth = IAuthorizer(authorizer);
         if (fromType == RewardType.LP && toType == RewardType.TOKEN) {
             if (lpDividendPoolBalance > 0) {
-                uint256 tokenAmount = auth.redeemLPToToken(lpDividendPoolBalance);
+                uint256 tokenAmount = LPLib.redeemLPToToken(IAuthorizer(authorizer), lpDividendPoolBalance);
                 lpDividendPoolBalance = 0;
                 if (tokenAmount > 0) {
                     tokenDividendPoolBalance += tokenAmount;
@@ -334,7 +332,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (fromType == RewardType.LP && toType == RewardType.BNB) {
             if (lpDividendPoolBalance > 0) {
-                uint256 wbnbAmount = auth.redeemLPToWBNB(lpDividendPoolBalance);
+                uint256 wbnbAmount = LPLib.redeemLPToWBNB(IAuthorizer(authorizer), lpDividendPoolBalance);
                 lpDividendPoolBalance = 0;
                 if (wbnbAmount > 0) {
                     bnbDividendPoolBalance += wbnbAmount;
@@ -342,7 +340,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (fromType == RewardType.TOKEN && toType == RewardType.LP) {
             if (tokenDividendPoolBalance > 0) {
-                uint256 lpAmount = auth.convertTokenToLP(tokenDividendPoolBalance);
+                uint256 lpAmount = LPLib.convertTokenToLP(IAuthorizer(authorizer), tokenDividendPoolBalance);
                 tokenDividendPoolBalance = 0;
                 if (lpAmount > 0) {
                     lpDividendPoolBalance += lpAmount;
@@ -350,7 +348,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (fromType == RewardType.TOKEN && toType == RewardType.BNB) {
             if (tokenDividendPoolBalance > 0) {
-                uint256 bnbAmount = auth.swapTokenToBNB(tokenDividendPoolBalance);
+                uint256 bnbAmount = LPLib.swapTokenToBNB(IAuthorizer(authorizer), tokenDividendPoolBalance);
                 tokenDividendPoolBalance = 0;
                 if (bnbAmount > 0) {
                     bnbDividendPoolBalance += bnbAmount;
@@ -358,7 +356,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (fromType == RewardType.BNB && toType == RewardType.LP) {
             if (bnbDividendPoolBalance > 0) {
-                uint256 lpAmount = auth.convertBNBToLP(bnbDividendPoolBalance);
+                uint256 lpAmount = LPLib.convertBNBToLP(IAuthorizer(authorizer), bnbDividendPoolBalance);
                 bnbDividendPoolBalance = 0;
                 if (lpAmount > 0) {
                     lpDividendPoolBalance += lpAmount;
@@ -366,7 +364,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (fromType == RewardType.BNB && toType == RewardType.TOKEN) {
             if (bnbDividendPoolBalance > 0) {
-                uint256 tokenAmount = auth.swapBNBToToken(bnbDividendPoolBalance);
+                uint256 tokenAmount = LPLib.swapBNBToToken(IAuthorizer(authorizer), bnbDividendPoolBalance);
                 bnbDividendPoolBalance = 0;
                 if (tokenAmount > 0) {
                     tokenDividendPoolBalance += tokenAmount;
@@ -379,14 +377,14 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @dev 复利手续费（仅owner）
      */
     function compoundFees() external onlyOwner {
-        IAuthorizer(authorizer).compoundFees();
+        LPLib.compoundFees(IAuthorizer(authorizer));
     }
 
     /**
      * @dev 领取分红
      */
     function claimLPDividend() external nonReentrant whenNotPaused {
-        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
         uint256 userWeight = IDividendManager(dividendManager).getUserWeight(msg.sender);
         require(userWeight > 0, "DividendManagerLP: No weight");
 
@@ -414,12 +412,12 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         if (currentType == RewardType.LP) {
             require(dividend <= lpDividendPoolBalance, "DividendManagerLP: Insufficient LP");
             lpDividendPoolBalance -= dividend;
-            IAuthorizer(authorizer).redeemLPToUser(dividend, msg.sender);
+            LPLib.redeemLPToUser(IAuthorizer(authorizer), dividend, msg.sender);
             emit LPDividendClaimed(msg.sender, dividend);
         } else if (currentType == RewardType.TOKEN) {
             require(dividend <= tokenDividendPoolBalance, "DividendManagerLP: Insufficient Token");
             tokenDividendPoolBalance -= dividend;
-            IBEP20 token = IBEP20(IAuthorizer(authorizer).getToken());
+            IBEP20 token = IBEP20(IAuthorizer(authorizer).getAddressByName(\"token\"));
             token.transfer(msg.sender, dividend);
             emit TokenDividendClaimed(msg.sender, dividend);
         }
@@ -433,7 +431,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 可领取的分红总额
      */
     function getClaimableLPDividend(address user) external view returns (uint256) {
-        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
         uint256 userWeight = IDividendManager(dividendManager).getUserWeight(user);
         
         RewardType currentType = rewardType;

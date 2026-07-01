@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "./NFTLib.sol";
@@ -152,7 +152,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     modifier onlyTokenBurner() {
         require(authorizer != address(0), "NFTMint: authorizer not set");
-        address tokenBurnerContract = IAuthorizer(authorizer).getTokenBurner();
+        address tokenBurnerContract = IAuthorizer(authorizer).getAddressByName(\"tokenBurner\");
         require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
         require(msg.sender == tokenBurnerContract, "NFTMint: Unauthorized");
         _;
@@ -162,7 +162,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 修饰器：仅繁殖合约可调用
      */
     modifier onlyBreeding() {
-        address breedingContract = IAuthorizer(authorizer).getBreedingCore();
+        address breedingContract = IAuthorizer(authorizer).getAddressByName(\"breedingCore\");
         require(breedingContract != address(0), "NFTMint: breedingContract not set");
         require(msg.sender == breedingContract, "NFTMint: Only Breeding");
         _;
@@ -172,8 +172,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 修饰器：仅授权合约可调用（TokenBurner或Breeding）
      */
     modifier onlyAuthorized() {
-        address tokenBurnerContract = IAuthorizer(authorizer).getTokenBurner();
-        address breedingContract = IAuthorizer(authorizer).getBreedingCore();
+        address tokenBurnerContract = IAuthorizer(authorizer).getAddressByName(\"tokenBurner\");
+        address breedingContract = IAuthorizer(authorizer).getAddressByName(\"breedingCore\");
         require(tokenBurnerContract != address(0), "NFTMint: tokenBurnerContract not set");
         require(breedingContract != address(0), "NFTMint: breedingContract not set");
         require(msg.sender == tokenBurnerContract || msg.sender == breedingContract, "NFTMint: Unauthorized");
@@ -495,7 +495,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     uint256 public constant SYNC_FAILURE_WARNING_THRESHOLD = 10;
 
     function _syncNFTData(address to, uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth) internal {
-        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(\"nftData\");
         if (nftDataContract == address(0)) {
             // NFTData合约未设置，队列化失败同步以便后续重试
             _queueFailedSync(tokenId, zodiacType, level, growth, to);
@@ -535,7 +535,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         FailedSync storage sync = failedSyncs[currentEpoch][syncId];
         require(sync.retryCount < MAX_RETRY_COUNT, "NFTMint: Max retry count exceeded");
         
-        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(\"nftData\");
         try INFTDataInterface(nftDataContract).syncNFTData(sync.tokenId, sync.zodiacType, sync.level, sync.growth, sync.to) {
             _removeFailedSync(syncId);
         } catch {
@@ -548,7 +548,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function retryAllFailedSyncs() external onlyOwner {
         uint256 currentEpoch = _currentEpoch();
-        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(\"nftData\");
         for (uint256 i = 0; i < failedSyncCount; ) {
             FailedSync storage sync = failedSyncs[currentEpoch][i];
             if (sync.retryCount >= MAX_RETRY_COUNT) {
@@ -734,8 +734,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function _syncWeightOnTransfer(address from, address to, uint256 tokenId) internal {
-        address stakingContract = IAuthorizer(authorizer).getStaking();
-        address nftTradingContract = IAuthorizer(authorizer).getNFTTrading();
+        address stakingContract = IAuthorizer(authorizer).getAddressByName(\"staking\");
+        address nftTradingContract = IAuthorizer(authorizer).getAddressByName(\"nftTrading\");
         
         if (from == stakingContract || to == stakingContract) {
             return;
@@ -749,17 +749,17 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             return;
         }
         
-        address nftDataContract = IAuthorizer(authorizer).getNFTData();
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(\"nftData\");
         require(nftDataContract != address(0), "NFTMint: NFTData contract not set");
         INFTDataInterface(nftDataContract).removeUserNFT(from, tokenId);
         INFTDataInterface(nftDataContract).addUserNFT(to, tokenId);
         
-        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        address weightManager = IAuthorizer(authorizer).getAddressByName(\"weightManager\");
         require(weightManager != address(0), "NFTMint: WeightManager contract not set");
         IWeightManager(weightManager).syncUserWeight(from);
         IWeightManager(weightManager).syncUserWeight(to);
         
-        address dividendManager = IAuthorizer(authorizer).getDividendManager();
+        address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
         require(dividendManager != address(0), "NFTMint: DividendManager contract not set");
         IDividendManager(dividendManager).syncUserWeight(from);
         IDividendManager(dividendManager).syncUserWeight(to);
@@ -823,7 +823,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function tokenURI(uint256 tokenId) external view returns (string memory) {
         require(_exists(tokenId), "NFTMint: Token not exists");
         
-        address metadataContract = IAuthorizer(authorizer).getNFTMintMetadata();
+        address metadataContract = IAuthorizer(authorizer).getAddressByName(\"nftMintMetadata\");
         require(metadataContract != address(0), "NFTMint: Metadata contract not set");
         
         return INFTMintMetadata(metadataContract).tokenURI(tokenId);

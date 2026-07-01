@@ -595,85 +595,17 @@ interface ISetBattleCaller {
 /**
  * @title IAuthorizer
  * @dev Authorizer 合约接口 - 用于查询全局合约地址
+ *
+ * 核心理念：通过统一的 getAddressByName("合约名称") 查询任意合约地址，
+ * 不再使用硬编码的独立 getter 函数，新增合约无需修改接口。
  */
 interface IAuthorizer {
-    struct ContractAddresses {
-        address token;
-        address usdt;
-        address wbnb;
-        address nftMintCore;
-        address nftMintMetadata;
-        address nftUpdate;
-        address nftData;
-        address tokenBurner;
-        address nftTrading;
-        address nftBuyback;
-        address staking;
-        address stakingLP;
-        address tokenStaking;
-        address tokenStakingLP;
-        address rewardManager;
-        address dividendManager;
-        address dividendManagerLP;
-        address poolManager;
-        address priceOracle;
-        address battle;
-        address battleSkillData;
-        address battleHistory;
-        address breedingCore;
-        address breedingMarket;
-        address weightManager;
-        address arenaRankingManager;
-        address arenaRankingQuery;
-        address arenaReward;
-        address arenaRewardLP;
-        address arenaLeaderboard;
-        address arenaPlayer;
-        address arenaBattle;
-        address feeReceiver;
-        address pancakeSwapRouter;
-        address flapSwapRouter;
-        address uniswapRouter;
-    }
-    
-    function getGlobalAddresses() external view returns (ContractAddresses memory);
-    
-    function getToken() external view returns (address);
-    function getUSDT() external view returns (address);
-    function getNFTMintCore() external view returns (address);
-    function getNFTMintMetadata() external view returns (address);
-    function getNFTUpdate() external view returns (address);
-    function getNFTData() external view returns (address);
-    function getTokenBurner() external view returns (address);
-    function getNFTTrading() external view returns (address);
-    function getNFTBuyback() external view returns (address);
-    function getStaking() external view returns (address);
-    function getStakingLP() external view returns (address);
-    function getTokenStaking() external view returns (address);
-    function getRewardManager() external view returns (address);
-    function getDividendManager() external view returns (address);
-    function getDividendManagerLP() external view returns (address);
-    function getTokenStakingLP() external view returns (address);
-    function getArenaRewardLP() external view returns (address);
-    function getPoolManager() external view returns (address);
-    function getPriceOracle() external view returns (address);
-    function getBattle() external view returns (address);
-    function getBattleSkillData() external view returns (address);
-    function getBattleHistory() external view returns (address);
-    function getBreedingCore() external view returns (address);
-    function getBreedingMarket() external view returns (address);
-    function getWeightManager() external view returns (address);
-    function getArenaRankingManager() external view returns (address);
-    function getArenaRankingQuery() external view returns (address);
-    function getArenaReward() external view returns (address);
-    function getArenaLeaderboard() external view returns (address);
-    function getArenaPlayer() external view returns (address);
-    function getArenaBattle() external view returns (address);
-    function getFeeReceiver() external view returns (address);
-    function getPancakeSwapRouter() external view returns (address);
-    function getFlapSwapRouter() external view returns (address);
-    function getUniswapRouter() external view returns (address);
-    function getWBNB() external view returns (address);
+    /**
+     * @dev 通过字符串名称获取合约地址（推荐使用）
+     * @param name 合约名称，如 "token", "battle", "nftMintCore" 等
+     * @return 地址，未注册则返回 address(0)
+     */
+    function getAddressByName(string calldata name) external view returns (address);
     
     /**
      * @dev 检查一个地址是否是系统合约

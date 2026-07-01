@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -321,7 +321,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @dev 领取奖励
      */
     function claimLPReward() external nonReentrant whenNotPaused {
-        address tokenStaking = IAuthorizer(authorizer).getTokenStaking();
+        address tokenStaking = IAuthorizer(authorizer).getAddressByName(\"tokenStaking\");
         ITokenStaking.StakeInfo memory stake = ITokenStaking(tokenStaking).getUserStake(msg.sender);
         if (stake.amount == 0) revert NoStakedTokens();
 
@@ -356,7 +356,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         } else if (currentType == RewardType.TOKEN) {
             if (reward > tokenRewardPoolBalance) revert InsufficientToken();
             tokenRewardPoolBalance -= reward;
-            IBEP20 token = IBEP20(IAuthorizer(authorizer).getToken());
+            IBEP20 token = IBEP20(IAuthorizer(authorizer).getAddressByName(\"token\"));
             token.transfer(msg.sender, reward);
             emit TokenRewardsClaimed(msg.sender, reward);
         }
@@ -370,7 +370,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @return uint256 待领取奖励金额
      */
     function getPendingLPReward(address user) external view returns (uint256) {
-        address tokenStaking = IAuthorizer(authorizer).getTokenStaking();
+        address tokenStaking = IAuthorizer(authorizer).getAddressByName(\"tokenStaking\");
         ITokenStaking.StakeInfo memory stake = ITokenStaking(tokenStaking).getUserStake(user);
         if (stake.amount == 0) return 0;
 
@@ -445,7 +445,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         todayStart = currentDayStart;
         rewardRate = 100;
 
-        address tokenStaking = IAuthorizer(authorizer).getTokenStaking();
+        address tokenStaking = IAuthorizer(authorizer).getAddressByName(\"tokenStaking\");
         uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
 
         RewardType currentType = rewardType;

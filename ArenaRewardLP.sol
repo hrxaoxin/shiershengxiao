@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -11,7 +11,6 @@ import "./LPLib.sol";
 import "./ArenaRewardLPLib.sol";
 
 contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    using LPLib for IAuthorizer;
     using ArenaRewardLPLib for ArenaRewardLPLib.RewardPool;
     
     address public authorizer;
@@ -121,22 +120,22 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function compoundFees() external onlyOwner {
-        IAuthorizer(authorizer).compoundFees();
+        LPLib.compoundFees(IAuthorizer(authorizer));
     }
 
     function claimLPReward(uint256 seasonId) external nonReentrant whenNotPaused returns (uint256) {
-        address arenaReward = IAuthorizer(authorizer).getArenaReward();
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
         uint256 reward = IArenaReward(arenaReward).getPendingRewardsByPlayer(msg.sender, seasonId);
         return _pool.claimReward(IAuthorizer(authorizer), msg.sender, seasonId, reward, arenaReward);
     }
 
     function getPendingLPReward(address user, uint256 seasonId) external view returns (uint256) {
-        address arenaReward = IAuthorizer(authorizer).getArenaReward();
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
         return _pool.getPendingReward(user, seasonId, arenaReward);
     }
 
     function emergencyWithdrawWBNB(uint256 amount) external onlyOwner nonReentrant {
-        IAuthorizer(authorizer).emergencyWithdrawWBNB(amount);
+        LPLib.emergencyWithdrawWBNB(IAuthorizer(authorizer), amount);
     }
 
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {

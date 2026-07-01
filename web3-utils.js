@@ -233,7 +233,7 @@ window.ZODIAC_WEB3 = (function() {
                 return CONTRACT_ADDRESSES.tokenContract;
             }
             const authorizerContract = new web3.eth.Contract(ABIS.authorizerABI, authorizerAddr);
-            const tokenAddress = await authorizerContract.methods.getToken().call();
+            const tokenAddress = await authorizerContract.methods.getAddressByName("token").call();
             console.log('[ZODIAC_WEB3] Token address from authorizer:', tokenAddress);
             if (tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000') {
                 return tokenAddress;

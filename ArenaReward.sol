@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
@@ -192,7 +192,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return rewardPool BNB 奖励池, tokenRewardPool 代币奖励池, totalPlayers 总玩家数
      */
     function _getSeasonData(uint256 seasonId) internal view returns (uint256, uint256, uint256) {
-        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(\"arenaRankingManager\");
         return IArenaRanking(arenaRankingManager).getSeasonRewardData(seasonId);
     }
 
@@ -203,7 +203,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 模拟玩家奖励总额
      */
     function _calculateMockRewards(uint256 seasonId, uint256 totalReward) internal view returns (uint256) {
-        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(\"arenaRankingManager\");
         address[] memory rankings = IArenaRanking(arenaRankingManager).getSeasonRankings(seasonId);
         uint256 totalPlayers = rankings.length;
         uint256 mockRewardTotal = 0;
@@ -238,7 +238,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 已分配奖励总额
      */
     function _calculateRealPlayerRewards(uint256 seasonId, uint256 totalReward, uint256 mockRewardTotal) internal returns (uint256) {
-        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(\"arenaRankingManager\");
         address[] memory rankings = IArenaRanking(arenaRankingManager).getSeasonRankings(seasonId);
         uint256 totalRealPlayers = IArenaRanking(arenaRankingManager).countRealPlayers(seasonId);
         
@@ -310,7 +310,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function getTotalPendingRewards(address player) external view returns (uint256) {
         uint256 currentEpoch = _currentEpoch();
-        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(\"arenaRankingManager\");
         uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         uint256 total = 0;
         
@@ -343,7 +343,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function calculateRewardForRank(uint256 rank) external view returns (uint256) {
         require(rank > 0, "ArenaReward: Rank must be > 0");
-        address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(\"arenaRankingManager\");
         uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         (uint256 rewardPool, , uint256 totalPlayers) = IArenaRanking(arenaRankingManager).getSeasonRewardData(currentSeasonId);
         uint256 totalRealPlayers = IArenaRanking(arenaRankingManager).countRealPlayers(currentSeasonId);
@@ -360,7 +360,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param seasonId 赛季 ID
      */
     function markRewardClaimed(address player, uint256 seasonId) external {
-        require(msg.sender == IAuthorizer(authorizer).getArenaRewardLP(), "ArenaReward: Only ArenaRewardLP can call");
+        require(msg.sender == IAuthorizer(authorizer).getAddressByName(\"arenaRewardLP\"), "ArenaReward: Only ArenaRewardLP can call");
         uint256 currentEpoch = _currentEpoch();
         claimedRewards[currentEpoch][seasonId][player] = true;
     }
@@ -371,7 +371,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @notice 仅限owner调用，用于紧急情况
      */
     function emergencyWithdrawWBNB(uint256 amount) external onlyOwner nonReentrant {
-        address wbnb = IAuthorizer(authorizer).getWBNB();
+        address wbnb = IAuthorizer(authorizer).getAddressByName(\"wbnb\");
         require(amount > 0, "ArenaReward: Amount must be > 0");
         require(IWBNB(wbnb).balanceOf(address(this)) >= amount, "ArenaReward: Insufficient WBNB");
         

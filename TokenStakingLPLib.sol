@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
@@ -32,23 +32,23 @@ library TokenStakingLPLib {
     function getConfig(IAuthorizer authorizer, uint8 dexType) internal view returns (LPConfig memory) {
         address router;
         if (dexType == 0) {
-            router = authorizer.getFlapSwapRouter();
+            router = authorizer.getAddressByName(\"flapSwapRouter\");
         } else if (dexType == 1) {
-            router = authorizer.getPancakeSwapRouter();
+            router = authorizer.getAddressByName(\"pancakeSwapRouter\");
         } else {
-            router = authorizer.getUniswapRouter();
+            router = authorizer.getAddressByName(\"uniswapRouter\");
         }
         
         address lpToken = address(0);
         if (router != address(0)) {
             try IDexRouter(router).factory() returns (address factory) {
-                lpToken = IDexFactory(factory).getPair(authorizer.getToken(), authorizer.getWBNB());
+                lpToken = IDexFactory(factory).getPair(authorizer.getAddressByName(\"token\"), authorizer.getAddressByName(\"wbnb\"));
             } catch {}
         }
         
         return LPConfig({
-            token: authorizer.getToken(),
-            wbnb: authorizer.getWBNB(),
+            token: authorizer.getAddressByName(\"token\"),
+            wbnb: authorizer.getAddressByName(\"wbnb\"),
             router: router,
             slippage: 1000,
             lpToken: lpToken
@@ -411,8 +411,8 @@ library TokenStakingLPLib {
         address token,
         uint256 amount
     ) internal returns (RewardPoolState memory) {
-        address wbnb = authorizer.getWBNB();
-        address mainToken = authorizer.getToken();
+        address wbnb = authorizer.getAddressByName(\"wbnb\");
+        address mainToken = authorizer.getAddressByName(\"token\");
 
         if (token == wbnb) {
             if (rewardType == RewardType.LP) {
@@ -454,7 +454,7 @@ library TokenStakingLPLib {
     }
 
     function compoundFees(IAuthorizer authorizer) internal {
-        address wbnb = authorizer.getWBNB();
+        address wbnb = authorizer.getAddressByName(\"wbnb\");
         uint256 balance = IWBNB(wbnb).balanceOf(address(this));
 
         if (balance >= 1000000000000000) {
@@ -493,8 +493,8 @@ library TokenStakingLPLib {
     }
 
     function _transferRewards(IAuthorizer authorizer, address user, uint256 tokenAmount, uint256 wbnbAmount) internal {
-        address token = authorizer.getToken();
-        address wbnb = authorizer.getWBNB();
+        address token = authorizer.getAddressByName(\"token\");
+        address wbnb = authorizer.getAddressByName(\"wbnb\");
 
         if (tokenAmount > 0) {
             IERC20(token).transfer(user, tokenAmount);
@@ -508,7 +508,7 @@ library TokenStakingLPLib {
     }
 
     function emergencyWithdrawWBNB(IAuthorizer authorizer, uint256 amount) internal {
-        address wbnb = authorizer.getWBNB();
+        address wbnb = authorizer.getAddressByName(\"wbnb\");
         require(amount > 0, "Amount must be > 0");
         require(IWBNB(wbnb).balanceOf(address(this)) >= amount, "Insufficient WBNB");
 
@@ -525,7 +525,7 @@ library TokenStakingLPLib {
         uint256 rewardPrecision
     ) internal view returns (uint256) {
         if (state.rewardType == RewardType.LP || state.rewardType == RewardType.TOKEN) {
-            address tokenStaking = authorizer.getTokenStaking();
+            address tokenStaking = authorizer.getAddressByName(\"tokenStaking\");
             uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
             
             if (totalStaked > 0) {

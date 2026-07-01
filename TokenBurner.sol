@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "./NFTInterface.sol";
@@ -269,10 +269,10 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(authorizer != address(0), "TokenBurner: authorizer not set");
         require(user != address(0), "TokenBurner: Zero user address");
 
-        address tokenAddress = IAuthorizer(authorizer).getToken();
+        address tokenAddress = IAuthorizer(authorizer).getAddressByName(\"token\");
         _validateContractAddress(tokenAddress, "tokenContract");
 
-        address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
+        address nftMintAddress = IAuthorizer(authorizer).getAddressByName(\"nftMintCore\");
         _validateContractAddress(nftMintAddress, "nftMintContract");
 
         // 检查 NFTMintCore 是否暂停
@@ -311,10 +311,10 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(authorizer != address(0), "TokenBurner: authorizer not set");
         require(user != address(0), "TokenBurner: Zero user address");
 
-        address tokenAddress = IAuthorizer(authorizer).getToken();
+        address tokenAddress = IAuthorizer(authorizer).getAddressByName(\"token\");
         _validateContractAddress(tokenAddress, "tokenContract");
 
-        address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
+        address nftMintAddress = IAuthorizer(authorizer).getAddressByName(\"nftMintCore\");
         _validateContractAddress(nftMintAddress, "nftMintContract");
 
         require(!INFTMintCore(nftMintAddress).paused(), "TokenBurner: NFT Mint paused");
@@ -355,10 +355,10 @@ function burnAndMintTargeted(address user, uint8 zodiac) external nonReentrant w
     require(user != address(0), "TokenBurner: Zero user address");
     require(zodiac < 12, "TokenBurner: Invalid zodiac type");
 
-    address tokenAddress = IAuthorizer(authorizer).getToken();
+    address tokenAddress = IAuthorizer(authorizer).getAddressByName(\"token\");
     _validateContractAddress(tokenAddress, "tokenContract");
 
-    address nftMintAddress = IAuthorizer(authorizer).getNFTMintCore();
+    address nftMintAddress = IAuthorizer(authorizer).getAddressByName(\"nftMintCore\");
     _validateContractAddress(nftMintAddress, "nftMintContract");
 
     // 检查 NFTMintCore 是否暂停

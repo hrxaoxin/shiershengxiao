@@ -1071,7 +1071,7 @@
                         throw new Error('授权合约未初始化');
                     }
                     
-                    const tokenAddress = await authorizerContract.methods.getToken().call();
+                    const tokenAddress = await authorizerContract.methods.getAddressByName("token").call();
                     console.log('[BREEDING] Token address from Authorizer:', tokenAddress);
                     console.log('[BREEDING] BreedingCore address:', breedingCoreAddress);
                     console.log('[BREEDING] Fee:', web3.utils.fromWei(feeWei, 'ether'));

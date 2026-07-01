@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -430,7 +430,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @return 待发放奖励金额
      */
     function getPendingMockReward(uint256 seasonId) external view returns (uint256) {
-        address arenaReward = IAuthorizer(authorizer).getArenaReward();
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
         if (arenaReward == address(0)) {
             return 0;
         }
@@ -447,10 +447,10 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         require(mockRewardRecipients.length > 0, "ArenaRankingManager: No reward recipients set");
         require(amount > 0, "ArenaRankingManager: Amount must be > 0");
         
-        address arenaReward = IAuthorizer(authorizer).getArenaReward();
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
         require(arenaReward != address(0), "ArenaRankingManager: ArenaReward contract not set");
         
-        address wbnb = IAuthorizer(authorizer).getWBNB();
+        address wbnb = IAuthorizer(authorizer).getAddressByName(\"wbnb\");
         require(wbnb != address(0), "ArenaRankingManager: WBNB contract not set");
         
         uint256 balance = IERC20(wbnb).balanceOf(arenaReward);
@@ -507,7 +507,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @param _rewardType 奖励类型：LP = 0, TOKEN = 1, BNB = 2
      */
     function setRewardType(RewardType _rewardType) external onlyOwner {
-        address arenaRewardLP = IAuthorizer(authorizer).getArenaRewardLP();
+        address arenaRewardLP = IAuthorizer(authorizer).getAddressByName(\"arenaRewardLP\");
         require(arenaRewardLP != address(0), "ArenaRankingManager: ArenaRewardLP contract not set");
         
         RewardType oldRewardType = IArenaRewardLP(arenaRewardLP).rewardType();
@@ -525,7 +525,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @param team 队伍 NFT ID 数组
      */
     function _validateTeamOwnership(address owner, uint256[6] calldata team) internal view {
-        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayer = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer contract not set");
         for (uint256 i = 0; i < 6; i++) {
             uint256 tokenId = team[i];
@@ -541,9 +541,9 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @return success 挑战是否成功
      */
     function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external nonReentrant whenNotPaused returns (bool success) {
-        address arenaBattle = IAuthorizer(authorizer).getArenaBattle();
+        address arenaBattle = IAuthorizer(authorizer).getAddressByName(\"arenaBattle\");
         require(arenaBattle != address(0), "ArenaRankingManager: ArenaBattle contract not set");
-        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayer = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer contract not set");
         require(mockIndex > 0, "ArenaRankingManager: Invalid mock index");
         IArenaPlayer(arenaPlayer).decrementAttempts(msg.sender);
@@ -562,9 +562,9 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @return success 挑战是否成功
      */
     function challengeRealPlayer(address challengedPlayer, uint256[6] calldata playerTeam) external nonReentrant whenNotPaused returns (bool success) {
-        address arenaBattle = IAuthorizer(authorizer).getArenaBattle();
+        address arenaBattle = IAuthorizer(authorizer).getAddressByName(\"arenaBattle\");
         require(arenaBattle != address(0), "ArenaRankingManager: ArenaBattle contract not set");
-        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayer = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer contract not set");
         require(challengedPlayer != address(0), "ArenaRankingManager: Zero challenged player");
         require(challengedPlayer != msg.sender, "ArenaRankingManager: Cannot challenge self");
@@ -712,7 +712,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 用于奖励结算时检查新的一天是否开始
      */
     function _checkNewDay() internal {
-        address arenaReward = IAuthorizer(authorizer).getArenaReward();
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
         if (arenaReward != address(0)) {
             IArenaReward(arenaReward).checkNewDay();
         }
@@ -724,7 +724,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 调用ArenaReward合约计算指定赛季的奖励
      */
     function _calculateSeasonRewardsInternal(uint256 seasonId) internal {
-        address arenaReward = IAuthorizer(authorizer).getArenaReward();
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
         if (arenaReward != address(0)) {
             IArenaReward(arenaReward).calculateSeasonRewards(seasonId);
         }
@@ -747,7 +747,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         uint256 currentEpoch = _currentEpoch();
         require(msg.value > 0, "ArenaRankingManager: No BNB sent");
         _checkNewDay();
-        address arenaReward = IAuthorizer(authorizer).getArenaReward();
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
         if (arenaReward != address(0)) {
             IArenaReward(arenaReward).updateTodayIncomingReward(msg.value);
         }
@@ -760,7 +760,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      */
     receive() external payable {
         _checkNewDay();
-        address arenaReward = IAuthorizer(authorizer).getArenaReward();
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
         if (arenaReward != address(0)) {
             IArenaReward(arenaReward).updateTodayIncomingReward(msg.value);
         }
@@ -772,7 +772,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      */
     fallback() external payable {
         _checkNewDay();
-        address arenaReward = IAuthorizer(authorizer).getArenaReward();
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
         if (arenaReward != address(0)) {
             IArenaReward(arenaReward).updateTodayIncomingReward(msg.value);
         }
@@ -849,7 +849,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      */
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "ArenaRankingManager: Amount must be > 0");
-        address tokenContract = IAuthorizer(authorizer).getToken();
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
         require(tokenContract != address(0), "ArenaRankingManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "ArenaRankingManager: Insufficient token balance");
@@ -862,7 +862,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 玩家使用代币充值挑战次数（RECHARGE_COST代币获得RECHARGE_ATTEMPTS次挑战）
      */
     function rechargeChallengeAttempts() external nonReentrant whenNotPaused {
-        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayer = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer not set");
         IArenaPlayer(arenaPlayer).rechargeChallengeAttempts();
     }
@@ -873,7 +873,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 将玩家的NFT质押到竞技场系统，用于战斗队伍配置
      */
     function stakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
-        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayer = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer not set");
         require(tokenIds.length > 0 && tokenIds.length <= 6, "ArenaRankingManager: Invalid token count");
         IArenaPlayer(arenaPlayer).stakeNFTs(tokenIds);
@@ -885,7 +885,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 将已质押的NFT从竞技场系统解除质押
      */
     function unstakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
-        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayer = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer not set");
         require(tokenIds.length > 0 && tokenIds.length <= 6, "ArenaRankingManager: Invalid token count");
         IArenaPlayer(arenaPlayer).unstakeNFTs(tokenIds);
@@ -896,7 +896,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 清除玩家当前设置的战斗队伍（代理调用ArenaPlayer）
      */
     function clearBattleTeam() external nonReentrant whenNotPaused {
-        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayer = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer not set");
         IArenaPlayer(arenaPlayer).clearBattleTeam();
     }
@@ -908,7 +908,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 从ArenaPlayer合约获取玩家的战斗队伍信息
      */
     function _hasBattleTeam(address player) internal view returns (bool) {
-        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         if (arenaPlayerContract == address(0)) {
             return false;
         }
@@ -923,7 +923,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @notice 从ArenaPlayer合约获取玩家的战斗队伍信息
      */
     function _getBattleTeam(address player) internal view returns (uint256[6] memory) {
-        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         require(arenaPlayerContract != address(0), "ArenaRankingManager: ArenaPlayer contract not set");
         uint256[] memory team = IArenaPlayer(arenaPlayerContract).getPlayerBattleTeam(player);
         uint256[6] memory fixedTeam;

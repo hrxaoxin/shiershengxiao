@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -264,7 +264,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 排名位置（从1开始，未上榜返回0）
      */
     function getPlayerRank(address player) external view returns (uint256) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getArenaLeaderboard();
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(\"arenaLeaderboard\");
         if (arenaLeaderboardContract != address(0)) {
             return IArenaLeaderboard(arenaLeaderboardContract).getPlayerRank(player);
         }
@@ -298,7 +298,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 排行榜条目数组
      */
     function getLeaderboard(uint256 seasonId, uint256 limit) external view returns (LeaderboardEntry[] memory) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getArenaLeaderboard();
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(\"arenaLeaderboard\");
         if (arenaLeaderboardContract == address(0)) {
             return new LeaderboardEntry[](0);
         }
@@ -348,7 +348,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      */
     function getMockPlayerRank(address player) external view returns (uint256) {
         if (!_isMockPlayer(player)) return 0;
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getArenaLeaderboard();
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(\"arenaLeaderboard\");
         if (arenaLeaderboardContract != address(0)) {
             return IArenaLeaderboard(arenaLeaderboardContract).getMockPlayerRank(player);
         }
@@ -372,7 +372,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return entries 排行榜条目, totalPages 总页数, totalPlayers 总玩家数
      */
     function getLeaderboardByPage(uint256 seasonId, uint256 page, uint256 pageSize) external view returns (LeaderboardEntry[] memory entries, uint256 totalPages, uint256 totalPlayers) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getArenaLeaderboard();
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(\"arenaLeaderboard\");
         if (arenaLeaderboardContract == address(0)) {
             return (new LeaderboardEntry[](0), 0, 0);
         }
@@ -386,7 +386,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 总页数
      */
     function getLeaderboardPageCount(uint256 seasonId, uint256 pageSize) external view returns (uint256) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getArenaLeaderboard();
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(\"arenaLeaderboard\");
         if (arenaLeaderboardContract != address(0)) {
             return IArenaLeaderboard(arenaLeaderboardContract).getLeaderboardPageCount(seasonId, pageSize);
         }
@@ -400,7 +400,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return playerAddrs 玩家地址数组, scores 积分数组
      */
     function getTopPlayers(uint256 seasonId, uint256 count) external view returns (address[] memory playerAddrs, uint256[] memory scores) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getArenaLeaderboard();
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(\"arenaLeaderboard\");
         if (arenaLeaderboardContract != address(0)) {
             return IArenaLeaderboard(arenaLeaderboardContract).getTopPlayers(seasonId, count);
         }
@@ -456,7 +456,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      */
     function getRemainingAttempts(address player) external view returns (uint256) {
         uint256 currentEpoch = _currentEpoch();
-        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         if (arenaPlayerContract == address(0)) {
             PlayerRecord memory p = players[currentEpoch][player];
             if (p.lastResetTime == 0 || block.timestamp > p.lastResetTime + 24 hours) {
@@ -497,7 +497,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 代币数量（wei单位）
      */
     function rechargeCost() external view returns (uint256) {
-        address arenaPlayer = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayer = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         if (arenaPlayer != address(0)) {
             return IArenaPlayer(arenaPlayer).rechargeCost();
         }
@@ -538,7 +538,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             wins = 0;
             losses = 0;
         }
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getArenaLeaderboard();
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(\"arenaLeaderboard\");
         if (arenaLeaderboardContract != address(0)) {
             rank = IArenaLeaderboard(arenaLeaderboardContract).getPlayerRank(player);
         } else {
@@ -558,7 +558,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         address[] memory playerAddrs,
         uint256[] memory scores
     ) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getArenaLeaderboard();
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(\"arenaLeaderboard\");
         if (arenaLeaderboardContract != address(0)) {
             return IArenaLeaderboard(arenaLeaderboardContract).getPlayersByRankRange(seasonId, startRank, endRank);
         }
@@ -577,7 +577,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     ) {
         uint256 currentEpoch = _currentEpoch();
         PlayerRecord memory p = players[currentEpoch][player];
-        address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
         if (arenaPlayerContract != address(0)) {
             remainingAttempts = IArenaPlayer(arenaPlayerContract).getRemainingAttempts(player);
         } else {
@@ -613,7 +613,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     function _claimSeasonReward(uint256 seasonId) internal returns (uint256) {
         require(seasonId > 0 && seasonId <= currentSeasonId, "ArenaRankingQuery: Invalid season");
         require(!seasonRewardsClaimed[seasonId][msg.sender], "ArenaRankingQuery: Already claimed");
-        address arenaRewardLPContract = IAuthorizer(authorizer).getArenaRewardLP();
+        address arenaRewardLPContract = IAuthorizer(authorizer).getAddressByName(\"arenaRewardLP\");
         require(arenaRewardLPContract != address(0), "ArenaRankingQuery: ArenaRewardLP not set");
         uint256 amount = IArenaRewardLP(arenaRewardLPContract).claimLPReward(seasonId);
         seasonRewardsClaimed[seasonId][msg.sender] = true;

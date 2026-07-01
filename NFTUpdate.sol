@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "./NFTDataType.sol";
@@ -339,8 +339,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     function adminSetNFTLevel(uint256 tokenId, uint8 newLevel) external onlyOwner {
         require(newLevel >= 1 && newLevel <= 5, "NFTUpdate: Invalid level");
         IAuthorizer auth = IAuthorizer(authorizer);
-        address nftAddr = auth.getNFTMintCore();
-        address dividendAddr = auth.getDividendManager();
+        address nftAddr = auth.getAddressByName(\"nftMintCore\");
+        address dividendAddr = auth.getAddressByName(\"dividendManager\");
         require(nftAddr != address(0), "NFTUpdate: NFT contract not set");
         INFTMint nft = INFTMint(nftAddr);
         
@@ -415,9 +415,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     function upgradeWithNFT(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
         IAuthorizer auth = IAuthorizer(authorizer);
-        address nftAddr = auth.getNFTMintCore();
-        address metadataAddr = auth.getNFTData();
-        address dividendAddr = auth.getDividendManager();
+        address nftAddr = auth.getAddressByName(\"nftMintCore\");
+        address metadataAddr = auth.getAddressByName(\"nftData\");
+        address dividendAddr = auth.getAddressByName(\"dividendManager\");
         
         require(nftAddr != address(0), "NFTUpdate: NFT contract not set");
         require(metadataAddr != address(0), "NFTUpdate: Metadata contract not set");
@@ -564,7 +564,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         }
         
         // 修复：添加 WeightManager 同步，确保权重数据一致性
-        address weightManager = IAuthorizer(authorizer).getWeightManager();
+        address weightManager = IAuthorizer(authorizer).getAddressByName(\"weightManager\");
         if (weightManager != address(0)) {
             try IWeightManager(weightManager).syncUserWeight(user) {
                 // 成功
@@ -581,10 +581,10 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     function upgradeWithToken(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
         IAuthorizer auth = IAuthorizer(authorizer);
-        address nftAddr = auth.getNFTMintCore();
-        address metadataAddr = auth.getNFTData();
-        address tokenAddr = auth.getToken();
-        address dividendAddr = auth.getDividendManager();
+        address nftAddr = auth.getAddressByName(\"nftMintCore\");
+        address metadataAddr = auth.getAddressByName(\"nftData\");
+        address tokenAddr = auth.getAddressByName(\"token\");
+        address dividendAddr = auth.getAddressByName(\"dividendManager\");
         
         require(nftAddr != address(0), "NFTUpdate: NFT contract not set");
         require(metadataAddr != address(0), "NFTUpdate: Metadata contract not set");
@@ -623,11 +623,11 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     function upgradeWithUSDValue(uint256 tokenId) external nonReentrant whenNotPaused returns (uint8) {
         IAuthorizer auth = IAuthorizer(authorizer);
-        address nftAddr = auth.getNFTMintCore();
-        address metadataAddr = auth.getNFTData();
-        address tokenAddr = auth.getToken();
-        address dividendAddr = auth.getDividendManager();
-        address priceOracleAddr = auth.getPriceOracle();
+        address nftAddr = auth.getAddressByName(\"nftMintCore\");
+        address metadataAddr = auth.getAddressByName(\"nftData\");
+        address tokenAddr = auth.getAddressByName(\"token\");
+        address dividendAddr = auth.getAddressByName(\"dividendManager\");
+        address priceOracleAddr = auth.getAddressByName(\"priceOracle\");
         
         require(nftAddr != address(0), "NFTUpdate: NFT contract not set");
         require(metadataAddr != address(0), "NFTUpdate: Metadata contract not set");
@@ -777,7 +777,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "NFTUpdate: Amount must be > 0");
-        address tokenAddr = IAuthorizer(authorizer).getToken();
+        address tokenAddr = IAuthorizer(authorizer).getAddressByName(\"token\");
         require(tokenAddr != address(0), "NFTUpdate: Token contract not set");
         IERC20 token = IERC20(tokenAddr);
         require(token.balanceOf(address(this)) >= amount, "NFTUpdate: Insufficient token balance");
