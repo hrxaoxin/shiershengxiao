@@ -1,14 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-interface IERC20 {
-    function totalSupply() external view returns (uint256);
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address recipient, uint256 amount) external returns (bool);
-    function allowance(address owner, address spender) external view returns (uint256);
-    function approve(address spender, uint256 amount) external returns (bool);
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-}
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
 interface IFlapPortal {
     struct QuoteExactInputParams {
@@ -49,6 +42,7 @@ interface IPancakeRouter02 {
 }
 
 contract FlapPricePay {
+    using SafeERC20 for IERC20;
     IFlapPortal public constant PORTAL = IFlapPortal(0xe2cE6ab80874Fa9Fa2aAE65D277Dd6B8e65C9De0);
     IPancakeRouter02 public constant PANCAKE_ROUTER = IPancakeRouter02(0x10ED43C718714eb63d5aA57B78B54704E256024E);
     
@@ -165,7 +159,7 @@ function approveExact(address token, uint256 amount) external {
             // 将收到的代币转给 to
             uint256 balance = IERC20(token).balanceOf(address(this));
             if (balance > 0) {
-                IERC20(token).transfer(to, balance);
+                IERC20(token).safeTransfer(to, balance);
             }
             emit SwapBNBForToken(token, msg.value, outputAmount, to, "FlapPortal");
             return outputAmount;
@@ -215,7 +209,8 @@ function approveExact(address token, uint256 amount) external {
             uint256 outputAmount = PORTAL.swapExactInput(sp);
             IERC20(token).approve(address(PORTAL), 0);
             if (address(this).balance > 0) {
-                payable(to).transfer(address(this).balance);
+                (bool s1, ) = payable(to).call{value: address(this).balance}("");
+                require(s1, "FlapPricePay: BNB transfer failed");
             }
             emit SwapTokenForBNB(token, amountIn, outputAmount, to, "FlapPortal");
             return outputAmount;
@@ -227,10 +222,11 @@ function approveExact(address token, uint256 amount) external {
     // ---------- 紧急提款 ----------
     function withdrawToken(address token, address to) external onlyOwner {
         uint256 balance = IERC20(token).balanceOf(address(this));
-        if (balance > 0) IERC20(token).transfer(to, balance);
+        if (balance > 0) IERC20(token).safeTransfer(to, balance);
     }
     function withdrawBNB(address to) external onlyOwner {
-        payable(to).transfer(address(this).balance);
+        (bool s2, ) = payable(to).call{value: address(this).balance}("");
+        require(s2, "FlapPricePay: BNB transfer failed");
     }
     receive() external payable {}
 

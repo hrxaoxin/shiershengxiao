@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+﻿﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -145,8 +145,9 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
     uint256 public currentSeasonId;
     
     /**
-     * @dev 纪元版本号，用于快速重置合约数据
+     * @dev 纪元版本号，用于快速重置合约数据（循环复用，MAX_EPOCHS次后回到0）
      */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     /**
      * @dev 赛季持续时间（默认1天）
@@ -288,6 +289,11 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @param timestamp 重置时间戳
      */
     event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
+
+    /// @dev 构造函数：禁用初始化器，防止实现合约被直接部署后被初始化攻击
+    constructor() {
+        _disableInitializers();
+    }
 
     /**
      * @dev 初始化合约
@@ -954,7 +960,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch++;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         currentSeasonId = 0;
         seasonDuration = 1 days;
         battleIdCounter = 0;

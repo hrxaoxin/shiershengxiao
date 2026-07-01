@@ -9,11 +9,14 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "./NFTInterface.sol";
 import "./LPLib.sol";
 import "./ArenaRewardLPLib.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using ArenaRewardLPLib for ArenaRewardLPLib.RewardPool;
+    using SafeERC20 for IERC20;
     
     address public authorizer;
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     ArenaRewardLPLib.RewardPool private _pool;
     uint256[44] private __gap;
@@ -76,6 +79,7 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             _;
             return;
         }
+        require(authorizer != address(0), "ArenaRewardLP: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "ArenaRewardLP: Not authorized");
         _;
@@ -181,7 +185,7 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         require(to != address(0), "ArenaRewardLP: Invalid recipient");
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
-            IERC20(token).transfer(to, balance);
+            IERC20(token).safeTransfer(to, balance);
         }
     }
 
@@ -189,7 +193,8 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         require(to != address(0), "ArenaRewardLP: Invalid recipient");
         uint256 balance = address(this).balance;
         if (balance > 0) {
-            payable(to).transfer(balance);
+            (bool success, ) = payable(to).call{value: balance}("");
+            require(success, "ArenaRewardLP: BNB transfer failed");
         }
     }
 
@@ -200,7 +205,7 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch = epoch + 1;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         
         _pool.rewardType = RewardType.BNB;
         _pool.rewardRate = 100;

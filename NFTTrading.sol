@@ -6,8 +6,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "./NFTInterface.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title NFTTrading
@@ -91,6 +91,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     /**
      * @dev 纪元版本号，用于快速重置合约数据
      */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /**
@@ -194,6 +195,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             _;
             return;
         }
+        require(authorizer != address(0), "NFTTrading: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "NFTTrading: Not authorized");
         _;
@@ -327,8 +329,6 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 sellerAmount = price - fee;
         
         // 先验证合约拥有该 NFT，确保可以安全转移
-        require(INFT(nftContract).ownerOf(tokenId) == address(this), "NFTTrading: Contract does not own NFT");
-        
         // Checks-Effects-Interactions 模式：先清除挂牌状态
         delete listings[currentEpoch][tokenId];
         _removeFromListedNFTs(currentEpoch, tokenId);
@@ -647,7 +647,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch = epoch + 1;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         
         feePercent = 5;
         totalVolume = 0;

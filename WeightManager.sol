@@ -121,6 +121,7 @@ contract WeightManager is
     /**
      * @dev 纪元版本号，用于快速重置合约数据
      */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
 
     /**
@@ -539,7 +540,7 @@ contract WeightManager is
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch = epoch + 1;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         
         weightCacheDuration = 15 minutes;
         minOwnerWeight = 0;

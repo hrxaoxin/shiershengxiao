@@ -69,6 +69,7 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /**
      * @dev 纪元版本号，用于快速重置合约数据
      */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
 
     /**
@@ -106,6 +107,7 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
             _;
             return;
         }
+        require(authorizer != address(0), "BattleSkillData: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "BattleSkillData: Not owner or authorizer");
         _;
@@ -226,7 +228,7 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch = epoch + 1;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         
         skillsInitialized = false;
         skillsInitializationPending = true;

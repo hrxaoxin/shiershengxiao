@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+﻿﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
@@ -92,8 +92,9 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     
     /**
      * @dev 纪元版本号，用于快速重置合约数据
-     * @notice 初始值为1，每次重置时递增，旧数据自动失效
+     * @notice 循环复用，MAX_EPOCHS次后回到0，存储槽位复用防止膨胀
      */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /**
@@ -137,6 +138,11 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         _;
     }
     
+    /// @dev 构造函数：禁用初始化器，防止实现合约被直接部署后被初始化攻击
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
      * @dev 初始化函数
      * @param _authorizerAddress 授权合约地址
@@ -174,6 +180,8 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
         uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         require(currentSeasonId > 0, "ArenaLeaderboard: No active season");
+        // 修复：委托ArenaRankingManager执行赛季结算
+        IArenaRanking(arenaRankingManager).settleSeason(currentSeasonId);
     }
     
     function _currentEpoch() internal view returns (uint256) {
@@ -220,8 +228,10 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 currentIndex = playerRankIndex[currentEpoch][seasonId][player];
         address[] storage rankings = seasonRankings[currentEpoch][seasonId];
         
-        if (currentIndex == 0 && rankings.length >= MAX_LEADERBOARD_SIZE) {
-            return;
+        // 修复：移除currentIndex==0的错误条件，排行榜满时如果玩家在榜尾则不需要额外处理，
+        // 排序逻辑会自然地将不合格的玩家移出排行榜
+        if (rankings.length > MAX_LEADERBOARD_SIZE) {
+            // 超出的元素会在后续while循环和截断逻辑中处理
         }
         
         if (currentIndex > 0) {
@@ -292,8 +302,9 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         address[] storage rankings = seasonRankings[currentEpoch][seasonId];
         uint256 currentIndex = playerRankIndex[currentEpoch][seasonId][player];
         
-        // 先从当前位置移除（如果已经在排行榜中）
-        if (currentIndex > 0 && currentIndex < rankings.length) {
+        // 修复：通过验证rankings[currentIndex]==player来确认玩家是否已在排行榜中
+        // 避免索引0被误认为"不在排行榜中"（索引0=第1名）
+        if (currentIndex < rankings.length && rankings[currentIndex] == player) {
             for (uint256 i = currentIndex; i + 1 < rankings.length; i++) {
                 rankings[i] = rankings[i + 1];
                 playerRankIndex[currentEpoch][seasonId][rankings[i]] = i;
@@ -595,7 +606,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch++;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

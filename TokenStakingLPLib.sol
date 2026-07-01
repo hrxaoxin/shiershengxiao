@@ -1,10 +1,12 @@
 ﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 
 library TokenStakingLPLib {
+    using SafeERC20 for IERC20;
     struct LPConfig {
         address token;
         address wbnb;
@@ -497,7 +499,7 @@ library TokenStakingLPLib {
         address wbnb = authorizer.getAddressByName(\"wbnb\");
 
         if (tokenAmount > 0) {
-            IERC20(token).transfer(user, tokenAmount);
+            IERC20(token).safeTransfer(user, tokenAmount);
         }
 
         if (wbnbAmount > 0) {

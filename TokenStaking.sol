@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+﻿﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
@@ -316,7 +316,8 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /** @dev 上次计算奖励的时间 */
     uint256 public lastRewardCalculationTime;
 
-    /** @dev 当前纪元 */
+    /** @dev 当前纪元（循环复用，MAX_EPOCHS次后回到0） */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /** @dev 用户上次累积时使用的奖励率，防止重复累加（epoch => 地址 => 上次累积率） */
@@ -400,17 +401,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return userStakes[user];
     }
 
-    function userStakedWeight(address user) external view returns (uint256) {
-        return userStakedWeight[_currentEpoch()][user];
-    }
 
-    function pendingRewards(address user) external view returns (uint256) {
-        return pendingRewards[_currentEpoch()][user];
-    }
-
-    function _userSnapshotWeight(address user) external view returns (uint256) {
-        return _userSnapshotWeight[_currentEpoch()][user];
-    }
 
     /**
      * @dev 仅owner或authorizer或系统合约的修饰符
@@ -499,7 +490,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function resetContractData() external onlyOwnerOrAuthorizer {
         require(totalStakedTokens == 0, "TokenStaking: Cannot reset with active stakes");
         uint256 oldEpoch = epoch;
-        epoch++;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         totalStakedTokens = 0;
         dailyRewardPerToken = 0;
         todayIncomingTokens = 0;

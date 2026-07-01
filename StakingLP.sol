@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+﻿﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -8,6 +8,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
 import "./StakingLPLib.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title StakingLP
@@ -34,6 +35,7 @@ import "./StakingLPLib.sol";
  * - UUPS可升级模式，需onlyOwner授权升级
  */
 contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    using SafeERC20 for IERC20;
 
     /** @dev 授权合约地址 */
     address public authorizer;
@@ -69,7 +71,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     
     /** @dev 全局奖励累积值（每单位权重的奖励）- 用于LP和TOKEN类型 */
     uint256 public globalRewardPerWeight;
-    /** @dev 当前纪元 */
+    /** @dev 当前纪元（循环复用，MAX_EPOCHS次后回到0） */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /** @dev 用户奖励快照权重映射（epoch => 地址 => 用户快照） */
@@ -333,7 +336,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             uint256 reward = bnbRewardPoolBalance * userWeight / totalWeightedNFTs;
             if (reward > 0 && reward <= bnbRewardPoolBalance) {
                 bnbRewardPoolBalance -= reward;
-                payable(msg.sender).transfer(reward);
+                (bool success, ) = payable(msg.sender).call{value: reward}("");
+                require(success, "StakingLP: BNB transfer failed");
                 emit BNBRewardClaimed(msg.sender, reward);
             }
             return;
@@ -357,8 +361,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         } else if (currentType == RewardType.TOKEN) {
             if (reward > tokenRewardPoolBalance) revert InsufficientToken();
             tokenRewardPoolBalance -= reward;
-            IBEP20 token = IBEP20(IAuthorizer(authorizer).getAddressByName(\"token\"));
-            token.transfer(msg.sender, reward);
+            IERC20(IAuthorizer(authorizer).getAddressByName(\"token\")).safeTransfer(msg.sender, reward);
             emit TokenRewardClaimed(msg.sender, reward);
         }
 
@@ -509,7 +512,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         if (to == address(0)) revert InvalidRecipient();
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
-            IERC20(token).transfer(to, balance);
+            IERC20(token).safeTransfer(to, balance);
         }
     }
 
@@ -521,7 +524,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         if (to == address(0)) revert InvalidRecipient();
         uint256 balance = address(this).balance;
         if (balance > 0) {
-            payable(to).transfer(balance);
+            (bool success, ) = payable(to).call{value: balance}("");
+            require(success, "StakingLP: BNB transfer failed");
         }
     }
 
@@ -533,7 +537,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch++;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         lpRewardPoolBalance = 0;
         tokenRewardPoolBalance = 0;
         bnbRewardPoolBalance = 0;

@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+﻿﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -84,6 +84,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     /**
      * @dev 当前纪元
      */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /**
@@ -751,7 +752,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch++;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         
         normalWeights[0] = 1;
         normalWeights[1] = 2;

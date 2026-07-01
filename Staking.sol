@@ -1,12 +1,12 @@
-﻿// SPDX-License-Identifier: MIT
+﻿﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 import "./StakingLib.sol";
 
@@ -82,7 +82,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     /** @dev 紧急提取解锁时间戳，owner可在该时间后执行紧急提取 */
     uint256 public emergencyWithdrawUnlockTime;
 
-    /** @dev 当前纪元 */
+    /** @dev 当前纪元（循环复用，MAX_EPOCHS次后回到0） */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /** @dev 用户待领取奖励映射（epoch => 地址 => 待领取金额） */
@@ -792,7 +793,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function resetContractData() external onlyOwnerOrAuthorizer {
         require(totalStakedNFTs == 0, "Staking: Cannot reset with active stakes");
         uint256 oldEpoch = epoch;
-        epoch++;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         totalStakedNFTs = 0;
         totalWeightedNFTs = 0;
         todayIncomingTokens = 0;

@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+﻿﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -8,6 +8,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
 import "./LPLib.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title DividendManagerLP
@@ -33,6 +34,7 @@ import "./LPLib.sol";
  * - onlyOwnerOrAuthorizer：管理权限控制
  */
 contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    using SafeERC20 for IERC20;
     
     /** @dev 授权合约地址 */
     address public authorizer;
@@ -47,7 +49,8 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     /** @dev BNB分红池余额 */
     uint256 public bnbDividendPoolBalance;
     
-    /** @dev 当前纪元 */
+    /** @dev 当前纪元（循环复用，MAX_EPOCHS次后回到0） */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /** @dev 用户待领取代币分红金额（epoch => 用户地址 => 金额） */
@@ -395,7 +398,8 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             uint256 reward = bnbDividendPoolBalance * userWeight / (totalWeight + 1);
             if (reward > 0 && reward <= bnbDividendPoolBalance) {
                 bnbDividendPoolBalance -= reward;
-                payable(msg.sender).transfer(reward);
+                (bool success, ) = payable(msg.sender).call{value: reward}("");
+                require(success, "DividendManagerLP: BNB transfer failed");
                 emit BNBDividendClaimed(msg.sender, reward);
             }
             return;
@@ -417,8 +421,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         } else if (currentType == RewardType.TOKEN) {
             require(dividend <= tokenDividendPoolBalance, "DividendManagerLP: Insufficient Token");
             tokenDividendPoolBalance -= dividend;
-            IBEP20 token = IBEP20(IAuthorizer(authorizer).getAddressByName(\"token\"));
-            token.transfer(msg.sender, dividend);
+            IERC20(IAuthorizer(authorizer).getAddressByName(\"token\")).safeTransfer(msg.sender, dividend);
             emit TokenDividendClaimed(msg.sender, dividend);
         }
 
@@ -473,7 +476,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         require(to != address(0), "DividendManagerLP: Invalid recipient");
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
-            IERC20(token).transfer(to, balance);
+            IERC20(token).safeTransfer(to, balance);
         }
     }
 
@@ -485,7 +488,8 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         require(to != address(0), "DividendManagerLP: Invalid recipient");
         uint256 balance = address(this).balance;
         if (balance > 0) {
-            payable(to).transfer(balance);
+            (bool success, ) = payable(to).call{value: balance}("");
+            require(success, "DividendManagerLP: BNB transfer failed");
         }
     }
 
@@ -506,7 +510,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
 
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch++;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         lpDividendPoolBalance = 0;
         tokenDividendPoolBalance = 0;
         bnbDividendPoolBalance = 0;

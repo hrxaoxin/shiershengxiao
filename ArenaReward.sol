@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+﻿﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
@@ -6,8 +6,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 import "./ArenaRankingLib.sol";
 
@@ -78,9 +78,16 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     mapping(uint256 => mapping(uint256 => mapping(address => bool))) public claimedRewards;
     
     /**
-     * @dev 纪元版本号，用于快速重置合约数据
+     * @dev 纪元版本号，用于快速重置合约数据（循环复用，MAX_EPOCHS次后回到0）
      */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
+
+    /**
+     * @dev 通过addRewardToPool累积的待分配BNB池
+     * @notice 这笔BNB在calculateSeasonRewards时自动分配到当前赛季的rewardPool
+     */
+    uint256 public pendingBNBPool;
 
     /**
      * @dev 赛季奖励计算事件
@@ -111,6 +118,11 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "ArenaReward: Not authorized");
         _;
+    }
+
+    /// @dev 构造函数：禁用初始化器，防止实现合约被直接部署后被初始化攻击
+    constructor() {
+        _disableInitializers();
     }
 
     /**
@@ -170,20 +182,27 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(!seasonRewards[currentEpoch][seasonId].rewardCalculated, "ArenaReward: Already calculated");
         
         (uint256 rewardPool, uint256 tokenRewardPool, uint256 totalPlayers) = _getSeasonData(seasonId);
-        require(rewardPool + tokenRewardPool > 0, "ArenaReward: No reward in pool");
+        
+        // 修复：将pendingBNBPool和tokenRewardPool合并到总奖励池中
+        uint256 totalRewardPool = rewardPool + tokenRewardPool + pendingBNBPool;
+        require(totalRewardPool > 0, "ArenaReward: No reward in pool");
         
         SeasonRewardInfo storage seasonReward = seasonRewards[currentEpoch][seasonId];
         seasonReward.rewardPool = rewardPool;
         seasonReward.tokenRewardPool = tokenRewardPool;
         
-        uint256 mockRewardTotal = _calculateMockRewards(seasonId, rewardPool);
-        uint256 distributed = _calculateRealPlayerRewards(seasonId, rewardPool, mockRewardTotal);
+        // 使用总奖励池进行分配计算
+        uint256 mockRewardTotal = _calculateMockRewards(seasonId, totalRewardPool);
+        uint256 distributed = _calculateRealPlayerRewards(seasonId, totalRewardPool, mockRewardTotal);
+        
+        // 清空pendingBNBPool
+        pendingBNBPool = 0;
         
         seasonReward.pendingRewards += distributed;
         seasonReward.rewardCalculated = true;
         seasonReward.totalDistributed = distributed;
         
-        emit SeasonRewardsCalculated(seasonId, rewardPool, distributed);
+        emit SeasonRewardsCalculated(seasonId, totalRewardPool, distributed);
     }
 
     /**
@@ -325,9 +344,10 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 添加奖励到池中（用于接收BNB）
-     * @notice 当合约收到BNB时，自动添加到LP奖励池
+     * @notice 当合约收到BNB时，暂存到pendingBNBPool，在calculateSeasonRewards时自动分配到赛季奖励池
      */
     function addRewardToPool() external payable onlyOwnerOrAuthorizer {
+        pendingBNBPool += msg.value;
         emit RewardAdded(msg.value);
     }
 
@@ -386,7 +406,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch++;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

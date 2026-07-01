@@ -146,8 +146,9 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     address public authorizer;
     
     /**
-     * @dev 纪元版本号，用于快速重置合约数据
+     * @dev 纪元版本号，用于快速重置合约数据（循环复用，MAX_EPOCHS次后回到0）
      */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /**
@@ -219,6 +220,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             _;
             return;
         }
+        require(authorizer != address(0), "ArenaRankingQuery: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "ArenaRankingQuery: Not authorized");
         _;
@@ -615,15 +617,16 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         require(!seasonRewardsClaimed[seasonId][msg.sender], "ArenaRankingQuery: Already claimed");
         address arenaRewardLPContract = IAuthorizer(authorizer).getAddressByName(\"arenaRewardLP\");
         require(arenaRewardLPContract != address(0), "ArenaRankingQuery: ArenaRewardLP not set");
-        uint256 amount = IArenaRewardLP(arenaRewardLPContract).claimLPReward(seasonId);
+        // 修复：遵循 CEI 模式，先改状态再转账
         seasonRewardsClaimed[seasonId][msg.sender] = true;
+        uint256 amount = IArenaRewardLP(arenaRewardLPContract).claimLPReward(seasonId);
         emit RewardClaimed(msg.sender, amount, seasonId);
         return amount;
     }
 
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch = epoch + 1;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         currentSeasonId = 1;
         
         seasons[1] = SeasonInfo({

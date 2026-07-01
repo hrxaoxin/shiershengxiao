@@ -1,7 +1,8 @@
 ﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 
 /**
@@ -21,6 +22,7 @@ import "./NFTInterface.sol";
  * - 支持紧急提现功能
  */
 library LPLib {
+    using SafeERC20 for IERC20;
 
     struct LPConfig {
         address token;
@@ -109,7 +111,7 @@ library LPLib {
         uint256 wbnbAmount = _swapTokenToWBNB(config, halfToken);
 
         if (wbnbAmount == 0) {
-            IERC20(config.token).transfer(msg.sender, tokenAmount);
+            IERC20(config.token).safeTransfer(msg.sender, tokenAmount);
             return 0;
         }
 
@@ -127,8 +129,9 @@ library LPLib {
             return liquidity;
         } catch {
             IWBNB(config.wbnb).withdraw(wbnbAmount);
-            payable(msg.sender).transfer(wbnbAmount);
-            IERC20(config.token).transfer(msg.sender, halfToken);
+            (bool success, ) = payable(msg.sender).call{value: wbnbAmount}("");
+            require(success, "LPLib: BNB transfer failed");
+            IERC20(config.token).safeTransfer(msg.sender, halfToken);
             return 0;
         }
     }
@@ -163,7 +166,8 @@ library LPLib {
 
         if (tokenAmount == 0) {
             IWBNB(config.wbnb).withdraw(wbnbAmount);
-            payable(msg.sender).transfer(wbnbAmount);
+            (bool success1, ) = payable(msg.sender).call{value: wbnbAmount}("");
+            require(success1, "LPLib: BNB transfer failed");
             return 0;
         }
 
@@ -181,8 +185,9 @@ library LPLib {
             return liquidity;
         } catch {
             IWBNB(config.wbnb).withdraw(wbnbAmount - halfWBNB);
-            payable(msg.sender).transfer(wbnbAmount - halfWBNB);
-            IERC20(config.token).transfer(msg.sender, tokenAmount);
+            (bool success2, ) = payable(msg.sender).call{value: wbnbAmount - halfWBNB}("");
+            require(success2, "LPLib: BNB transfer failed");
+            IERC20(config.token).safeTransfer(msg.sender, tokenAmount);
             return 0;
         }
     }
@@ -337,7 +342,7 @@ library LPLib {
         address wbnb = authorizer.getAddressByName(\"wbnb\");
 
         if (tokenAmount > 0) {
-            IERC20(token).transfer(user, tokenAmount);
+            IERC20(token).safeTransfer(user, tokenAmount);
         }
 
         if (wbnbAmount > 0) {
@@ -375,7 +380,7 @@ library LPLib {
         uint256 wbnbAmount = _swapTokenToWBNBWithRetry(config, tokenAmount);
         
         if (wbnbAmount == 0) {
-            IERC20(config.token).transfer(msg.sender, tokenAmount);
+            IERC20(config.token).safeTransfer(msg.sender, tokenAmount);
             return 0;
         }
 
@@ -441,7 +446,8 @@ library LPLib {
         if (lpAmount > 0) return lpAmount;
         
         IWBNB(authorizer.getAddressByName(\"wbnb\")).withdraw(bnbAmount);
-        payable(msg.sender).transfer(bnbAmount);
+        (bool success3, ) = payable(msg.sender).call{value: bnbAmount}("");
+        require(success3, "LPLib: BNB transfer failed");
         return 0;
     }
 
@@ -469,7 +475,7 @@ library LPLib {
         lpAmount = _tryConvertWBNBToLP(authorizer, wbnbAmount, 2);
         if (lpAmount > 0) return lpAmount;
         
-        IERC20(authorizer.getAddressByName(\"wbnb\")).transfer(msg.sender, wbnbAmount);
+        IERC20(authorizer.getAddressByName(\"wbnb\")).safeTransfer(msg.sender, wbnbAmount);
         return 0;
     }
 
@@ -495,7 +501,7 @@ library LPLib {
         lpAmount = _tryConvertTokenToLP(authorizer, tokenAmount, 2);
         if (lpAmount > 0) return lpAmount;
         
-        IERC20(authorizer.getAddressByName(\"token\")).transfer(msg.sender, tokenAmount);
+        IERC20(authorizer.getAddressByName(\"token\")).safeTransfer(msg.sender, tokenAmount);
         return 0;
     }
 
@@ -523,7 +529,7 @@ library LPLib {
         } catch {}
         
         IWBNB(config.wbnb).withdraw(wbnbAmount);
-        IERC20(config.token).transfer(msg.sender, halfToken);
+        IERC20(config.token).safeTransfer(msg.sender, halfToken);
         return 0;
     }
 

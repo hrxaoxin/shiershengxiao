@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+﻿﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
@@ -39,6 +39,11 @@ import "./NFTInterface.sol";
  * - onlyAuthorized：发起战斗调用
  */
 contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
+    /// @dev 构造函数：禁用初始化器，防止实现合约被直接部署后被初始化攻击
+    constructor() {
+        _disableInitializers();
+    }
+
     /**
      * @dev 授权合约地址
      */
@@ -106,8 +111,9 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     mapping(uint256 => mapping(address => PlayerRecord)) public players;
     
     /**
-     * @dev 纪元版本号，用于快速重置合约数据
+     * @dev 纪元版本号，用于快速重置合约数据（循环复用，MAX_EPOCHS次后回到0）
      */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /**
@@ -226,6 +232,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function challengeMockPlayer(uint256 mockIndex) external nonReentrant whenNotPaused returns (bool, uint256) {
         _checkSeasonActive();
+        require(mockIndex < MAX_MOCK_RANKING, "ArenaBattle: Invalid mock player index");
         
         uint256 currentEpoch = _currentEpoch();
         address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
@@ -602,7 +609,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch = epoch + 1;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

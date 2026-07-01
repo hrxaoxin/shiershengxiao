@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+﻿﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "./BattleLib.sol";
@@ -74,6 +74,7 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     /**
      * @dev 当前纪元
      */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /**
@@ -166,6 +167,7 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             _;
             return;
         }
+        require(authorizer != address(0), "BattleHistory: Authorizer not set");
         IAuthorizer auth = IAuthorizer(authorizer);
         require(auth.isSystemContract(msg.sender), "BattleHistory: Not authorized");
         _;
@@ -226,7 +228,7 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch++;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         battleCount = 0;
         earliestBattleId = 0;
         emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);

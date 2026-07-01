@@ -1,11 +1,13 @@
 ﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 import "./LPLib.sol";
 
 library ArenaRewardLPLib {
+    using SafeERC20 for IERC20;
     using LPLib for IAuthorizer;
 
     struct RewardPool {
@@ -297,11 +299,11 @@ library ArenaRewardLPLib {
             authorizer.redeemLPToUser(reward, user);
             emit LPRewardClaimed(user, seasonId, reward);
         } else if (currentType == RewardType.TOKEN) {
-            IBEP20 token = IBEP20(authorizer.getAddressByName(\"token\"));
-            token.transfer(user, reward);
+            IERC20(authorizer.getAddressByName(\"token\")).safeTransfer(user, reward);
             emit TokenRewardClaimed(user, seasonId, reward);
         } else if (currentType == RewardType.BNB) {
-            payable(user).transfer(reward);
+            (bool success, ) = payable(user).call{value: reward}("");
+            require(success, "ArenaRewardLPLib: BNB transfer failed");
             emit BNBRewardClaimed(user, seasonId, reward);
         }
 

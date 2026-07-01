@@ -7,8 +7,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/IERC721Upgradeable.sol";
 import "./NFTInterface.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./BreedingLib.sol";
 
 /**
@@ -56,8 +56,13 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     /// @dev 黑洞地址（费用燃烧地址）
     address public constant BLACK_HOLE = 0x000000000000000000000000000000000000dEaD;
     
-    /// @dev 纪元版本号，用于快速重置合约数据
+    /// @dev 纪元版本号，用于快速重置合约数据（循环复用，MAX_EPOCHS次后回到0）
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
+
+    /// @dev 被锁定的NFT追踪：记录在转移失败时卡在合约中的NFT及其原始所有者
+    /// @notice 用于EmergencyNFTLocked事件后的恢复
+    mapping(uint256 => address) public stuckNFTs;
 
     // ============================
     // 繁殖类型常量
@@ -629,6 +634,15 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         }
         _syncWeightAfterTransfer(address(this), motherOwner, pair.motherId, nftMintContract);
         
+        // 修复：取消繁殖时退还费用
+        uint256 fee = pair.breedingType == BREEDING_TYPE_SELF ? selfBreedingFee : marketBreedingFee;
+        if (fee > 0) {
+            address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+            if (tokenContract != address(0)) {
+                IERC20(tokenContract).safeTransfer(msg.sender, fee);
+            }
+        }
+        
         emit BreedingCancelled(pairId, pair.fatherId, pair.motherId, msg.sender);
     }
 
@@ -957,6 +971,25 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         }
     }
 
+    /**
+     * @dev 恢复被卡在合约中的NFT（仅owner可调用）
+     * @param tokenId 被卡住的NFT ID
+     * @param to 接收地址（应为NFT的原始所有者）
+     * @notice 用于处理NFT转移失败导致NFT永久锁定在合约中的紧急情况
+     * @dev 验证NFT确实归此合约所有且不在活跃繁殖中
+     */
+    function recoverStuckNFT(uint256 tokenId, address to) external onlyOwner nonReentrant {
+        require(to != address(0), "BC: ITO");
+        uint256 currentEpoch = _currentEpoch();
+        address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        require(nftMintContract != address(0), "BC: NCS");
+        IERC721Upgradeable nft = IERC721Upgradeable(nftMintContract);
+        require(nft.ownerOf(tokenId) == address(this), "BC: NNH");
+        require(!isNFTInActiveBreeding[currentEpoch][tokenId], "BC: NB");
+        nft.safeTransferFrom(address(this), to, tokenId);
+        _syncWeightAfterTransfer(address(this), to, tokenId);
+    }
+
     // ============================
     // 接收函数
     // ============================
@@ -982,7 +1015,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         require(breedingPairCount[currentEpoch] == 0, "BC: ACB");
 
         uint256 oldEpoch = epoch;
-        epoch = epoch + 1;
+        epoch = (epoch + 1) % MAX_EPOCHS;
 
         paused = false;
         pauseReason = "";

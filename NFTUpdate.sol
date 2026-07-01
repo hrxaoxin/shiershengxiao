@@ -112,7 +112,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /** @dev 授权合约地址 */
     address public authorizer;
     
-    /** @dev 纪元版本号，用于快速重置合约数据 */
+    /** @dev 纪元版本号，用于快速重置合约数据（循环复用，MAX_EPOCHS次后回到0） */
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /** @dev 各级别升级费用（代币数量，含精度18位） */
@@ -819,7 +820,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch = epoch + 1;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         
         pauseReason = "";
         level1UpgradeCost = 0;

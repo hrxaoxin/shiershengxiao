@@ -5,8 +5,8 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/IERC20.sol";
-import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 
 /**
@@ -76,7 +76,8 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     // 市场数据映射
     // ============================
     
-    /// @dev 纪元版本号，用于快速重置合约数据
+    /// @dev 纪元版本号，用于快速重置合约数据（循环复用，MAX_EPOCHS次后回到0）
+    uint256 public constant MAX_EPOCHS = 50;
     uint256 public epoch;
     
     /// @dev 市场挂牌映射（epoch => tokenId => 挂牌信息）
@@ -326,7 +327,7 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
         uint256 oldEpoch = epoch;
-        epoch = epoch + 1;
+        epoch = (epoch + 1) % MAX_EPOCHS;
         
         // 清空挂牌数组
         delete listedTokenIds;
