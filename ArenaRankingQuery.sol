@@ -604,4 +604,25 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         emit RewardClaimed(msg.sender, amount, seasonId);
         return amount;
     }
+
+    function resetContractData() external onlyOwnerOrAuthorizer {
+        currentSeasonId = 1;
+        
+        seasons[1] = SeasonInfo({
+            seasonId: 1,
+            startTime: block.timestamp,
+            endTime: block.timestamp + 1 days,
+            isActive: true,
+            isSettled: false,
+            rewardCalculated: false,
+            totalPlayers: 0,
+            rewardPool: 0,
+            tokenRewardPool: 0,
+            pendingRewards: 0
+        });
+        
+        emit ContractDataReset(msg.sender, block.timestamp);
+    }
+
+    event ContractDataReset(address indexed operator, uint256 timestamp);
 }

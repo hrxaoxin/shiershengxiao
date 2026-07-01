@@ -599,7 +599,7 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
     }
 
     function resetAllContractData() external onlyOwner {
-        address[] memory contracts = new address[](30);
+        address[] memory contracts = new address[](31);
         
         contracts[0] = _addresses[keccak256("nftMintCore")];
         contracts[1] = _addresses[keccak256("nftMintMetadata")];
@@ -624,13 +624,14 @@ contract Authorizer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         contracts[20] = _addresses[keccak256("breedingCore")];
         contracts[21] = _addresses[keccak256("breedingMarket")];
         contracts[22] = _addresses[keccak256("arenaRankingManager")];
-        contracts[23] = _addresses[keccak256("arenaPlayer")];
-        contracts[24] = _addresses[keccak256("arenaBattle")];
-        contracts[25] = _addresses[keccak256("arenaLeaderboard")];
-        contracts[26] = _addresses[keccak256("arenaReward")];
-        contracts[27] = _addresses[keccak256("arenaRewardLP")];
-        contracts[28] = _addresses[keccak256("FlapPricePay")];
-        contracts[29] = _addresses[keccak256("FlapPriceQuerier")];
+        contracts[23] = _addresses[keccak256("arenaRankingQuery")];
+        contracts[24] = _addresses[keccak256("arenaPlayer")];
+        contracts[25] = _addresses[keccak256("arenaBattle")];
+        contracts[26] = _addresses[keccak256("arenaLeaderboard")];
+        contracts[27] = _addresses[keccak256("arenaReward")];
+        contracts[28] = _addresses[keccak256("arenaRewardLP")];
+        contracts[29] = _addresses[keccak256("FlapPricePay")];
+        contracts[30] = _addresses[keccak256("FlapPriceQuerier")];
         
         for (uint256 i = 0; i < contracts.length; i++) {
             if (contracts[i] != address(0)) {
