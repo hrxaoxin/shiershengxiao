@@ -48,14 +48,17 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     /** @dev BNB分红池余额 */
     uint256 public bnbDividendPoolBalance;
     
-    /** @dev 用户待领取代币分红金额 */
-    mapping(address => uint256) public pendingTokenDividends;
+    /** @dev 当前纪元 */
+    uint256 public epoch;
+    
+    /** @dev 用户待领取代币分红金额（epoch => 用户地址 => 金额） */
+    mapping(uint256 => mapping(address => uint256)) public pendingTokenDividends;
     
     /** @dev 累计每权重分红（用于计算LP和代币分红） */
     uint256 public cumulativePerWeightDividend;
     
-    /** @dev 用户分红快照（记录用户上次领取时的累计分红值） */
-    mapping(address => uint256) public userRewardSnapshots;
+    /** @dev 用户分红快照（epoch => 用户地址 => 快照值） */
+    mapping(uint256 => mapping(address => uint256)) public userRewardSnapshots;
 
     /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[50] private __gap;
@@ -108,6 +111,11 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         __Pausable_init();
         authorizer = _authorizerAddress;
         rewardType = RewardType.LP;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
     
     /**
@@ -395,7 +403,8 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             return;
         }
 
-        uint256 cumulativeDiff = cumulativePerWeightDividend - userRewardSnapshots[msg.sender];
+        uint256 currentEpoch = _currentEpoch();
+        uint256 cumulativeDiff = cumulativePerWeightDividend - userRewardSnapshots[currentEpoch][msg.sender];
         uint256 dividend = userWeight * cumulativeDiff / 1e18;
         
         if (dividend == 0) {
@@ -415,7 +424,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             emit TokenDividendClaimed(msg.sender, dividend);
         }
 
-        userRewardSnapshots[msg.sender] = cumulativePerWeightDividend;
+        userRewardSnapshots[currentEpoch][msg.sender] = cumulativePerWeightDividend;
     }
 
     /**
@@ -435,11 +444,12 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             return bnbDividendPoolBalance * userWeight / (totalWeight + 1);
         }
         
-        if (userWeight == 0) return pendingTokenDividends[user];
+        uint256 currentEpoch = _currentEpoch();
+        if (userWeight == 0) return pendingTokenDividends[currentEpoch][user];
         
-        uint256 cumulativeDiff = cumulativePerWeightDividend - userRewardSnapshots[user];
+        uint256 cumulativeDiff = cumulativePerWeightDividend - userRewardSnapshots[currentEpoch][user];
         uint256 newDividend = userWeight * cumulativeDiff / 1e18;
-        return pendingTokenDividends[user] + newDividend;
+        return pendingTokenDividends[currentEpoch][user] + newDividend;
     }
 
     /**
@@ -481,23 +491,29 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         }
     }
 
+    function pendingTokenDividends(address user) external view returns (uint256) {
+        return pendingTokenDividends[_currentEpoch()][user];
+    }
+
+    function userRewardSnapshots(address user) external view returns (uint256) {
+        return userRewardSnapshots[_currentEpoch()][user];
+    }
+
     /**
      * @dev 合约数据重置事件
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
-    /**
-     * @dev 重置合约核心数据（仅owner或authorizer）
-     * 注意：无法遍历mapping，只重置核心状态变量
-     */
     function resetContractData() external onlyOwnerOrAuthorizer {
+        uint256 oldEpoch = epoch;
+        epoch++;
         lpDividendPoolBalance = 0;
         tokenDividendPoolBalance = 0;
         bnbDividendPoolBalance = 0;
         cumulativePerWeightDividend = 0;
         
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

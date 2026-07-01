@@ -525,6 +525,10 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         }
     }
 
+    function userRewardSnapshotWeight(address user) external view returns (uint256) {
+        return userRewardSnapshotWeight[_currentEpoch()][user];
+    }
+
     event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     function resetContractData() external onlyOwnerOrAuthorizer {

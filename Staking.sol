@@ -539,6 +539,18 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         return userStakedNFTs[user];
     }
 
+    function userStakedWeight(address user) external view returns (uint256) {
+        return userStakedWeight[_currentEpoch()][user];
+    }
+
+    function pendingRewards(address user) external view returns (uint256) {
+        return pendingRewards[_currentEpoch()][user];
+    }
+
+    function _userSnapshotWeight(address user) external view returns (uint256) {
+        return _userSnapshotWeight[_currentEpoch()][user];
+    }
+
     /**
      * @dev 查询待领取奖励（Gas优化：O(1)用户级别累计公式，不遍历NFT列表）
      * @param user 用户地址

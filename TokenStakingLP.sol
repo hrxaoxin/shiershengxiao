@@ -557,6 +557,10 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
      */
+    function lastRewardAccumulatedRate(address user) external view returns (uint256) {
+        return lastRewardAccumulatedRate[_currentEpoch()][user];
+    }
+
     event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     function resetContractData() external onlyOwnerOrAuthorizer {

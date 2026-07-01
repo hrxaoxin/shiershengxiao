@@ -400,6 +400,18 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         return userStakes[user];
     }
 
+    function userStakedWeight(address user) external view returns (uint256) {
+        return userStakedWeight[_currentEpoch()][user];
+    }
+
+    function pendingRewards(address user) external view returns (uint256) {
+        return pendingRewards[_currentEpoch()][user];
+    }
+
+    function _userSnapshotWeight(address user) external view returns (uint256) {
+        return _userSnapshotWeight[_currentEpoch()][user];
+    }
+
     /**
      * @dev 仅owner或authorizer或系统合约的修饰符
      */

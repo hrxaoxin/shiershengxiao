@@ -114,9 +114,11 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 授权者合约地址，用于获取系统配置
     address public authorizer;
     
-    /// @dev 用户权重映射：用户地址 => 权重值
-    /// @notice 权重根据用户持有的NFT等级和稀有度计算
-    mapping(address => uint256) public userWeights;
+    /// @dev 当前纪元
+    uint256 public epoch;
+    
+    /// @dev 用户权重映射：epoch => 用户地址 => 权重值
+    mapping(uint256 => mapping(address => uint256)) public userWeights;
     
     /// @dev 最大快照数量，用于循环缓冲区
     uint256 public constant MAX_SNAPSHOTS = 100;
@@ -124,8 +126,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 分红领取警告阈值（30天）
     uint256 public constant DIVIDEND_CLAIM_WARNING_THRESHOLD = 30 days;
     
-    /// @dev 用户最后领取分红的时间戳
-    mapping(address => uint256) public lastClaimTime;
+    /// @dev 用户最后领取分红的时间戳（epoch => 用户地址 => 时间戳）
+    mapping(uint256 => mapping(address => uint256)) public lastClaimTime;
 
     // =========================================================================
     // 初始化函数
@@ -140,6 +142,11 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     /// @dev UUPS升级授权检查，仅管理员可升级
@@ -171,8 +178,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     // 用户分红相关变量
     // =========================================================================
 
-    /// @dev 用户待领取分红映射：用户地址 => 待领取分红金额
-    mapping(address => uint256) public pendingDividends;
+    /// @dev 用户待领取分红映射：epoch => 用户地址 => 待领取分红金额
+    mapping(uint256 => mapping(address => uint256)) public pendingDividends;
     
     /// @dev 所有用户的总权重
     uint256 public totalWeight;
@@ -267,8 +274,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 累计每权重分红额（核心计算参数）
     uint256 public cumulativePerWeightDividend;
     
-    /// @dev 用户累计分红快照：用户地址 => 累计快照值
-    mapping(address => uint256) public userCumulativeSnapshots;
+    /// @dev 用户累计分红快照：epoch => 用户地址 => 累计快照值
+    mapping(uint256 => mapping(address => uint256)) public userCumulativeSnapshots;
 
     // =========================================================================
     // 内部分红池添加函数
@@ -348,30 +355,31 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 非重入修饰符，合约未暂停时可调用
     /// @return 实际领取的分红金额
     function claim() external nonReentrant whenNotPaused returns (uint256) {
+        uint256 currentEpoch = _currentEpoch();
         _autoSyncDividendPool();
 
-        uint256 userWeight = userWeights[msg.sender];
+        uint256 userWeight = userWeights[currentEpoch][msg.sender];
 
-        if (lastClaimTime[msg.sender] > 0 &&
-            block.timestamp - lastClaimTime[msg.sender] > DIVIDEND_CLAIM_WARNING_THRESHOLD) {
-            emit DividendClaimWarning(msg.sender, block.timestamp - lastClaimTime[msg.sender]);
+        if (lastClaimTime[currentEpoch][msg.sender] > 0 &&
+            block.timestamp - lastClaimTime[currentEpoch][msg.sender] > DIVIDEND_CLAIM_WARNING_THRESHOLD) {
+            emit DividendClaimWarning(msg.sender, block.timestamp - lastClaimTime[currentEpoch][msg.sender]);
         }
 
         uint256 newDividend = 0;
         if (userWeight > 0) {
-            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[msg.sender];
+            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][msg.sender];
             newDividend = (userWeight * cumulativeDiff) / 1e18;
         }
 
-        uint256 totalDividend = pendingDividends[msg.sender] + newDividend;
+        uint256 totalDividend = pendingDividends[currentEpoch][msg.sender] + newDividend;
 
         require(totalDividend > 0, "DM: No dividend");
 
-        pendingDividends[msg.sender] = 0;
+        pendingDividends[currentEpoch][msg.sender] = 0;
         if (userWeight > 0) {
-            userCumulativeSnapshots[msg.sender] = cumulativePerWeightDividend;
+            userCumulativeSnapshots[currentEpoch][msg.sender] = cumulativePerWeightDividend;
         }
-        lastClaimTime[msg.sender] = block.timestamp;
+        lastClaimTime[currentEpoch][msg.sender] = block.timestamp;
 
         address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "DM: Token not set");
@@ -395,7 +403,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @return 用户当前权重
     function calcUserDividend(address user) external view returns (uint256, uint256) {
         uint256 claimable = this.getClaimableDividend(user);
-        return (claimable, userWeights[user]);
+        return (claimable, userWeights[_currentEpoch()][user]);
     }
 
     // =========================================================================
@@ -406,19 +414,20 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param user 用户地址
     /// @return 可领取的分红总额（包含已记录的pendingDividends）
     function getClaimableDividend(address user) external view returns (uint256) {
-        uint256 userWeight = userWeights[user];
-        if (userWeight == 0) return pendingDividends[user];
+        uint256 currentEpoch = _currentEpoch();
+        uint256 userWeight = userWeights[currentEpoch][user];
+        if (userWeight == 0) return pendingDividends[currentEpoch][user];
         
-        uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
+        uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][user];
         uint256 newDividend = userWeight * cumulativeDiff / 1e18;
-        return pendingDividends[user] + newDividend;
+        return pendingDividends[currentEpoch][user] + newDividend;
     }
 
     /// @notice 获取用户权重
     /// @param user 用户地址
     /// @return 用户当前权重
     function getUserWeight(address user) external view returns (uint256) {
-        return userWeights[user];
+        return userWeights[_currentEpoch()][user];
     }
 
     /// @notice 获取总权重
@@ -437,8 +446,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 最小权重更新间隔（秒）
     uint256 public minWeightUpdateInterval = 0;
     
-    /// @dev 用户上次权重更新时间
-    mapping(address => uint256) public lastWeightUpdateTime;
+    /// @dev 用户上次权重更新时间（epoch => 用户地址 => 时间）
+    mapping(uint256 => mapping(address => uint256)) public lastWeightUpdateTime;
 
     // =========================================================================
     // 权重设置函数
@@ -449,19 +458,20 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param user 用户地址
     /// @param weight 新的权重值
     function setUserWeight(address user, uint256 weight) external onlyOwnerOrAuthorizer {
+        uint256 currentEpoch = _currentEpoch();
         require(weight <= MAX_USER_WEIGHT, "DM: Weight max");
         
-        if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
-            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-            uint256 weightedProduct = userWeights[user] * cumulativeDiff;
-            require(weightedProduct / userWeights[user] == cumulativeDiff, "DM: Pending overflow");
+        if (userWeights[currentEpoch][user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[currentEpoch][user]) {
+            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][user];
+            uint256 weightedProduct = userWeights[currentEpoch][user] * cumulativeDiff;
+            require(weightedProduct / userWeights[currentEpoch][user] == cumulativeDiff, "DM: Pending overflow");
             uint256 pending = weightedProduct / 1e18;
-            pendingDividends[user] += pending;
+            pendingDividends[currentEpoch][user] += pending;
         }
         
-        totalWeight = totalWeight - userWeights[user] + weight;
-        userWeights[user] = weight;
-        userCumulativeSnapshots[user] = cumulativePerWeightDividend;
+        totalWeight = totalWeight - userWeights[currentEpoch][user] + weight;
+        userWeights[currentEpoch][user] = weight;
+        userCumulativeSnapshots[currentEpoch][user] = cumulativePerWeightDividend;
     }
 
     /// @notice 更新用户权重（基于NFT等级和元素）
@@ -471,38 +481,39 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param isAdd 是否为增加权重（true增加，false减少）
     /// @param element NFT元素类型（3或4为稀有元素）
     function updateUserWeight(address user, uint256 level, bool isAdd, uint8 element) external onlyOwnerOrAuthorizer {
+        uint256 currentEpoch = _currentEpoch();
         require(user != address(0), "DM: Zero user");
         uint256 weight = _calculateWeight(level, element);
 
         if (minWeightUpdateInterval > 0) {
-            require(block.timestamp >= lastWeightUpdateTime[user] + minWeightUpdateInterval, "DM: Too frequent");
+            require(block.timestamp >= lastWeightUpdateTime[currentEpoch][user] + minWeightUpdateInterval, "DM: Too frequent");
         }
         
-        if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
-            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-            uint256 weightedProduct = userWeights[user] * cumulativeDiff;
-            require(weightedProduct / userWeights[user] == cumulativeDiff, "DM: Weight calc overflow");
+        if (userWeights[currentEpoch][user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[currentEpoch][user]) {
+            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][user];
+            uint256 weightedProduct = userWeights[currentEpoch][user] * cumulativeDiff;
+            require(weightedProduct / userWeights[currentEpoch][user] == cumulativeDiff, "DM: Weight calc overflow");
             uint256 pending = weightedProduct / 1e18;
-            pendingDividends[user] += pending;
+            pendingDividends[currentEpoch][user] += pending;
         }
 
         if (isAdd) {
-            uint256 newUserWeight = userWeights[user] + weight;
-            require(newUserWeight >= userWeights[user], "DM: Weight overflow");
+            uint256 newUserWeight = userWeights[currentEpoch][user] + weight;
+            require(newUserWeight >= userWeights[currentEpoch][user], "DM: Weight overflow");
             require(newUserWeight <= MAX_USER_WEIGHT, "DM: New weight max");
             uint256 newTotalWeight = totalWeight + weight;
             require(newTotalWeight >= totalWeight, "DM: Total overflow");
             totalWeight = newTotalWeight;
-            userWeights[user] = newUserWeight;
+            userWeights[currentEpoch][user] = newUserWeight;
         } else {
-            require(userWeights[user] >= weight, "DM: Insufficient weight");
+            require(userWeights[currentEpoch][user] >= weight, "DM: Insufficient weight");
             require(totalWeight >= weight, "DM: Total underflow");
             totalWeight -= weight;
-            userWeights[user] -= weight;
+            userWeights[currentEpoch][user] -= weight;
         }
         
-        userCumulativeSnapshots[user] = cumulativePerWeightDividend;
-        lastWeightUpdateTime[user] = block.timestamp;
+        userCumulativeSnapshots[currentEpoch][user] = cumulativePerWeightDividend;
+        lastWeightUpdateTime[currentEpoch][user] = block.timestamp;
     }
 
     /// @notice 设置最小权重更新间隔
@@ -517,6 +528,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 仅授权的系统合约可调用，防止恶意调用影响分红计算
     /// @param user 用户地址
     function syncUserWeight(address user) external onlyOwnerOrAuthorizer {
+        uint256 currentEpoch = _currentEpoch();
         require(user != address(0), "DM: Zero user");
         address nftDataContract = IAuthorizer(authorizer).getNFTData();
         if (nftDataContract == address(0)) return;
@@ -524,25 +536,25 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         INFTDataInterface nftData = INFTDataInterface(nftDataContract);
         uint256 newWeight = nftData.calcUserWeight(user);
         
-        if (userWeights[user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
-            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-            uint256 weightedProduct = userWeights[user] * cumulativeDiff;
-            require(weightedProduct / userWeights[user] == cumulativeDiff, "DM: Sync overflow");
+        if (userWeights[currentEpoch][user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[currentEpoch][user]) {
+            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][user];
+            uint256 weightedProduct = userWeights[currentEpoch][user] * cumulativeDiff;
+            require(weightedProduct / userWeights[currentEpoch][user] == cumulativeDiff, "DM: Sync overflow");
             uint256 pending = weightedProduct / 1e18;
-            uint256 newPending = pendingDividends[user] + pending;
-            require(newPending >= pendingDividends[user], "DM: Pending overflow");
-            pendingDividends[user] = newPending;
+            uint256 newPending = pendingDividends[currentEpoch][user] + pending;
+            require(newPending >= pendingDividends[currentEpoch][user], "DM: Pending overflow");
+            pendingDividends[currentEpoch][user] = newPending;
         }
         
-        require(totalWeight >= userWeights[user], "DM: Total underflow");
-        uint256 totalWeightAfterRemove = totalWeight - userWeights[user];
+        require(totalWeight >= userWeights[currentEpoch][user], "DM: Total underflow");
+        uint256 totalWeightAfterRemove = totalWeight - userWeights[currentEpoch][user];
         uint256 totalWeightAfterAdd = totalWeightAfterRemove + newWeight;
         require(totalWeightAfterAdd >= totalWeightAfterRemove, "DM: Total overflow");
         totalWeight = totalWeightAfterAdd;
         
-        userWeights[user] = newWeight;
-        userCumulativeSnapshots[user] = cumulativePerWeightDividend;
-        lastWeightUpdateTime[user] = block.timestamp;
+        userWeights[currentEpoch][user] = newWeight;
+        userCumulativeSnapshots[currentEpoch][user] = cumulativePerWeightDividend;
+        lastWeightUpdateTime[currentEpoch][user] = block.timestamp;
         
         emit WeightUpdated(user, newWeight);
     }
@@ -680,6 +692,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         address[] calldata users,
         uint256[] calldata weights
     ) external onlyOwnerOrAuthorizer {
+        uint256 currentEpoch = _currentEpoch();
         require(users.length == weights.length, "DM: Length mismatch");
         require(users.length <= 100, "DM: Batch max");
         
@@ -689,11 +702,11 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         for (uint256 i = 0; i < usersLength; i++) {
             address user = users[i];
             uint256 newWeight = weights[i];
-            uint256 oldWeight = userWeights[user];
+            uint256 oldWeight = userWeights[currentEpoch][user];
             
-            if (oldWeight > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[user]) {
-                uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[user];
-                pendingDividends[user] += oldWeight * cumulativeDiff / 1e18;
+            if (oldWeight > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[currentEpoch][user]) {
+                uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][user];
+                pendingDividends[currentEpoch][user] += oldWeight * cumulativeDiff / 1e18;
             }
             
             if (newWeight > oldWeight) {
@@ -705,8 +718,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
                 totalWeightChange = totalWeightChange - decrease;
             }
             
-            userWeights[user] = newWeight;
-            userCumulativeSnapshots[user] = cumulativePerWeightDividend;
+            userWeights[currentEpoch][user] = newWeight;
+            userCumulativeSnapshots[currentEpoch][user] = cumulativePerWeightDividend;
         }
         
         totalWeight = totalWeight + totalWeightChange;
@@ -872,6 +885,18 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param timestamp 请求时间戳
     event EmergencyWithdrawRequested(address indexed operator, uint256 timestamp);
 
+    function userWeights(address user) external view returns (uint256) {
+        return userWeights[_currentEpoch()][user];
+    }
+
+    function pendingDividends(address user) external view returns (uint256) {
+        return pendingDividends[_currentEpoch()][user];
+    }
+
+    function userCumulativeSnapshots(address user) external view returns (uint256) {
+        return userCumulativeSnapshots[_currentEpoch()][user];
+    }
+
     /**
      * @dev 清空合约内部的所有数据
      * 仅合约所有者和authorizer合约可调用
@@ -879,38 +904,22 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * 注意：由于Solidity无法遍历mapping的所有键，此函数只重置核心状态变量
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 重置总权重
+        uint256 oldEpoch = epoch;
+        epoch++;
         totalWeight = 0;
-
-        // 重置分红池余额
         dividendPoolBalance = 0;
         lastSyncedBalance = 0;
         lastAutoSyncTime = 0;
-
-        // 重置累计分红
         cumulativePerWeightDividend = 0;
-
-        // 清空快照数组
         delete snapshots;
         snapshotStartIndex = 0;
         lastSnapshotTime = 0;
-
-        // 重置紧急提取状态
         emergencyWithdrawRequested = false;
         emergencyWithdrawRequestedAt = 0;
-
-        // 重置暂停状态
         paused = false;
         pauseReason = "";
-
-        // 发出数据重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
-    /**
-     * @dev 合约数据重置事件
-     * @param operator 执行重置的操作者地址
-     * @param timestamp 重置时间戳
-     */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 }

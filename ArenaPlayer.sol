@@ -344,6 +344,11 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         return playerBattleTeams[currentEpoch][player];
     }
 
+    function nftStakedOwner(uint256 tokenId) external view returns (address) {
+        uint256 currentEpoch = _currentEpoch();
+        return nftStakedOwner[currentEpoch][tokenId];
+    }
+
     function rechargeChallengeAttempts() external nonReentrant whenNotPaused {
         address arenaRankingManager = IAuthorizer(authorizer).getArenaRankingManager();
         require(IArenaRanking(arenaRankingManager).currentSeasonId() > 0, "ArenaPlayer: No active season");
