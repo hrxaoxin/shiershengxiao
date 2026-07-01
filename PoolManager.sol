@@ -82,10 +82,15 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     address public authorizer;
 
     /**
-     * @dev 池子余额映射
-     * poolType => balance
+     * @dev 纪元版本号，用于快速重置合约数据
      */
-    mapping(uint256 => uint256) public poolBalances;
+    uint256 public epoch;
+
+    /**
+     * @dev 池子余额映射
+     * epoch => poolType => balance
+     */
+    mapping(uint256 => mapping(uint256 => uint256)) public poolBalances;
 
     /**
      * @dev 累计存入/提取金额
@@ -116,12 +121,17 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
     }
 
     /**
      * @dev UUPS升级授权
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
+    }
 
     /**
      * @dev 设置授权合约地址
@@ -152,11 +162,12 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function addToNFTStakingPool(uint256 amount) external onlyOwnerOrAuthorizer whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
+        uint256 currentEpoch = _currentEpoch();
         // 修复：添加溢出检查
-        uint256 newBalance = poolBalances[POOL_NFT_STAKING] + amount;
-        require(newBalance >= poolBalances[POOL_NFT_STAKING], "PoolManager: Overflow");
-        poolBalances[POOL_NFT_STAKING] = newBalance;
-        _recordFlow(POOL_NFT_STAKING, amount, msg.sender, address(this), FLOW_DEPOSIT);
+        uint256 newBalance = poolBalances[currentEpoch][POOL_NFT_STAKING] + amount;
+        require(newBalance >= poolBalances[currentEpoch][POOL_NFT_STAKING], "PoolManager: Overflow");
+        poolBalances[currentEpoch][POOL_NFT_STAKING] = newBalance;
+        _recordFlow(currentEpoch, POOL_NFT_STAKING, amount, msg.sender, address(this), FLOW_DEPOSIT);
         emit PoolDeposited(POOL_NFT_STAKING, amount);
     }
 
@@ -165,11 +176,12 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function addToTokenStakingPool(uint256 amount) external onlyOwnerOrAuthorizer whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
+        uint256 currentEpoch = _currentEpoch();
         // 修复：添加溢出检查
-        uint256 newBalance = poolBalances[POOL_TOKEN_STAKING] + amount;
-        require(newBalance >= poolBalances[POOL_TOKEN_STAKING], "PoolManager: Overflow");
-        poolBalances[POOL_TOKEN_STAKING] = newBalance;
-        _recordFlow(POOL_TOKEN_STAKING, amount, msg.sender, address(this), FLOW_DEPOSIT);
+        uint256 newBalance = poolBalances[currentEpoch][POOL_TOKEN_STAKING] + amount;
+        require(newBalance >= poolBalances[currentEpoch][POOL_TOKEN_STAKING], "PoolManager: Overflow");
+        poolBalances[currentEpoch][POOL_TOKEN_STAKING] = newBalance;
+        _recordFlow(currentEpoch, POOL_TOKEN_STAKING, amount, msg.sender, address(this), FLOW_DEPOSIT);
         emit PoolDeposited(POOL_TOKEN_STAKING, amount);
     }
 
@@ -178,11 +190,12 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function addToArenaRewardPool(uint256 amount) external onlyOwnerOrAuthorizer whenNotPaused {
         require(amount > 0, "PoolManager: Invalid amount");
+        uint256 currentEpoch = _currentEpoch();
         // 修复：添加溢出检查
-        uint256 newBalance = poolBalances[POOL_ARENA_REWARD] + amount;
-        require(newBalance >= poolBalances[POOL_ARENA_REWARD], "PoolManager: Overflow");
-        poolBalances[POOL_ARENA_REWARD] = newBalance;
-        _recordFlow(POOL_ARENA_REWARD, amount, msg.sender, address(this), FLOW_DEPOSIT);
+        uint256 newBalance = poolBalances[currentEpoch][POOL_ARENA_REWARD] + amount;
+        require(newBalance >= poolBalances[currentEpoch][POOL_ARENA_REWARD], "PoolManager: Overflow");
+        poolBalances[currentEpoch][POOL_ARENA_REWARD] = newBalance;
+        _recordFlow(currentEpoch, POOL_ARENA_REWARD, amount, msg.sender, address(this), FLOW_DEPOSIT);
         emit PoolDeposited(POOL_ARENA_REWARD, amount);
     }
 
@@ -193,9 +206,10 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param amount 提取数量
      */
     function withdrawFromNFTStakingPool(uint256 amount) external onlyOwnerOrAuthorizer whenNotPaused {
-        require(poolBalances[POOL_NFT_STAKING] >= amount, "PoolManager: Insufficient balance");
-        poolBalances[POOL_NFT_STAKING] -= amount;
-        _recordFlow(POOL_NFT_STAKING, amount, address(this), msg.sender, FLOW_WITHDRAW);
+        uint256 currentEpoch = _currentEpoch();
+        require(poolBalances[currentEpoch][POOL_NFT_STAKING] >= amount, "PoolManager: Insufficient balance");
+        poolBalances[currentEpoch][POOL_NFT_STAKING] -= amount;
+        _recordFlow(currentEpoch, POOL_NFT_STAKING, amount, address(this), msg.sender, FLOW_WITHDRAW);
         emit PoolWithdrawn(POOL_NFT_STAKING, amount);
     }
 
@@ -204,9 +218,10 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param amount 提取数量
      */
     function withdrawFromTokenStakingPool(uint256 amount) external onlyOwnerOrAuthorizer whenNotPaused {
-        require(poolBalances[POOL_TOKEN_STAKING] >= amount, "PoolManager: Insufficient balance");
-        poolBalances[POOL_TOKEN_STAKING] -= amount;
-        _recordFlow(POOL_TOKEN_STAKING, amount, address(this), msg.sender, FLOW_WITHDRAW);
+        uint256 currentEpoch = _currentEpoch();
+        require(poolBalances[currentEpoch][POOL_TOKEN_STAKING] >= amount, "PoolManager: Insufficient balance");
+        poolBalances[currentEpoch][POOL_TOKEN_STAKING] -= amount;
+        _recordFlow(currentEpoch, POOL_TOKEN_STAKING, amount, address(this), msg.sender, FLOW_WITHDRAW);
         emit PoolWithdrawn(POOL_TOKEN_STAKING, amount);
     }
 
@@ -218,7 +233,8 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 池子当前余额
      */
     function getPoolBalance(uint256 poolType) external view returns (uint256) {
-        return poolBalances[poolType];
+        uint256 currentEpoch = _currentEpoch();
+        return poolBalances[currentEpoch][poolType];
     }
 
     /**
@@ -270,18 +286,20 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     /**
      * @dev 资金流动记录数组（使用环形缓冲区）
+     * epoch => FlowRecord[]
      */
-    FlowRecord[] public flowRecords;
+    mapping(uint256 => FlowRecord[]) public flowRecords;
     
     /**
      * @dev 资金流动记录起始索引（环形缓冲区）
+     * epoch => startIndex
      */
-    uint256 public flowRecordsStartIndex;
+    mapping(uint256 => uint256) public flowRecordsStartIndex;
 
     /**
      * @dev 记录资金流动
      */
-    function _recordFlow(uint256 poolType, uint256 amount, address from, address to, uint8 flowType) internal {
+    function _recordFlow(uint256 currentEpoch, uint256 poolType, uint256 amount, address from, address to, uint8 flowType) internal {
         // 更新累计变量
         if (flowType == FLOW_DEPOSIT) {
             totalDeposited += amount;
@@ -298,11 +316,11 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             flowType: flowType
         });
         
-        if (flowRecords.length < MAX_FLOW_RECORDS) {
-            flowRecords.push(record);
+        if (flowRecords[currentEpoch].length < MAX_FLOW_RECORDS) {
+            flowRecords[currentEpoch].push(record);
         } else {
-            flowRecords[flowRecordsStartIndex] = record;
-            flowRecordsStartIndex = (flowRecordsStartIndex + 1) % MAX_FLOW_RECORDS;
+            flowRecords[currentEpoch][flowRecordsStartIndex[currentEpoch]] = record;
+            flowRecordsStartIndex[currentEpoch] = (flowRecordsStartIndex[currentEpoch] + 1) % MAX_FLOW_RECORDS;
         }
     }
 
@@ -310,7 +328,8 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @dev 获取资金流动记录长度
      */
     function getFlowRecordsLength() external view returns (uint256) {
-        return flowRecords.length;
+        uint256 currentEpoch = _currentEpoch();
+        return flowRecords[currentEpoch].length;
     }
 
     /**
@@ -319,17 +338,18 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param count 获取数量
      */
     function getFlowRecords(uint256 startIndex, uint256 count) external view returns (FlowRecord[] memory) {
-        require(startIndex < flowRecords.length, "PoolManager: Invalid start index");
+        uint256 currentEpoch = _currentEpoch();
+        require(startIndex < flowRecords[currentEpoch].length, "PoolManager: Invalid start index");
         require(count > 0, "PoolManager: Invalid count");
 
         uint256 endIndex = startIndex + count;
-        if (endIndex > flowRecords.length) {
-            endIndex = flowRecords.length;
+        if (endIndex > flowRecords[currentEpoch].length) {
+            endIndex = flowRecords[currentEpoch].length;
         }
 
         FlowRecord[] memory records = new FlowRecord[](endIndex - startIndex);
         for (uint256 i = startIndex; i < endIndex; i++) {
-            records[i - startIndex] = flowRecords[i];
+            records[i - startIndex] = flowRecords[currentEpoch][i];
         }
 
         return records;
@@ -340,18 +360,19 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param count 记录数量
      */
     function getRecentFlowRecords(uint256 count) external view returns (FlowRecord[] memory) {
-        if (flowRecords.length == 0) {
+        uint256 currentEpoch = _currentEpoch();
+        if (flowRecords[currentEpoch].length == 0) {
             return new FlowRecord[](0);
         }
 
-        if (count > flowRecords.length) {
-            count = flowRecords.length;
+        if (count > flowRecords[currentEpoch].length) {
+            count = flowRecords[currentEpoch].length;
         }
 
         FlowRecord[] memory records = new FlowRecord[](count);
-        uint256 startIndex = flowRecords.length - count;
+        uint256 startIndex = flowRecords[currentEpoch].length - count;
         for (uint256 i = 0; i < count; i++) {
-            records[i] = flowRecords[startIndex + i];
+            records[i] = flowRecords[currentEpoch][startIndex + i];
         }
 
         return records;
@@ -363,9 +384,10 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param count 获取数量
      */
     function getPoolFlowRecords(uint256 poolType, uint256 count) external view returns (FlowRecord[] memory) {
+        uint256 currentEpoch = _currentEpoch();
         uint256 count_ = 0;
-        for (uint256 i = 0; i < flowRecords.length; i++) {
-            if (flowRecords[i].poolType == poolType) {
+        for (uint256 i = 0; i < flowRecords[currentEpoch].length; i++) {
+            if (flowRecords[currentEpoch][i].poolType == poolType) {
                 count_++;
             }
         }
@@ -380,9 +402,9 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
         FlowRecord[] memory records = new FlowRecord[](count);
         uint256 index = 0;
-        for (uint256 i = flowRecords.length; i > 0; i--) {
-            if (flowRecords[i - 1].poolType == poolType && index < count) {
-                records[count - 1 - index] = flowRecords[i - 1];
+        for (uint256 i = flowRecords[currentEpoch].length; i > 0; i--) {
+            if (flowRecords[currentEpoch][i - 1].poolType == poolType && index < count) {
+                records[count - 1 - index] = flowRecords[currentEpoch][i - 1];
                 index++;
             }
             if (index >= count) break;
@@ -396,7 +418,8 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 所有flowRecords记录
      */
     function exportAllFlowRecords() external view onlyOwner returns (FlowRecord[] memory) {
-        return flowRecords;
+        uint256 currentEpoch = _currentEpoch();
+        return flowRecords[currentEpoch];
     }
     
     /**
@@ -406,15 +429,16 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 指定范围的flowRecords记录
      */
     function exportFlowRecordsRange(uint256 startIndex, uint256 endIndex) external view onlyOwner returns (FlowRecord[] memory) {
-        require(startIndex < flowRecords.length, "PoolManager: Invalid start index");
-        require(endIndex <= flowRecords.length, "PoolManager: Invalid end index");
+        uint256 currentEpoch = _currentEpoch();
+        require(startIndex < flowRecords[currentEpoch].length, "PoolManager: Invalid start index");
+        require(endIndex <= flowRecords[currentEpoch].length, "PoolManager: Invalid end index");
         require(startIndex <= endIndex, "PoolManager: Start index must be <= end index");
         
         uint256 count = endIndex - startIndex;
         FlowRecord[] memory records = new FlowRecord[](count);
         
         for (uint256 i = startIndex; i < endIndex; i++) {
-            records[i - startIndex] = flowRecords[i];
+            records[i - startIndex] = flowRecords[currentEpoch][i];
         }
         
         return records;
@@ -435,9 +459,10 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256 totalDeposited_,
         uint256 totalWithdrawn_
     ) {
-        nftStakingBalance = poolBalances[0];
-        tokenStakingBalance = poolBalances[1];
-        arenaRewardBalance = poolBalances[2];
+        uint256 currentEpoch = _currentEpoch();
+        nftStakingBalance = poolBalances[currentEpoch][0];
+        tokenStakingBalance = poolBalances[currentEpoch][1];
+        arenaRewardBalance = poolBalances[currentEpoch][2];
         totalDeposited_ = totalDeposited;
         totalWithdrawn_ = totalWithdrawn;
     }
@@ -457,26 +482,20 @@ contract PoolManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @dev 重置合约核心数据（仅owner或authorizer）
      * 注意：无法遍历mapping，只重置核心状态变量和数组
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 重置池子余额（需要手动处理每个池子）
-        poolBalances[POOL_NFT_STAKING] = 0;
-        poolBalances[POOL_TOKEN_STAKING] = 0;
-        poolBalances[POOL_ARENA_REWARD] = 0;
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
         
         totalDeposited = 0;
         totalWithdrawn = 0;
         paused = false;
         
-        // 清空流动记录数组
-        delete flowRecords;
-        flowRecordsStartIndex = 0;
-        
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

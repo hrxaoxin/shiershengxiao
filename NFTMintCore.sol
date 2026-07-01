@@ -113,6 +113,11 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     address public authorizer;
     
     /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
+    
+    /**
      * @dev 是否暂停铸造
      */
     bool public paused;
@@ -203,6 +208,11 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         rareElementProbabilities = [50, 50];
         authorizer = _authorizerAddress;
         _nextCardId = 1;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
     
     /**
@@ -478,7 +488,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint8 retryCount;
     }
 
-    mapping(uint256 => FailedSync) public failedSyncs;
+    mapping(uint256 => mapping(uint256 => FailedSync)) public failedSyncs;
     uint256 public failedSyncCount;
     uint256 public syncFailureWarningTriggered;
     uint256 public constant MAX_RETRY_COUNT = 5;
@@ -501,7 +511,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function _queueFailedSync(uint256 tokenId, uint256 zodiacType, uint8 level, uint8 growth, address to) internal {
-        failedSyncs[failedSyncCount] = FailedSync({
+        uint256 currentEpoch = _currentEpoch();
+        failedSyncs[currentEpoch][failedSyncCount] = FailedSync({
             tokenId: tokenId,
             zodiacType: zodiacType,
             level: level,
@@ -520,7 +531,8 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     function retryFailedSync(uint256 syncId) external onlyOwner {
         require(syncId < failedSyncCount, "NFTMint: Invalid syncId");
         
-        FailedSync storage sync = failedSyncs[syncId];
+        uint256 currentEpoch = _currentEpoch();
+        FailedSync storage sync = failedSyncs[currentEpoch][syncId];
         require(sync.retryCount < MAX_RETRY_COUNT, "NFTMint: Max retry count exceeded");
         
         address nftDataContract = IAuthorizer(authorizer).getNFTData();
@@ -535,9 +547,10 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function retryAllFailedSyncs() external onlyOwner {
+        uint256 currentEpoch = _currentEpoch();
         address nftDataContract = IAuthorizer(authorizer).getNFTData();
         for (uint256 i = 0; i < failedSyncCount; ) {
-            FailedSync storage sync = failedSyncs[i];
+            FailedSync storage sync = failedSyncs[currentEpoch][i];
             if (sync.retryCount >= MAX_RETRY_COUNT) {
                 _removeFailedSync(i);
                 continue;
@@ -553,10 +566,11 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function _removeFailedSync(uint256 syncId) internal {
+        uint256 currentEpoch = _currentEpoch();
         if (syncId < failedSyncCount - 1) {
-            failedSyncs[syncId] = failedSyncs[failedSyncCount - 1];
+            failedSyncs[currentEpoch][syncId] = failedSyncs[currentEpoch][failedSyncCount - 1];
         }
-        delete failedSyncs[failedSyncCount - 1];
+        delete failedSyncs[currentEpoch][failedSyncCount - 1];
         failedSyncCount--;
     }
     
@@ -847,7 +861,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param operator 操作者地址
      * @param timestamp 操作时间戳
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
     
     /**
      * @dev 重置合约核心数据
@@ -857,6 +871,7 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * - mapping类型数据（tokenType, tokenLevel, tokenGrowth等，Solidity无法遍历mapping）
      * 
      * 重置内容：
+     * - epoch：纪元版本号（递增，使旧mapping数据自动失效）
      * - mintCounter：铸造计数器
      * - lastMintBlock：上次铸造区块
      * - mintCounterWarningTriggered：计数器警告标志
@@ -865,6 +880,9 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * - allowPublicMinting：公开铸造标志
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        
         mintCounter = 0;
         lastMintBlock = 0;
         mintCounterWarningTriggered = false;
@@ -872,6 +890,6 @@ contract NFTMintCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         syncFailureWarningTriggered = 0;
         allowPublicMinting = false;
         
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

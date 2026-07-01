@@ -15,8 +15,9 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     using ArenaRewardLPLib for ArenaRewardLPLib.RewardPool;
     
     address public authorizer;
+    uint256 public epoch;
     ArenaRewardLPLib.RewardPool private _pool;
-    uint256[45] private __gap;
+    uint256[44] private __gap;
 
     event LPRewardClaimed(address user, uint256 seasonId, uint256 amount);
     event TokenRewardClaimed(address user, uint256 seasonId, uint256 amount);
@@ -32,8 +33,10 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 合约数据重置事件
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
+     * @param oldEpoch 重置前的纪元版本号
+     * @param newEpoch 重置后的纪元版本号
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     constructor() {
         _disableInitializers();
@@ -46,12 +49,17 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         __ReentrancyGuard_init();
         __Pausable_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
         _pool.rewardType = RewardType.BNB;
         _pool.rewardRate = 100;
         _pool.maxRewardRate = 500;
         _pool.maxDailyRewardPercent = 100;
         _pool.rateStep = 10;
         _pool.rewardPrecision = 10000;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
     
     function pause() external onlyOwner {
@@ -188,18 +196,20 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
 
     /**
      * @dev 重置合约数据
-     * @notice 清空LP奖励数据，仅owner或authorizer可调用
+     * @notice 通过递增纪元版本号快速重置，仅owner或authorizer可调用
+     * @dev 注意：奖励池余额（LP/Token/BNB）代表真实资产，不会随epoch重置而丢失
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 重置奖励池参数
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        
         _pool.rewardType = RewardType.BNB;
         _pool.rewardRate = 100;
         _pool.maxRewardRate = 500;
         _pool.maxDailyRewardPercent = 100;
         _pool.rateStep = 10;
         _pool.rewardPrecision = 10000;
-        // 注意：RewardPool结构体中的其他mapping数据无法完全清空
-        // 发出重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

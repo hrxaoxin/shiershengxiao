@@ -248,6 +248,18 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "timestamp",
 				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
 			}
 		],
 		"name": "ContractDataReset",
@@ -1477,6 +1489,18 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "timestamp",
 				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
 			}
 		],
 		"name": "ContractDataReset",
@@ -2285,6 +2309,18 @@ window.ZODIAC_CONFIG = (function() {
 				"indexed": false,
 				"internalType": "uint256",
 				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
 				"type": "uint256"
 			}
 		],
@@ -3706,6 +3742,18 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "timestamp",
 				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
 			}
 		],
 		"name": "ContractDataReset",
@@ -4720,6 +4768,18 @@ window.ZODIAC_CONFIG = (function() {
 				"indexed": false,
 				"internalType": "uint256",
 				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
 				"type": "uint256"
 			}
 		],
@@ -5755,6 +5815,18 @@ window.ZODIAC_CONFIG = (function() {
 				"indexed": false,
 				"internalType": "uint256",
 				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
 				"type": "uint256"
 			}
 		],
@@ -7080,6 +7152,18 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "timestamp",
 				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
 			}
 		],
 		"name": "ContractDataReset",
@@ -8293,6 +8377,18 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "timestamp",
 				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
 			}
 		],
 		"name": "ContractDataReset",
@@ -8902,6 +8998,18 @@ window.ZODIAC_CONFIG = (function() {
 				"indexed": false,
 				"internalType": "uint256",
 				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
 				"type": "uint256"
 			}
 		],
@@ -9829,6 +9937,18 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "timestamp",
 				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
 			}
 		],
 		"name": "ContractDataReset",
@@ -10609,6 +10729,18 @@ window.ZODIAC_CONFIG = (function() {
 				"indexed": false,
 				"internalType": "uint256",
 				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
 				"type": "uint256"
 			}
 		],
@@ -11721,6 +11853,18 @@ window.ZODIAC_CONFIG = (function() {
 				"indexed": false,
 				"internalType": "uint256",
 				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
 				"type": "uint256"
 			}
 		],
@@ -13189,6 +13333,18 @@ window.ZODIAC_CONFIG = (function() {
 				"indexed": false,
 				"internalType": "uint256",
 				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
 				"type": "uint256"
 			}
 		],

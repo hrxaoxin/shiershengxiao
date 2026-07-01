@@ -124,6 +124,15 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * 所有关联合约地址通过 authorizer 动态获取
      */
     address public authorizer;
+    
+    /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
+    }
 
     /**
      * @dev 代币销毁事件，记录用户地址、销毁数量和时间戳
@@ -174,6 +183,7 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         __Ownable2Step_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
         
         // 初始化带默认值的参数
         normalMintCost = 8888 * 10**18;
@@ -428,13 +438,16 @@ function burnAndMintTargeted(address user, uint8 zodiac) external nonReentrant w
     fallback() external payable {}
 
     function resetContractData() external onlyOwnerOrAuthorizer {
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        
         paused = false;
         pauseReason = "";
         normalMintCost = 8888 * 10**18;
         rareMintCost = 88888 * 10**18;
         
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 }

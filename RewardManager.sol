@@ -146,6 +146,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
         
         // 初始化带默认值的参数
         autoSwapEnabled = true;
@@ -242,6 +243,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     uint256 public constant PRECISION = 10000;
 
     /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
+
+    /**
      * @dev 累计分发总量（用于统计和前端展示）
      */
     uint256 public totalDistributed;
@@ -259,7 +265,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     /**
      * @dev 用于追踪已记录的用户（用于 holdersCount 计数）
      */
-    mapping(address => bool) private _isRecordedHolder;
+    mapping(uint256 => mapping(address => bool)) private _isRecordedHolder;
+
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
+    }
 
     /**
      * @dev 奖励事件
@@ -543,11 +553,11 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         }
     }
 
-    /// @dev 用户可领取分红映射
-    mapping(address => uint256) public pendingDividends;
+    /// @dev 用户可领取分红映射（epoch-keyed）
+    mapping(uint256 => mapping(address => uint256)) public pendingDividends;
     
-    /// @dev 用户权重映射，用于计算分红比例
-    mapping(address => uint256) public userWeights;
+    /// @dev 用户权重映射，用于计算分红比例（epoch-keyed）
+    mapping(uint256 => mapping(address => uint256)) public userWeights;
 
     /**
      * @dev 分红发放事件
@@ -566,13 +576,14 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         address tokenContract = IAuthorizer(authorizer).getToken();
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         
-        uint256 dividend = pendingDividends[user];
+        uint256 currentEpoch = _currentEpoch();
+        uint256 dividend = pendingDividends[currentEpoch][user];
         require(dividend > 0, "RewardManager: No pending dividend");
         
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= dividend, "RewardManager: Insufficient contract balance");
         
-        pendingDividends[user] = 0;
+        pendingDividends[currentEpoch][user] = 0;
         
         SafeERC20.safeTransfer(token, user, dividend);
         
@@ -595,13 +606,14 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         require(user != address(0), "RewardManager: Invalid user address");
         
-        uint256 dividend = pendingDividends[user];
+        uint256 currentEpoch = _currentEpoch();
+        uint256 dividend = pendingDividends[currentEpoch][user];
         require(dividend > 0, "RewardManager: No pending dividend");
         
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= dividend, "RewardManager: Insufficient contract balance");
         
-        pendingDividends[user] = 0;
+        pendingDividends[currentEpoch][user] = 0;
         
         SafeERC20.safeTransfer(token, user, dividend);
         
@@ -615,7 +627,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @return 用户待领取的分红数量
      */
     function getDividend(address user) external view returns (uint256) {
-        return pendingDividends[user];
+        return pendingDividends[_currentEpoch()][user];
     }
 
     /**
@@ -625,7 +637,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @return weight 用户当前权重
      */
     function calcUserDividend(address user) external view returns (uint256 pending, uint256 weight) {
-        return (pendingDividends[user], userWeights[user]);
+        uint256 currentEpoch = _currentEpoch();
+        return (pendingDividends[currentEpoch][user], userWeights[currentEpoch][user]);
     }
     
     /**
@@ -634,7 +647,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @return 用户待领取的分红数量
      */
     function getUserPendingDividend(address user) external view returns (uint256) {
-        return pendingDividends[user];
+        return pendingDividends[_currentEpoch()][user];
     }
 
     /**
@@ -720,8 +733,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 在分配到用户分红时记录新的持有者
      */
     function _recordHolder(address user) internal {
-        if (user != address(0) && !_isRecordedHolder[user]) {
-            _isRecordedHolder[user] = true;
+        if (user != address(0) && !_isRecordedHolder[_currentEpoch()][user]) {
+            _isRecordedHolder[_currentEpoch()][user] = true;
             holdersCount++;
         }
     }
@@ -967,50 +980,44 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     event LockedBNBRedistributed(uint256 totalLocked, uint256 successfullyDistributed, uint256 remainingLocked);
 
     /**
-     * @dev 清空合约内部的所有数据
+     * @dev 重置合约数据
      * 仅合约所有者和authorizer合约可调用
-     * 用于紧急情况下重置整个项目数据
-     * 注意：由于Solidity无法遍历mapping的所有键，此函数只重置核心状态变量
+     * 通过递增纪元版本号快速重置所有用户相关的mapping数据
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 重置累计分发总量
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        
         totalDistributed = 0;
-
-        // 重置持有者数量
         holdersCount = 0;
-
-        // 重置锁定BNB金额
         lockedBNBAmount = 0;
-
-        // 重置自动兑换设置
+        
         autoSwapEnabled = true;
         minSwapAmount = 1000000000000000;
         slippage = 1000;
         activeDEX = 0;
-
-        // 重置分配比例为默认值
+        
         dividendPercent = 4000;
         nftStakingPercent = 2000;
         tokenStakingPercent = 1500;
         arenaRewardPercent = 1500;
         nftBuybackPercent = 1000;
-
-        // 清空分发历史
+        
         delete distributionHistory;
         distributionHistoryStartIndex = 0;
-
-        // 重置暂停状态
+        
         paused = false;
         pauseReason = "";
-
-        // 发出数据重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
     /**
      * @dev 合约数据重置事件
      * @param operator 执行重置的操作者地址
      * @param timestamp 重置时间戳
+     * @param oldEpoch 重置前的纪元版本号
+     * @param newEpoch 重置后的纪元版本号
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 }

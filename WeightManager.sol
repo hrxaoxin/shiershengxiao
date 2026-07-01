@@ -119,19 +119,24 @@ contract WeightManager is
     uint256 public ownerWeight;
     
     /**
-     * @dev 用户当前权重映射（持久化存储）
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
+
+    /**
+     * @dev 用户当前权重映射（持久化存储，epoch-keyed）
      * address: 用户钱包地址
      * uint256: 用户权重值，由NFT数量和稀有度决定
      */
-    mapping(address => uint256) public userWeight;
+    mapping(uint256 => mapping(address => uint256)) public userWeight;
     /**
-     * @dev 用户权重缓存映射，用于快速查询，避免重复计算
+     * @dev 用户权重缓存映射，用于快速查询，避免重复计算（epoch-keyed）
      */
-    mapping(address => uint256) public cachedUserWeight;
+    mapping(uint256 => mapping(address => uint256)) public cachedUserWeight;
     /**
-     * @dev 权重缓存时间戳映射，记录缓存更新时间，用于判断缓存是否过期
+     * @dev 权重缓存时间戳映射，记录缓存更新时间，用于判断缓存是否过期（epoch-keyed）
      */
-    mapping(address => uint256) public cachedWeightTimestamp;
+    mapping(uint256 => mapping(address => uint256)) public cachedWeightTimestamp;
     /**
      * @dev 权重缓存持续时间（秒），默认15分钟
      * 超过此时间后查询将触发重新计算
@@ -139,26 +144,30 @@ contract WeightManager is
     uint256 public weightCacheDuration = 15 minutes;
     
     /**
-     * @dev 合格用户链表：前一个用户映射
+     * @dev 合格用户链表：前一个用户映射（epoch-keyed）
      * 用于构建双向链表，便于遍历所有合格用户
      */
-    mapping(address => address) public eligibleUserPrev;
+    mapping(uint256 => mapping(address => address)) public eligibleUserPrev;
     /**
-     * @dev 合格用户链表：后一个用户映射
+     * @dev 合格用户链表：后一个用户映射（epoch-keyed）
      */
-    mapping(address => address) public eligibleUserNext;
+    mapping(uint256 => mapping(address => address)) public eligibleUserNext;
     /**
-     * @dev 用户是否在合格列表中的标志映射
+     * @dev 用户是否在合格列表中的标志映射（epoch-keyed）
      */
-    mapping(address => bool) public inEligibleList;
+    mapping(uint256 => mapping(address => bool)) public inEligibleList;
     /**
-     * @dev 合格用户链表头地址，链表的第一个用户
+     * @dev 合格用户链表头地址（epoch-keyed），链表的第一个用户
      */
-    address public eligibleUserHead;
+    mapping(uint256 => address) public eligibleUserHead;
     /**
-     * @dev 合格用户链表尾地址，链表的最后一个用户
+     * @dev 合格用户链表尾地址（epoch-keyed），链表的最后一个用户
      */
-    address public eligibleUserTail;
+    mapping(uint256 => address) public eligibleUserTail;
+
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
+    }
     
     /**
      * @dev 用户权重更新事件，记录用户权重变化
@@ -185,6 +194,7 @@ contract WeightManager is
         minOwnerWeight = 0;
         ownerWeight = 100;
         authorizer = _authorizerAddress;
+        epoch = 1;
         
         // 初始化带默认值的参数
         weightCacheDuration = 15 minutes;
@@ -282,14 +292,15 @@ contract WeightManager is
     function getUserWeight(address user) external returns (uint256) {
         if (user == owner()) return ownerWeight;
         
-        if (cachedWeightTimestamp[user] + weightCacheDuration >= block.timestamp) {
-            return cachedUserWeight[user];
+        uint256 currentEpoch = _currentEpoch();
+        if (cachedWeightTimestamp[currentEpoch][user] + weightCacheDuration >= block.timestamp) {
+            return cachedUserWeight[currentEpoch][user];
         }
         
         // 缓存过期，重新计算并更新缓存
         uint256 weight = _calcUserWeight(user);
-        cachedUserWeight[user] = weight;
-        cachedWeightTimestamp[user] = block.timestamp;
+        cachedUserWeight[currentEpoch][user] = weight;
+        cachedWeightTimestamp[currentEpoch][user] = block.timestamp;
         return weight;
     }
     
@@ -305,9 +316,10 @@ contract WeightManager is
         INFTDataInterface nftData = INFTDataInterface(nftDataAddr);
         if (user == owner()) return;
         
+        uint256 currentEpoch = _currentEpoch();
         uint256 weight = nftData.calcUserWeight(user);
-        cachedUserWeight[user] = weight;
-        cachedWeightTimestamp[user] = block.timestamp;
+        cachedUserWeight[currentEpoch][user] = weight;
+        cachedWeightTimestamp[currentEpoch][user] = block.timestamp;
     }
     
     /**
@@ -350,8 +362,9 @@ contract WeightManager is
      * @param user 目标用户地址
      */
     function clearUserWeightCache(address user) external onlyOperator {
-        delete cachedUserWeight[user];
-        delete cachedWeightTimestamp[user];
+        uint256 currentEpoch = _currentEpoch();
+        delete cachedUserWeight[currentEpoch][user];
+        delete cachedWeightTimestamp[currentEpoch][user];
     }
     
     /**
@@ -363,8 +376,9 @@ contract WeightManager is
     function _hasEligibility(address user) internal view returns (bool) {
         if (user == owner()) return ownerWeight >= minOwnerWeight;
         
-        if (cachedWeightTimestamp[user] + weightCacheDuration >= block.timestamp) {
-            return cachedUserWeight[user] >= minOwnerWeight;
+        uint256 currentEpoch = _currentEpoch();
+        if (cachedWeightTimestamp[currentEpoch][user] + weightCacheDuration >= block.timestamp) {
+            return cachedUserWeight[currentEpoch][user] >= minOwnerWeight;
         }
         
         uint256 w = _calcUserWeight(user);
@@ -386,21 +400,22 @@ contract WeightManager is
      * @param user 目标用户地址
      */
     function _updateUserWeight(address user) internal {
-        uint256 oldWeight = userWeight[user];
+        uint256 currentEpoch = _currentEpoch();
+        uint256 oldWeight = userWeight[currentEpoch][user];
         uint256 newWeight;
         
         if (user == owner()) {
             newWeight = ownerWeight;
-        } else if (cachedWeightTimestamp[user] + weightCacheDuration >= block.timestamp) {
-            newWeight = cachedUserWeight[user];
+        } else if (cachedWeightTimestamp[currentEpoch][user] + weightCacheDuration >= block.timestamp) {
+            newWeight = cachedUserWeight[currentEpoch][user];
         } else {
             newWeight = _calcUserWeight(user);
         }
         
         if (oldWeight != newWeight) {
-            userWeight[user] = newWeight;
-            cachedUserWeight[user] = newWeight;
-            cachedWeightTimestamp[user] = block.timestamp;
+            userWeight[currentEpoch][user] = newWeight;
+            cachedUserWeight[currentEpoch][user] = newWeight;
+            cachedWeightTimestamp[currentEpoch][user] = block.timestamp;
             emit UserWeightUpdated(user, oldWeight, newWeight, block.timestamp);
         }
         
@@ -432,7 +447,7 @@ contract WeightManager is
      */
     function _manageEligibleList(address user) internal {
         bool isEligible = _hasEligibility(user);
-        bool wasInList = inEligibleList[user];
+        bool wasInList = inEligibleList[_currentEpoch()][user];
         
         if (isEligible && !wasInList) {
             _addToEligibleList(user);
@@ -447,18 +462,19 @@ contract WeightManager is
      * @param user 目标用户地址
      */
     function _addToEligibleList(address user) internal {
-        if (eligibleUserTail == address(0)) {
-            eligibleUserHead = user;
-            eligibleUserTail = user;
-            eligibleUserPrev[user] = address(0);
-            eligibleUserNext[user] = address(0);
+        uint256 currentEpoch = _currentEpoch();
+        if (eligibleUserTail[currentEpoch] == address(0)) {
+            eligibleUserHead[currentEpoch] = user;
+            eligibleUserTail[currentEpoch] = user;
+            eligibleUserPrev[currentEpoch][user] = address(0);
+            eligibleUserNext[currentEpoch][user] = address(0);
         } else {
-            eligibleUserNext[eligibleUserTail] = user;
-            eligibleUserPrev[user] = eligibleUserTail;
-            eligibleUserNext[user] = address(0);
-            eligibleUserTail = user;
+            eligibleUserNext[currentEpoch][eligibleUserTail[currentEpoch]] = user;
+            eligibleUserPrev[currentEpoch][user] = eligibleUserTail[currentEpoch];
+            eligibleUserNext[currentEpoch][user] = address(0);
+            eligibleUserTail[currentEpoch] = user;
         }
-        inEligibleList[user] = true;
+        inEligibleList[currentEpoch][user] = true;
     }
     
     /**
@@ -467,24 +483,25 @@ contract WeightManager is
      * @param user 目标用户地址
      */
     function _removeFromEligibleList(address user) internal {
-        address prev = eligibleUserPrev[user];
-        address next = eligibleUserNext[user];
+        uint256 currentEpoch = _currentEpoch();
+        address prev = eligibleUserPrev[currentEpoch][user];
+        address next = eligibleUserNext[currentEpoch][user];
         
         if (prev != address(0)) {
-            eligibleUserNext[prev] = next;
+            eligibleUserNext[currentEpoch][prev] = next;
         } else {
-            eligibleUserHead = next;
+            eligibleUserHead[currentEpoch] = next;
         }
         
         if (next != address(0)) {
-            eligibleUserPrev[next] = prev;
+            eligibleUserPrev[currentEpoch][next] = prev;
         } else {
-            eligibleUserTail = prev;
+            eligibleUserTail[currentEpoch] = prev;
         }
         
-        delete eligibleUserPrev[user];
-        delete eligibleUserNext[user];
-        inEligibleList[user] = false;
+        delete eligibleUserPrev[currentEpoch][user];
+        delete eligibleUserNext[currentEpoch][user];
+        inEligibleList[currentEpoch][user] = false;
     }
     
     /**
@@ -504,50 +521,43 @@ contract WeightManager is
      * @param user 目标用户地址
      */
     function removeHolder(address user) external onlyOperator whenNotPaused {
-        uint256 oldWeight = userWeight[user];
+        uint256 currentEpoch = _currentEpoch();
+        uint256 oldWeight = userWeight[currentEpoch][user];
         if (oldWeight > 0) {
-            userWeight[user] = 0;
-            delete cachedUserWeight[user];
-            delete cachedWeightTimestamp[user];
+            userWeight[currentEpoch][user] = 0;
+            delete cachedUserWeight[currentEpoch][user];
+            delete cachedWeightTimestamp[currentEpoch][user];
             _manageEligibleList(user);
             emit UserWeightUpdated(user, oldWeight, 0, block.timestamp);
         }
     }
 
     /**
-     * @dev 清空合约内部的所有数据
+     * @dev 重置合约数据
      * 仅合约所有者和authorizer合约可调用
-     * 用于紧急情况下重置整个项目数据
+     * 通过递增纪元版本号快速重置所有用户相关的mapping数据
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 清空所有用户权重数据
-        // 注意：由于无法遍历所有mapping键，这里只清空核心状态变量
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
         
-        // 清空缓存数据
         weightCacheDuration = 15 minutes;
-        
-        // 重置合格用户链表
-        eligibleUserHead = address(0);
-        eligibleUserTail = address(0);
-        
-        // 重置暂停状态
+        minOwnerWeight = 0;
+        ownerWeight = 100;
         paused = false;
         pauseReason = "";
         
-        // 重置权重参数
-        minOwnerWeight = 0;
-        ownerWeight = 100;
-        
-        // 发出数据重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
     /**
      * @dev 合约数据重置事件
      * @param operator 执行重置的操作者地址
      * @param timestamp 重置时间戳
+     * @param oldEpoch 重置前的纪元版本号
+     * @param newEpoch 重置后的纪元版本号
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @dev 接收 BNB - 防止用户误转 BNB 到本合约后永久锁定

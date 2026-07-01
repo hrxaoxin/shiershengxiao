@@ -70,7 +70,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     /**
      * @dev NFT 质押所有者映射
      */
-    mapping(uint256 => mapping(uint256 => address)) public nftStakedOwner;
+    mapping(uint256 => mapping(uint256 => address)) internal _nftStakedOwner;
     /**
      * @dev 用户质押的 NFT 列表
      */
@@ -238,12 +238,12 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId > 0, "ArenaPlayer: Invalid token ID");
-            require(nftStakedOwner[currentEpoch][tokenId] == address(0), "ArenaPlayer: NFT already staked in this contract");
+            require(_nftStakedOwner[currentEpoch][tokenId] == address(0), "ArenaPlayer: NFT already staked in this contract");
             require(nft.ownerOf(tokenId) == msg.sender, "ArenaPlayer: Not owner of token");
             require(nft.isApprovedForAll(msg.sender, address(this)), "ArenaPlayer: Contract not approved for transfer");
             
             nft.safeTransferFrom(msg.sender, address(this), tokenId);
-            nftStakedOwner[currentEpoch][tokenId] = msg.sender;
+            _nftStakedOwner[currentEpoch][tokenId] = msg.sender;
             userStakedNFTs[currentEpoch][msg.sender].push(tokenId);
         }
         
@@ -269,8 +269,8 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId > 0, "ArenaPlayer: Invalid token ID");
-            require(nftStakedOwner[currentEpoch][tokenId] != address(0), "ArenaPlayer: NFT not staked");
-            require(nftStakedOwner[currentEpoch][tokenId] == msg.sender, "ArenaPlayer: Not owner of staked NFT");
+            require(_nftStakedOwner[currentEpoch][tokenId] != address(0), "ArenaPlayer: NFT not staked");
+            require(_nftStakedOwner[currentEpoch][tokenId] == msg.sender, "ArenaPlayer: Not owner of staked NFT");
             
             for (uint256 j = 0; j < team.length; j++) {
                 if (team[j] == tokenId) {
@@ -280,7 +280,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
             }
             
             nft.safeTransferFrom(address(this), msg.sender, tokenId);
-            nftStakedOwner[currentEpoch][tokenId] = address(0);
+            _nftStakedOwner[currentEpoch][tokenId] = address(0);
             
             uint256[] storage stakedList = userStakedNFTs[currentEpoch][msg.sender];
             for (uint256 j = 0; j < stakedList.length; j++) {
@@ -306,7 +306,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         for (uint256 i = 0; i < 6; i++) {
             uint256 tokenId = tokenIds[i];
             require(tokenId > 0, "ArenaPlayer: Invalid token ID");
-            require(nftStakedOwner[currentEpoch][tokenId] == msg.sender, "ArenaPlayer: NFT not staked or not owner");
+            require(_nftStakedOwner[currentEpoch][tokenId] == msg.sender, "ArenaPlayer: NFT not staked or not owner");
             
             for (uint256 j = i + 1; j < 6; j++) {
                 require(tokenIds[j] != tokenId, "ArenaPlayer: Duplicate token in team");
@@ -346,7 +346,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function nftStakedOwner(uint256 tokenId) external view returns (address) {
         uint256 currentEpoch = _currentEpoch();
-        return nftStakedOwner[currentEpoch][tokenId];
+        return _nftStakedOwner[currentEpoch][tokenId];
     }
 
     function rechargeChallengeAttempts() external nonReentrant whenNotPaused {
@@ -454,7 +454,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function isNFTStaked(uint256 tokenId) external view returns (bool) {
         uint256 currentEpoch = _currentEpoch();
-        return nftStakedOwner[currentEpoch][tokenId] != address(0);
+        return _nftStakedOwner[currentEpoch][tokenId] != address(0);
     }
 
     /**
@@ -464,7 +464,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function getNFTStakedOwner(uint256 tokenId) external view returns (address) {
         uint256 currentEpoch = _currentEpoch();
-        return nftStakedOwner[currentEpoch][tokenId];
+        return _nftStakedOwner[currentEpoch][tokenId];
     }
 
     /**

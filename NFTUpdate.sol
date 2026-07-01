@@ -112,6 +112,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /** @dev 授权合约地址 */
     address public authorizer;
     
+    /** @dev 纪元版本号，用于快速重置合约数据 */
+    uint256 public epoch;
+    
     /** @dev 各级别升级费用（代币数量，含精度18位） */
     uint256 public level1UpgradeCost = 10000 * 10**18;
     uint256 public level2UpgradeCost = 40000 * 10**18;
@@ -160,6 +163,8 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         level2USDUpgradeCost = 4e18;      // 4 USDT
         level3USDUpgradeCost = 12e18;     // 12 USDT
         level4USDUpgradeCost = 48e18;     // 48 USDT
+        
+        epoch = 1;
     }
 
     /**
@@ -798,7 +803,7 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param operator 操作者地址
      * @param timestamp 操作时间戳
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
     
     /**
      * @dev 重置合约核心数据
@@ -813,6 +818,9 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * - level1-4USDUpgradeCost：各级别USD升级费用（重置为0）
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        
         pauseReason = "";
         level1UpgradeCost = 0;
         level2UpgradeCost = 0;
@@ -824,6 +832,6 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         level3USDUpgradeCost = 0;
         level4USDUpgradeCost = 0;
         
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

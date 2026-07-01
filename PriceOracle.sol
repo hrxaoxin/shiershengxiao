@@ -60,6 +60,8 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
     }
 
     address public authorizer;
+    
+    uint256 public epoch;
 
     /**
      * @dev 仅owner或authorizer的修饰符
@@ -74,6 +76,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
     }
 
     function _authorizeUpgrade(address newImplementation) internal view override {
@@ -165,14 +168,15 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @dev 重置合约核心数据（仅owner或authorizer）
      * 注意：此合约主要为查询合约，无核心状态变量需要重置
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // PriceOracle主要为查询合约，无核心状态变量需要重置
-        emit ContractDataReset(msg.sender, block.timestamp);
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

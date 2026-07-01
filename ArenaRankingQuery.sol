@@ -116,9 +116,9 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
 
     /**
      * @dev 玩家记录映射
-     * address => PlayerRecord
+     * epoch => address => PlayerRecord
      */
-    mapping(address => PlayerRecord) public players;
+    mapping(uint256 => mapping(address => PlayerRecord)) public players;
     /**
      * @dev 赛季信息映射
      * seasonId => SeasonInfo
@@ -144,6 +144,11 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @dev 授权合约地址（Authorizer）- 通过此地址获取所有关联合约地址
      */
     address public authorizer;
+    
+    /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
     
     /**
      * @dev 模拟玩家基础地址
@@ -175,6 +180,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         __Pausable_init();
         authorizer = _authorizerAddress;
         currentSeasonId = 1;
+        epoch = 1;
         seasons[1] = SeasonInfo({
             seasonId: 1,
             startTime: block.timestamp,
@@ -187,6 +193,10 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             tokenRewardPool: 0,
             pendingRewards: 0
         });
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     /**
@@ -301,7 +311,8 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return score 积分, wins 胜利次数, losses 失败次数, seasonId 赛季 ID
      */
     function getPlayerRecord(address player) external view returns (uint256 score, uint256 wins, uint256 losses, uint256 seasonId) {
-        PlayerRecord memory p = players[player];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord memory p = players[currentEpoch][player];
         return (p.score, p.wins, p.losses, p.seasonId);
     }
 
@@ -444,9 +455,10 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 剩余挑战次数
      */
     function getRemainingAttempts(address player) external view returns (uint256) {
+        uint256 currentEpoch = _currentEpoch();
         address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
         if (arenaPlayerContract == address(0)) {
-            PlayerRecord memory p = players[player];
+            PlayerRecord memory p = players[currentEpoch][player];
             if (p.lastResetTime == 0 || block.timestamp > p.lastResetTime + 24 hours) {
                 return 3;
             }
@@ -461,7 +473,8 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 队伍 NFT ID 数组（6个）
      */
     function getPlayerBattleTeam(address player) external view returns (uint256[] memory) {
-        PlayerRecord memory p = players[player];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord memory p = players[currentEpoch][player];
         uint256[] memory team = new uint256[](6);
         for (uint256 i = 0; i < 6; i++) {
             team[i] = p.battleTeam[i];
@@ -475,7 +488,8 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 时间戳
      */
     function getLastBattleTime(address player) external view returns (uint256) {
-        return players[player].lastBattleTime;
+        uint256 currentEpoch = _currentEpoch();
+        return players[currentEpoch][player].lastBattleTime;
     }
 
     /**
@@ -513,7 +527,8 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         uint256 rank,
         bool rewardClaimed
     ) {
-        PlayerRecord memory p = players[player];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord memory p = players[currentEpoch][player];
         if (p.seasonId == seasonNumber) {
             score = p.score;
             wins = p.wins;
@@ -560,7 +575,8 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         uint256 lastBattleTime,
         bool hasTeam
     ) {
-        PlayerRecord memory p = players[player];
+        uint256 currentEpoch = _currentEpoch();
+        PlayerRecord memory p = players[currentEpoch][player];
         address arenaPlayerContract = IAuthorizer(authorizer).getArenaPlayer();
         if (arenaPlayerContract != address(0)) {
             remainingAttempts = IArenaPlayer(arenaPlayerContract).getRemainingAttempts(player);
@@ -606,6 +622,8 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     }
 
     function resetContractData() external onlyOwnerOrAuthorizer {
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
         currentSeasonId = 1;
         
         seasons[1] = SeasonInfo({
@@ -621,8 +639,8 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             pendingRewards: 0
         });
         
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 }

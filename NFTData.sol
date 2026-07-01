@@ -547,7 +547,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @return address[] 持有者地址列表
      */
     function _getTypeOwners(uint256 nftType) internal view returns (address[] memory) {
-        return _nftTypeOwners[nftType];
+        return _nftTypeOwners[_currentEpoch()][nftType];
     }
 
     /**
@@ -725,7 +725,7 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
      * @return total 总数量
      */
     function getUserNFTsPaginated(address user, uint256 offset, uint256 limit) external view returns (uint256[] memory nfts, uint256 total) {
-        uint256[] storage allNFTs = _userNFTs[user];
+        uint256[] memory allNFTs = _userNFTs[_currentEpoch()][user];
         total = allNFTs.length;
 
         if (offset >= total) {

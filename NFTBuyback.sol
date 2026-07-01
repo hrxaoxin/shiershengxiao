@@ -96,6 +96,11 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 授权者地址（可与所有者共同管理合约）- 通过此地址获取所有关联合约地址
      */
     address public authorizer;
+    
+    /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
 
     /**
      * @dev 最高回购倍率（默认110，表示最高回购价为成本的110%）
@@ -177,11 +182,16 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
         
         maxBuybackMultiplier = 110;
         fixedBuybackOpen = false;
         growthBuybackOpen = false;
         balanceRatioBuybackOpen = false;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     /**
@@ -776,6 +786,9 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     event EmergencyWBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
     function resetContractData() external onlyOwnerOrAuthorizer {
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        
         paused = false;
         pauseReason = "";
         maxBuybackMultiplier = 110;
@@ -784,8 +797,8 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         growthBuybackOpen = false;
         balanceRatioBuybackOpen = false;
         
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 }

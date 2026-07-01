@@ -132,13 +132,18 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     }
 
     /**
-     * @dev 战斗历史数组（环形缓冲区，最多保存MAX_BATTLE_HISTORY场战斗）
+     * @dev 纪元版本号，用于快速重置合约数据
      */
-    BattleState[] public battleHistory;
+    uint256 public epoch;
+    
     /**
-     * @dev 战斗历史环形缓冲区当前写入索引
+     * @dev 战斗历史映射（epoch => index => BattleState）
      */
-    uint256 public battleHistoryIndex = 0;
+    mapping(uint256 => mapping(uint256 => BattleState)) public battleHistory;
+    /**
+     * @dev 战斗历史环形缓冲区当前写入索引（epoch => index）
+     */
+    mapping(uint256 => uint256) public battleHistoryIndex;
 
     /**
      * @dev 战斗常量配置
@@ -206,8 +211,10 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @dev 合约数据重置事件
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
+     * @param oldEpoch 重置前的纪元版本号
+     * @param newEpoch 重置后的纪元版本号
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @notice 修饰器：仅所有者或授权器可调用
@@ -247,7 +254,12 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
         _initSkills();
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     /**
@@ -470,42 +482,31 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
             }
         }
 
-        uint256 battleId = battleHistoryIndex + 1;
+        uint256 currentEpoch = _currentEpoch();
+        uint256 historyIndex = battleHistoryIndex[currentEpoch];
+        uint256 battleId = historyIndex + 1;
 
-        if (battleHistory.length < MAX_BATTLE_HISTORY) {
-            battleHistory.push(BattleState({
-                battleId: battleId,
-                startTime: block.timestamp,
-                status: 1,
-                winner: 0,
-                challengerId: challengerId,
-                challengedId: challengedId,
-                challenger: msg.sender,
-                challenged: challengedAddress
-            }));
-        } else {
-            battleHistory[battleHistoryIndex] = BattleState({
-                battleId: battleId,
-                startTime: block.timestamp,
-                status: 1,
-                winner: 0,
-                challengerId: challengerId,
-                challengedId: challengedId,
-                challenger: msg.sender,
-                challenged: challengedAddress
-            });
-        }
+        battleHistory[currentEpoch][historyIndex] = BattleState({
+            battleId: battleId,
+            startTime: block.timestamp,
+            status: 1,
+            winner: 0,
+            challengerId: challengerId,
+            challengedId: challengedId,
+            challenger: msg.sender,
+            challenged: challengedAddress
+        });
 
-        uint256 currentHistoryIndex = battleHistoryIndex;
-        battleHistoryIndex = (battleHistoryIndex + 1) % MAX_BATTLE_HISTORY;
+        battleHistoryIndex[currentEpoch] = (historyIndex + 1) % MAX_BATTLE_HISTORY;
 
         emit BattleStarted(battleId, msg.sender, challengedAddress, challengerTeam, challengedTeam);
 
         uint8 winner = _executeBattle(challengerTeam, challengedTeam, battleId);
 
-        uint256 historyIndex = battleHistory.length > MAX_BATTLE_HISTORY ? currentHistoryIndex : battleHistory.length - 1;
-        battleHistory[historyIndex].winner = winner;
-        battleHistory[historyIndex].status = 2;
+        uint256 newHistoryIndex = battleHistoryIndex[currentEpoch];
+        uint256 writeIndex = (newHistoryIndex == 0) ? MAX_BATTLE_HISTORY - 1 : newHistoryIndex - 1;
+        battleHistory[currentEpoch][writeIndex].winner = winner;
+        battleHistory[currentEpoch][writeIndex].status = 2;
 
         emit BattleEnded(battleId, winner);
 
@@ -1108,7 +1109,8 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @return 战斗日志数量
      */
     function getBattleLogCount() external view returns (uint256) {
-        return battleHistory.length;
+        uint256 currentEpoch = _currentEpoch();
+        return battleHistoryIndex[currentEpoch];
     }
 
     /**
@@ -1133,8 +1135,9 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         uint256 timestamp,
         uint8 status
     ) {
-        require(index < battleHistory.length, "Battle: Invalid index");
-        BattleState memory battle = battleHistory[index];
+        uint256 currentEpoch = _currentEpoch();
+        require(index < battleHistoryIndex[currentEpoch], "Battle: Invalid index");
+        BattleState memory battle = battleHistory[currentEpoch][index];
         return (
             battle.battleId,
             battle.challengerId,
@@ -1327,14 +1330,11 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
 
     /**
      * @dev 重置合约数据
-     * @notice 清空战斗历史记录，仅owner或authorizer可调用
+     * @notice 通过递增纪元版本号快速重置，仅owner或authorizer可调用
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 清空战斗历史数组
-        delete battleHistory;
-        // 重置战斗历史索引
-        battleHistoryIndex = 0;
-        // 发出重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

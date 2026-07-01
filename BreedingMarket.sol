@@ -76,8 +76,11 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     // 市场数据映射
     // ============================
     
-    /// @dev 市场挂牌映射（tokenId => 挂牌信息）
-    mapping(uint256 => MarketListing) public marketListings;
+    /// @dev 纪元版本号，用于快速重置合约数据
+    uint256 public epoch;
+    
+    /// @dev 市场挂牌映射（epoch => tokenId => 挂牌信息）
+    mapping(uint256 => mapping(uint256 => MarketListing)) public marketListings;
     
     /// @dev 所有已挂牌的NFT ID列表（包含历史记录）
     uint256[] public listedTokenIds;
@@ -102,7 +105,7 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     event MarketListingRemoved(uint256 indexed tokenId, address indexed owner);
 
     /// @dev 合约数据重置事件
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     // ============================
     // 修饰器
@@ -144,6 +147,11 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         authorizer = _authorizerAddress;
+        epoch = 1;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     // ============================
@@ -206,7 +214,9 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         require(nftMintContract != address(0), "BM: NFT contract not set");
         require(breedingCoreContract != address(0), "BM: Breeding core not set");
         require(INFTMint(nftMintContract).ownerOf(tokenId) == msg.sender, "BM: Not token owner");
-        require(!marketListings[tokenId].isActive, "BM: Already listed");
+        
+        uint256 currentEpoch = _currentEpoch();
+        require(!marketListings[currentEpoch][tokenId].isActive, "BM: Already listed");
         
         bool inCooldown = IBreedingCore(breedingCoreContract).isInCooldown(tokenId);
         require(!inCooldown, "BM: NFT in cooldown");
@@ -216,7 +226,7 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         
         require(INFTMint(nftMintContract).tokenLevel(tokenId) >= 5, "BM: Level too low");
 
-        marketListings[tokenId] = MarketListing({ tokenId: tokenId, owner: msg.sender, listTime: block.timestamp, isActive: true });
+        marketListings[currentEpoch][tokenId] = MarketListing({ tokenId: tokenId, owner: msg.sender, listTime: block.timestamp, isActive: true });
         listedTokenIds.push(tokenId);
         activeListedTokenIds.push(tokenId);
         emit MarketListingCreated(tokenId, msg.sender);
@@ -236,9 +246,10 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * - 从活跃列表中移除
      */
     function delistFromMarketBreeding(uint256 tokenId) external nonReentrant whenNotPaused {
-        require(marketListings[tokenId].isActive, "BM: Not listed");
-        require(marketListings[tokenId].owner == msg.sender, "BM: Not listing owner");
-        delete marketListings[tokenId];
+        uint256 currentEpoch = _currentEpoch();
+        require(marketListings[currentEpoch][tokenId].isActive, "BM: Not listed");
+        require(marketListings[currentEpoch][tokenId].owner == msg.sender, "BM: Not listing owner");
+        delete marketListings[currentEpoch][tokenId];
         
         // 从所有挂牌列表中移除
         for (uint256 i = 0; i < listedTokenIds.length; i++) {
@@ -283,7 +294,7 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @return MarketListing 挂牌信息结构体
      */
     function getMarketListing(uint256 tokenId) external view returns (MarketListing memory) { 
-        return marketListings[tokenId]; 
+        return marketListings[_currentEpoch()][tokenId]; 
     }
 
     /**
@@ -311,9 +322,12 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     /**
      * @dev 重置合约核心状态数据
      * @notice 仅owner或授权合约可调用，用于紧急情况下的数据重置
-     * @dev 清空市场挂牌数组和重置暂停状态
+     * @dev 通过递增epoch版本号实现快速数据重置，旧mapping数据自动失效
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        
         // 清空挂牌数组
         delete listedTokenIds;
         delete activeListedTokenIds;
@@ -322,9 +336,6 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         paused = false;
         pauseReason = "";
 
-        // 注意：marketListings mapping无法遍历清空，
-        // 但通过清空数组，新数据会覆盖旧数据
-
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

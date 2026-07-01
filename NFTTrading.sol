@@ -89,27 +89,32 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     /**
-     * @dev 挂牌映射
-     * tokenId => Listing
+     * @dev 纪元版本号，用于快速重置合约数据
      */
-    mapping(uint256 => Listing) public listings;
+    uint256 public epoch;
+    
+    /**
+     * @dev 挂牌映射
+     * epoch => tokenId => Listing
+     */
+    mapping(uint256 => mapping(uint256 => Listing)) public listings;
 
     /**
-     * @dev 在售NFT列表
+     * @dev 在售NFT列表（按epoch分组）
      */
-    uint256[] public listedNFTs;
+    mapping(uint256 => uint256[]) public listedNFTs;
     
     /**
      * @dev 在售NFT索引映射（优化删除）
-     * tokenId => 在数组中的索引
+     * epoch => tokenId => 在数组中的索引
      */
-    mapping(uint256 => uint256) public listedNFTIndex;
+    mapping(uint256 => mapping(uint256 => uint256)) public listedNFTIndex;
 
     /**
      * @dev 用户挂单映射 - 修复：避免getUserListings遍历所有挂单导致的性能问题
-     * user => tokenId[]
+     * epoch => user => tokenId[]
      */
-    mapping(address => uint256[]) public userListings;
+    mapping(uint256 => mapping(address => uint256[])) public userListings;
 
     /**
      * @dev 手续费率（百分比）
@@ -141,12 +146,17 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         
         // 初始化带默认值的参数
         feePercent = 5;
+        epoch = 1;
     }
 
     /**
      * @dev UUPS升级授权
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
+    }
 
     /**
      * @dev 设置授权合约地址
@@ -226,7 +236,9 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(INFTMint(nftContract).ownerOf(tokenId) == msg.sender, "NFTTrading: Not token owner");
-        require(listings[tokenId].seller == address(0), "NFTTrading: Already listed");
+        
+        uint256 currentEpoch = _currentEpoch();
+        require(listings[currentEpoch][tokenId].seller == address(0), "NFTTrading: Already listed");
 
         // 将 NFT 转入合约托管（escrow），使用 safeTransferFrom 确保接收合约有效
         try INFT(nftContract).safeTransferFrom(msg.sender, address(this), tokenId) {
@@ -235,18 +247,18 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             revert("NFTTrading: NFT escrow transfer failed");
         }
 
-        listings[tokenId] = Listing({
+        listings[currentEpoch][tokenId] = Listing({
             seller: msg.sender,
             priceWei: priceWei,
             listTime: block.timestamp
         });
 
         // 记录索引用于O(1)删除
-        listedNFTIndex[tokenId] = listedNFTs.length;
-        listedNFTs.push(tokenId);
+        listedNFTIndex[currentEpoch][tokenId] = listedNFTs[currentEpoch].length;
+        listedNFTs[currentEpoch].push(tokenId);
         
         // 维护用户挂单列表，避免getUserListings遍历所有挂单
-        userListings[msg.sender].push(tokenId);
+        userListings[currentEpoch][msg.sender].push(tokenId);
         
         // 同步权重：NFT从用户转移到NFTTrading合约
         _syncWeightAfterTransfer(msg.sender, address(this), tokenId, nftContract);
@@ -258,18 +270,19 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 下架NFT（将NFT从合约转回卖家）
      */
     function delistNFT(uint256 tokenId) external whenNotPaused nonReentrant {
-        require(listings[tokenId].seller != address(0), "NFTTrading: Listing not found");
-        require(listings[tokenId].seller == msg.sender, "NFTTrading: Not owner");
+        uint256 currentEpoch = _currentEpoch();
+        require(listings[currentEpoch][tokenId].seller != address(0), "NFTTrading: Listing not found");
+        require(listings[currentEpoch][tokenId].seller == msg.sender, "NFTTrading: Not owner");
 
-        address seller = listings[tokenId].seller;
+        address seller = listings[currentEpoch][tokenId].seller;
         address nftContract = IAuthorizer(authorizer).getNFTMintCore();
 
         // 先删除挂牌信息（Checks-Effects-Interactions 模式）
-        delete listings[tokenId];
-        _removeFromListedNFTs(tokenId);
+        delete listings[currentEpoch][tokenId];
+        _removeFromListedNFTs(currentEpoch, tokenId);
         
         // 修复：从用户挂单列表中移除
-        _removeFromUserListings(seller, tokenId);
+        _removeFromUserListings(currentEpoch, seller, tokenId);
 
         // 将 NFT 从合约转回卖家
         try INFT(nftContract).safeTransferFrom(address(this), seller, tokenId) {
@@ -288,7 +301,9 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     function buyNFT(uint256 tokenId) external whenNotPaused nonReentrant {
         require(tokenId > 0, "NFTTrading: Invalid token ID");
         require(msg.sender != address(0), "NFTTrading: Invalid buyer address");
-        require(listings[tokenId].seller != address(0), "NFTTrading: Listing not found");
+        
+        uint256 currentEpoch = _currentEpoch();
+        require(listings[currentEpoch][tokenId].seller != address(0), "NFTTrading: Listing not found");
         
         address nftContract = IAuthorizer(authorizer).getNFTMintCore();
         address tokenContract = IAuthorizer(authorizer).getToken();
@@ -297,7 +312,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(feeReceiver != address(0), "NFTTrading: Fee receiver not set");
         require(tokenContract != address(0), "NFTTrading: Token contract not set");
 
-        Listing memory listing = listings[tokenId];
+        Listing memory listing = listings[currentEpoch][tokenId];
         address seller = listing.seller;
         uint256 price = listing.priceWei;
 
@@ -315,11 +330,11 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(INFT(nftContract).ownerOf(tokenId) == address(this), "NFTTrading: Contract does not own NFT");
         
         // Checks-Effects-Interactions 模式：先清除挂牌状态
-        delete listings[tokenId];
-        _removeFromListedNFTs(tokenId);
+        delete listings[currentEpoch][tokenId];
+        _removeFromListedNFTs(currentEpoch, tokenId);
         
         // 修复：从卖家挂单列表中移除
-        _removeFromUserListings(seller, tokenId);
+        _removeFromUserListings(currentEpoch, seller, tokenId);
 
         // 先从买家转移代币到合约
         token.safeTransferFrom(msg.sender, address(this), price);
@@ -348,10 +363,11 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 更新价格
      */
     function updatePrice(uint256 tokenId, uint256 newPriceWei) external whenNotPaused nonReentrant {
-        require(listings[tokenId].seller == msg.sender, "NFTTrading: Not owner");
+        uint256 currentEpoch = _currentEpoch();
+        require(listings[currentEpoch][tokenId].seller == msg.sender, "NFTTrading: Not owner");
         require(newPriceWei > 0, "NFTTrading: Invalid price");
 
-        listings[tokenId].priceWei = newPriceWei;
+        listings[currentEpoch][tokenId].priceWei = newPriceWei;
         emit NFTListed(tokenId, msg.sender, newPriceWei);
     }
 
@@ -363,7 +379,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 priceWei,
         uint256 listTime
     ) {
-        Listing memory listing = listings[tokenId];
+        uint256 currentEpoch = _currentEpoch();
+        Listing memory listing = listings[currentEpoch][tokenId];
         return (listing.seller, listing.priceWei, listing.listTime);
     }
 
@@ -371,19 +388,20 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 获取在售NFT列表
      */
     function getListedNFTs() external view returns (uint256[] memory) {
+        uint256 currentEpoch = _currentEpoch();
         uint256 count = 0;
-        for (uint256 i = 0; i < listedNFTs.length; i++) {
-            uint256 tokenId = listedNFTs[i];
-            if (listings[tokenId].seller != address(0)) {
+        for (uint256 i = 0; i < listedNFTs[currentEpoch].length; i++) {
+            uint256 tokenId = listedNFTs[currentEpoch][i];
+            if (listings[currentEpoch][tokenId].seller != address(0)) {
                 count++;
             }
         }
         
         uint256[] memory result = new uint256[](count);
         uint256 index = 0;
-        for (uint256 i = 0; i < listedNFTs.length; i++) {
-            uint256 tokenId = listedNFTs[i];
-            if (listings[tokenId].seller != address(0)) {
+        for (uint256 i = 0; i < listedNFTs[currentEpoch].length; i++) {
+            uint256 tokenId = listedNFTs[currentEpoch][i];
+            if (listings[currentEpoch][tokenId].seller != address(0)) {
                 result[index++] = tokenId;
             }
         }
@@ -397,11 +415,12 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return tokenIds 分页的挂牌NFT ID列表
      */
     function getListingsPaginated(uint256 offset, uint256 limit) external view returns (uint256[] memory tokenIds) {
+        uint256 currentEpoch = _currentEpoch();
         uint256 totalCount = 0;
-        for (uint256 i = 0; i < listedNFTs.length; i++) {
-            uint256 tokenId = listedNFTs[i];
+        for (uint256 i = 0; i < listedNFTs[currentEpoch].length; i++) {
+            uint256 tokenId = listedNFTs[currentEpoch][i];
             // 检查挂牌是否存在（seller != address(0) 表示有效挂牌）
-            if (listings[tokenId].seller != address(0)) {
+            if (listings[currentEpoch][tokenId].seller != address(0)) {
                 totalCount++;
             }
         }
@@ -418,10 +437,10 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         tokenIds = new uint256[](size);
         uint256 resultIndex = 0;
         uint256 count = 0;
-        for (uint256 i = 0; i < listedNFTs.length; i++) {
-            uint256 tokenId = listedNFTs[i];
+        for (uint256 i = 0; i < listedNFTs[currentEpoch].length; i++) {
+            uint256 tokenId = listedNFTs[currentEpoch][i];
             // 检查挂牌是否存在（seller != address(0) 表示有效挂牌）
-            if (listings[tokenId].seller != address(0)) {
+            if (listings[currentEpoch][tokenId].seller != address(0)) {
                 if (count >= offset && resultIndex < size) {
                     tokenIds[resultIndex++] = tokenId;
                 }
@@ -445,26 +464,27 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     /**
      * @dev 从列表移除（O(1)时间复杂度）
      */
-    function _removeFromListedNFTs(uint256 tokenId) internal {
-        uint256 index = listedNFTIndex[tokenId];
-        uint256 lastIndex = listedNFTs.length - 1;
+    function _removeFromListedNFTs(uint256 currentEpoch, uint256 tokenId) internal {
+        uint256 index = listedNFTIndex[currentEpoch][tokenId];
+        uint256 lastIndex = listedNFTs[currentEpoch].length - 1;
         
         if (index != lastIndex) {
-            uint256 lastTokenId = listedNFTs[lastIndex];
-            listedNFTs[index] = lastTokenId;
-            listedNFTIndex[lastTokenId] = index;
+            uint256 lastTokenId = listedNFTs[currentEpoch][lastIndex];
+            listedNFTs[currentEpoch][index] = lastTokenId;
+            listedNFTIndex[currentEpoch][lastTokenId] = index;
         }
-        listedNFTs.pop();
-        delete listedNFTIndex[tokenId];
+        listedNFTs[currentEpoch].pop();
+        delete listedNFTIndex[currentEpoch][tokenId];
     }
     
     /**
      * @dev 从用户挂单列表中移除tokenId
+     * @param currentEpoch 当前纪元
      * @param user 用户地址
      * @param tokenId NFT ID
      */
-    function _removeFromUserListings(address user, uint256 tokenId) internal {
-        uint256[] storage userList = userListings[user];
+    function _removeFromUserListings(uint256 currentEpoch, address user, uint256 tokenId) internal {
+        uint256[] storage userList = userListings[currentEpoch][user];
         for (uint256 i = 0; i < userList.length; i++) {
             if (userList[i] == tokenId) {
                 userList[i] = userList[userList.length - 1];
@@ -480,8 +500,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return count 挂牌数量
      */
     function getUserListedCount(address user) external view returns (uint256 count) {
-        // 修复：直接返回mapping中的数量，避免遍历所有挂单
-        return userListings[user].length;
+        uint256 currentEpoch = _currentEpoch();
+        return userListings[currentEpoch][user].length;
     }
 
     /**
@@ -490,8 +510,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return tokenIds 用户挂牌的NFT ID列表
      */
     function getUserListings(address user) external view returns (uint256[] memory tokenIds) {
-        // 修复：直接返回mapping中的列表，避免遍历所有挂单
-        return userListings[user];
+        uint256 currentEpoch = _currentEpoch();
+        return userListings[currentEpoch][user];
     }
     
     /**
@@ -502,7 +522,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return tokenIds 用户挂牌的NFT ID列表
      */
     function getUserListingsPaginated(address user, uint256 offset, uint256 limit) external view returns (uint256[] memory tokenIds) {
-        uint256[] storage allListings = userListings[user];
+        uint256 currentEpoch = _currentEpoch();
+        uint256[] storage allListings = userListings[currentEpoch][user];
         uint256 total = allListings.length;
         
         if (offset >= total) {
@@ -533,16 +554,17 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 floorPrice,
         uint256 totalVolume
     ) {
-        totalListings = listedNFTs.length;
+        uint256 currentEpoch = _currentEpoch();
+        totalListings = listedNFTs[currentEpoch].length;
         activeListings = 0;
         floorPrice = type(uint256).max;
 
-        for (uint256 i = 0; i < listedNFTs.length; i++) {
-            uint256 tokenId = listedNFTs[i];
-            if (listings[tokenId].seller != address(0)) {
+        for (uint256 i = 0; i < listedNFTs[currentEpoch].length; i++) {
+            uint256 tokenId = listedNFTs[currentEpoch][i];
+            if (listings[currentEpoch][tokenId].seller != address(0)) {
                 activeListings++;
-                if (listings[tokenId].priceWei < floorPrice) {
-                    floorPrice = listings[tokenId].priceWei;
+                if (listings[currentEpoch][tokenId].priceWei < floorPrice) {
+                    floorPrice = listings[currentEpoch][tokenId].priceWei;
                 }
             }
         }
@@ -559,11 +581,12 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return tokenIds 符合条件的NFT ID列表
      */
     function getListingsByPriceRange(uint256 minPrice, uint256 maxPrice) external view returns (uint256[] memory tokenIds) {
+        uint256 currentEpoch = _currentEpoch();
         uint256 count = 0;
-        for (uint256 i = 0; i < listedNFTs.length; i++) {
-            uint256 tokenId = listedNFTs[i];
-            if (listings[tokenId].seller != address(0)) {
-                if (listings[tokenId].priceWei >= minPrice && listings[tokenId].priceWei <= maxPrice) {
+        for (uint256 i = 0; i < listedNFTs[currentEpoch].length; i++) {
+            uint256 tokenId = listedNFTs[currentEpoch][i];
+            if (listings[currentEpoch][tokenId].seller != address(0)) {
+                if (listings[currentEpoch][tokenId].priceWei >= minPrice && listings[currentEpoch][tokenId].priceWei <= maxPrice) {
                     count++;
                 }
             }
@@ -571,10 +594,10 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
         tokenIds = new uint256[](count);
         uint256 index = 0;
-        for (uint256 i = 0; i < listedNFTs.length; i++) {
-            uint256 tokenId = listedNFTs[i];
-            if (listings[tokenId].seller != address(0)) {
-                if (listings[tokenId].priceWei >= minPrice && listings[tokenId].priceWei <= maxPrice) {
+        for (uint256 i = 0; i < listedNFTs[currentEpoch].length; i++) {
+            uint256 tokenId = listedNFTs[currentEpoch][i];
+            if (listings[currentEpoch][tokenId].seller != address(0)) {
+                if (listings[currentEpoch][tokenId].priceWei >= minPrice && listings[currentEpoch][tokenId].priceWei <= maxPrice) {
                     tokenIds[index++] = tokenId;
                 }
             }
@@ -623,20 +646,16 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     function resetContractData() external onlyOwnerOrAuthorizer {
-        uint256 len = listedNFTs.length;
-        for (uint256 i = 0; i < len; i++) {
-            delete listings[listedNFTs[i]];
-            delete listedNFTIndex[listedNFTs[i]];
-        }
-        delete listedNFTs;
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
         
         feePercent = 5;
         totalVolume = 0;
         paused = false;
         pauseReason = "";
         
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 }

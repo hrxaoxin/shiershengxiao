@@ -491,11 +491,11 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         }
     }
 
-    function pendingTokenDividends(address user) external view returns (uint256) {
+    function getPendingTokenDividends(address user) external view returns (uint256) {
         return pendingTokenDividends[_currentEpoch()][user];
     }
 
-    function userRewardSnapshots(address user) external view returns (uint256) {
+    function getUserRewardSnapshots(address user) external view returns (uint256) {
         return userRewardSnapshots[_currentEpoch()][user];
     }
 

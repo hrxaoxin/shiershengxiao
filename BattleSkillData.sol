@@ -66,6 +66,11 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 授权合约地址（Authorizer）
      */
     address public authorizer;
+    
+    /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
 
     /**
      * @dev 技能数据映射
@@ -88,8 +93,10 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 合约数据重置事件
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
+     * @param oldEpoch 重置前的纪元版本号
+     * @param newEpoch 重置后的纪元版本号
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     /**
      * @notice 修饰器：仅所有者或授权器可调用
@@ -114,7 +121,12 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         __UUPSUpgradeable_init();
         require(_authorizerAddress != address(0), "BattleSkillData: Invalid authorizer address");
         authorizer = _authorizerAddress;
+        epoch = 1;
         skillsInitializationPending = true;
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
 
     /**
@@ -209,15 +221,17 @@ contract BattleSkillData is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
     /**
      * @dev 重置合约数据
-     * @notice 清空技能数据，仅owner或authorizer可调用
+     * @notice 通过递增纪元版本号快速重置，仅owner或authorizer可调用
+     * @dev 注意：fullSkills是技能配置数据，跨赛季持久化，不随epoch重置
+     * 需要手动调用 initAllSkills() 重新初始化技能数据
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        // 重置技能初始化标志
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        
         skillsInitialized = false;
         skillsInitializationPending = true;
-        // 注意：fullSkills mapping无法完全清空
-        // 由于Solidity限制无法遍历mapping，需要重新初始化技能数据
-        // 发出重置事件
-        emit ContractDataReset(msg.sender, block.timestamp);
+        
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }

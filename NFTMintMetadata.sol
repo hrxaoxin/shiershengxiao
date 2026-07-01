@@ -56,6 +56,11 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     address public authorizer;
     
     /**
+     * @dev 纪元版本号，用于快速重置合约数据
+     */
+    uint256 public epoch;
+    
+    /**
      * @dev IPFS 基础 URL（普通NFT）
      */
     string public ipfsBaseNormal;
@@ -125,6 +130,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         __UUPSUpgradeable_init();
         require(_authorizerAddress != address(0), "NFTMintMetadata: Invalid authorizer address");
         authorizer = _authorizerAddress;
+        epoch = 1;
         
         if (bytes(_ipfsBaseNormal).length > 0) {
             ipfsBaseNormal = _ipfsBaseNormal;
@@ -137,6 +143,10 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         } else {
             ipfsBaseRare = "https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/";
         }
+    }
+    
+    function _currentEpoch() internal view returns (uint256) {
+        return epoch;
     }
     
     /**
@@ -238,8 +248,10 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 合约数据重置事件
      * @param operator 操作者地址
      * @param timestamp 操作时间戳
+     * @param oldEpoch 重置前的纪元版本号
+     * @param newEpoch 重置后的纪元版本号
      */
-    event ContractDataReset(address indexed operator, uint256 timestamp);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
     
     /**
      * @dev 重置合约核心数据
@@ -247,13 +259,17 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * - authorizer（授权合约地址，重置会导致合约无法正常工作）
      * 
      * 重置内容：
+     * - epoch：纪元版本号（递增）
      * - ipfsBaseNormal：普通NFT的IPFS基础URL（重置为空字符串）
      * - ipfsBaseRare：稀有NFT的IPFS基础URL（重置为空字符串）
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
+        uint256 oldEpoch = epoch;
+        epoch = epoch + 1;
+        
         ipfsBaseNormal = "";
         ipfsBaseRare = "";
         
-        emit ContractDataReset(msg.sender, block.timestamp);
+        emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 }
