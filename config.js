@@ -141,20 +141,20 @@ window.ZODIAC_CONFIG = (function() {
 
     // 合约地址配置 - 从合约.txt导入
     const CONTRACT_ADDRESSES = {
-        tokenContract: getEnvContractAddress('token', '0xd06994d9ff24dc4a579f53c91f65d95b6be97777'),
+        tokenContract: getEnvContractAddress('token', '0x2b84542e9b6bd4b3fae09f59ce05efd9cb847777'),
         usdtContract: getEnvContractAddress('usdt', '0x55d398326f99059fF775485246999027B3197955'),
         wbnbContract: getEnvContractAddress('wbnb', '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c'),
         authorizer: getEnvContractAddress('authorizer', '0xFfcEDAFA1aef266bA7E68cf67Cc8E191c44AF258'),
         rewardManager: getEnvContractAddress('rewardManager', '0x9575e82A7e741a8844EC7f4C382E7A82767572b1'),
         dividendManager: getEnvContractAddress('dividendManager', '0x68845823d7f627612A44F651cAd06547D9383a98'),
-        dividendManagerLP: getEnvContractAddress('dividendManagerLP', '0xF82353e671E910331aC604FA36499Df40041C040'),
+        dividendManagerLP: getEnvContractAddress('dividendManagerLP', '0x5F228F8575C1e150065A9a4460C0DF73A44e52C9'),
         weightManager: getEnvContractAddress('weightManager', '0x5Be08747416E6aD188217af1C077aC0cC81dFeeF'),
         poolManager: getEnvContractAddress('poolManager', '0x1ECc5730C39C29636043277a85aeDCBe165463aa'),
         priceOracle: getEnvContractAddress('priceOracle', '0x9B9fB6DB6A95dBA06EC9d92f76FFF8d754a33E2E'),
         tokenBurner: getEnvContractAddress('tokenBurner', '0x78702588a9F88Ec844ad91C2FAb9632c797139D3'),
-        nftMintCore: getEnvContractAddress('nftMintCore', '0x5EdB527CC4Ef4f605a6De4386c63920eD428a590'),
-        nftMint: getEnvContractAddress('nftMint', '0x5EdB527CC4Ef4f605a6De4386c63920eD428a590'),
-        nftMintMetadata: getEnvContractAddress('nftMintMetadata', '0xf03215F849a0a665f5eCa46c2904553a42b4b1c6'),
+        nftMintCore: getEnvContractAddress('nftMintCore', '0x03448DD46e3D1116cd0f852d542c6460DAF9a4C5'),
+        nftMint: getEnvContractAddress('nftMint', '0x03448DD46e3D1116cd0f852d542c6460DAF9a4C5'),
+        nftMintMetadata: getEnvContractAddress('nftMintMetadata', '0xe24150D6547Bc59909162ACdC947d1d9773c7C0C'),
         nftUpdate: getEnvContractAddress('nftUpdate', '0x78CEad5D0e6aafFBF99D2acc3DF15E3C58f516d4'),
         nftData: getEnvContractAddress('nftData', '0xAe668b2c9af49F1828B3690DcE178eea63677D3B'),
         nftTrading: getEnvContractAddress('nftTrading', '0x01023a601053fFDEE23546A132F8cd09AAf1deA6'),
@@ -162,13 +162,13 @@ window.ZODIAC_CONFIG = (function() {
         breedingCore: getEnvContractAddress('breedingCore', '0xc31805140f8f3b0C6E0fD7a722479633c6AFa87d'),
         breedingMarket: getEnvContractAddress('breedingMarket', '0x8Fd236941d2A279c5f1A61f3FDFF8A2B23529C2A'),
         staking: getEnvContractAddress('staking', '0x1970E85A257512bd3D3f0f2b37cE59D01612EefC'),
-        stakingLP: getEnvContractAddress('stakingLP', '0x37D92e6786efb1e2674192E0785733dfa5A06a5c'),
+        stakingLP: getEnvContractAddress('stakingLP', '0xb7D34Be9dC7880ee079b63439421515F63a1D69f'),
         tokenStaking: getEnvContractAddress('tokenStaking', '0x7B77DE8A352A8A1fd04dc20e8e5713C02Fd864E1'),
         tokenStakingLP: getEnvContractAddress('tokenStakingLP', '0x7D49C01EA53B056513da95A5c18913A03bfAe83B'),
         arenaRankingManager: getEnvContractAddress('arenaRankingManager', '0x22e86392ba7514993F3Aa0DBCA4a97576573981D'),
         arenaRankingQuery: getEnvContractAddress('arenaRankingQuery', '0x031749dc2EFb941e76F0BcA64C910a346BD999B4'),
         arenaReward: getEnvContractAddress('arenaReward', '0x4BF5eCD0bbA02929b7E33643D50751801a408ab3'),
-        arenaRewardLP: getEnvContractAddress('arenaRewardLP', '0x7ADDd1318BBf399E08931B6bB85413725Ab8Bb9c'),
+        arenaRewardLP: getEnvContractAddress('arenaRewardLP', '0x3CBe1DC33505277bfeD80ab29091912D62d0d0d4'),
         arenaLeaderboard: getEnvContractAddress('arenaLeaderboard', '0x107871b5223808fc0E5648B40BCc7ED0D6BbA8Fc'),
         arenaPlayer: getEnvContractAddress('arenaPlayer', '0xA708576bB9DB6EF59EE613582144eee750d6CCf5'),
         arenaBattle: getEnvContractAddress('arenaBattle', '0x7A66840FEFFeF90bf273b218864A7278c2BEb13A'),
@@ -181,179 +181,7 @@ window.ZODIAC_CONFIG = (function() {
         uniswapRouter: getEnvContractAddress('uniswapRouter', '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D')
     };
 
-    function getContractAddresses() {
-        return CONTRACT_ADDRESSES;
-    }
-
-    const CONTRACT_ADDRESS_CATEGORIES = {
-        core: ['nftMint', 'tokenContract', 'battle', 'nftData'],
-        staking: ['staking', 'stakingLP', 'tokenStaking'],
-        trading: ['nftTrading', 'breedingCore', 'breedingMarket'],
-        rewards: ['rewardManager', 'dividendManager', 'poolManager', 'arenaReward'],
-        system: ['authorizer', 'weightManager', 'tokenBurner'],
-        arena: ['arena', 'arenaReward', 'arenaLeaderboard', 'arenaPlayer', 'arenaBattle', 'battleHistory', 'battleSkillData'],
-        oracle: ['priceOracle'],
-        upgrade: ['nftUpdate']
-    };
-
-    function validateContractAddresses() {
-        const INVALID_ADDRESS = '0x0000000000000000000000000000000000000000';
-        const TEST_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{8}0{32}$/;
-        const PLACEHOLDER_PATTERN = /^0x0{40}$/;
-        
-        const invalidAddresses = Object.entries(CONTRACT_ADDRESSES)
-            .filter(([name, addr]) => {
-                if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) return true;
-                if (addr === INVALID_ADDRESS) return true;
-                if (TEST_ADDRESS_PATTERN.test(addr)) return true;
-                return false;
-            });
-        
-        const placeholderAddresses = Object.entries(CONTRACT_ADDRESSES)
-            .filter(([name, addr]) => PLACEHOLDER_PATTERN.test(addr));
-        
-        if (invalidAddresses.length > 0 || placeholderAddresses.length > 0) {
-            console.error('[ZODIAC_CONFIG] Contract configuration issues detected:');
-            
-            if (invalidAddresses.length > 0) {
-                console.error('Invalid addresses:', invalidAddresses);
-            }
-            
-            if (placeholderAddresses.length > 0) {
-                console.warn('[ZODIAC_CONFIG] Placeholder addresses (not deployed yet):');
-                placeholderAddresses.forEach(([name, addr]) => {
-                    console.warn(`  ${name}: ${addr}`);
-                });
-            }
-            
-            if (typeof window !== 'undefined' && window.console) {
-                let warningMsg = '';
-                
-                if (invalidAddresses.length > 0) {
-                    warningMsg += `错误: 检测到 ${invalidAddresses.length} 个无效合约地址！\n`;
-                    warningMsg += '无效地址列表:\n';
-                    warningMsg += invalidAddresses.map(([name, addr]) => `  ❌ ${name}: ${addr}`).join('\n');
-                    warningMsg += '\n\n';
-                }
-                
-                if (placeholderAddresses.length > 0) {
-                    warningMsg += `警告: 检测到 ${placeholderAddresses.length} 个未部署的占位符地址\n`;
-                    warningMsg += '占位符地址列表:\n';
-                    warningMsg += placeholderAddresses.map(([name, addr]) => `  ⚠️  ${name}: ${addr}`).join('\n');
-                    warningMsg += '\n\n';
-                }
-                
-                warningMsg += '请参考 CONTRACT_DEPLOYMENT_GUIDE.md 进行合约部署和配置。\n';
-                warningMsg += '或使用环境变量覆盖地址，如: window.ZODIAC_NFTMINT_ADDRESS = "0x..."';
-                
-                console.warn(warningMsg);
-            }
-        }
-        
-        return invalidAddresses.length === 0;
-    }
-
-    function getContractStatus() {
-        const INVALID_ADDRESS = '0x0000000000000000000000000000000000000000';
-        const TEST_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{8}0{32}$/;
-        
-        const status = {};
-        let deployedCount = 0;
-        let totalCount = 0;
-        
-        Object.entries(CONTRACT_ADDRESSES).forEach(([name, addr]) => {
-            totalCount++;
-            const isValid = /^0x[a-fA-F0-9]{40}$/.test(addr) && 
-                           addr !== INVALID_ADDRESS && 
-                           !TEST_ADDRESS_PATTERN.test(addr);
-            
-            status[name] = {
-                address: addr,
-                isDeployed: isValid,
-                category: Object.keys(CONTRACT_ADDRESS_CATEGORIES).find(
-                    cat => CONTRACT_ADDRESS_CATEGORIES[cat].includes(name)
-                ) || 'other'
-            };
-            
-            if (isValid) deployedCount++;
-        });
-        
-        return {
-            contracts: status,
-            deployedCount,
-            totalCount,
-            isProductionReady: deployedCount === totalCount
-        };
-    }
-
-    function getRequiredContracts() {
-        return Object.entries(CONTRACT_ADDRESS_CATEGORIES)
-            .filter(([cat]) => ['core', 'staking', 'trading'].includes(cat))
-            .flatMap(([, names]) => names)
-            .filter(name => {
-                const addr = CONTRACT_ADDRESSES[name];
-                return addr && addr !== '0x0000000000000000000000000000000000000000';
-            });
-    }
-
-    const MINT_COSTS = {
-        normal: 8888,
-        rare: 88888,
-        normalTen: 88880,
-        rareTen: 888880,
-        targeted: (8888 * 6 + 88888 * 4) * 10
-    };
-
-    const UPGRADE_COSTS = {
-        1: { nft: 1, tokens: 10000, usdtValue: 1 },
-        2: { nft: 2, tokens: 40000, usdtValue: 4 },
-        3: { nft: 3, tokens: 120000, usdtValue: 12 },
-        4: { nft: 4, tokens: 480000, usdtValue: 48 }
-    };
-
-    const WEIGHTS = {
-        normal: { 1: 1, 2: 2, 3: 6, 4: 18, 5: 66 },
-        rare: { 1: 10, 2: 12, 3: 16, 4: 28, 5: 76 }
-    };
-
-    const TAX_RATES = {
-        total: 3,
-        dividendPool: 1.0,
-        burn: 1.0,
-        nftStakingPool: 0.5,
-        arenaRewards: 0.3,
-        tokenStakingPool: 0.2
-    };
-
-    const BREEDING_CONFIG = {
-        minLevel: 5,
-        selfBreedingDuration: 12 * 60 * 60,
-        marketBreedingDuration: 24 * 60 * 60
-    };
-
-    const ARENA_CONFIG = {
-        dailyAttempts: 3,        // 与合约 DAILY_ATTEMPTS = 3 保持一致
-        teamSize: 6,
-        rechargeCost: 888,       // 销毁代币数量
-        rechargeAttempts: 3,     // 充值获得的挑战次数
-        battleCooldown: 60,      // 战斗冷却时间（秒）
-        maxRechargeAttempts: 5  // 每日最大充值次数（与合约保持一致）
-    };
-
-    const IPFS_BASES = {
-        water: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
-        wind: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
-        fire: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
-        dark: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/',
-        light: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
-    };
-
-    const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
-    const ATTR_NAMES = { water: '水', wind: '风', fire: '火', dark: '暗', light: '光' };
-    const ATTR_PREFIXES = { water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang' };
-    const ANIMAL_KEYS = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
-
-    const ABIS = {
+	    const ABIS = {
         nftMintABI: [
 	{
 		"anonymous": false,
@@ -1300,43 +1128,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "approve",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "tokenId",
-				"type": "uint256"
-			}
-		],
-		"name": "getApproved",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
@@ -2267,7 +2058,7 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "receive"
 	}
 ],
-        tokenABI: [{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"bytes","name":"reason","type":"bytes"}],"name":"DividendShareUpdateFailed","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[],"name":"EIP712DomainChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint8","name":"version","type":"uint8"}],"name":"Initialized","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint8","name":"fromState","type":"uint8"},{"indexed":false,"internalType":"uint8","name":"toState","type":"uint8"}],"name":"PoolStateChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"bytes","name":"reason","type":"bytes"}],"name":"TaxLiquidationError","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"TokensBurned","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"TransferFlapToken","type":"event"},{"inputs":[],"name":"DOMAIN_SEPARATOR","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"MIN_LIQ_THRESHOLD","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"START_LIQ_THRESHOLD","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"antiFarmerDuration","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"antiFarmerExpirationTime","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"subtractedValue","type":"uint256"}],"name":"decreaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"dividendContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"eip712Domain","outputs":[{"internalType":"bytes1","name":"fields","type":"bytes1"},{"internalType":"string","name":"name","type":"string"},{"internalType":"string","name":"version","type":"string"},{"internalType":"uint256","name":"chainId","type":"uint256"},{"internalType":"address","name":"verifyingContract","type":"address"},{"internalType":"bytes32","name":"salt","type":"bytes32"},{"internalType":"uint256[]","name":"extensions","type":"uint256[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"finalizeMigration","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"getPoolStateData","outputs":[{"internalType":"enum FlapTaxTokenV2.PoolState","name":"currentState","type":"uint8"},{"internalType":"uint16","name":"currentTaxRate","type":"uint16"},{"internalType":"uint256","name":"currentLiquidationThreshold","type":"uint256"},{"internalType":"uint256","name":"currentTaxExpirationTime","type":"uint256"},{"internalType":"uint256","name":"currentAntiFarmerExpirationTime","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"addedValue","type":"uint256"}],"name":"increaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"components":[{"internalType":"string","name":"name","type":"string"},{"internalType":"string","name":"symbol","type":"string"},{"internalType":"string","name":"meta","type":"string"},{"internalType":"uint16","name":"tax","type":"uint16"},{"internalType":"address","name":"taxProcessor","type":"address"},{"internalType":"address","name":"dividendContract","type":"address"},{"internalType":"address","name":"quoteToken","type":"address"},{"internalType":"uint256","name":"liqExpectedOutputAmount","type":"uint256"},{"internalType":"uint256","name":"taxDuration","type":"uint256"},{"internalType":"address[]","name":"pools","type":"address[]"},{"internalType":"address","name":"v2Router","type":"address"},{"internalType":"uint256","name":"antiFarmerDuration","type":"uint256"}],"internalType":"struct IFlapTaxTokenV2.InitParams","name":"params","type":"tuple"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"liqExpectedOutputAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"liquidationThreshold","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"mainPool","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"maxSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"metaURI","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"nonces","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"permit","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"poolState","outputs":[{"internalType":"uint8","name":"state","type":"uint8"},{"internalType":"uint16","name":"taxRate","type":"uint16"},{"internalType":"bool","name":"notLiquidating","type":"bool"},{"internalType":"uint96","name":"liquidationThreshold","type":"uint96"},{"internalType":"uint64","name":"taxExpirationTime","type":"uint64"},{"internalType":"uint64","name":"antiFarmerExpirationTime","type":"uint64"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"pools","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"quoteToken","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"startMigration","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"state","outputs":[{"internalType":"enum FlapTaxTokenV2.PoolState","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"taxExpirationTime","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"taxProcessor","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"taxRate","outputs":[{"internalType":"uint16","name":"","type":"uint16"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"v2Router","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"}],
+        tokenABI: [{"inputs":[{"internalType":"uint256","name":"minLiqThreshold_","type":"uint256"},{"internalType":"uint256","name":"startLiqThreshold_","type":"uint256"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"account","type":"address"},{"internalType":"bytes","name":"reason","type":"bytes"}],"name":"DividendShareUpdateFailed","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[],"name":"EIP712DomainChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint8","name":"version","type":"uint8"}],"name":"Initialized","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint8","name":"fromState","type":"uint8"},{"indexed":false,"internalType":"uint8","name":"toState","type":"uint8"}],"name":"PoolStateChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"bytes","name":"reason","type":"bytes"}],"name":"TaxLiquidationError","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"TokensBurned","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"from","type":"address"},{"indexed":false,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"TransferFlapToken","type":"event"},{"inputs":[],"name":"DOMAIN_SEPARATOR","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"MIN_LIQ_THRESHOLD","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"START_LIQ_THRESHOLD","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"antiFarmerDuration","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"antiFarmerExpirationTime","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"buyTaxRate","outputs":[{"internalType":"uint16","name":"","type":"uint16"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"subtractedValue","type":"uint256"}],"name":"decreaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"dividendContract","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"eip712Domain","outputs":[{"internalType":"bytes1","name":"fields","type":"bytes1"},{"internalType":"string","name":"name","type":"string"},{"internalType":"string","name":"version","type":"string"},{"internalType":"uint256","name":"chainId","type":"uint256"},{"internalType":"address","name":"verifyingContract","type":"address"},{"internalType":"bytes32","name":"salt","type":"bytes32"},{"internalType":"uint256[]","name":"extensions","type":"uint256[]"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"finalizeMigration","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"getPoolStateData","outputs":[{"internalType":"enum IFlapTaxTokenV3.PoolState","name":"currentState","type":"uint8"},{"internalType":"uint16","name":"currentBuyTaxRate","type":"uint16"},{"internalType":"uint16","name":"currentSellTaxRate","type":"uint16"},{"internalType":"uint256","name":"currentLiquidationThreshold","type":"uint256"},{"internalType":"uint256","name":"currentTaxExpirationTime","type":"uint256"},{"internalType":"uint256","name":"currentAntiFarmerExpirationTime","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"addedValue","type":"uint256"}],"name":"increaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"initialLiquidationThreshold","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"components":[{"internalType":"string","name":"name","type":"string"},{"internalType":"string","name":"symbol","type":"string"},{"internalType":"string","name":"meta","type":"string"},{"internalType":"uint16","name":"buyTax","type":"uint16"},{"internalType":"uint16","name":"sellTax","type":"uint16"},{"internalType":"address","name":"taxProcessor","type":"address"},{"internalType":"address","name":"dividendContract","type":"address"},{"internalType":"address","name":"quoteToken","type":"address"},{"internalType":"uint256","name":"liqExpectedOutputAmount","type":"uint256"},{"internalType":"uint256","name":"taxDuration","type":"uint256"},{"internalType":"address[]","name":"pools","type":"address[]"},{"internalType":"address","name":"v2Router","type":"address"},{"internalType":"uint256","name":"antiFarmerDuration","type":"uint256"}],"internalType":"struct IFlapTaxTokenV3.InitParams","name":"params","type":"tuple"}],"name":"initialize","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"liqExpectedOutputAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"liquidationThreshold","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"mainPool","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"maxSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"metaURI","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"nonces","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"value","type":"uint256"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint8","name":"v","type":"uint8"},{"internalType":"bytes32","name":"r","type":"bytes32"},{"internalType":"bytes32","name":"s","type":"bytes32"}],"name":"permit","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"poolState","outputs":[{"internalType":"uint8","name":"state","type":"uint8"},{"internalType":"uint16","name":"buyTaxRate","type":"uint16"},{"internalType":"uint16","name":"sellTaxRate","type":"uint16"},{"internalType":"bool","name":"notLiquidating","type":"bool"},{"internalType":"uint96","name":"liquidationThreshold","type":"uint96"},{"internalType":"uint64","name":"taxExpirationTime","type":"uint64"},{"internalType":"uint48","name":"antiFarmerExpirationTime","type":"uint48"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"pools","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"quoteToken","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"sellTaxRate","outputs":[{"internalType":"uint16","name":"","type":"uint16"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"startMigration","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"state","outputs":[{"internalType":"enum IFlapTaxTokenV3.PoolState","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"taxExpirationTime","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"taxProcessor","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"taxRate","outputs":[{"internalType":"uint16","name":"","type":"uint16"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"v2Router","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"}],
         rewardManagerABI: [
 	{
 		"inputs": [],
@@ -18608,13 +18399,6 @@ window.ZODIAC_CONFIG = (function() {
 		stakingLPABI: [
 	{
 		"inputs": [],
-		"name": "acceptOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
 	},
@@ -18656,6 +18440,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "InvalidDexType",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidRecipient",
 		"type": "error"
 	},
 	{
@@ -18793,27 +18582,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "calculateDailyReward",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "claimLPReward",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "compoundFees",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -18825,7 +18593,7 @@ window.ZODIAC_CONFIG = (function() {
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "rewardPerWeight",
+				"name": "increment",
 				"type": "uint256"
 			}
 		],
@@ -18844,7 +18612,7 @@ window.ZODIAC_CONFIG = (function() {
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "increment",
+				"name": "rewardPerWeight",
 				"type": "uint256"
 			}
 		],
@@ -18896,19 +18664,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "emergencyWithdrawWBNB",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -18920,19 +18675,6 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"name": "FeesCompounded",
 		"type": "event"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_authorizerAddress",
-				"type": "address"
-			}
-		],
-		"name": "initialize",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
 	},
 	{
 		"anonymous": false,
@@ -19042,35 +18784,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "uint8",
-				"name": "oldDexType",
-				"type": "uint8"
-			},
-			{
-				"internalType": "uint8",
-				"name": "newDexType",
-				"type": "uint8"
-			},
-			{
-				"internalType": "uint256",
-				"name": "lpAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "migrateLP",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -19109,13 +18822,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "pause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -19127,6 +18833,391 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"name": "Paused",
 		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "rewardRate",
+				"type": "uint256"
+			}
+		],
+		"name": "RewardRateUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newRate",
+				"type": "uint256"
+			}
+		],
+		"name": "RewardRateUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "enum RewardType",
+				"name": "oldType",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum RewardType",
+				"name": "newType",
+				"type": "uint8"
+			}
+		],
+		"name": "RewardTypeChanged",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tokenAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "TokenAddedToPool",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tokenAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "TokenRewardClaimed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "Unpaused",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "implementation",
+				"type": "address"
+			}
+		],
+		"name": "Upgraded",
+		"type": "event"
+	},
+	{
+		"stateMutability": "payable",
+		"type": "fallback"
+	},
+	{
+		"inputs": [],
+		"name": "REWARD_PRECISION",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "STAKING_REWARD_PRECISION",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "acceptOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "authorizer",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "bnbRewardPoolBalance",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "calculateDailyReward",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "claimLPReward",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "compoundFees",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "emergencyWithdrawWBNB",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getPendingLPReward",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "globalRewardPerWeight",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
+			}
+		],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "lpRewardPoolBalance",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "maxDailyRewardPercent",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "maxRewardRate",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint8",
+				"name": "oldDexType",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint8",
+				"name": "newDexType",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint256",
+				"name": "lpAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "migrateLP",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "pause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "paused",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "pendingOwner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "proxiableUUID",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "rateStep",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
 	},
 	{
 		"inputs": [
@@ -19180,49 +19271,30 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"anonymous": false,
-		"inputs": [
+		"inputs": [],
+		"name": "rewardRate",
+		"outputs": [
 			{
-				"indexed": false,
 				"internalType": "uint256",
-				"name": "newRate",
+				"name": "",
 				"type": "uint256"
 			}
 		],
-		"name": "RewardRateUpdated",
-		"type": "event"
+		"stateMutability": "view",
+		"type": "function"
 	},
 	{
-		"anonymous": false,
-		"inputs": [
+		"inputs": [],
+		"name": "rewardType",
+		"outputs": [
 			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "rewardRate",
-				"type": "uint256"
-			}
-		],
-		"name": "RewardRateUpdated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
 				"internalType": "enum RewardType",
-				"name": "oldType",
-				"type": "uint8"
-			},
-			{
-				"indexed": false,
-				"internalType": "enum RewardType",
-				"name": "newType",
+				"name": "",
 				"type": "uint8"
 			}
 		],
-		"name": "RewardTypeChanged",
-		"type": "event"
+		"stateMutability": "view",
+		"type": "function"
 	},
 	{
 		"inputs": [
@@ -19316,355 +19388,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "snapshotWeight",
-				"type": "uint256"
-			}
-		],
-		"name": "syncUserWeight",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "tokenAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "TokenAddedToPool",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "tokenAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "TokenRewardClaimed",
-		"type": "event"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "transferOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "account",
-				"type": "address"
-			}
-		],
-		"name": "Unpaused",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "implementation",
-				"type": "address"
-			}
-		],
-		"name": "Upgraded",
-		"type": "event"
-	},
-	{
-		"stateMutability": "payable",
-		"type": "fallback"
-	},
-	{
-		"inputs": [],
-		"name": "unpause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_totalWeightedNFTs",
-				"type": "uint256"
-			}
-		],
-		"name": "updateTotalWeight",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
-			}
-		],
-		"name": "upgradeTo",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
-			},
-			{
-				"internalType": "bytes",
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"name": "upgradeToAndCall",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"stateMutability": "payable",
-		"type": "receive"
-	},
-	{
-		"inputs": [],
-		"name": "authorizer",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "bnbRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			}
-		],
-		"name": "getPendingLPReward",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "globalRewardPerWeight",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "lpRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "maxDailyRewardPercent",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "maxRewardRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "owner",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "paused",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "pendingOwner",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "proxiableUUID",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rateStep",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "REWARD_PRECISION",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rewardRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rewardType",
-		"outputs": [
-			{
-				"internalType": "enum RewardType",
-				"name": "",
-				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"name": "shouldCalculateDailyReward",
 		"outputs": [
@@ -19691,16 +19414,21 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "STAKING_REWARD_PRECISION",
-		"outputs": [
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "snapshotWeight",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
+		"name": "syncUserWeight",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -19772,6 +19500,70 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "unpause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_totalWeightedNFTs",
+				"type": "uint256"
+			}
+		],
+		"name": "updateTotalWeight",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			}
+		],
+		"name": "upgradeTo",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
 				"name": "",
 				"type": "address"
 			}
@@ -19786,6 +19578,41 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"stateMutability": "view",
 		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "withdrawBNB",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "withdrawToken",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"stateMutability": "payable",
+		"type": "receive"
 	}
 ],
 		tokenStakingABI: [
@@ -24260,20 +24087,6 @@ window.ZODIAC_CONFIG = (function() {
 	tokenStakingLPABI: [
 	{
 		"inputs": [],
-		"name": "acceptOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "calculateDailyReward",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
 	},
@@ -24440,20 +24253,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "claimLPReward",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "compoundFees",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -24496,32 +24295,6 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"name": "EmergencyWBNBWithdrawn",
 		"type": "event"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "emergencyWithdrawWBNB",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_authorizerAddress",
-				"type": "address"
-			}
-		],
-		"name": "initialize",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
 	},
 	{
 		"anonymous": false,
@@ -24620,13 +24393,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "pause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -24638,6 +24404,377 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"name": "Paused",
 		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "rewardRate",
+				"type": "uint256"
+			}
+		],
+		"name": "RewardRateUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "enum RewardType",
+				"name": "oldType",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum RewardType",
+				"name": "newType",
+				"type": "uint8"
+			}
+		],
+		"name": "RewardTypeChanged",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "TokenAddedToPool",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tokenAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "TokenAddedToPool",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "TokenRewardsClaimed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "Unpaused",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "implementation",
+				"type": "address"
+			}
+		],
+		"name": "Upgraded",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "DAILY_REWARD_PRECISION",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "STAKING_REWARD_PRECISION",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "acceptOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "authorizer",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "bnbRewardPoolBalance",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "calculateDailyReward",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "claimLPReward",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "compoundFees",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "dailyRewardPerToken",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "emergencyWithdrawWBNB",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getPendingLPReward",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
+			}
+		],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "lastRewardAccumulatedRate",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "lpRewardPoolBalance",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "maxDailyRewardPercent",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "maxRewardRate",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "pause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "paused",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "pendingOwner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "proxiableUUID",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "rateStep",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
 	},
 	{
 		"inputs": [
@@ -24709,36 +24846,30 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"anonymous": false,
-		"inputs": [
+		"inputs": [],
+		"name": "rewardRate",
+		"outputs": [
 			{
-				"indexed": false,
 				"internalType": "uint256",
-				"name": "rewardRate",
+				"name": "",
 				"type": "uint256"
 			}
 		],
-		"name": "RewardRateUpdated",
-		"type": "event"
+		"stateMutability": "view",
+		"type": "function"
 	},
 	{
-		"anonymous": false,
-		"inputs": [
+		"inputs": [],
+		"name": "rewardType",
+		"outputs": [
 			{
-				"indexed": false,
 				"internalType": "enum RewardType",
-				"name": "oldType",
-				"type": "uint8"
-			},
-			{
-				"indexed": false,
-				"internalType": "enum RewardType",
-				"name": "newType",
+				"name": "",
 				"type": "uint8"
 			}
 		],
-		"name": "RewardTypeChanged",
-		"type": "event"
+		"stateMutability": "view",
+		"type": "function"
 	},
 	{
 		"inputs": [
@@ -24819,352 +24950,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "TokenAddedToPool",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "tokenAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "TokenAddedToPool",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "TokenRewardsClaimed",
-		"type": "event"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "transferOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "unpause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "account",
-				"type": "address"
-			}
-		],
-		"name": "Unpaused",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "implementation",
-				"type": "address"
-			}
-		],
-		"name": "Upgraded",
-		"type": "event"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
-			}
-		],
-		"name": "upgradeTo",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
-			},
-			{
-				"internalType": "bytes",
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"name": "upgradeToAndCall",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"stateMutability": "payable",
-		"type": "receive"
-	},
-	{
-		"inputs": [],
-		"name": "authorizer",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "bnbRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "DAILY_REWARD_PRECISION",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "dailyRewardPerToken",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			}
-		],
-		"name": "getPendingLPReward",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "lastRewardAccumulatedRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "lpRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "maxDailyRewardPercent",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "maxRewardRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "owner",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "paused",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "pendingOwner",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "proxiableUUID",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rateStep",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rewardRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rewardType",
-		"outputs": [
-			{
-				"internalType": "enum RewardType",
-				"name": "",
-				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"name": "shouldCalculateDailyReward",
 		"outputs": [
@@ -25172,19 +24957,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "bool",
 				"name": "",
 				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "STAKING_REWARD_PRECISION",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -25241,6 +25013,92 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"stateMutability": "view",
 		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "unpause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			}
+		],
+		"name": "upgradeTo",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "withdrawBNB",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "withdrawToken",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"stateMutability": "payable",
+		"type": "receive"
 	}
 ],
 
@@ -25847,6 +25705,37 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "withdrawBNB",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "withdrawToken",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -26473,6 +26362,46 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "constructor"
 	},
 	{
+		"inputs": [],
+		"name": "ARL_AlreadyClaimed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARL_BNBOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARL_InsufficientBNB",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARL_InsufficientLP",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARL_InsufficientToken",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARL_LPOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARL_NoReward",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARL_TokenOverflow",
+		"type": "error"
+	},
+	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -26502,6 +26431,44 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BNBAddedToPool",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "BNBAddedToPool",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "BNBRewardClaimed",
 		"type": "event"
 	},
 	{
@@ -26560,6 +26527,19 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"indexed": false,
+				"internalType": "uint256",
+				"name": "dailyReward",
+				"type": "uint256"
+			}
+		],
+		"name": "DailyRewardCalculated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
 				"internalType": "uint8",
 				"name": "version",
 				"type": "uint8"
@@ -26579,6 +26559,44 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "LPAddedToPool",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "LPAddedToPool",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "LPRewardClaimed",
 		"type": "event"
 	},
 	{
@@ -26675,6 +26693,19 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"indexed": false,
+				"internalType": "uint256",
+				"name": "newRate",
+				"type": "uint256"
+			}
+		],
+		"name": "RewardRateUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
 				"internalType": "enum RewardType",
 				"name": "oldType",
 				"type": "uint8"
@@ -26700,6 +26731,44 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "TokenAddedToPool",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "TokenAddedToPool",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "seasonId",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "TokenRewardClaimed",
 		"type": "event"
 	},
 	{
@@ -26755,32 +26824,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "REWARD_PRECISION",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "STAKING_REWARD_PRECISION",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -26794,19 +26837,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "",
 				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "bnbRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -26897,45 +26927,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "lpRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "maxDailyRewardPercent",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "maxRewardRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "owner",
 		"outputs": [
 			{
@@ -26988,19 +26979,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "bytes32",
 				"name": "",
 				"type": "bytes32"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rateStep",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -27073,32 +27051,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "renounceOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rewardRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rewardType",
-		"outputs": [
-			{
-				"internalType": "enum RewardType",
-				"name": "",
-				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -27193,58 +27145,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "todayIncomingTokens",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "todayRewardAmount",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "todayStart",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -27293,6 +27193,37 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "upgradeToAndCall",
 		"outputs": [],
 		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "withdrawBNB",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "withdrawToken",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -27765,6 +27696,180 @@ window.ZODIAC_CONFIG = (function() {
 	}
 ],
     };
+
+    function getContractAddresses() {
+        return CONTRACT_ADDRESSES;
+    }
+
+    const CONTRACT_ADDRESS_CATEGORIES = {
+        core: ['nftMint', 'tokenContract', 'battle', 'nftData'],
+        staking: ['staking', 'stakingLP', 'tokenStaking'],
+        trading: ['nftTrading', 'breedingCore', 'breedingMarket'],
+        rewards: ['rewardManager', 'dividendManager', 'poolManager', 'arenaReward'],
+        system: ['authorizer', 'weightManager', 'tokenBurner'],
+        arena: ['arena', 'arenaReward', 'arenaLeaderboard', 'arenaPlayer', 'arenaBattle', 'battleHistory', 'battleSkillData'],
+        oracle: ['priceOracle'],
+        upgrade: ['nftUpdate']
+    };
+
+    function validateContractAddresses() {
+        const INVALID_ADDRESS = '0x0000000000000000000000000000000000000000';
+        const TEST_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{8}0{32}$/;
+        const PLACEHOLDER_PATTERN = /^0x0{40}$/;
+        
+        const invalidAddresses = Object.entries(CONTRACT_ADDRESSES)
+            .filter(([name, addr]) => {
+                if (!/^0x[a-fA-F0-9]{40}$/.test(addr)) return true;
+                if (addr === INVALID_ADDRESS) return true;
+                if (TEST_ADDRESS_PATTERN.test(addr)) return true;
+                return false;
+            });
+        
+        const placeholderAddresses = Object.entries(CONTRACT_ADDRESSES)
+            .filter(([name, addr]) => PLACEHOLDER_PATTERN.test(addr));
+        
+        if (invalidAddresses.length > 0 || placeholderAddresses.length > 0) {
+            console.error('[ZODIAC_CONFIG] Contract configuration issues detected:');
+            
+            if (invalidAddresses.length > 0) {
+                console.error('Invalid addresses:', invalidAddresses);
+            }
+            
+            if (placeholderAddresses.length > 0) {
+                console.warn('[ZODIAC_CONFIG] Placeholder addresses (not deployed yet):');
+                placeholderAddresses.forEach(([name, addr]) => {
+                    console.warn(`  ${name}: ${addr}`);
+                });
+            }
+            
+            if (typeof window !== 'undefined' && window.console) {
+                let warningMsg = '';
+                
+                if (invalidAddresses.length > 0) {
+                    warningMsg += `错误: 检测到 ${invalidAddresses.length} 个无效合约地址！\n`;
+                    warningMsg += '无效地址列表:\n';
+                    warningMsg += invalidAddresses.map(([name, addr]) => `  ❌ ${name}: ${addr}`).join('\n');
+                    warningMsg += '\n\n';
+                }
+                
+                if (placeholderAddresses.length > 0) {
+                    warningMsg += `警告: 检测到 ${placeholderAddresses.length} 个未部署的占位符地址\n`;
+                    warningMsg += '占位符地址列表:\n';
+                    warningMsg += placeholderAddresses.map(([name, addr]) => `  ⚠️  ${name}: ${addr}`).join('\n');
+                    warningMsg += '\n\n';
+                }
+                
+                warningMsg += '请参考 CONTRACT_DEPLOYMENT_GUIDE.md 进行合约部署和配置。\n';
+                warningMsg += '或使用环境变量覆盖地址，如: window.ZODIAC_NFTMINT_ADDRESS = "0x..."';
+                
+                console.warn(warningMsg);
+            }
+        }
+        
+        return invalidAddresses.length === 0;
+    }
+
+    function getContractStatus() {
+        const INVALID_ADDRESS = '0x0000000000000000000000000000000000000000';
+        const TEST_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{8}0{32}$/;
+        
+        const status = {};
+        let deployedCount = 0;
+        let totalCount = 0;
+        
+        Object.entries(CONTRACT_ADDRESSES).forEach(([name, addr]) => {
+            totalCount++;
+            const isValid = /^0x[a-fA-F0-9]{40}$/.test(addr) && 
+                           addr !== INVALID_ADDRESS && 
+                           !TEST_ADDRESS_PATTERN.test(addr);
+            
+            status[name] = {
+                address: addr,
+                isDeployed: isValid,
+                category: Object.keys(CONTRACT_ADDRESS_CATEGORIES).find(
+                    cat => CONTRACT_ADDRESS_CATEGORIES[cat].includes(name)
+                ) || 'other'
+            };
+            
+            if (isValid) deployedCount++;
+        });
+        
+        return {
+            contracts: status,
+            deployedCount,
+            totalCount,
+            isProductionReady: deployedCount === totalCount
+        };
+    }
+
+    function getRequiredContracts() {
+        return Object.entries(CONTRACT_ADDRESS_CATEGORIES)
+            .filter(([cat]) => ['core', 'staking', 'trading'].includes(cat))
+            .flatMap(([, names]) => names)
+            .filter(name => {
+                const addr = CONTRACT_ADDRESSES[name];
+                return addr && addr !== '0x0000000000000000000000000000000000000000';
+            });
+    }
+
+    const MINT_COSTS = {
+        normal: 8888,
+        rare: 88888,
+        normalTen: 88880,
+        rareTen: 888880,
+        targeted: (8888 * 6 + 88888 * 4) * 10
+    };
+
+    const UPGRADE_COSTS = {
+        1: { nft: 1, tokens: 10000, usdtValue: 1 },
+        2: { nft: 2, tokens: 40000, usdtValue: 4 },
+        3: { nft: 3, tokens: 120000, usdtValue: 12 },
+        4: { nft: 4, tokens: 480000, usdtValue: 48 }
+    };
+
+    const WEIGHTS = {
+        normal: { 1: 1, 2: 2, 3: 6, 4: 18, 5: 66 },
+        rare: { 1: 10, 2: 12, 3: 16, 4: 28, 5: 76 }
+    };
+
+    const TAX_RATES = {
+        total: 3,
+        dividendPool: 1.0,
+        burn: 1.0,
+        nftStakingPool: 0.5,
+        arenaRewards: 0.3,
+        tokenStakingPool: 0.2
+    };
+
+    const BREEDING_CONFIG = {
+        minLevel: 5,
+        selfBreedingDuration: 12 * 60 * 60,
+        marketBreedingDuration: 24 * 60 * 60
+    };
+
+    const ARENA_CONFIG = {
+        dailyAttempts: 3,        // 与合约 DAILY_ATTEMPTS = 3 保持一致
+        teamSize: 6,
+        rechargeCost: 888,       // 销毁代币数量
+        rechargeAttempts: 3,     // 充值获得的挑战次数
+        battleCooldown: 60,      // 战斗冷却时间（秒）
+        maxRechargeAttempts: 5  // 每日最大充值次数（与合约保持一致）
+    };
+
+    const IPFS_BASES = {
+        water: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+        wind: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+        fire: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeifxtqzcstmdvrqghlrqppikcedzushbtucagc7nhnykg2pjl25qvi/',
+        dark: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/',
+        light: 'https://gold-fascinating-ermine-925.mypinata.cloud/ipfs/bafybeidyidmnm7uk3qr3i3aa5azxjwhdlmlaca3h5p6ppjoj2fz27rhud4/'
+    };
+
+    const ZODIAC_NAMES = ['鼠', '牛', '虎', '兔', '龙', '蛇', '马', '羊', '猴', '鸡', '狗', '猪'];
+    const ATTR_NAMES = { water: '水', wind: '风', fire: '火', dark: '暗', light: '光' };
+    const ATTR_PREFIXES = { water: 'shui', wind: 'feng', fire: 'huo', dark: 'an', light: 'guang' };
+    const ANIMAL_KEYS = ['shu', 'niu', 'hu', 'tu', 'long', 'she', 'ma', 'yang', 'hou', 'ji', 'gou', 'zhu'];
+
+
 
 
 

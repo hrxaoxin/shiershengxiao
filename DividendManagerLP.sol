@@ -315,70 +315,53 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @param toType 目标奖励类型
      */
     function _convertPoolAssets(RewardType fromType, RewardType toType) internal {
+        IAuthorizer auth = IAuthorizer(authorizer);
         if (fromType == RewardType.LP && toType == RewardType.TOKEN) {
             if (lpDividendPoolBalance > 0) {
-                try IAuthorizer(authorizer).redeemLPToToken(lpDividendPoolBalance) returns (uint256 tokenAmount) {
-                    lpDividendPoolBalance = 0;
-                    if (tokenAmount > 0) {
-                        tokenDividendPoolBalance += tokenAmount;
-                    }
-                } catch {
-                    lpDividendPoolBalance = 0;
+                uint256 tokenAmount = auth.redeemLPToToken(lpDividendPoolBalance);
+                lpDividendPoolBalance = 0;
+                if (tokenAmount > 0) {
+                    tokenDividendPoolBalance += tokenAmount;
                 }
             }
         } else if (fromType == RewardType.LP && toType == RewardType.BNB) {
             if (lpDividendPoolBalance > 0) {
-                try IAuthorizer(authorizer).redeemLPToWBNB(lpDividendPoolBalance) returns (uint256 wbnbAmount) {
-                    lpDividendPoolBalance = 0;
-                    if (wbnbAmount > 0) {
-                        bnbDividendPoolBalance += wbnbAmount;
-                    }
-                } catch {
-                    lpDividendPoolBalance = 0;
+                uint256 wbnbAmount = auth.redeemLPToWBNB(lpDividendPoolBalance);
+                lpDividendPoolBalance = 0;
+                if (wbnbAmount > 0) {
+                    bnbDividendPoolBalance += wbnbAmount;
                 }
             }
         } else if (fromType == RewardType.TOKEN && toType == RewardType.LP) {
             if (tokenDividendPoolBalance > 0) {
-                try IAuthorizer(authorizer).convertTokenToLP(tokenDividendPoolBalance) returns (uint256 lpAmount) {
-                    tokenDividendPoolBalance = 0;
-                    if (lpAmount > 0) {
-                        lpDividendPoolBalance += lpAmount;
-                    }
-                } catch {
-                    tokenDividendPoolBalance = 0;
+                uint256 lpAmount = auth.convertTokenToLP(tokenDividendPoolBalance);
+                tokenDividendPoolBalance = 0;
+                if (lpAmount > 0) {
+                    lpDividendPoolBalance += lpAmount;
                 }
             }
         } else if (fromType == RewardType.TOKEN && toType == RewardType.BNB) {
             if (tokenDividendPoolBalance > 0) {
-                try IAuthorizer(authorizer).swapTokenToBNB(tokenDividendPoolBalance) returns (uint256 bnbAmount) {
-                    tokenDividendPoolBalance = 0;
-                    if (bnbAmount > 0) {
-                        bnbDividendPoolBalance += bnbAmount;
-                    }
-                } catch {
-                    tokenDividendPoolBalance = 0;
+                uint256 bnbAmount = auth.swapTokenToBNB(tokenDividendPoolBalance);
+                tokenDividendPoolBalance = 0;
+                if (bnbAmount > 0) {
+                    bnbDividendPoolBalance += bnbAmount;
                 }
             }
         } else if (fromType == RewardType.BNB && toType == RewardType.LP) {
             if (bnbDividendPoolBalance > 0) {
-                try IAuthorizer(authorizer).convertBNBToLP(bnbDividendPoolBalance) returns (uint256 lpAmount) {
-                    bnbDividendPoolBalance = 0;
-                    if (lpAmount > 0) {
-                        lpDividendPoolBalance += lpAmount;
-                    }
-                } catch {
-                    bnbDividendPoolBalance = 0;
+                uint256 lpAmount = auth.convertBNBToLP(bnbDividendPoolBalance);
+                bnbDividendPoolBalance = 0;
+                if (lpAmount > 0) {
+                    lpDividendPoolBalance += lpAmount;
                 }
             }
         } else if (fromType == RewardType.BNB && toType == RewardType.TOKEN) {
             if (bnbDividendPoolBalance > 0) {
-                try IAuthorizer(authorizer).swapBNBToToken(bnbDividendPoolBalance) returns (uint256 tokenAmount) {
-                    bnbDividendPoolBalance = 0;
-                    if (tokenAmount > 0) {
-                        tokenDividendPoolBalance += tokenAmount;
-                    }
-                } catch {
-                    bnbDividendPoolBalance = 0;
+                uint256 tokenAmount = auth.swapBNBToToken(bnbDividendPoolBalance);
+                bnbDividendPoolBalance = 0;
+                if (tokenAmount > 0) {
+                    tokenDividendPoolBalance += tokenAmount;
                 }
             }
         }

@@ -7,8 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
-import "./LPLib.sol";
-import "./StakingLib.sol";
+import "./StakingLPLib.sol";
 
 /**
  * @title StakingLP
@@ -35,7 +34,6 @@ import "./StakingLib.sol";
  * - UUPS可升级模式，需onlyOwner授权升级
  */
 contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
-    using LPLib for IAuthorizer;
 
     /** @dev 授权合约地址 */
     address public authorizer;
@@ -95,6 +93,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     error NotAuthorizer();
     error ContractPaused();
     error AlreadyInitialized();
+    error InvalidRecipient();
 
     /** @dev LP奖励领取事件 */
     event LPRewardClaimed(address indexed user, uint256 lpAmount);
@@ -199,8 +198,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     receive() external payable {
         if (msg.value > 0) {
-            LPLib.RewardPoolState memory state = _getPoolState();
-            state = LPLib.processIncomingBNB(state, IAuthorizer(authorizer), rewardType, msg.value);
+            StakingLPLib.RewardPoolState memory state = _getPoolState();
+            state = StakingLPLib.processIncomingBNB(state, IAuthorizer(authorizer), rewardType, msg.value);
             _setPoolState(state);
         }
     }
@@ -211,8 +210,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
         if (amount == 0) revert AmountZero();
-        LPLib.RewardPoolState memory state = _getPoolState();
-        state = LPLib.processIncomingBNB(state, IAuthorizer(authorizer), rewardType, amount);
+        StakingLPLib.RewardPoolState memory state = _getPoolState();
+        state = StakingLPLib.processIncomingBNB(state, IAuthorizer(authorizer), rewardType, amount);
         _setPoolState(state);
     }
 
@@ -226,16 +225,16 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         if (amount == 0) revert AmountZero();
         
         IBEP20(token).transferFrom(msg.sender, address(this), amount);
-        LPLib.RewardPoolState memory state = _getPoolState();
-        state = LPLib.processIncomingToken(state, IAuthorizer(authorizer), rewardType, token, amount);
+        StakingLPLib.RewardPoolState memory state = _getPoolState();
+        state = StakingLPLib.processIncomingToken(state, IAuthorizer(authorizer), rewardType, token, amount);
         _setPoolState(state);
     }
 
     /**
      * @dev 获取奖励池状态（内部函数）
      */
-    function _getPoolState() internal view returns (LPLib.RewardPoolState memory) {
-        return LPLib.RewardPoolState({
+    function _getPoolState() internal view returns (StakingLPLib.RewardPoolState memory) {
+        return StakingLPLib.RewardPoolState({
             lpRewardPoolBalance: lpRewardPoolBalance,
             tokenRewardPoolBalance: tokenRewardPoolBalance,
             bnbRewardPoolBalance: bnbRewardPoolBalance,
@@ -257,7 +256,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /**
      * @dev 设置奖励池状态（内部函数）
      */
-    function _setPoolState(LPLib.RewardPoolState memory state) internal {
+    function _setPoolState(StakingLPLib.RewardPoolState memory state) internal {
         lpRewardPoolBalance = state.lpRewardPoolBalance;
         tokenRewardPoolBalance = state.tokenRewardPoolBalance;
         bnbRewardPoolBalance = state.bnbRewardPoolBalance;
@@ -296,8 +295,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             return;
         }
         
-        LPLib.RewardPoolState memory state = _getPoolState();
-        state = LPLib.convertPoolAssets(state, IAuthorizer(authorizer), oldType, _rewardType);
+        StakingLPLib.RewardPoolState memory state = _getPoolState();
+        state = StakingLPLib.convertPoolAssets(state, IAuthorizer(authorizer), oldType, _rewardType);
         _setPoolState(state);
         
         rewardType = _rewardType;
@@ -308,7 +307,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 复利手续费（仅owner）
      */
     function compoundFees() external onlyOwner whenNotPaused {
-        IAuthorizer(authorizer).compoundFees();
+        StakingLPLib.compoundFees(IAuthorizer(authorizer));
+        emit FeesCompounded(0);
     }
 
     /**
@@ -343,7 +343,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         if (currentType == RewardType.LP) {
             if (reward > lpRewardPoolBalance) revert InsufficientLP();
             lpRewardPoolBalance -= reward;
-            IAuthorizer(authorizer).redeemLPToUser(reward, msg.sender);
+            StakingLPLib.redeemLPToUser(IAuthorizer(authorizer), reward, msg.sender);
             emit LPRewardClaimed(msg.sender, reward);
         } else if (currentType == RewardType.TOKEN) {
             if (reward > tokenRewardPoolBalance) revert InsufficientToken();
@@ -387,7 +387,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param amount 提取金额
      */
     function emergencyWithdrawWBNB(uint256 amount) external onlyOwner nonReentrant {
-        IAuthorizer(authorizer).emergencyWithdrawWBNB(amount);
+        StakingLPLib.emergencyWithdrawWBNB(IAuthorizer(authorizer), amount);
         emit EmergencyWBNBWithdrawn(msg.sender, owner(), amount);
     }
 
@@ -402,9 +402,9 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @return 新DEX的LP数量
      */
     function migrateLP(uint8 oldDexType, uint8 newDexType, uint256 lpAmount) public onlyOwner nonReentrant whenNotPaused returns (uint256) {
-        LPLib.RewardPoolState memory state = _getPoolState();
+        StakingLPLib.RewardPoolState memory state = _getPoolState();
         uint256 newLPAmount;
-        (state, newLPAmount) = LPLib.migrateLP(state, IAuthorizer(authorizer), oldDexType, newDexType, lpAmount);
+        (state, newLPAmount) = StakingLPLib.migrateLP(state, IAuthorizer(authorizer), oldDexType, newDexType, lpAmount);
         _setPoolState(state);
         return newLPAmount;
     }
@@ -458,8 +458,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 计算并释放每日奖励
      */
     function calculateDailyReward() external whenNotPaused {
-        LPLib.RewardPoolState memory state = _getPoolState();
-        state = LPLib.calculateDailyReward(state);
+        StakingLPLib.RewardPoolState memory state = _getPoolState();
+        state = StakingLPLib.calculateDailyReward(state);
         _setPoolState(state);
     }
 
@@ -495,8 +495,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param to 接收地址
      */
     function withdrawToken(address token, address to) external onlyOwner {
-        require(token != address(0), "StakingLP: Invalid token");
-        require(to != address(0), "StakingLP: Invalid recipient");
+        if (token == address(0)) revert InvalidAmount();
+        if (to == address(0)) revert InvalidRecipient();
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
             IERC20(token).transfer(to, balance);
@@ -508,7 +508,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param to 接收地址
      */
     function withdrawBNB(address to) external onlyOwner {
-        require(to != address(0), "StakingLP: Invalid recipient");
+        if (to == address(0)) revert InvalidRecipient();
         uint256 balance = address(this).balance;
         if (balance > 0) {
             payable(to).transfer(balance);
