@@ -238,7 +238,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(tokenIds.length > 0 && tokenIds.length <= 6, "ArenaPlayer: Invalid tokenIds count");
         
         uint256 currentEpoch = _currentEpoch();
-        address nftContract = IAuthorizer(authorizer).getAddressByName(\"nftMintCore\");
+        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
         require(nftContract != address(0), "ArenaPlayer: NFT contract not set");
         INFT nft = INFT(nftContract);
         
@@ -266,7 +266,7 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function unstakeNFTs(uint256[] calldata tokenIds) external nonReentrant whenNotPaused {
         uint256 currentEpoch = _currentEpoch();
-        address nftContract = IAuthorizer(authorizer).getAddressByName(\"nftMintCore\");
+        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
         require(nftContract != address(0), "ArenaPlayer: NFT contract not set");
         INFT nft = INFT(nftContract);
         
@@ -357,12 +357,12 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function rechargeChallengeAttempts() external nonReentrant whenNotPaused {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(\"arenaRankingManager\");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
         require(IArenaRanking(arenaRankingManager).currentSeasonId() > 0, "ArenaPlayer: No active season");
         
         _checkAndResetAttempts(msg.sender);
         
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
         require(tokenContract != address(0), "ArenaPlayer: Token contract not set");
         
         IERC20(tokenContract).safeTransferFrom(msg.sender, address(this), rechargeCost);
@@ -480,9 +480,9 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param tokenIds 质押的NFT ID列表
      */
     function _syncWeightAfterStake(address user, uint256[] calldata tokenIds) internal {
-        address nftDataContract = IAuthorizer(authorizer).getAddressByName(\"nftData\");
-        address weightManager = IAuthorizer(authorizer).getAddressByName(\"weightManager\");
-        address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName("nftData");
+        address weightManager = IAuthorizer(authorizer).getAddressByName("weightManager");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
         
         // 从用户NFT列表中移除质押的NFT
         if (nftDataContract != address(0)) {
@@ -520,9 +520,9 @@ contract ArenaPlayer is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @param tokenIds 解除质押的NFT ID列表
      */
     function _syncWeightAfterUnstake(address user, uint256[] calldata tokenIds) internal {
-        address nftDataContract = IAuthorizer(authorizer).getAddressByName(\"nftData\");
-        address weightManager = IAuthorizer(authorizer).getAddressByName(\"weightManager\");
-        address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName("nftData");
+        address weightManager = IAuthorizer(authorizer).getAddressByName("weightManager");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
         
         // 将解除质押的NFT添加回用户列表
         if (nftDataContract != address(0)) {

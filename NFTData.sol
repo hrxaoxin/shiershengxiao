@@ -673,14 +673,14 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _addUserNFT(to, tokenId);
         _addToTypeOwners(zodiacType, to);
         
-        address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
         if (dividendManager != address(0)) {
             uint8 element = uint8(zodiacType / 24);
             IDividendManager(dividendManager).updateUserWeight(to, uint256(level), true, element);
         }
         
         // 修复：添加 WeightManager 同步，确保权重数据一致性
-        address weightManager = IAuthorizer(authorizer).getAddressByName(\"weightManager\");
+        address weightManager = IAuthorizer(authorizer).getAddressByName("weightManager");
         if (weightManager != address(0)) {
             IWeightManager(weightManager).syncUserWeight(to);
         }

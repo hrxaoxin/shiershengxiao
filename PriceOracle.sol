@@ -86,7 +86,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
 
     function getTokenPriceUSD() external view returns (uint256) {
         IAuthorizer auth = IAuthorizer(authorizer);
-        address token = auth.getAddressByName(\"token\");
+        address token = auth.getAddressByName("token");
         
         if (token == address(0)) return 0;
 
@@ -126,7 +126,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
 
     function getTokenPriceUSDV8() external view returns (uint256) {
         IAuthorizer auth = IAuthorizer(authorizer);
-        address token = auth.getAddressByName(\"token\");
+        address token = auth.getAddressByName("token");
         
         if (token == address(0)) return 0;
 

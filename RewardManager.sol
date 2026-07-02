@@ -351,7 +351,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function _distributeDividendPool(uint256 amount) private {
-        address dividendPool = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
+        address dividendPool = IAuthorizer(authorizer).getAddressByName("dividendManager");
         uint256 dividendAmount = amount * dividendPercent / PRECISION;
         
         if (dividendPool != address(0) && dividendAmount > 0) {
@@ -366,7 +366,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function _distributeStakingPool(uint256 amount) private {
-        address stakingLP = IAuthorizer(authorizer).getAddressByName(\"stakingLP\");
+        address stakingLP = IAuthorizer(authorizer).getAddressByName("stakingLP");
         uint256 stakingAmount = amount * nftStakingPercent / PRECISION;
         
         if (stakingLP != address(0) && stakingAmount > 0) {
@@ -381,7 +381,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function _distributeTokenStakingPool(uint256 amount) private {
-        address tokenStakingLP = IAuthorizer(authorizer).getAddressByName(\"tokenStakingLP\");
+        address tokenStakingLP = IAuthorizer(authorizer).getAddressByName("tokenStakingLP");
         uint256 tokenStakingAmount = amount * tokenStakingPercent / PRECISION;
         
         if (tokenStakingLP != address(0) && tokenStakingAmount > 0) {
@@ -396,7 +396,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function _distributeArenaPool(uint256 amount) private {
-        address arenaRewardLP = IAuthorizer(authorizer).getAddressByName(\"arenaRewardLP\");
+        address arenaRewardLP = IAuthorizer(authorizer).getAddressByName("arenaRewardLP");
         uint256 arenaAmount = amount * arenaRewardPercent / PRECISION;
         
         if (arenaRewardLP != address(0) && arenaAmount > 0) {
@@ -411,7 +411,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function _distributeBuybackPool(uint256 amount) private {
-        address nftBuybackPool = IAuthorizer(authorizer).getAddressByName(\"nftBuyback\");
+        address nftBuybackPool = IAuthorizer(authorizer).getAddressByName("nftBuyback");
         uint256 buybackAmount = amount * nftBuybackPercent / PRECISION;
         
         if (nftBuybackPool != address(0) && buybackAmount > 0) {
@@ -434,13 +434,13 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         // 根据 activeDEX 选择正确的 DEX 路由
         address dexRouter;
         if (activeDEX == 1) {
-            dexRouter = IAuthorizer(authorizer).getAddressByName(\"pancakeSwapRouter\");
+            dexRouter = IAuthorizer(authorizer).getAddressByName("pancakeSwapRouter");
         } else if (activeDEX == 2) {
-            dexRouter = IAuthorizer(authorizer).getAddressByName(\"uniswapRouter\");
+            dexRouter = IAuthorizer(authorizer).getAddressByName("uniswapRouter");
         } else {
-            dexRouter = IAuthorizer(authorizer).getAddressByName(\"flapSwapRouter\");
+            dexRouter = IAuthorizer(authorizer).getAddressByName("flapSwapRouter");
         }
-        address wbnb = IAuthorizer(authorizer).getAddressByName(\"wbnb\");
+        address wbnb = IAuthorizer(authorizer).getAddressByName("wbnb");
         
         address[] memory path = new address[](2);
         path[0] = wbnb;
@@ -478,10 +478,10 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         address tokenContract
     ) internal {
         IERC20 token = IERC20(tokenContract);
-        address nftStakingPool = IAuthorizer(authorizer).getAddressByName(\"staking\");
-        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName(\"tokenStaking\");
-        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
-        address poolManager = IAuthorizer(authorizer).getAddressByName(\"poolManager\");
+        address nftStakingPool = IAuthorizer(authorizer).getAddressByName("staking");
+        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName("tokenStaking");
+        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName("arenaReward");
+        address poolManager = IAuthorizer(authorizer).getAddressByName("poolManager");
         
         // 计算各池应得代币数量（按BNB金额比例）
         uint256 nftStakingTokenAmount;
@@ -536,15 +536,15 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     function addStakingReward(uint256 amount, uint256 poolType) external onlyOwnerOrAuthorizer whenNotPaused {
         require(amount > 0, "RewardManager: Invalid amount");
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
         require(tokenContract != address(0), "RewardManager: Token contract not set");
 
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(msg.sender) >= amount, "RewardManager: Insufficient balance");
 
-        address nftStakingPool = IAuthorizer(authorizer).getAddressByName(\"staking\");
-        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName(\"tokenStaking\");
-        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
+        address nftStakingPool = IAuthorizer(authorizer).getAddressByName("staking");
+        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName("tokenStaking");
+        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName("arenaReward");
 
         if (poolType == 0 && nftStakingPool != address(0)) {
             token.safeTransferFrom(msg.sender, nftStakingPool, amount);
@@ -575,7 +575,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     function claimDividend() external whenNotPaused nonReentrant returns (uint256) {
         address user = msg.sender;
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         
         uint256 currentEpoch = _currentEpoch();
@@ -604,7 +604,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             msg.sender == owner() || msg.sender == authorizer,
             "RewardManager: Not authorized to claim for other users"
         );
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         require(user != address(0), "RewardManager: Invalid user address");
         
@@ -657,8 +657,8 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @return 分红池中代币余额
      */
     function dividendPoolBalance() external view returns (uint256) {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
-        address dividendPool = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address dividendPool = IAuthorizer(authorizer).getAddressByName("dividendManager");
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         return IERC20(tokenContract).balanceOf(dividendPool);
     }
@@ -667,13 +667,13 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 分配奖励到各个池
      */
     function _distributeReward(uint256 amount) internal {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
-        address dividendPool = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
-        address nftStakingPool = IAuthorizer(authorizer).getAddressByName(\"staking\");
-        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName(\"tokenStaking\");
-        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
-        address nftBuybackPool = IAuthorizer(authorizer).getAddressByName(\"nftBuyback\");
-        address poolManager = IAuthorizer(authorizer).getAddressByName(\"poolManager\");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address dividendPool = IAuthorizer(authorizer).getAddressByName("dividendManager");
+        address nftStakingPool = IAuthorizer(authorizer).getAddressByName("staking");
+        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName("tokenStaking");
+        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName("arenaReward");
+        address nftBuybackPool = IAuthorizer(authorizer).getAddressByName("nftBuyback");
+        address poolManager = IAuthorizer(authorizer).getAddressByName("poolManager");
         require(tokenContract != address(0), "RewardManager: Token contract not set");
 
         IERC20 token = IERC20(tokenContract);
@@ -883,10 +883,10 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         uint256 arenaRewardBalance,
         uint256 totalDistributed_
     ) {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
-        address dividendPool = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
-        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName(\"tokenStaking\");
-        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address dividendPool = IAuthorizer(authorizer).getAddressByName("dividendManager");
+        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName("tokenStaking");
+        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName("arenaReward");
         IERC20 token = IERC20(tokenContract);
 
         if (dividendPool != address(0)) {
@@ -922,7 +922,7 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      */
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "RewardManager: Amount must be > 0");
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
         require(tokenContract != address(0), "RewardManager: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "RewardManager: Insufficient token balance");
@@ -943,9 +943,9 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             return;
         }
         
-        address dividendPool = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
-        address dexRouter = IAuthorizer(authorizer).getAddressByName(\"pancakeSwapRouter\");
+        address dividendPool = IAuthorizer(authorizer).getAddressByName("dividendManager");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address dexRouter = IAuthorizer(authorizer).getAddressByName("pancakeSwapRouter");
         
         uint256 dividendAmount = lockedAmount * dividendPercent / PRECISION;
         uint256 nftStakingAmount = lockedAmount * nftStakingPercent / PRECISION;

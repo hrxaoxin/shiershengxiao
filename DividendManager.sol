@@ -1,4 +1,4 @@
-﻿﻿// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -19,12 +19,43 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     using SafeERC20 for IERC20;
     using DividendManagerLib for *;
 
-    /**
-     * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
-     */
     constructor() {
         _disableInitializers();
     }
+
+    error DM_InvalidAuthorizer();
+    error DM_Paused();
+    error DM_InvalidAmount();
+    error DM_TokenNotSet();
+    error DM_Overflow();
+    error DM_ScaleOverflow();
+    error DM_CumOverflow();
+    error DM_InvalidIndex();
+    error DM_NoDividend();
+    error DM_InsufficientBalance();
+    error DM_WeightMax();
+    error DM_PendingOverflow();
+    error DM_ZeroUser();
+    error DM_TooFrequent();
+    error DM_WeightCalcOverflow();
+    error DM_WeightOverflow();
+    error DM_NewWeightMax();
+    error DM_TotalOverflow();
+    error DM_InsufficientWeight();
+    error DM_TotalUnderflow();
+    error DM_SyncOverflow();
+    error DM_LengthMismatch();
+    error DM_BatchMax();
+    error DM_ChangeUnderflow();
+    error DM_InvalidStart();
+    error DM_InvalidCount();
+    error DM_NotRequested();
+    error DM_Timelock();
+    error DM_AmountZero();
+    error DM_BNBFailed();
+    error DM_InsufficientToken();
+    error DM_AuthorizerNotSet();
+    error DM_NotAuthorized();
 
     // =========================================================================
     // 暂停功能相关状态变量
@@ -59,7 +90,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
     /// @dev 暂停检查修饰符
     modifier whenNotPaused() {
-        require(!paused, "DM: Paused");
+        if (paused) revert DM_Paused();
         _;
     }
 
@@ -140,7 +171,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 只能在代理合约部署时调用一次
     /// @param _authorizerAddress 授权者合约地址
     function initialize(address _authorizerAddress) external initializer {
-        require(_authorizerAddress != address(0), "DM: Invalid authorizer");
+        if (_authorizerAddress == address(0)) revert DM_InvalidAuthorizer();
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -160,20 +191,18 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 仅管理员或授权者可调用
     /// @param _authorizerAddress 新的授权者合约地址
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
-        require(_authorizerAddress != address(0), "DM: Invalid authorizer");
+        if (_authorizerAddress == address(0)) revert DM_InvalidAuthorizer();
         authorizer = _authorizerAddress;
     }
 
-    /// @dev 管理员或授权者检查修饰符
     modifier onlyOwnerOrAuthorizer() {
         if (msg.sender == owner() || msg.sender == authorizer) {
             _;
             return;
         }
-        // 修复：先检查authorizer是否有效
-        require(authorizer != address(0), "DM: Authorizer not set");
+        if (authorizer == address(0)) revert DM_AuthorizerNotSet();
         IAuthorizer auth = IAuthorizer(authorizer);
-        require(auth.isSystemContract(msg.sender), "DM: Not authorized");
+        if (!auth.isSystemContract(msg.sender)) revert DM_NotAuthorized();
         _;
     }
 
@@ -193,15 +222,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 最后快照时间戳
     uint256 public lastSnapshotTime;
     
-    /// @dev 分红快照结构体，用于记录历史分红状态
-    struct DividendSnapshot {
-        uint256 totalWeight;        // 快照时的总权重
-        uint256 totalDividend;      // 快照时的分红池总额
-        uint256 perWeightDividend;  // 快照时每权重分红额
-        uint256 timestamp;          // 快照时间戳
-    }
-    
-    /// @dev 分红快照数组（循环缓冲区）
+    /// @dev 分红快照数组（循环缓冲区），元素类型为 NFTInterface.sol 中定义的全局 DividendSnapshot
     DividendSnapshot[] public snapshots;
     
     /// @dev 循环缓冲区起始索引
@@ -224,9 +245,9 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 仅管理员可调用，增加分红池余额并更新快照
     /// @param amount 要添加的分红金额
     function addDividendPool(uint256 amount) external onlyOwner whenNotPaused {
-        require(amount > 0, "DM: Invalid amount");
+        if (amount == 0) revert DM_InvalidAmount();
         _addToDividendPool(amount);
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
         if (tokenContract != address(0)) {
             lastSyncedBalance = IERC20(tokenContract).balanceOf(address(this));
         }
@@ -236,8 +257,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 手动同步合约代币余额与分红池，更新新的分红
     /// @dev 仅管理员或授权者可调用
     function syncDividendPool() external onlyOwnerOrAuthorizer {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
-        require(tokenContract != address(0), "DM: Token not set");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        if (tokenContract == address(0)) revert DM_TokenNotSet();
         IERC20 token = IERC20(tokenContract);
         uint256 currentBalance = token.balanceOf(address(this));
 
@@ -250,24 +271,19 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         lastAutoSyncTime = block.timestamp;
     }
     
-    /// @dev 自动同步分红池的内部函数
-    /// @dev 当距离上次同步超过6小时时自动执行
     function _autoSyncDividendPool() internal {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
-        if (tokenContract == address(0)) return;
-        
-        if (block.timestamp >= lastAutoSyncTime + AUTO_SYNC_INTERVAL) {
-            IERC20 token = IERC20(tokenContract);
-            uint256 currentBalance = token.balanceOf(address(this));
-
-            if (currentBalance > lastSyncedBalance) {
-                uint256 newFunds = currentBalance - lastSyncedBalance;
-                _addToDividendPool(newFunds);
-            }
-
-            lastSyncedBalance = currentBalance;
-            lastAutoSyncTime = block.timestamp;
-        }
+        (lastSyncedBalance, lastAutoSyncTime, dividendPoolBalance, cumulativePerWeightDividend, snapshotStartIndex) =
+            DividendManagerLib.autoSyncDividendPool(
+                authorizer,
+                lastAutoSyncTime,
+                AUTO_SYNC_INTERVAL,
+                lastSyncedBalance,
+                totalWeight,
+                dividendPoolBalance,
+                cumulativePerWeightDividend,
+                snapshots,
+                snapshotStartIndex
+            );
     }
 
     // =========================================================================
@@ -287,35 +303,16 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 内部函数：向分红池添加金额并更新快照
     /// @param amount 要添加的金额
     function _addToDividendPool(uint256 amount) internal {
-        uint256 newBalance = dividendPoolBalance + amount;
-        require(newBalance >= dividendPoolBalance, "DM: Overflow");
-        dividendPoolBalance = newBalance;
-
-        uint256 perWeightDividendIncrement = 0;
-        if (totalWeight > 0) {
-            if (amount > 0) {
-                require(type(uint256).max / amount >= 1e18, "DM: Scale overflow");
-            }
-            perWeightDividendIncrement = (amount * 1e18) / totalWeight;
-            uint256 newCumulative = cumulativePerWeightDividend + perWeightDividendIncrement;
-            require(newCumulative >= cumulativePerWeightDividend, "DM: Cum overflow");
-            cumulativePerWeightDividend = newCumulative;
-        }
-
-        DividendSnapshot memory newSnapshot = DividendSnapshot({
-            totalWeight: totalWeight,
-            totalDividend: dividendPoolBalance,
-            perWeightDividend: perWeightDividendIncrement,
-            timestamp: block.timestamp
-        });
-
-        if (snapshots.length < MAX_SNAPSHOTS) {
-            snapshots.push(newSnapshot);
-        } else {
-            require(snapshotStartIndex < MAX_SNAPSHOTS, "DM: Invalid index");
-            snapshots[snapshotStartIndex] = newSnapshot;
-            snapshotStartIndex = (snapshotStartIndex + 1) % MAX_SNAPSHOTS;
-        }
+        uint256 perWeightDividendIncrement;
+        (dividendPoolBalance, cumulativePerWeightDividend, snapshotStartIndex, perWeightDividendIncrement) =
+            DividendManagerLib.addToDividendPool(
+                amount,
+                totalWeight,
+                dividendPoolBalance,
+                cumulativePerWeightDividend,
+                snapshots,
+                snapshotStartIndex
+            );
 
         emit DividendPoolAdded(amount, dividendPoolBalance, perWeightDividendIncrement);
     }
@@ -337,7 +334,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @return perWeightDividend 快照时的每权重分红增量
     /// @return timestamp 快照时间戳
     function getSnapshot(uint256 index) external view returns (uint256, uint256, uint256, uint256) {
-        require(index < snapshots.length, "DM: Invalid index");
+        if (index >= snapshots.length) revert DM_InvalidIndex();
         uint256 actualIndex = _getActualIndex(index);
         DividendSnapshot memory snapshot = snapshots[actualIndex];
         return (snapshot.totalWeight, snapshot.totalDividend, snapshot.perWeightDividend, snapshot.timestamp);
@@ -376,7 +373,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
 
         uint256 totalDividend = pendingDividends[currentEpoch][msg.sender] + newDividend;
 
-        require(totalDividend > 0, "DM: No dividend");
+        if (totalDividend == 0) revert DM_NoDividend();
 
         pendingDividends[currentEpoch][msg.sender] = 0;
         if (userWeight > 0) {
@@ -384,10 +381,10 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         }
         lastClaimTime[currentEpoch][msg.sender] = block.timestamp;
 
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
-        require(tokenContract != address(0), "DM: Token not set");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        if (tokenContract == address(0)) revert DM_TokenNotSet();
         IERC20 token = IERC20(tokenContract);
-        require(token.balanceOf(address(this)) >= totalDividend, "DM: Insufficient balance");
+        if (token.balanceOf(address(this)) < totalDividend) revert DM_InsufficientBalance();
         token.safeTransfer(msg.sender, totalDividend);
 
         emit DividendClaimed(msg.sender, totalDividend);
@@ -465,15 +462,16 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param weight 新的权重值
     function setUserWeight(address user, uint256 weight) external onlyOwnerOrAuthorizer {
         uint256 currentEpoch = _currentEpoch();
-        require(weight <= MAX_USER_WEIGHT, "DM: Weight max");
+        if (weight > MAX_USER_WEIGHT) revert DM_WeightMax();
         
-        if (userWeights[currentEpoch][user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[currentEpoch][user]) {
-            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][user];
-            uint256 weightedProduct = userWeights[currentEpoch][user] * cumulativeDiff;
-            require(weightedProduct / userWeights[currentEpoch][user] == cumulativeDiff, "DM: Pending overflow");
-            uint256 pending = weightedProduct / 1e18;
-            pendingDividends[currentEpoch][user] += pending;
-        }
+        DividendManagerLib.settlePendingDividend(
+            pendingDividends,
+            currentEpoch,
+            user,
+            userWeights[currentEpoch][user],
+            cumulativePerWeightDividend,
+            userCumulativeSnapshots[currentEpoch][user]
+        );
         
         totalWeight = totalWeight - userWeights[currentEpoch][user] + weight;
         userWeights[currentEpoch][user] = weight;
@@ -488,32 +486,33 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param element NFT元素类型（3或4为稀有元素）
     function updateUserWeight(address user, uint256 level, bool isAdd, uint8 element) external onlyOwnerOrAuthorizer {
         uint256 currentEpoch = _currentEpoch();
-        require(user != address(0), "DM: Zero user");
+        if (user == address(0)) revert DM_ZeroUser();
         uint256 weight = _calculateWeight(level, element);
 
         if (minWeightUpdateInterval > 0) {
-            require(block.timestamp >= lastWeightUpdateTime[currentEpoch][user] + minWeightUpdateInterval, "DM: Too frequent");
+            if (block.timestamp < lastWeightUpdateTime[currentEpoch][user] + minWeightUpdateInterval) revert DM_TooFrequent();
         }
         
-        if (userWeights[currentEpoch][user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[currentEpoch][user]) {
-            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][user];
-            uint256 weightedProduct = userWeights[currentEpoch][user] * cumulativeDiff;
-            require(weightedProduct / userWeights[currentEpoch][user] == cumulativeDiff, "DM: Weight calc overflow");
-            uint256 pending = weightedProduct / 1e18;
-            pendingDividends[currentEpoch][user] += pending;
-        }
+        DividendManagerLib.settlePendingDividend(
+            pendingDividends,
+            currentEpoch,
+            user,
+            userWeights[currentEpoch][user],
+            cumulativePerWeightDividend,
+            userCumulativeSnapshots[currentEpoch][user]
+        );
 
         if (isAdd) {
             uint256 newUserWeight = userWeights[currentEpoch][user] + weight;
-            require(newUserWeight >= userWeights[currentEpoch][user], "DM: Weight overflow");
-            require(newUserWeight <= MAX_USER_WEIGHT, "DM: New weight max");
+            if (newUserWeight < userWeights[currentEpoch][user]) revert DM_WeightOverflow();
+            if (newUserWeight > MAX_USER_WEIGHT) revert DM_NewWeightMax();
             uint256 newTotalWeight = totalWeight + weight;
-            require(newTotalWeight >= totalWeight, "DM: Total overflow");
+            if (newTotalWeight < totalWeight) revert DM_TotalOverflow();
             totalWeight = newTotalWeight;
             userWeights[currentEpoch][user] = newUserWeight;
         } else {
-            require(userWeights[currentEpoch][user] >= weight, "DM: Insufficient weight");
-            require(totalWeight >= weight, "DM: Total underflow");
+            if (userWeights[currentEpoch][user] < weight) revert DM_InsufficientWeight();
+            if (totalWeight < weight) revert DM_TotalUnderflow();
             totalWeight -= weight;
             userWeights[currentEpoch][user] -= weight;
         }
@@ -535,27 +534,26 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param user 用户地址
     function syncUserWeight(address user) external onlyOwnerOrAuthorizer {
         uint256 currentEpoch = _currentEpoch();
-        require(user != address(0), "DM: Zero user");
-        address nftDataContract = IAuthorizer(authorizer).getAddressByName(\"nftData\");
+        if (user == address(0)) revert DM_ZeroUser();
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName("nftData");
         if (nftDataContract == address(0)) return;
         
         INFTDataInterface nftData = INFTDataInterface(nftDataContract);
         uint256 newWeight = nftData.calcUserWeight(user);
         
-        if (userWeights[currentEpoch][user] > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[currentEpoch][user]) {
-            uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][user];
-            uint256 weightedProduct = userWeights[currentEpoch][user] * cumulativeDiff;
-            require(weightedProduct / userWeights[currentEpoch][user] == cumulativeDiff, "DM: Sync overflow");
-            uint256 pending = weightedProduct / 1e18;
-            uint256 newPending = pendingDividends[currentEpoch][user] + pending;
-            require(newPending >= pendingDividends[currentEpoch][user], "DM: Pending overflow");
-            pendingDividends[currentEpoch][user] = newPending;
-        }
+        DividendManagerLib.settlePendingDividend(
+            pendingDividends,
+            currentEpoch,
+            user,
+            userWeights[currentEpoch][user],
+            cumulativePerWeightDividend,
+            userCumulativeSnapshots[currentEpoch][user]
+        );
         
-        require(totalWeight >= userWeights[currentEpoch][user], "DM: Total underflow");
+        if (totalWeight < userWeights[currentEpoch][user]) revert DM_TotalUnderflow();
         uint256 totalWeightAfterRemove = totalWeight - userWeights[currentEpoch][user];
         uint256 totalWeightAfterAdd = totalWeightAfterRemove + newWeight;
-        require(totalWeightAfterAdd >= totalWeightAfterRemove, "DM: Total overflow");
+        if (totalWeightAfterAdd < totalWeightAfterRemove) revert DM_TotalOverflow();
         totalWeight = totalWeightAfterAdd;
         
         userWeights[currentEpoch][user] = newWeight;
@@ -593,7 +591,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @return normalWeights 普通元素各等级权重
     /// @return rareWeights 稀有元素各等级权重
     function getWeightConfig() external view returns (uint256[5] memory normalWeights, uint256[5] memory rareWeights) {
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(\"nftData\");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
         if (nftDataAddr != address(0)) {
             bool hasData = false;
             for (uint8 i = 0; i < 5; i++) {
@@ -641,8 +639,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256[] calldata weights
     ) external onlyOwnerOrAuthorizer {
         uint256 currentEpoch = _currentEpoch();
-        require(users.length == weights.length, "DM: Length mismatch");
-        require(users.length <= 100, "DM: Batch max");
+        if (users.length != weights.length) revert DM_LengthMismatch();
+        if (users.length > 100) revert DM_BatchMax();
         
         uint256 usersLength = users.length;
         uint256 totalWeightChange = 0;
@@ -652,17 +650,21 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
             uint256 newWeight = weights[i];
             uint256 oldWeight = userWeights[currentEpoch][user];
             
-            if (oldWeight > 0 && cumulativePerWeightDividend > userCumulativeSnapshots[currentEpoch][user]) {
-                uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshots[currentEpoch][user];
-                pendingDividends[currentEpoch][user] += oldWeight * cumulativeDiff / 1e18;
-            }
+            DividendManagerLib.settlePendingDividend(
+                pendingDividends,
+                currentEpoch,
+                user,
+                oldWeight,
+                cumulativePerWeightDividend,
+                userCumulativeSnapshots[currentEpoch][user]
+            );
             
             if (newWeight > oldWeight) {
                 uint256 increase = newWeight - oldWeight;
                 totalWeightChange = totalWeightChange + increase;
             } else if (oldWeight > newWeight) {
                 uint256 decrease = oldWeight - newWeight;
-                require(totalWeightChange >= decrease, "DM: Change underflow");
+                if (totalWeightChange < decrease) revert DM_ChangeUnderflow();
                 totalWeightChange = totalWeightChange - decrease;
             }
             
@@ -712,8 +714,8 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @return 分红快照数组
     function getSnapshotHistory(uint256 startIndex, uint256 count) external view returns (DividendSnapshot[] memory) {
         uint256 totalCount = snapshots.length;
-        require(startIndex < totalCount, "DM: Invalid start");
-        require(count > 0, "DM: Invalid count");
+        if (startIndex >= totalCount) revert DM_InvalidStart();
+        if (count == 0) revert DM_InvalidCount();
 
         uint256 endIndex = startIndex + count;
         if (endIndex > totalCount) {
@@ -763,7 +765,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256 snapshotCount,
         uint256 lastSnapshotTime
     ) {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
         if (tokenContract != address(0)) {
             currentPool = IERC20(tokenContract).balanceOf(address(this));
         }
@@ -802,12 +804,12 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 需要先请求并等待24小时时间锁到期
     /// @param amount 要提取的BNB金额
     function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
-        require(emergencyWithdrawRequested, "DM: Not requested");
-        require(block.timestamp >= emergencyWithdrawRequestedAt + emergencyWithdrawTimelock, "DM: Timelock");
-        require(amount > 0, "DM: Amount 0");
-        require(amount <= address(this).balance, "DM: Insufficient balance");
+        if (!emergencyWithdrawRequested) revert DM_NotRequested();
+        if (block.timestamp < emergencyWithdrawRequestedAt + emergencyWithdrawTimelock) revert DM_Timelock();
+        if (amount == 0) revert DM_AmountZero();
+        if (amount > address(this).balance) revert DM_InsufficientBalance();
         (bool success, ) = payable(owner()).call{value: amount}("");
-        require(success, "DM: BNB failed");
+        if (!success) revert DM_BNBFailed();
         emergencyWithdrawRequested = false;
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
@@ -816,13 +818,13 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 需要先请求并等待24小时时间锁到期
     /// @param amount 要提取的代币金额
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
-        require(emergencyWithdrawRequested, "DM: Not requested");
-        require(block.timestamp >= emergencyWithdrawRequestedAt + emergencyWithdrawTimelock, "DM: Timelock");
-        require(amount > 0, "DM: Amount 0");
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
-        require(tokenContract != address(0), "DM: Token not set");
+        if (!emergencyWithdrawRequested) revert DM_NotRequested();
+        if (block.timestamp < emergencyWithdrawRequestedAt + emergencyWithdrawTimelock) revert DM_Timelock();
+        if (amount == 0) revert DM_AmountZero();
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        if (tokenContract == address(0)) revert DM_TokenNotSet();
         IERC20 token = IERC20(tokenContract);
-        require(token.balanceOf(address(this)) >= amount, "DM: Insufficient token");
+        if (token.balanceOf(address(this)) < amount) revert DM_InsufficientToken();
         token.safeTransfer(owner(), amount);
         emergencyWithdrawRequested = false;
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
@@ -832,10 +834,6 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @param operator 操作者地址
     /// @param timestamp 请求时间戳
     event EmergencyWithdrawRequested(address indexed operator, uint256 timestamp);
-
-    function getUserWeights(address user) external view returns (uint256) {
-        return userWeights[_currentEpoch()][user];
-    }
 
     function getPendingDividends(address user) external view returns (uint256) {
         return pendingDividends[_currentEpoch()][user];

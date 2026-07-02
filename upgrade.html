@@ -682,7 +682,7 @@
             }
 
             // 策略2：直接调用 Flap Portal.getTokenV5 获取价格
-            const tokenAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract;
+            const tokenAddr = await window.ZODIAC_WEB3.getContractAddress('tokenContract');
             if (tokenAddr && tokenAddr !== '0x0000000000000000000000000000000000000000') {
                 try {
                     const flap = await fetchTokenPriceFromFlapPortal(tokenAddr);
@@ -968,7 +968,7 @@
                 
                 try {
                 // 直接使用配置创建合约实例，避免依赖 ZODIAC_WEB3
-                const priceOracleAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.priceOracle;
+                const priceOracleAddr = await window.ZODIAC_WEB3.getContractAddress('priceOracle');
                 if (!priceOracleAddr || priceOracleAddr === '0x0000000000000000000000000000000000000000') {
                     usdValueText = '⚠ 价格预言机未配置';
                 } else if (!window.web3) {
@@ -1220,10 +1220,10 @@
             try {
                 ZODIAC_UI.showLoading('检查授权...');
                 
-                const isApproved = await nftContract.methods.isApprovedForAll(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
+                const isApproved = await nftContract.methods.isApprovedForAll(account, await window.ZODIAC_WEB3.getContractAddress('nftUpdate')).call();
                 if (!isApproved) {
                     ZODIAC_UI.showLoading('请求授权...');
-                    await nftContract.methods.setApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, true).send({ from: account, gas: 100000 });
+                    await nftContract.methods.setApprovalForAll(await window.ZODIAC_WEB3.getContractAddress('nftUpdate'), true).send({ from: account, gas: 100000 });
                 }
                 
                 ZODIAC_UI.showLoading('检查交易可行性...');
@@ -1320,10 +1320,11 @@
             try {
                 ZODIAC_UI.showLoading('检查授权...');
                 
-                const allowance = await tokenContract.methods.allowance(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call();
+                const nftUpdateAddress = await window.ZODIAC_WEB3.getContractAddress('nftUpdate');
+                const allowance = await tokenContract.methods.allowance(account, nftUpdateAddress).call();
                 if (BigInt(allowance) < BigInt(requiredTokensWei)) {
                     ZODIAC_UI.showLoading('请求授权...');
-                    await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff').send({ from: account, gas: 100000 });
+                    await tokenContract.methods.approve(nftUpdateAddress, '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff').send({ from: account, gas: 100000 });
                 }
                 
                 ZODIAC_UI.showLoading('检查交易可行性...');
@@ -1429,7 +1430,7 @@
             let price = 0n;
             let requiredTokens = 0n;
             let requiredTokensDisplay = '0';
-            const priceOracleAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.priceOracle;
+            const priceOracleAddr = await window.ZODIAC_WEB3.getContractAddress('priceOracle');
             
             // 辅助函数：验证并计算价格 → 代币数量
             // price 是18位精度的 USDT/Token 价格，需要除以1e18得到真实价格
@@ -1511,10 +1512,11 @@
             try {
                 ZODIAC_UI.showLoading('检查授权...');
                 
-                const allowance = BigInt(await tokenContract.methods.allowance(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate).call());
+                const nftUpdateAddress = await window.ZODIAC_WEB3.getContractAddress('nftUpdate');
+                const allowance = BigInt(await tokenContract.methods.allowance(account, nftUpdateAddress).call());
                 if (allowance < requiredTokens) {
                     ZODIAC_UI.showLoading('请求授权...');
-                    await tokenContract.methods.approve(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftUpdate, '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff').send({ from: account, gas: 100000 });
+                    await tokenContract.methods.approve(nftUpdateAddress, '0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff').send({ from: account, gas: 100000 });
                 }
                 
                 ZODIAC_UI.showLoading('检查交易可行性...');

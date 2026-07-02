@@ -686,6 +686,17 @@ interface IBreedingMarket {
 }
 
 /**
+ * @title 分红快照结构体（全局共用）
+ * @dev 供 DividendManager 与 DividendManagerLib 共享使用
+ */
+struct DividendSnapshot {
+    uint256 totalWeight;        // 快照时的总权重
+    uint256 totalDividend;      // 快照时的分红池总额
+    uint256 perWeightDividend;  // 快照时每权重分红额
+    uint256 timestamp;          // 快照时间戳
+}
+
+/**
  * @title IDividendManager
  * @dev 分红池接口
  */

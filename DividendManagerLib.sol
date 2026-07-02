@@ -1,15 +1,24 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "./NFTInterface.sol";
+import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 
 library DividendManagerLib {
     uint256 internal constant SCALE = 1e18;
     uint256 internal constant MAX_NFT_LEVEL = 5;
     uint256 internal constant MAX_SNAPSHOTS = 100;
 
+    error DM_Lib_InvalidIndex();
+    error DM_Lib_Overflow();
+    error DM_Lib_ScaleOverflow();
+    error DM_Lib_CumOverflow();
+    error DM_Lib_InvalidStart();
+    error DM_Lib_InvalidCount();
+    error DM_Lib_PendingOverflow();
+
     function getActualIndex(uint256 logicalIndex, uint256 snapshotStartIndex, uint256 snapshotsLength) internal pure returns (uint256) {
-        require(snapshotsLength > 0, "DM: Invalid index");
+        if (snapshotsLength == 0) revert DM_Lib_InvalidIndex();
         return (snapshotStartIndex + logicalIndex) % snapshotsLength;
     }
 
@@ -38,16 +47,16 @@ library DividendManagerLib {
         uint256 perWeightDividendIncrement
     ) {
         newDividendPoolBalance = dividendPoolBalance + amount;
-        require(newDividendPoolBalance >= dividendPoolBalance, "DM: Overflow");
+        if (newDividendPoolBalance < dividendPoolBalance) revert DM_Lib_Overflow();
 
         perWeightDividendIncrement = 0;
         if (totalWeight > 0) {
             if (amount > 0) {
-                require(type(uint256).max / amount >= SCALE, "DM: Scale overflow");
+                if (type(uint256).max / amount < SCALE) revert DM_Lib_ScaleOverflow();
             }
             perWeightDividendIncrement = (amount * SCALE) / totalWeight;
             newCumulativePerWeightDividend = cumulativePerWeightDividend + perWeightDividendIncrement;
-            require(newCumulativePerWeightDividend >= cumulativePerWeightDividend, "DM: Cum overflow");
+            if (newCumulativePerWeightDividend < cumulativePerWeightDividend) revert DM_Lib_CumOverflow();
         } else {
             newCumulativePerWeightDividend = cumulativePerWeightDividend;
         }
@@ -63,7 +72,7 @@ library DividendManagerLib {
             snapshots.push(snapshot);
             newSnapshotStartIndex = snapshotStartIndex;
         } else {
-            require(snapshotStartIndex < MAX_SNAPSHOTS, "DM: Invalid index");
+            if (snapshotStartIndex >= MAX_SNAPSHOTS) revert DM_Lib_InvalidIndex();
             snapshots[snapshotStartIndex] = snapshot;
             newSnapshotStartIndex = (snapshotStartIndex + 1) % MAX_SNAPSHOTS;
         }
@@ -74,7 +83,7 @@ library DividendManagerLib {
         uint256 snapshotStartIndex,
         uint256 index
     ) internal view returns (uint256 totalWeight, uint256 totalDividend, uint256 perWeightDividend, uint256 timestamp) {
-        require(index < snapshots.length, "DM: Invalid index");
+        if (index >= snapshots.length) revert DM_Lib_InvalidIndex();
         uint256 actualIndex = getActualIndex(index, snapshotStartIndex, snapshots.length);
         DividendSnapshot storage snapshot = snapshots[actualIndex];
         return (snapshot.totalWeight, snapshot.totalDividend, snapshot.perWeightDividend, snapshot.timestamp);
@@ -96,8 +105,8 @@ library DividendManagerLib {
         uint256 count
     ) internal view returns (DividendSnapshot[] memory) {
         uint256 totalCount = snapshots.length;
-        require(startIndex < totalCount, "DM: Invalid start");
-        require(count > 0, "DM: Invalid count");
+        if (startIndex >= totalCount) revert DM_Lib_InvalidStart();
+        if (count == 0) revert DM_Lib_InvalidCount();
 
         uint256 endIndex = startIndex + count;
         if (endIndex > totalCount) {
@@ -114,7 +123,7 @@ library DividendManagerLib {
     }
 
     function getWeightConfig(address authorizer) internal view returns (uint256[5] memory normalWeights, uint256[5] memory rareWeights) {
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(\"nftData\");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
         if (nftDataAddr != address(0)) {
             bool hasData = true;
             for (uint8 i = 0; i < 5; i++) {
@@ -173,7 +182,7 @@ library DividendManagerLib {
     function getWeightByConfig(uint256 level, bool isRare, address authorizer) internal view returns (uint256) {
         if (level == 0) return 0;
 
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(\"nftData\");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
         if (nftDataAddr != address(0)) {
             try INFTData(nftDataAddr).getWeightByLevel(uint8(level), isRare) returns (uint256 w) {
                 if (w > 0) return w;
@@ -198,5 +207,65 @@ library DividendManagerLib {
             return weights[level - 1];
         }
         return weights[MAX_NFT_LEVEL - 1];
+    }
+
+    function settlePendingDividend(
+        mapping(uint256 => mapping(address => uint256)) storage pendingDividends,
+        uint256 currentEpoch,
+        address user,
+        uint256 userWeight,
+        uint256 cumulativePerWeightDividend,
+        uint256 userCumulativeSnapshot
+    ) internal {
+        if (userWeight == 0 || cumulativePerWeightDividend <= userCumulativeSnapshot) {
+            return;
+        }
+        uint256 cumulativeDiff = cumulativePerWeightDividend - userCumulativeSnapshot;
+        uint256 weightedProduct = userWeight * cumulativeDiff;
+        if (weightedProduct / userWeight != cumulativeDiff) revert DM_Lib_PendingOverflow();
+        uint256 pending = weightedProduct / SCALE;
+        uint256 newPending = pendingDividends[currentEpoch][user] + pending;
+        if (newPending < pendingDividends[currentEpoch][user]) revert DM_Lib_PendingOverflow();
+        pendingDividends[currentEpoch][user] = newPending;
+    }
+
+    function autoSyncDividendPool(
+        address authorizer,
+        uint256 lastAutoSyncTime,
+        uint256 autoSyncInterval,
+        uint256 lastSyncedBalance,
+        uint256 totalWeight,
+        uint256 dividendPoolBalance,
+        uint256 cumulativePerWeightDividend,
+        DividendSnapshot[] storage snapshots,
+        uint256 snapshotStartIndex
+    ) internal returns (
+        uint256 newLastSyncedBalance,
+        uint256 newLastAutoSyncTime,
+        uint256 newDividendPoolBalance,
+        uint256 newCumulativePerWeightDividend,
+        uint256 newSnapshotStartIndex
+    ) {
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        if (tokenContract == address(0)) {
+            return (lastSyncedBalance, lastAutoSyncTime, dividendPoolBalance, cumulativePerWeightDividend, snapshotStartIndex);
+        }
+
+        if (block.timestamp < lastAutoSyncTime + autoSyncInterval) {
+            return (lastSyncedBalance, lastAutoSyncTime, dividendPoolBalance, cumulativePerWeightDividend, snapshotStartIndex);
+        }
+
+        IERC20 token = IERC20(tokenContract);
+        uint256 currentBalance = token.balanceOf(address(this));
+
+        if (currentBalance <= lastSyncedBalance) {
+            return (currentBalance, block.timestamp, dividendPoolBalance, cumulativePerWeightDividend, snapshotStartIndex);
+        }
+
+        uint256 newFunds = currentBalance - lastSyncedBalance;
+        (newDividendPoolBalance, newCumulativePerWeightDividend, newSnapshotStartIndex, ) =
+            addToDividendPool(newFunds, totalWeight, dividendPoolBalance, cumulativePerWeightDividend, snapshots, snapshotStartIndex);
+
+        return (currentBalance, block.timestamp, newDividendPoolBalance, newCumulativePerWeightDividend, newSnapshotStartIndex);
     }
 }

@@ -1256,8 +1256,9 @@
 
         async function checkApprovalForAll() {
             if (!account || !nftMintContract) return false;
-            console.log('[TRADING] checkApprovalForAll: checking approval for', account, 'to', ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftTrading);
-            const approval = await nftMintContract.methods.isApprovedForAll(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftTrading).call();
+            const tradingAddress = await window.ZODIAC_WEB3.getContractAddress('nftTrading');
+            console.log('[TRADING] checkApprovalForAll: checking approval for', account, 'to', tradingAddress);
+            const approval = await nftMintContract.methods.isApprovedForAll(account, tradingAddress).call();
             console.log('[TRADING] checkApprovalForAll result:', approval);
             return approval;
         }
@@ -1274,7 +1275,7 @@
             if (!confirm) return;
             
             try {
-                await ZODIAC_WEB3.setNFTApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftTrading, true);
+                await ZODIAC_WEB3.setNFTApprovalForAll(await window.ZODIAC_WEB3.getContractAddress('nftTrading'), true);
                 ZODIAC_UI.showToast('授权成功！', 'success');
             } catch (error) {
                 ZODIAC_UI.showToast('授权失败: ' + (error.message || '未知错误'), 'error');

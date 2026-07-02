@@ -1,4 +1,4 @@
-﻿﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -51,23 +51,23 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     uint256 public bnbRewardPoolBalance;
     
     /** @dev 滑点保护参数（默认1000 = 10%容差） */
-    uint256 public slippage = 1000;
+    uint256 private _slippage = 1000;
     
     /** @dev 每日释放比例（万分比，默认1% = 100/10000） */
-    uint256 public rewardRate = 100;
+    uint256 private _rewardRate = 100;
     /** @dev 最大每日释放比例（万分比） */
-    uint256 public maxRewardRate = 500;
+    uint256 private _maxRewardRate = 500;
     /** @dev 每日最大释放百分比（10% = 100/1000） */
-    uint256 public maxDailyRewardPercent = 100;
+    uint256 private _maxDailyRewardPercent = 100;
     /** @dev 奖励率调整步长（万分比，10 = 0.1%） */
-    uint256 public rateStep = 10;
+    uint256 private _rateStep = 10;
     
     /** @dev 今日开始时间 */
-    uint256 public todayStart;
+    uint256 private _todayStart;
     /** @dev 今日已释放奖励金额 */
-    uint256 public todayRewardAmount;
+    uint256 private _todayRewardAmount;
     /** @dev 今日流入代币数量 */
-    uint256 public todayIncomingTokens;
+    uint256 private _todayIncomingTokens;
     
     /** @dev 全局奖励累积值（每单位权重的奖励）- 用于LP和TOKEN类型 */
     uint256 public globalRewardPerWeight;
@@ -76,7 +76,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     uint256 public epoch;
     
     /** @dev 用户奖励快照权重映射（epoch => 地址 => 用户快照） */
-    mapping(uint256 => mapping(address => uint256)) public userRewardSnapshotWeight;
+    mapping(uint256 => mapping(address => uint256)) private _userRewardSnapshotWeight;
     
     /** @dev 质押奖励精度缩放因子（1e18） */
     uint256 public constant STAKING_REWARD_PRECISION = 1e18;
@@ -86,7 +86,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     /** @dev 总质押权重（从主合约同步） */
     uint256 public totalWeightedNFTs;
 
-    error InvalidAmount();
+    error InvalidParam();
     error Unauthorized();
     error InsufficientLP();
     error InsufficientToken();
@@ -95,11 +95,9 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
     error SameRewardType();
     error SameDEXType();
     error InvalidDexType();
-    error AmountZero();
-    error NotAuthorizer();
     error ContractPaused();
     error AlreadyInitialized();
-    error InvalidRecipient();
+    error SLP_BNBTransferFailed();
 
     /** @dev LP奖励领取事件 */
     event LPRewardClaimed(address indexed user, uint256 lpAmount);
@@ -134,7 +132,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param _authorizerAddress 授权合约地址
      */
     function initialize(address _authorizerAddress) external initializer {
-        if (_authorizerAddress == address(0)) revert InvalidAmount();
+        if (_authorizerAddress == address(0)) revert InvalidParam();
         
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
@@ -144,23 +142,21 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         authorizer = _authorizerAddress;
         rewardType = RewardType.BNB;
         
-        slippage = 1000;
+        _slippage = 1000;
         
-        rewardRate = 100;
-        maxRewardRate = 500;
-        maxDailyRewardPercent = 100;
-        rateStep = 10;
-        todayStart = 0;
-        todayRewardAmount = 0;
-        todayIncomingTokens = 0;
+        _rewardRate = 100;
+        _maxRewardRate = 500;
+        _maxDailyRewardPercent = 100;
+        _rateStep = 10;
+        _todayStart = 0;
+        _todayRewardAmount = 0;
+        _todayIncomingTokens = 0;
         globalRewardPerWeight = 0;
         totalWeightedNFTs = 0;
         epoch = 1;
     }
     
-    function _currentEpoch() internal view returns (uint256) {
-        return epoch;
-    }
+    
 
     /**
      * @dev 仅owner或authorizer的修饰符
@@ -200,7 +196,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param _authorizerAddress 新的授权合约地址
      */
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
-        if (_authorizerAddress == address(0)) revert InvalidAmount();
+        if (_authorizerAddress == address(0)) revert InvalidParam();
         authorizer = _authorizerAddress;
     }
 
@@ -220,7 +216,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param amount BNB数量
      */
     function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
-        if (amount == 0) revert AmountZero();
+        if (amount == 0) revert InvalidParam();
         StakingLPLib.RewardPoolState memory state = _getPoolState();
         state = StakingLPLib.processIncomingBNB(state, IAuthorizer(authorizer), rewardType, amount);
         _setPoolState(state);
@@ -232,8 +228,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param amount 代币数量
      */
     function receiveToken(address token, uint256 amount) external onlyOwnerOrAuthorizer {
-        if (token == address(0)) revert InvalidAmount();
-        if (amount == 0) revert AmountZero();
+        if (token == address(0)) revert InvalidParam();
+        if (amount == 0) revert InvalidParam();
         
         IBEP20(token).transferFrom(msg.sender, address(this), amount);
         StakingLPLib.RewardPoolState memory state = _getPoolState();
@@ -253,13 +249,13 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             globalRewardPerWeight: globalRewardPerWeight,
             stakingRewardPrecision: STAKING_REWARD_PRECISION,
             rewardType: rewardType,
-            todayStart: todayStart,
-            rewardRate: rewardRate,
-            maxRewardRate: maxRewardRate,
-            maxDailyRewardPercent: maxDailyRewardPercent,
-            rateStep: rateStep,
-            todayRewardAmount: todayRewardAmount,
-            todayIncomingTokens: todayIncomingTokens,
+            todayStart: _todayStart,
+            rewardRate: _rewardRate,
+            maxRewardRate: _maxRewardRate,
+            maxDailyRewardPercent: _maxDailyRewardPercent,
+            rateStep: _rateStep,
+            todayRewardAmount: _todayRewardAmount,
+            todayIncomingTokens: _todayIncomingTokens,
             rewardPrecision: REWARD_PRECISION
         });
     }
@@ -273,10 +269,10 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         bnbRewardPoolBalance = state.bnbRewardPoolBalance;
         totalWeightedNFTs = state.totalWeightedNFTs;
         globalRewardPerWeight = state.globalRewardPerWeight;
-        todayStart = state.todayStart;
-        rewardRate = state.rewardRate;
-        todayRewardAmount = state.todayRewardAmount;
-        todayIncomingTokens = state.todayIncomingTokens;
+        _todayStart = state.todayStart;
+        _rewardRate = state.rewardRate;
+        _todayRewardAmount = state.todayRewardAmount;
+        _todayIncomingTokens = state.todayIncomingTokens;
     }
 
     /**
@@ -293,7 +289,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param snapshotWeight 用户快照权重
      */
     function syncUserWeight(address user, uint256 snapshotWeight) external onlyOwnerOrAuthorizer {
-        userRewardSnapshotWeight[_currentEpoch()][user] = snapshotWeight;
+        _userRewardSnapshotWeight[epoch][user] = snapshotWeight;
     }
 
     /**
@@ -326,26 +322,24 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @dev 领取奖励
      */
     function claimLPReward() external nonReentrant whenNotPaused {
-        address staking = IAuthorizer(authorizer).getAddressByName(\"staking\");
+        address staking = IAuthorizer(authorizer).getAddressByName("staking");
         uint256 userWeight = IStaking(staking).userStakedWeight(msg.sender);
         if (userWeight == 0) revert NoStakedNFTs();
 
         RewardType currentType = rewardType;
         
         if (currentType == RewardType.BNB) {
-            uint256 reward = bnbRewardPoolBalance * userWeight / totalWeightedNFTs;
-            if (reward > 0 && reward <= bnbRewardPoolBalance) {
+            uint256 reward = StakingLPLib.claimBNBReward(bnbRewardPoolBalance, userWeight, totalWeightedNFTs, msg.sender);
+            if (reward > 0) {
                 bnbRewardPoolBalance -= reward;
-                (bool success, ) = payable(msg.sender).call{value: reward}("");
-                require(success, "StakingLP: BNB transfer failed");
                 emit BNBRewardClaimed(msg.sender, reward);
             }
             return;
         }
 
-        uint256 currentEpoch = _currentEpoch();
+        uint256 currentEpoch = epoch;
         uint256 rewardBase = globalRewardPerWeight * userWeight;
-        uint256 snapshotBase = userRewardSnapshotWeight[currentEpoch][msg.sender];
+        uint256 snapshotBase = _userRewardSnapshotWeight[currentEpoch][msg.sender];
         
         if (rewardBase <= snapshotBase) {
             return;
@@ -361,11 +355,11 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         } else if (currentType == RewardType.TOKEN) {
             if (reward > tokenRewardPoolBalance) revert InsufficientToken();
             tokenRewardPoolBalance -= reward;
-            IERC20(IAuthorizer(authorizer).getAddressByName(\"token\")).safeTransfer(msg.sender, reward);
+            IERC20(IAuthorizer(authorizer).getAddressByName("token")).safeTransfer(msg.sender, reward);
             emit TokenRewardClaimed(msg.sender, reward);
         }
 
-        userRewardSnapshotWeight[currentEpoch][msg.sender] = globalRewardPerWeight;
+        _userRewardSnapshotWeight[currentEpoch][msg.sender] = globalRewardPerWeight;
     }
 
     /**
@@ -374,7 +368,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @return 待领取奖励金额
      */
     function getPendingLPReward(address user) external view returns (uint256) {
-        address staking = IAuthorizer(authorizer).getAddressByName(\"staking\");
+        address staking = IAuthorizer(authorizer).getAddressByName("staking");
         uint256 userWeight = IStaking(staking).userStakedWeight(user);
         if (userWeight == 0) return 0;
 
@@ -384,9 +378,9 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
             return bnbRewardPoolBalance * userWeight / (totalWeightedNFTs + 1);
         }
         
-        uint256 currentEpoch = _currentEpoch();
+        uint256 currentEpoch = epoch;
         uint256 rewardBase = globalRewardPerWeight * userWeight;
-        uint256 snapshotBase = userRewardSnapshotWeight[currentEpoch][user];
+        uint256 snapshotBase = _userRewardSnapshotWeight[currentEpoch][user];
         
         if (rewardBase <= snapshotBase) {
             return 0;
@@ -424,39 +418,39 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
 
     /**
      * @dev 设置滑点保护参数
-     * @param _slippage 新的滑点参数
+     * @param __slippage 新的滑点参数
      */
-    function setSlippage(uint256 _slippage) external onlyOwner {
-        if (_slippage == 0 || _slippage > 10000) revert InvalidAmount();
-        slippage = _slippage;
+    function setSlippage(uint256 __slippage) external onlyOwner {
+        if (__slippage == 0 || __slippage > 10000) revert InvalidParam();
+        _slippage = __slippage;
     }
 
     /**
      * @dev 设置每日释放比例
-     * @param _rewardRate 新的奖励率（万分比）
+     * @param __rewardRate 新的奖励率（万分比）
      */
-    function setRewardRate(uint256 _rewardRate) external onlyOwner {
-        if (_rewardRate == 0 || _rewardRate > maxRewardRate) revert InvalidAmount();
-        rewardRate = _rewardRate;
-        emit RewardRateUpdated(_rewardRate);
+    function setRewardRate(uint256 __rewardRate) external onlyOwner {
+        if (__rewardRate == 0 || __rewardRate > _maxRewardRate) revert InvalidParam();
+        _rewardRate = __rewardRate;
+        emit RewardRateUpdated(__rewardRate);
     }
 
     /**
      * @dev 设置最大每日释放比例
-     * @param _maxRewardRate 最大奖励率（万分比）
+     * @param __maxRewardRate 最大奖励率（万分比）
      */
-    function setMaxRewardRate(uint256 _maxRewardRate) external onlyOwner {
-        if (_maxRewardRate < rewardRate) revert InvalidAmount();
-        maxRewardRate = _maxRewardRate;
+    function setMaxRewardRate(uint256 __maxRewardRate) external onlyOwner {
+        if (__maxRewardRate < _rewardRate) revert InvalidParam();
+        _maxRewardRate = __maxRewardRate;
     }
 
     /**
      * @dev 设置每日最大释放百分比
-     * @param _percent 百分比（千分比，100 = 10%）
+     * @param __percent 百分比（千分比，100 = 10%）
      */
-    function setMaxDailyRewardPercent(uint256 _percent) external onlyOwner {
-        if (_percent == 0 || _percent > 500) revert InvalidAmount();
-        maxDailyRewardPercent = _percent;
+    function setMaxDailyRewardPercent(uint256 __percent) external onlyOwner {
+        if (__percent == 0 || __percent > 500) revert InvalidParam();
+        _maxDailyRewardPercent = __percent;
     }
 
     /**
@@ -464,7 +458,7 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     function shouldCalculateDailyReward() public view returns (bool) {
         uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
-        return currentDayStart > todayStart;
+        return currentDayStart > _todayStart;
     }
 
     /**
@@ -482,20 +476,20 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      */
     function recordIncomingTokens(uint256 amount) external onlyOwnerOrAuthorizer {
         uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
-        if (currentDayStart != todayStart) {
-            todayStart = currentDayStart;
-            todayIncomingTokens = 0;
+        if (currentDayStart != _todayStart) {
+            _todayStart = currentDayStart;
+            _todayIncomingTokens = 0;
         }
-        todayIncomingTokens += amount;
+        _todayIncomingTokens += amount;
     }
 
     /**
      * @dev 设置奖励率调整步长
-     * @param _rateStep 调整步长（万分比）
+     * @param __rateStep 调整步长（万分比）
      */
-    function setRateStep(uint256 _rateStep) external onlyOwner {
-        if (_rateStep == 0) revert InvalidAmount();
-        rateStep = _rateStep;
+    function setRateStep(uint256 __rateStep) external onlyOwner {
+        if (__rateStep == 0) revert InvalidParam();
+        _rateStep = __rateStep;
     }
 
     // ============================================================
@@ -508,8 +502,8 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param to 接收地址
      */
     function withdrawToken(address token, address to) external onlyOwner {
-        if (token == address(0)) revert InvalidAmount();
-        if (to == address(0)) revert InvalidRecipient();
+        if (token == address(0)) revert InvalidParam();
+        if (to == address(0)) revert InvalidParam();
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
             IERC20(token).safeTransfer(to, balance);
@@ -521,16 +515,16 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
      * @param to 接收地址
      */
     function withdrawBNB(address to) external onlyOwner {
-        if (to == address(0)) revert InvalidRecipient();
+        if (to == address(0)) revert InvalidParam();
         uint256 balance = address(this).balance;
         if (balance > 0) {
             (bool success, ) = payable(to).call{value: balance}("");
-            require(success, "StakingLP: BNB transfer failed");
+            if (!success) revert SLP_BNBTransferFailed();
         }
     }
 
     function userRewardSnapshotWeight(address user) external view returns (uint256) {
-        return userRewardSnapshotWeight[_currentEpoch()][user];
+        return _userRewardSnapshotWeight[epoch][user];
     }
 
     event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
@@ -543,17 +537,14 @@ contract StakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         bnbRewardPoolBalance = 0;
         globalRewardPerWeight = 0;
         totalWeightedNFTs = 0;
-        todayStart = 0;
-        todayRewardAmount = 0;
-        todayIncomingTokens = 0;
-        rewardRate = 100;
-        slippage = 1000;
+        _todayStart = 0;
+        _todayRewardAmount = 0;
+        _todayIncomingTokens = 0;
+        _rewardRate = 100;
+        _slippage = 1000;
         
         emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }
 
-    /**
-     * @dev Fallback函数
-     */
-    fallback() external payable {}
+    
 }

@@ -1187,7 +1187,7 @@
         async function stakeNFTs() {
             if (selectedNFTs.length === 0) return;
 
-            const stakingAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.staking;
+            const stakingAddress = await window.ZODIAC_WEB3.getContractAddress('staking');
             if (!stakingAddress || stakingAddress === '0x0000000000000000000000000000000000000000') {
                 ZODIAC_UI.showToast('质押合约地址未配置，请联系管理员部署合约', 'error');
                 return;
@@ -1208,7 +1208,7 @@
             btn.textContent = '质押中...';
 
             try {
-                const stakingAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.staking;
+                const stakingAddress = await window.ZODIAC_WEB3.getContractAddress('staking');
                 
                 const tokenIdsNum = selectedNFTs.map(id => parseInt(id, 10));
                 
@@ -1421,7 +1421,7 @@
                 return;
             }
 
-            const tokenStakingAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenStaking;
+            const tokenStakingAddress = await window.ZODIAC_WEB3.getContractAddress('tokenStaking');
             if (!tokenStakingAddress || tokenStakingAddress === '0x0000000000000000000000000000000000000000') {
                 ZODIAC_UI.showToast('代币质押合约地址未配置', 'error');
                 return;

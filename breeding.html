@@ -1014,7 +1014,7 @@
                     throw new Error('请先连接钱包');
                 }
 
-                const breedingCoreAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.breedingCore;
+                const breedingCoreAddress = await window.ZODIAC_WEB3.getContractAddress('breedingCore');
                 if (!breedingCoreAddress) {
                     throw new Error('孕育合约地址未配置');
                 }
@@ -1865,7 +1865,7 @@
                 return;
             }
 
-            const breedingCoreAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.breedingCore;
+            const breedingCoreAddress = await window.ZODIAC_WEB3.getContractAddress('breedingCore');
             if (!breedingCoreAddress) {
                 ZODIAC_UI.showToast('孕育合约地址未配置', 'error');
                 return;
@@ -1891,7 +1891,7 @@
             if (breedingCoreContract) {
                 const feeWei = await breedingCoreContract.methods.marketBreedingFee().call();
                 if (BigInt(feeWei) > BigInt(0)) {
-                    const tokenAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenContract;
+                    const tokenAddress = await window.ZODIAC_WEB3.getContractAddress('tokenContract');
                     if (tokenAddress) {
                         const tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
                         if (tokenContract) {

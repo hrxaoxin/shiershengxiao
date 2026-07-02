@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -7,13 +7,25 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
-import "./LPLib.sol";
 import "./ArenaRewardLPLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using ArenaRewardLPLib for ArenaRewardLPLib.RewardPool;
     using SafeERC20 for IERC20;
+    
+    error ARLP_InvalidAuthorizer();
+    error ARLP_AuthorizerNotSet();
+    error ARLP_NotAuthorized();
+    error ARLP_AmountMustBePositive();
+    error ARLP_InvalidTokenAddress();
+    error ARLP_ArraysLengthMismatch();
+    error ARLP_InvalidRewardRate();
+    error ARLP_MaxRateTooLow();
+    error ARLP_InvalidPercent();
+    error ARLP_StepMustBePositive();
+    error ARLP_InvalidRecipient();
+    error ARLP_BNBTransferFailed();
     
     address public authorizer;
     uint256 public constant MAX_EPOCHS = 50;
@@ -45,7 +57,7 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function initialize(address _authorizerAddress) external initializer {
-        require(_authorizerAddress != address(0), "ArenaRewardLP: Invalid authorizer");
+        if (_authorizerAddress == address(0)) revert ARLP_InvalidAuthorizer();
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -79,9 +91,9 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
             _;
             return;
         }
-        require(authorizer != address(0), "ArenaRewardLP: Authorizer not set");
+        if (authorizer == address(0)) revert ARLP_AuthorizerNotSet();
         IAuthorizer auth = IAuthorizer(authorizer);
-        require(auth.isSystemContract(msg.sender), "ArenaRewardLP: Not authorized");
+        if (!auth.isSystemContract(msg.sender)) revert ARLP_NotAuthorized();
         _;
     }
 
@@ -92,19 +104,19 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
-        require(amount > 0, "ArenaRewardLP: Amount must be > 0");
+        if (amount == 0) revert ARLP_AmountMustBePositive();
         _pool.processIncomingBNB(IAuthorizer(authorizer), amount);
     }
 
     function receiveToken(address token, uint256 amount) external onlyOwnerOrAuthorizer {
-        require(token != address(0), "ArenaRewardLP: Invalid token address");
-        require(amount > 0, "ArenaRewardLP: Amount must be > 0");
+        if (token == address(0)) revert ARLP_InvalidTokenAddress();
+        if (amount == 0) revert ARLP_AmountMustBePositive();
         IBEP20(token).transferFrom(msg.sender, address(this), amount);
         _pool.processIncomingToken(IAuthorizer(authorizer), token, amount);
     }
 
     function receiveMultipleTokens(address[] calldata tokens, uint256[] calldata amounts) external onlyOwnerOrAuthorizer {
-        require(tokens.length == amounts.length, "ArenaRewardLP: Arrays length mismatch");
+        if (tokens.length != amounts.length) revert ARLP_ArraysLengthMismatch();
         for (uint256 i = 0; i < tokens.length; i++) {
             if (amounts[i] > 0) {
                 IBEP20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
@@ -124,42 +136,42 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function compoundFees() external onlyOwner {
-        LPLib.compoundFees(IAuthorizer(authorizer));
+        ArenaRewardLPLib.compoundFees(IAuthorizer(authorizer));
     }
 
     function claimLPReward(uint256 seasonId) external nonReentrant whenNotPaused returns (uint256) {
-        address arenaReward = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
+        address arenaReward = IAuthorizer(authorizer).getAddressByName("arenaReward");
         uint256 reward = IArenaReward(arenaReward).getPendingRewardsByPlayer(msg.sender, seasonId);
         return _pool.claimReward(IAuthorizer(authorizer), msg.sender, seasonId, reward, arenaReward);
     }
 
     function getPendingLPReward(address user, uint256 seasonId) external view returns (uint256) {
-        address arenaReward = IAuthorizer(authorizer).getAddressByName(\"arenaReward\");
+        address arenaReward = IAuthorizer(authorizer).getAddressByName("arenaReward");
         return _pool.getPendingReward(user, seasonId, arenaReward);
     }
 
     function emergencyWithdrawWBNB(uint256 amount) external onlyOwner nonReentrant {
-        LPLib.emergencyWithdrawWBNB(IAuthorizer(authorizer), amount);
+        ArenaRewardLPLib.emergencyWithdrawWBNB(IAuthorizer(authorizer), amount);
     }
 
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
-        require(_authorizerAddress != address(0), "ArenaRewardLP: Invalid authorizer");
+        if (_authorizerAddress == address(0)) revert ARLP_InvalidAuthorizer();
         authorizer = _authorizerAddress;
     }
 
     function setRewardRate(uint256 _rewardRate) external onlyOwner {
-        require(_rewardRate > 0 && _rewardRate <= _pool.maxRewardRate, "ArenaRewardLP: Invalid reward rate");
+        if (_rewardRate == 0 || _rewardRate > _pool.maxRewardRate) revert ARLP_InvalidRewardRate();
         _pool.rewardRate = _rewardRate;
         emit RewardRateUpdated(_rewardRate);
     }
 
     function setMaxRewardRate(uint256 _maxRewardRate) external onlyOwner {
-        require(_maxRewardRate >= _pool.rewardRate, "ArenaRewardLP: Max rate must be >= current rate");
+        if (_maxRewardRate < _pool.rewardRate) revert ARLP_MaxRateTooLow();
         _pool.maxRewardRate = _maxRewardRate;
     }
 
     function setMaxDailyRewardPercent(uint256 _percent) external onlyOwner {
-        require(_percent > 0 && _percent <= 500, "ArenaRewardLP: Invalid percent");
+        if (_percent == 0 || _percent > 500) revert ARLP_InvalidPercent();
         _pool.maxDailyRewardPercent = _percent;
     }
 
@@ -176,13 +188,13 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function setRateStep(uint256 _rateStep) external onlyOwner {
-        require(_rateStep > 0, "ArenaRewardLP: Step must be > 0");
+        if (_rateStep == 0) revert ARLP_StepMustBePositive();
         _pool.rateStep = _rateStep;
     }
 
     function withdrawToken(address token, address to) external onlyOwner {
-        require(token != address(0), "ArenaRewardLP: Invalid token");
-        require(to != address(0), "ArenaRewardLP: Invalid recipient");
+        if (token == address(0)) revert ARLP_InvalidTokenAddress();
+        if (to == address(0)) revert ARLP_InvalidRecipient();
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
             IERC20(token).safeTransfer(to, balance);
@@ -190,11 +202,11 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function withdrawBNB(address to) external onlyOwner {
-        require(to != address(0), "ArenaRewardLP: Invalid recipient");
+        if (to == address(0)) revert ARLP_InvalidRecipient();
         uint256 balance = address(this).balance;
         if (balance > 0) {
             (bool success, ) = payable(to).call{value: balance}("");
-            require(success, "ArenaRewardLP: BNB transfer failed");
+            if (!success) revert ARLP_BNBTransferFailed();
         }
     }
 

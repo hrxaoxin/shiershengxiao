@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
@@ -26,6 +26,9 @@ library TokenStakingLPLib {
     error RP_LPOverflow();
     error RP_TokenOverflow();
     error RP_BNBOverflow();
+    error TSL_BNBTransferFailed();
+    error TSL_AmountZero();
+    error TSL_InsufficientWBNB();
 
     event LPAddedToPool(uint256 lpAmount);
     event TokenAddedToPool(uint256 tokenAmount);
@@ -34,23 +37,23 @@ library TokenStakingLPLib {
     function getConfig(IAuthorizer authorizer, uint8 dexType) internal view returns (LPConfig memory) {
         address router;
         if (dexType == 0) {
-            router = authorizer.getAddressByName(\"flapSwapRouter\");
+            router = authorizer.getAddressByName("flapSwapRouter");
         } else if (dexType == 1) {
-            router = authorizer.getAddressByName(\"pancakeSwapRouter\");
+            router = authorizer.getAddressByName("pancakeSwapRouter");
         } else {
-            router = authorizer.getAddressByName(\"uniswapRouter\");
+            router = authorizer.getAddressByName("uniswapRouter");
         }
         
         address lpToken = address(0);
         if (router != address(0)) {
             try IDexRouter(router).factory() returns (address factory) {
-                lpToken = IDexFactory(factory).getPair(authorizer.getAddressByName(\"token\"), authorizer.getAddressByName(\"wbnb\"));
+                lpToken = IDexFactory(factory).getPair(authorizer.getAddressByName("token"), authorizer.getAddressByName("wbnb"));
             } catch {}
         }
         
         return LPConfig({
-            token: authorizer.getAddressByName(\"token\"),
-            wbnb: authorizer.getAddressByName(\"wbnb\"),
+            token: authorizer.getAddressByName("token"),
+            wbnb: authorizer.getAddressByName("wbnb"),
             router: router,
             slippage: 1000,
             lpToken: lpToken
@@ -413,8 +416,8 @@ library TokenStakingLPLib {
         address token,
         uint256 amount
     ) internal returns (RewardPoolState memory) {
-        address wbnb = authorizer.getAddressByName(\"wbnb\");
-        address mainToken = authorizer.getAddressByName(\"token\");
+        address wbnb = authorizer.getAddressByName("wbnb");
+        address mainToken = authorizer.getAddressByName("token");
 
         if (token == wbnb) {
             if (rewardType == RewardType.LP) {
@@ -456,7 +459,7 @@ library TokenStakingLPLib {
     }
 
     function compoundFees(IAuthorizer authorizer) internal {
-        address wbnb = authorizer.getAddressByName(\"wbnb\");
+        address wbnb = authorizer.getAddressByName("wbnb");
         uint256 balance = IWBNB(wbnb).balanceOf(address(this));
 
         if (balance >= 1000000000000000) {
@@ -495,8 +498,8 @@ library TokenStakingLPLib {
     }
 
     function _transferRewards(IAuthorizer authorizer, address user, uint256 tokenAmount, uint256 wbnbAmount) internal {
-        address token = authorizer.getAddressByName(\"token\");
-        address wbnb = authorizer.getAddressByName(\"wbnb\");
+        address token = authorizer.getAddressByName("token");
+        address wbnb = authorizer.getAddressByName("wbnb");
 
         if (tokenAmount > 0) {
             IERC20(token).safeTransfer(user, tokenAmount);
@@ -505,18 +508,18 @@ library TokenStakingLPLib {
         if (wbnbAmount > 0) {
             IWBNB(wbnb).withdraw(wbnbAmount);
             (bool success, ) = payable(user).call{value: wbnbAmount}("");
-            require(success, "BNB transfer failed");
+            if (!success) revert TSL_BNBTransferFailed();
         }
     }
 
     function emergencyWithdrawWBNB(IAuthorizer authorizer, uint256 amount) internal {
-        address wbnb = authorizer.getAddressByName(\"wbnb\");
-        require(amount > 0, "Amount must be > 0");
-        require(IWBNB(wbnb).balanceOf(address(this)) >= amount, "Insufficient WBNB");
+        address wbnb = authorizer.getAddressByName("wbnb");
+        if (amount == 0) revert TSL_AmountZero();
+        if (IWBNB(wbnb).balanceOf(address(this)) < amount) revert TSL_InsufficientWBNB();
 
         IWBNB(wbnb).withdraw(amount);
         (bool success, ) = payable(msg.sender).call{value: amount}("");
-        require(success, "BNB transfer failed");
+        if (!success) revert TSL_BNBTransferFailed();
     }
 
     function calculateRewardPerTokenIncrement(
@@ -527,7 +530,7 @@ library TokenStakingLPLib {
         uint256 rewardPrecision
     ) internal view returns (uint256) {
         if (state.rewardType == RewardType.LP || state.rewardType == RewardType.TOKEN) {
-            address tokenStaking = authorizer.getAddressByName(\"tokenStaking\");
+            address tokenStaking = authorizer.getAddressByName("tokenStaking");
             uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
             
             if (totalStaked > 0) {

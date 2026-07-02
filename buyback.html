@@ -671,7 +671,7 @@
 
             try {
                 const balance = await tokenContract.methods.balanceOf(account).call();
-                const buybackAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftBuyback;
+                const buybackAddr = await window.ZODIAC_WEB3.getContractAddress('nftBuyback');
                 const buybackBal = await tokenContract.methods.balanceOf(buybackAddr).call();
 
                 const balanceInTokens = web3.utils.fromWei(balance, 'ether');
@@ -757,7 +757,7 @@
             console.log(`[BUYBACK] hasValidTokenId: ${hasValidTokenId}`);
 
             try {
-                const balanceWei = await tokenContract.methods.balanceOf(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftBuyback).call();
+                const balanceWei = await tokenContract.methods.balanceOf(await window.ZODIAC_WEB3.getContractAddress('nftBuyback')).call();
                 const totalSupply = await nftMintContract.methods.totalSupply().call();
                 const balanceNum = parseFloat(web3.utils.fromWei(balanceWei, 'ether'));
                 
@@ -790,7 +790,7 @@
                 let totalWeight = '0';
                 
                 try {
-                    const dividendManagerAddr = ZODIAC_CONFIG.CONTRACT_ADDRESSES.dividendManager;
+                    const dividendManagerAddr = await window.ZODIAC_WEB3.getContractAddress('dividendManager');
                     if (dividendManagerAddr && dividendManagerAddr !== '0x0000000000000000000000000000000000000000') {
                         const dividendABI = [{"inputs":[],"name":"getTotalWeight","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}];
                         const dividendContract = new web3.eth.Contract(dividendABI, dividendManagerAddr);
@@ -1411,7 +1411,7 @@
 
         async function checkApproval() {
             if (!account || !nftMintContract) return false;
-            const approval = await nftMintContract.methods.isApprovedForAll(account, ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftBuyback).call();
+            const approval = await nftMintContract.methods.isApprovedForAll(account, await window.ZODIAC_WEB3.getContractAddress('nftBuyback')).call();
             return approval;
         }
 
@@ -1427,7 +1427,7 @@
             if (!confirm) return;
 
             try {
-                await ZODIAC_WEB3.setNFTApprovalForAll(ZODIAC_CONFIG.CONTRACT_ADDRESSES.nftBuyback, true);
+                await ZODIAC_WEB3.setNFTApprovalForAll(await window.ZODIAC_WEB3.getContractAddress('nftBuyback'), true);
                 ZODIAC_UI.showToast('授权成功！', 'success');
             } catch (error) {
                 ZODIAC_UI.showToast('授权失败: ' + (error.message || '未知错误'), 'error');

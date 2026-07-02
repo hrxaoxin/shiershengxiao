@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -67,29 +67,33 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     uint256 public epoch;
     
     /** @dev 用户奖励快照累积率映射（epoch => 地址 => 用户上次领取时的累积率） */
-    mapping(uint256 => mapping(address => uint256)) public lastRewardAccumulatedRate;
+    mapping(uint256 => mapping(address => uint256)) private _lastRewardAccumulatedRate;
 
     uint256 private constant DAILY_REWARD_PRECISION = 10000;
+    
+    address public handler;
 
     /** @dev 存储间隙，用于合约升级兼容性 */
-    uint256[48] private __gap;
+    uint256[47] private __gap;
 
     // Custom errors for reduced bytecode size
-    error InvalidAuthorizer();
-    error NotAuthorized();
-    error AmountZero();
-    error InvalidToken();
-    error InvalidRecipient();
-    error ArraysLengthMismatch();
-    error NoStakedTokens();
-    error InsufficientLP();
-    error InsufficientToken();
-    error InsufficientBNB();
-    error InvalidRewardRate();
-    error InvalidMaxRate();
-    error InvalidPercent();
-    error InvalidStep();
-    error AlreadyInitialized();
+    error TSLP_InvalidAuthorizer();
+    error TSLP_NotAuthorized();
+    error TSLP_AmountZero();
+    error TSLP_InvalidToken();
+    error TSLP_InvalidRecipient();
+    error TSLP_NoStakedTokens();
+    error TSLP_InsufficientLP();
+    error TSLP_InsufficientToken();
+    error TSLP_InsufficientBNB();
+    error TSLP_InvalidRewardRate();
+    error TSLP_InvalidMaxRate();
+    error TSLP_InvalidPercent();
+    error TSLP_InvalidStep();
+    error TSLP_AlreadyInitialized();
+    error TSLP_AuthorizerNotSet();
+    error TSLP_BNBTransferFailed();
+    error TSLP_InvalidHandler();
 
     /**
      * @dev LP奖励领取事件
@@ -138,17 +142,15 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         _disableInitializers();
     }
 
-    /**
-     * @dev 初始化合约
-     * @param _authorizerAddress 授权合约地址
-     */
-    function initialize(address _authorizerAddress) external initializer {
-        if (_authorizerAddress == address(0)) revert InvalidAuthorizer();
+    function initialize(address _authorizerAddress, address _handler) external initializer {
+        if (_authorizerAddress == address(0)) revert TSLP_InvalidAuthorizer();
+        if (_handler == address(0)) revert TSLP_InvalidAuthorizer();
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
         authorizer = _authorizerAddress;
+        handler = _handler;
         rewardType = RewardType.BNB;
         
         rewardRate = 100;
@@ -191,9 +193,9 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
             _;
             return;
         }
-        require(authorizer != address(0), "TokenStakingLP: Authorizer not set");
+        if (authorizer == address(0)) revert TSLP_AuthorizerNotSet();
         IAuthorizer auth = IAuthorizer(authorizer);
-        if (!auth.isSystemContract(msg.sender)) revert NotAuthorized();
+        if (!auth.isSystemContract(msg.sender)) revert TSLP_NotAuthorized();
         _;
     }
 
@@ -216,7 +218,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param amount BNB数量
      */
     function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
-        if (amount == 0) revert AmountZero();
+        if (amount == 0) revert TSLP_AmountZero();
         TokenStakingLPLib.RewardPoolState memory state = _getSimplePoolState();
         uint256 lpBefore = state.lpRewardPoolBalance;
         uint256 tokenBefore = state.tokenRewardPoolBalance;
@@ -231,8 +233,8 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param amount 代币数量
      */
     function receiveToken(address token, uint256 amount) external onlyOwnerOrAuthorizer {
-        if (token == address(0)) revert InvalidToken();
-        if (amount == 0) revert AmountZero();
+        if (token == address(0)) revert TSLP_InvalidToken();
+        if (amount == 0) revert TSLP_AmountZero();
         
         IBEP20(token).transferFrom(msg.sender, address(this), amount);
         TokenStakingLPLib.RewardPoolState memory state = _getSimplePoolState();
@@ -243,28 +245,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         _updateRewardPerToken(lpBefore, tokenBefore, state);
     }
 
-    /**
-     * @dev 批量接收多种资产
-     * @param tokens 代币地址数组
-     * @param amounts 代币数量数组
-     */
-    function receiveMultipleTokens(address[] calldata tokens, uint256[] calldata amounts) external onlyOwnerOrAuthorizer {
-        if (tokens.length != amounts.length) revert ArraysLengthMismatch();
-        
-        TokenStakingLPLib.RewardPoolState memory state = _getSimplePoolState();
-        uint256 lpBefore = state.lpRewardPoolBalance;
-        uint256 tokenBefore = state.tokenRewardPoolBalance;
-        
-        for (uint256 i = 0; i < tokens.length; i++) {
-            if (amounts[i] > 0) {
-                IBEP20(tokens[i]).transferFrom(msg.sender, address(this), amounts[i]);
-                state = TokenStakingLPLib.processIncomingToken(state, IAuthorizer(authorizer), rewardType, tokens[i], amounts[i]);
-            }
-        }
-        
-        _setSimplePoolState(state);
-        _updateRewardPerToken(lpBefore, tokenBefore, state);
-    }
+
 
     function _getSimplePoolState() internal view returns (TokenStakingLPLib.RewardPoolState memory state) {
         state.lpRewardPoolBalance = lpRewardPoolBalance;
@@ -321,51 +302,9 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         TokenStakingLPLib.compoundFees(IAuthorizer(authorizer));
     }
 
-    /**
-     * @dev 领取奖励
-     */
     function claimLPReward() external nonReentrant whenNotPaused {
-        address tokenStaking = IAuthorizer(authorizer).getAddressByName(\"tokenStaking\");
-        ITokenStaking.StakeInfo memory stake = ITokenStaking(tokenStaking).getUserStake(msg.sender);
-        if (stake.amount == 0) revert NoStakedTokens();
-
-        RewardType currentType = rewardType;
-        
-        if (currentType == RewardType.BNB) {
-            uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
-            uint256 reward = bnbRewardPoolBalance * stake.amount / (totalStaked + 1);
-            if (reward > 0 && reward <= bnbRewardPoolBalance) {
-                bnbRewardPoolBalance -= reward;
-                (bool success, ) = payable(msg.sender).call{value: reward}("");
-                require(success, "TokenStakingLP: BNB transfer failed");
-                emit BNBRewardsClaimed(msg.sender, reward);
-            }
-            return;
-        }
-
-        uint256 currentEpoch = _currentEpoch();
-        uint256 currentRate = dailyRewardPerToken;
-        uint256 lastRate = lastRewardAccumulatedRate[currentEpoch][msg.sender];
-        
-        if (currentRate <= lastRate) {
-            return;
-        }
-
-        uint256 reward = stake.amount * (currentRate - lastRate) / REWARD_PRECISION;
-        
-        if (currentType == RewardType.LP) {
-            if (reward > lpRewardPoolBalance) revert InsufficientLP();
-            lpRewardPoolBalance -= reward;
-            TokenStakingLPLib.redeemLPToUser(IAuthorizer(authorizer), reward, msg.sender);
-            emit LPRewardsClaimed(msg.sender, reward);
-        } else if (currentType == RewardType.TOKEN) {
-            if (reward > tokenRewardPoolBalance) revert InsufficientToken();
-            tokenRewardPoolBalance -= reward;
-            IERC20(IAuthorizer(authorizer).getAddressByName(\"token\")).safeTransfer(msg.sender, reward);
-            emit TokenRewardsClaimed(msg.sender, reward);
-        }
-
-        lastRewardAccumulatedRate[currentEpoch][msg.sender] = currentRate;
+        (bool success, ) = handler.delegatecall(abi.encodeWithSignature("claimLPRewardHandler()"));
+        require(success, "TSLP: DH");
     }
 
     /**
@@ -374,7 +313,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @return uint256 待领取奖励金额
      */
     function getPendingLPReward(address user) external view returns (uint256) {
-        address tokenStaking = IAuthorizer(authorizer).getAddressByName(\"tokenStaking\");
+        address tokenStaking = IAuthorizer(authorizer).getAddressByName("tokenStaking");
         ITokenStaking.StakeInfo memory stake = ITokenStaking(tokenStaking).getUserStake(user);
         if (stake.amount == 0) return 0;
 
@@ -387,7 +326,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         
         uint256 currentEpoch = _currentEpoch();
         uint256 currentRate = dailyRewardPerToken;
-        uint256 lastRate = lastRewardAccumulatedRate[currentEpoch][user];
+        uint256 lastRate = _lastRewardAccumulatedRate[currentEpoch][user];
         
         if (currentRate <= lastRate) {
             return 0;
@@ -405,13 +344,14 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         emit EmergencyWBNBWithdrawn(msg.sender, owner(), amount);
     }
 
-    /**
-     * @dev 设置授权合约地址
-     * @param _authorizerAddress 新的授权合约地址
-     */
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
-        if (_authorizerAddress == address(0)) revert InvalidAuthorizer();
+        if (_authorizerAddress == address(0)) revert TSLP_InvalidAuthorizer();
         authorizer = _authorizerAddress;
+    }
+    
+    function setHandler(address _handler) external onlyOwner {
+        if (_handler == address(0)) revert TSLP_InvalidHandler();
+        handler = _handler;
     }
 
     /**
@@ -419,7 +359,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param _rewardRate 新的奖励率（万分比）
      */
     function setRewardRate(uint256 _rewardRate) external onlyOwner {
-        if (_rewardRate == 0 || _rewardRate > maxRewardRate) revert InvalidRewardRate();
+        if (_rewardRate == 0 || _rewardRate > maxRewardRate) revert TSLP_InvalidRewardRate();
         rewardRate = _rewardRate;
         emit RewardRateUpdated(_rewardRate);
     }
@@ -429,7 +369,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param _maxRewardRate 最大奖励率（万分比）
      */
     function setMaxRewardRate(uint256 _maxRewardRate) external onlyOwner {
-        if (_maxRewardRate < rewardRate) revert InvalidMaxRate();
+        if (_maxRewardRate < rewardRate) revert TSLP_InvalidMaxRate();
         maxRewardRate = _maxRewardRate;
     }
 
@@ -438,79 +378,13 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param _percent 百分比（千分比，100 = 10%）
      */
     function setMaxDailyRewardPercent(uint256 _percent) external onlyOwner {
-        if (_percent == 0 || _percent > 500) revert InvalidPercent();
+        if (_percent == 0 || _percent > 500) revert TSLP_InvalidPercent();
         maxDailyRewardPercent = _percent;
     }
 
     function calculateDailyReward() external whenNotPaused {
-        uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
-        if (currentDayStart <= todayStart) return;
-
-        todayStart = currentDayStart;
-        rewardRate = 100;
-
-        address tokenStaking = IAuthorizer(authorizer).getAddressByName(\"tokenStaking\");
-        uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
-
-        RewardType currentType = rewardType;
-        uint256 poolBalance;
-
-        if (currentType == RewardType.LP) {
-            poolBalance = lpRewardPoolBalance;
-        } else if (currentType == RewardType.TOKEN) {
-            poolBalance = tokenRewardPoolBalance;
-        } else {
-            poolBalance = bnbRewardPoolBalance;
-        }
-
-        if (poolBalance == 0 || totalStaked == 0) {
-            todayRewardAmount = 0;
-            todayIncomingTokens = 0;
-            return;
-        }
-
-        uint256 expectedDailyReward = poolBalance * rewardRate / DAILY_REWARD_PRECISION;
-        
-        if (expectedDailyReward > 0 && todayIncomingTokens > expectedDailyReward) {
-            uint256 multiple = todayIncomingTokens / expectedDailyReward;
-            uint256 steps = multiple - 1;
-            uint256 maxSteps = (maxRewardRate - rewardRate) / rateStep;
-
-            if (steps > maxSteps) {
-                steps = maxSteps;
-            }
-
-            uint256 newRate = rewardRate + (steps * rateStep);
-            if (newRate != rewardRate) {
-                rewardRate = newRate;
-                emit RewardRateUpdated(rewardRate);
-            }
-        }
-
-        uint256 dailyReward = poolBalance * rewardRate / DAILY_REWARD_PRECISION;
-        uint256 maxDailyReward = poolBalance * maxDailyRewardPercent / 1000;
-        
-        if (dailyReward > maxDailyReward) {
-            dailyReward = maxDailyReward;
-        }
-
-        if (dailyReward > 0) {
-            uint256 increment = (dailyReward * REWARD_PRECISION) / totalStaked;
-            dailyRewardPerToken += increment;
-            todayRewardAmount = dailyReward;
-            
-            if (currentType == RewardType.LP) {
-                lpRewardPoolBalance -= dailyReward;
-            } else if (currentType == RewardType.TOKEN) {
-                tokenRewardPoolBalance -= dailyReward;
-            } else {
-                bnbRewardPoolBalance -= dailyReward;
-            }
-            
-            emit DailyRewardCalculated(dailyReward, increment);
-        }
-
-        todayIncomingTokens = 0;
+        (bool success, ) = handler.delegatecall(abi.encodeWithSignature("calculateDailyRewardHandler()"));
+        require(success, "TSLP: DH");
     }
 
     /**
@@ -531,41 +405,34 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @param _rateStep 调整步长（万分比）
      */
     function setRateStep(uint256 _rateStep) external onlyOwner {
-        if (_rateStep == 0) revert InvalidStep();
+        if (_rateStep == 0) revert TSLP_InvalidStep();
         rateStep = _rateStep;
     }
 
-    // ============================================================
-    //  紧急取款函数（仅所有者）
-    // ============================================================
-
-    function withdrawToken(address token, address to) external onlyOwner {
-        if (token == address(0)) revert InvalidToken();
-        if (to == address(0)) revert InvalidRecipient();
-        uint256 balance = IERC20(token).balanceOf(address(this));
-        if (balance > 0) {
-            IERC20(token).safeTransfer(to, balance);
+    function emergencyWithdraw(uint256 tokenType, address tokenOrTo, uint256 amount) external onlyOwner {
+        if (tokenOrTo == address(0)) revert TSLP_InvalidRecipient();
+        if (tokenType == 0) {
+            if (amount > address(this).balance) revert TSLP_InsufficientBNB();
+            (bool success, ) = payable(tokenOrTo).call{value: amount}("");
+            if (!success) revert TSLP_BNBTransferFailed();
+        } else {
+            uint256 balance = IERC20(tokenOrTo).balanceOf(address(this));
+            if (amount > balance) revert TSLP_InsufficientToken();
+            IERC20(tokenOrTo).safeTransfer(tokenOrTo, amount);
         }
     }
 
-    function withdrawBNB(address to) external onlyOwner {
-        if (to == address(0)) revert InvalidRecipient();
-        uint256 balance = address(this).balance;
-        if (balance > 0) {
-            (bool success, ) = payable(to).call{value: balance}("");
-            require(success, "TokenStakingLP: BNB transfer failed");
-        }
+    function lastRewardAccumulatedRate(address user) external view returns (uint256) {
+        return _lastRewardAccumulatedRate[_currentEpoch()][user];
     }
 
     /**
      * @dev 合约数据重置事件
      * @param operator 操作者地址
      * @param timestamp 重置时间戳
+     * @param oldEpoch 旧纪元
+     * @param newEpoch 新纪元
      */
-    function lastRewardAccumulatedRate(address user) external view returns (uint256) {
-        return lastRewardAccumulatedRate[_currentEpoch()][user];
-    }
-
     event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
 
     function resetContractData() external onlyOwnerOrAuthorizer {

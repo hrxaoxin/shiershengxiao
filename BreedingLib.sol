@@ -245,7 +245,7 @@ library BreedingLib {
         uint256 marketBreedingFee,
         address blackHole
     ) internal {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
         require(tokenContract != address(0), "BC: TNS");
         uint256 fee = breedingType == 0 ? selfBreedingFee : marketBreedingFee;
         if (fee == 0) return;
@@ -263,7 +263,7 @@ library BreedingLib {
         address to,
         uint256 tokenId
     ) internal {
-        address nftDataContract = IAuthorizer(authorizer).getAddressByName(\"nftData\");
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName("nftData");
         if (nftDataContract != address(0)) {
             try INFTDataInterface(nftDataContract).removeUserNFT(from, tokenId) {
             } catch {
@@ -273,7 +273,7 @@ library BreedingLib {
             }
         }
 
-        address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
         if (dividendManager != address(0)) {
             try IDividendManager(dividendManager).syncUserWeight(from) {
             } catch {
@@ -283,7 +283,7 @@ library BreedingLib {
             }
         }
 
-        address weightManager = IAuthorizer(authorizer).getAddressByName(\"weightManager\");
+        address weightManager = IAuthorizer(authorizer).getAddressByName("weightManager");
         if (weightManager != address(0)) {
             try IWeightManager(weightManager).syncUserWeight(from) {
             } catch {

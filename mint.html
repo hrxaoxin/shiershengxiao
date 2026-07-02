@@ -473,7 +473,7 @@
                 const account = ZODIAC_WEB3.getAccount();
                 if (!account || !tokenContract) return;
                 
-                const burnerAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenBurner;
+                const burnerAddress = await window.ZODIAC_WEB3.getContractAddress('tokenBurner');
                 
                 const allowance = await tokenContract.methods.allowance(account, burnerAddress).call();
                 const web3 = ZODIAC_WEB3.getWeb3();
@@ -530,7 +530,7 @@
                     return;
                 }
 
-                const burnerAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenBurner;
+                const burnerAddress = await window.ZODIAC_WEB3.getContractAddress('tokenBurner');
                 await ZODIAC_WEB3.approveToken(burnerAddress, '115792089237316195423570985008687907853269984665640564039457584007913129639935');
 
                 // 重新初始化合约并检查授权状态
@@ -561,7 +561,7 @@
                     return;
                 }
 
-                const burnerAddress = ZODIAC_CONFIG.CONTRACT_ADDRESSES.tokenBurner;
+                const burnerAddress = await window.ZODIAC_WEB3.getContractAddress('tokenBurner');
 
                 const mintCostWei = MINT_PRICE.toString();
                 const lightDarkCostWei = LIGHT_DARK_COST.toString();

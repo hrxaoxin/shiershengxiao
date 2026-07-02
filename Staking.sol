@@ -1,4 +1,4 @@
-﻿﻿// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -62,6 +62,36 @@ import "./StakingLib.sol";
 contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable {
     using SafeERC20 for IERC20;
 
+    error S_InvalidAuthorizerAddress();
+    error S_MinimumLevelTooLow();
+    error S_AuthorizerNotSet();
+    error S_NotAuthorized();
+    error S_Paused();
+    error S_EmptyTokenIds();
+    error S_NFTContractNotSet();
+    error S_ContractNotApproved();
+    error S_InvalidTokenId();
+    error S_AlreadyStaked();
+    error S_NotTokenOwner();
+    error S_NFTLevelBelowMinimum();
+    error S_NotOwner();
+    error S_LockPeriodNotEnded();
+    error S_SnapshotUnderflow();
+    error S_RewardTokenNotSet();
+    error S_InsufficientRewardBalance();
+    error S_NoStakedNFTs();
+    error S_NoPendingReward();
+    error S_RewardCalculationOverflow();
+    error S_TokenNotInUserStakedList();
+    error S_PendingRewardsOverflow();
+    error S_TimelockNotExpired();
+    error S_AmountMustBePositive();
+    error S_InsufficientBalance();
+    error S_BNBTransferFailed();
+    error S_InsufficientTokenBalance();
+    error S_TimelockTooShort();
+    error S_CannotResetWithActiveStakes();
+
     /**
      * @dev 构造函数：禁用初始化器，防止直接部署实现合约时的初始化攻击
      */
@@ -87,16 +117,16 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     uint256 public epoch;
     
     /** @dev 用户待领取奖励映射（epoch => 地址 => 待领取金额） */
-    mapping(uint256 => mapping(address => uint256)) public pendingRewards;
+    mapping(uint256 => mapping(address => uint256)) private _pendingRewards;
     /** @dev 今日流入合约的代币数量（用于动态奖励率调整） */
     uint256 public todayIncomingTokens;
     /** @dev 全局累积奖励（每单位权重），用于O(1)奖励计算 */
     uint256 public globalRewardPerWeight;
 
     /** @dev 用户质押的NFT总权重（epoch => 地址 => 总权重），优化getPendingReward/claimReward的Gas消耗 */
-    mapping(uint256 => mapping(address => uint256)) public userStakedWeight;
+    mapping(uint256 => mapping(address => uint256)) private _userStakedWeight;
     /** @dev 用户级别累计快照权重（epoch => 地址 => Σ(accumulatedReward * weight)），用于O(1)计算待领取奖励 */
-    mapping(uint256 => mapping(address => uint256)) private _userSnapshotWeight;
+    mapping(uint256 => mapping(address => uint256)) private _userSnapshotWeightMap;
     
     /** @dev 用户快照权重溢出保护阈值（约90%的uint256最大值），距离最大值的安全距离 */
     uint256 public constant USER_SNAPSHOT_OVERFLOW_THRESHOLD = 158456325028528675187087900672;
@@ -187,7 +217,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @param _authorizerAddress 授权合约地址，用于获取NFT合约和代币合约等依赖
      */
     function initialize(address _authorizerAddress) external initializer {
-        require(_authorizerAddress != address(0), "Staking: Invalid authorizer address");
+        if (_authorizerAddress == address(0)) revert S_InvalidAuthorizerAddress();
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -210,7 +240,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @param _authorizerAddress 新的授权合约地址
      */
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
-        require(_authorizerAddress != address(0), "Staking: Invalid authorizer address");
+        if (_authorizerAddress == address(0)) revert S_InvalidAuthorizerAddress();
         authorizer = _authorizerAddress;
     }
 
@@ -219,7 +249,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @param _minLevel 最小质押等级要求
      */
     function setMinStakingLevel(uint8 _minLevel) external onlyOwnerOrAuthorizer {
-        require(_minLevel > 0, "Staking: Minimum level must be at least 1");
+        if (_minLevel == 0) revert S_MinimumLevelTooLow();
         minStakingLevel = _minLevel;
     }
 
@@ -231,10 +261,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             _;
             return;
         }
-        // 修复：先检查authorizer是否有效
-        require(authorizer != address(0), "Staking: Authorizer not set");
+        if (authorizer == address(0)) revert S_AuthorizerNotSet();
         IAuthorizer auth = IAuthorizer(authorizer);
-        require(auth.isSystemContract(msg.sender), "Staking: Not authorized");
+        if (!auth.isSystemContract(msg.sender)) revert S_NotAuthorized();
         _;
     }
 
@@ -248,7 +277,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @dev 非暂停状态检查修饰符
      */
     modifier whenNotPaused() {
-        require(!paused, "Staking: Paused");
+        if (paused) revert S_Paused();
         _;
     }
 
@@ -257,9 +286,9 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @param tokenIds 要质押的tokenId数组
      */
     function stake(uint256[] calldata tokenIds) external whenNotPaused nonReentrant {
-        require(tokenIds.length > 0, "Staking: Empty tokenIds");
-        address nftContract = IAuthorizer(authorizer).getAddressByName(\"nftMintCore\");
-        require(nftContract != address(0), "Staking: NFT contract not set");
+        if (tokenIds.length == 0) revert S_EmptyTokenIds();
+        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        if (nftContract == address(0)) revert S_NFTContractNotSet();
 
         if (!isStakingUser[msg.sender] && userStakedNFTs[msg.sender].length == 0) {
             isStakingUser[msg.sender] = true;
@@ -268,17 +297,16 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         }
 
         INFT nft = INFT(nftContract);
-        require(nft.isApprovedForAll(msg.sender, address(this)), "Staking: Contract not approved for transfer");
+        if (!nft.isApprovedForAll(msg.sender, address(this))) revert S_ContractNotApproved();
         
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
-            require(tokenId > 0, "Staking: Invalid token ID");
-            require(stakingInfo[tokenId].owner == address(0), "Staking: Already staked");
-            require(nft.ownerOf(tokenId) == msg.sender, "Staking: Not owner of token");
+            if (tokenId == 0) revert S_InvalidTokenId();
+            if (stakingInfo[tokenId].owner != address(0)) revert S_AlreadyStaked();
+            if (nft.ownerOf(tokenId) != msg.sender) revert S_NotTokenOwner();
 
-            // 检查 NFT 等级是否满足质押要求
             uint8 tokenLevel = nft.tokenLevel(tokenId);
-            require(tokenLevel >= minStakingLevel, "Staking: NFT level below minimum requirement");
+            if (tokenLevel < minStakingLevel) revert S_NFTLevelBelowMinimum();
 
             bool isRareToken = nft.isRare(tokenId);
             nft.safeTransferFrom(msg.sender, address(this), tokenId);
@@ -299,11 +327,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             uint256 weight = _getNFTWeight(tokenLevel, isRareToken);
             totalWeightedNFTs += weight;
             uint256 currentEpoch = _currentEpoch();
-            userStakedWeight[currentEpoch][msg.sender] += weight;
+            _userStakedWeight[currentEpoch][msg.sender] += weight;
             
             uint256 snapshotIncrement = globalRewardPerWeight * weight;
-            if (snapshotIncrement < USER_SNAPSHOT_OVERFLOW_THRESHOLD && _userSnapshotWeight[currentEpoch][msg.sender] < USER_SNAPSHOT_OVERFLOW_THRESHOLD - snapshotIncrement) {
-                _userSnapshotWeight[currentEpoch][msg.sender] += snapshotIncrement;
+            if (snapshotIncrement < USER_SNAPSHOT_OVERFLOW_THRESHOLD && _userSnapshotWeightMap[currentEpoch][msg.sender] < USER_SNAPSHOT_OVERFLOW_THRESHOLD - snapshotIncrement) {
+                _userSnapshotWeightMap[currentEpoch][msg.sender] += snapshotIncrement;
             }
             
             _syncWeight(msg.sender, tokenId, nftContract, true);
@@ -317,19 +345,19 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @param tokenIds 要解除质押的tokenId数组
      */
     function unstake(uint256[] calldata tokenIds) external whenNotPaused nonReentrant {
-        address nftContract = IAuthorizer(authorizer).getAddressByName(\"nftMintCore\");
-        require(nftContract != address(0), "Staking: NFT contract not set");
+        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        if (nftContract == address(0)) revert S_NFTContractNotSet();
         INFT nft = INFT(nftContract);
 
         uint256 currentEpoch = _currentEpoch();
-        uint256 totalWeightBefore = userStakedWeight[currentEpoch][msg.sender];
+        uint256 totalWeightBefore = _userStakedWeight[currentEpoch][msg.sender];
 
         for (uint256 i = 0; i < tokenIds.length; i++) {
             uint256 tokenId = tokenIds[i];
-            require(tokenId > 0, "Staking: Invalid token ID");
+            if (tokenId == 0) revert S_InvalidTokenId();
             StakingInfo storage info = stakingInfo[tokenId];
-            require(info.owner == msg.sender, "Staking: Not owner");
-            require(block.timestamp >= info.stakeTime + minStakingDuration, "Staking: Lock period");
+            if (info.owner != msg.sender) revert S_NotOwner();
+            if (block.timestamp < info.stakeTime + minStakingDuration) revert S_LockPeriodNotEnded();
 
             bool wasRare = info.isRare;
             uint256 weight = _getNFTWeight(info.level, wasRare);
@@ -337,27 +365,27 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             _removeFromUserStakedNFTs(msg.sender, tokenId);
             totalStakedNFTs--;
             totalWeightedNFTs -= weight;
-            userStakedWeight[currentEpoch][msg.sender] -= weight;
+            _userStakedWeight[currentEpoch][msg.sender] -= weight;
             uint256 snapshotDecrement = globalRewardPerWeight * weight;
             if (globalRewardPerWeight == 0) {
-                if (pendingRewards[currentEpoch][msg.sender] > 0) {
-                    uint256 pending = pendingRewards[currentEpoch][msg.sender];
-                    pendingRewards[currentEpoch][msg.sender] = 0;
-                    address rewardTokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
+                if (_pendingRewards[currentEpoch][msg.sender] > 0) {
+                    uint256 pending = _pendingRewards[currentEpoch][msg.sender];
+                    _pendingRewards[currentEpoch][msg.sender] = 0;
+                    address rewardTokenContract = IAuthorizer(authorizer).getAddressByName("token");
                     if (rewardTokenContract != address(0)) {
                         IERC20 rewardToken = IERC20(rewardTokenContract);
                         if (rewardToken.balanceOf(address(this)) >= pending) {
                             rewardToken.safeTransfer(msg.sender, pending);
                             emit RewardClaimed(msg.sender, pending);
                         } else {
-                            pendingRewards[currentEpoch][msg.sender] = pending;
+                            _pendingRewards[currentEpoch][msg.sender] = pending;
                         }
                     }
                 }
-                _userSnapshotWeight[currentEpoch][msg.sender] = 0;
+                _userSnapshotWeightMap[currentEpoch][msg.sender] = 0;
             } else {
-                require(_userSnapshotWeight[currentEpoch][msg.sender] >= snapshotDecrement, "Staking: Snapshot underflow");
-                _userSnapshotWeight[currentEpoch][msg.sender] -= snapshotDecrement;
+                if (_userSnapshotWeightMap[currentEpoch][msg.sender] < snapshotDecrement) revert S_SnapshotUnderflow();
+                _userSnapshotWeightMap[currentEpoch][msg.sender] -= snapshotDecrement;
             }
 
             nft.safeTransferFrom(address(this), msg.sender, tokenId);
@@ -371,13 +399,13 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             
             uint256 totalClaimable = _calcUserPending(msg.sender);
             if (totalClaimable > 0) {
-                address rewardTokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
-                require(rewardTokenContract != address(0), "Staking: Reward token contract not set");
+                address rewardTokenContract = IAuthorizer(authorizer).getAddressByName("token");
+                if (rewardTokenContract == address(0)) revert S_RewardTokenNotSet();
                 IERC20 rewardToken = IERC20(rewardTokenContract);
-                require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance for unstake");
+                if (rewardToken.balanceOf(address(this)) < totalClaimable) revert S_InsufficientRewardBalance();
                 rewardToken.safeTransfer(msg.sender, totalClaimable);
                 emit RewardClaimed(msg.sender, totalClaimable);
-                pendingRewards[_currentEpoch()][msg.sender] = 0;
+                _pendingRewards[_currentEpoch()][msg.sender] = 0;
             }
         }
         emit Unstaked(msg.sender, tokenIds);
@@ -389,15 +417,15 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function claimReward() external whenNotPaused nonReentrant {
         uint256 currentEpoch = _currentEpoch();
         uint256[] storage nfts = userStakedNFTs[msg.sender];
-        require(nfts.length > 0, "Staking: No staked NFTs");
-        address rewardTokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
-        require(rewardTokenContract != address(0), "Staking: Reward token not set");
+        if (nfts.length == 0) revert S_NoStakedNFTs();
+        address rewardTokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        if (rewardTokenContract == address(0)) revert S_RewardTokenNotSet();
 
         uint256 totalClaimable = _calcUserPending(msg.sender);
-        require(totalClaimable > 0, "Staking: No pending reward");
+        if (totalClaimable == 0) revert S_NoPendingReward();
 
         IERC20 rewardToken = IERC20(rewardTokenContract);
-        require(rewardToken.balanceOf(address(this)) >= totalClaimable, "Staking: Insufficient reward balance");
+        if (rewardToken.balanceOf(address(this)) < totalClaimable) revert S_InsufficientRewardBalance();
         
         for (uint256 i = 0; i < nfts.length; i++) {
             StakingInfo storage info = stakingInfo[nfts[i]];
@@ -407,8 +435,8 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             }
         }
         
-        _userSnapshotWeight[currentEpoch][msg.sender] = globalRewardPerWeight * userStakedWeight[currentEpoch][msg.sender];
-        pendingRewards[currentEpoch][msg.sender] = 0;
+        _userSnapshotWeightMap[currentEpoch][msg.sender] = globalRewardPerWeight * _userStakedWeight[currentEpoch][msg.sender];
+        _pendingRewards[currentEpoch][msg.sender] = 0;
         
         rewardToken.safeTransfer(msg.sender, totalClaimable);
         
@@ -424,7 +452,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @return 权重值
      */
     function _getNFTWeight(uint8 level, bool isRare) internal view returns (uint256) {
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(\"nftData\");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
         if (nftDataAddr == address(0)) {
             return StakingLib.calculateNFTWeight(isRare, level);
         }
@@ -446,8 +474,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         if (globalRewardPerWeight <= info.accumulatedReward) return 0;
         
         uint256 rewardDiff = globalRewardPerWeight - info.accumulatedReward;
-        // 修复：添加乘法溢出检查
-        require(rewardDiff == 0 || weight <= type(uint256).max / rewardDiff, "Staking: Reward calculation overflow");
+        if (rewardDiff != 0 && weight > type(uint256).max / rewardDiff) revert S_RewardCalculationOverflow();
         
         return rewardDiff * weight / STAKING_REWARD_PRECISION;
     }
@@ -459,7 +486,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     function _settleNFTReward(StakingInfo storage info) internal {
         uint256 reward = _calculatePendingForNFT(info);
         if (reward > 0) {
-            pendingRewards[_currentEpoch()][info.owner] += reward;
+            _pendingRewards[_currentEpoch()][info.owner] += reward;
             info.accumulatedReward = globalRewardPerWeight;
         }
     }
@@ -478,8 +505,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
         uint256[] storage nfts = userStakedNFTs[user];
         uint256 removeIndex = tokenIdToUserIndex[tokenId];
         
-        // 验证索引有效性：如果 removeIndex 超出范围，或者对应位置的 tokenId 不匹配，说明未质押
-        require(removeIndex < nfts.length && nfts[removeIndex] == tokenId, "Staking: Token not in user's staked list");
+        if (removeIndex >= nfts.length || nfts[removeIndex] != tokenId) revert S_TokenNotInUserStakedList();
         
         uint256 lastIndex = nfts.length - 1;
         if (removeIndex != lastIndex) {
@@ -541,15 +567,15 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
     }
 
     function userStakedWeight(address user) external view returns (uint256) {
-        return userStakedWeight[_currentEpoch()][user];
+        return _userStakedWeight[_currentEpoch()][user];
     }
 
     function pendingRewards(address user) external view returns (uint256) {
-        return pendingRewards[_currentEpoch()][user];
+        return _pendingRewards[_currentEpoch()][user];
     }
 
     function _userSnapshotWeight(address user) external view returns (uint256) {
-        return _userSnapshotWeight[_currentEpoch()][user];
+        return _userSnapshotWeightMap[_currentEpoch()][user];
     }
 
     /**
@@ -566,7 +592,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @return weights 等级1-5的权重数组
      */
     function normalNFTWeight() external view returns (uint256[5] memory weights) {
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(\"nftData\");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
         if (nftDataAddr == address(0)) {
             weights = StakingLib.getNormalNFTWeights();
             return weights;
@@ -603,7 +629,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @return weights 等级1-5的权重数组
      */
     function rareNFTWeight() external view returns (uint256[5] memory weights) {
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(\"nftData\");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
         if (nftDataAddr == address(0)) {
             weights = StakingLib.getRareNFTWeights();
             return weights;
@@ -644,20 +670,20 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      */
     function _calcUserPending(address user) internal view returns (uint256) {
         uint256 currentEpoch = _currentEpoch();
-        uint256 totalWeight = userStakedWeight[currentEpoch][user];
-        if (totalWeight == 0) return pendingRewards[currentEpoch][user];
+        uint256 totalWeight = _userStakedWeight[currentEpoch][user];
+        if (totalWeight == 0) return _pendingRewards[currentEpoch][user];
 
-        uint256 snapshotBase = _userSnapshotWeight[currentEpoch][user];
+        uint256 snapshotBase = _userSnapshotWeightMap[currentEpoch][user];
         
-        require(globalRewardPerWeight == 0 || totalWeight <= type(uint256).max / globalRewardPerWeight, "Staking: Reward calculation overflow");
+        if (globalRewardPerWeight != 0 && totalWeight > type(uint256).max / globalRewardPerWeight) revert S_RewardCalculationOverflow();
         uint256 rewardBase = globalRewardPerWeight * totalWeight;
 
-        if (rewardBase <= snapshotBase) return pendingRewards[currentEpoch][user];
+        if (rewardBase <= snapshotBase) return _pendingRewards[currentEpoch][user];
         
         uint256 earnedReward = (rewardBase - snapshotBase) / STAKING_REWARD_PRECISION;
         
-        require(earnedReward <= type(uint256).max - pendingRewards[currentEpoch][user], "Staking: Pending rewards overflow");
-        return earnedReward + pendingRewards[currentEpoch][user];
+        if (earnedReward > type(uint256).max - _pendingRewards[currentEpoch][user]) revert S_PendingRewardsOverflow();
+        return earnedReward + _pendingRewards[currentEpoch][user];
     }
 
     /**
@@ -743,11 +769,11 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @param amount 提取金额
      */
     function emergencyWithdrawBNB(uint256 amount) external onlyOwner nonReentrant {
-        require(block.timestamp >= emergencyWithdrawUnlockTime, "Staking: Timelock not expired");
-        require(amount > 0, "Staking: Amount must be > 0");
-        require(amount <= address(this).balance, "Staking: Insufficient balance");
+        if (block.timestamp < emergencyWithdrawUnlockTime) revert S_TimelockNotExpired();
+        if (amount == 0) revert S_AmountMustBePositive();
+        if (amount > address(this).balance) revert S_InsufficientBalance();
         (bool success, ) = payable(owner()).call{value: amount}("");
-        require(success, "Staking: BNB transfer failed");
+        if (!success) revert S_BNBTransferFailed();
         emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
         emit EmergencyBNBWithdrawn(msg.sender, owner(), amount);
     }
@@ -757,12 +783,12 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @param amount 提取金额
      */
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
-        require(block.timestamp >= emergencyWithdrawUnlockTime, "Staking: Timelock not expired");
-        require(amount > 0, "Staking: Amount must be > 0");
-        address rewardTokenContract = IAuthorizer(authorizer).getAddressByName(\"token\");
-        require(rewardTokenContract != address(0), "Staking: Token contract not set");
+        if (block.timestamp < emergencyWithdrawUnlockTime) revert S_TimelockNotExpired();
+        if (amount == 0) revert S_AmountMustBePositive();
+        address rewardTokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        if (rewardTokenContract == address(0)) revert S_RewardTokenNotSet();
         IERC20 token = IERC20(rewardTokenContract);
-        require(token.balanceOf(address(this)) >= amount, "Staking: Insufficient token balance");
+        if (token.balanceOf(address(this)) < amount) revert S_InsufficientTokenBalance();
         token.safeTransfer(owner(), amount);
         emergencyWithdrawUnlockTime = block.timestamp + emergencyWithdrawTimelock;
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
@@ -773,7 +799,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @param _timelock 新的timelock时间（秒）
      */
     function setEmergencyWithdrawTimelock(uint256 _timelock) external onlyOwner {
-        require(_timelock >= 24 hours, "Staking: Timelock must be at least 24 hours");
+        if (_timelock < 24 hours) revert S_TimelockTooShort();
         emergencyWithdrawTimelock = _timelock;
     }
 
@@ -791,7 +817,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * 注意：由于Solidity无法遍历mapping的所有键，此函数只重置核心状态变量
      */
     function resetContractData() external onlyOwnerOrAuthorizer {
-        require(totalStakedNFTs == 0, "Staking: Cannot reset with active stakes");
+        if (totalStakedNFTs != 0) revert S_CannotResetWithActiveStakes();
         uint256 oldEpoch = epoch;
         epoch = (epoch + 1) % MAX_EPOCHS;
         totalStakedNFTs = 0;
@@ -822,7 +848,7 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
      * @param isStaking true=质押操作（移除NFT），false=解除质押操作（添加NFT）
      */
     function _syncWeight(address user, uint256 tokenId, address nftContract, bool isStaking) internal {
-        address nftDataContract = IAuthorizer(authorizer).getAddressByName(\"nftData\");
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName("nftData");
         if (nftDataContract != address(0)) {
             if (isStaking) {
                 try INFTDataInterface(nftDataContract).removeUserNFT(user, tokenId) {
@@ -835,14 +861,14 @@ contract Staking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Ree
             }
         }
         
-        address weightManager = IAuthorizer(authorizer).getAddressByName(\"weightManager\");
+        address weightManager = IAuthorizer(authorizer).getAddressByName("weightManager");
         if (weightManager != address(0)) {
             try IWeightManager(weightManager).syncUserWeight(user) {
             } catch {
             }
         }
         
-        address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
         if (dividendManager != address(0)) {
             try IDividendManager(dividendManager).syncUserWeight(user) {
             } catch {

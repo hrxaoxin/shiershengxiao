@@ -235,7 +235,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(mockIndex < MAX_MOCK_RANKING, "ArenaBattle: Invalid mock player index");
         
         uint256 currentEpoch = _currentEpoch();
-        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
         require(arenaPlayerContract != address(0), "ArenaBattle: Player contract not set");
         
         IArenaPlayer(arenaPlayerContract).decrementAttempts(msg.sender);
@@ -263,7 +263,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(challengedPlayer != msg.sender, "ArenaBattle: Cannot challenge self");
         
         uint256 currentEpoch = _currentEpoch();
-        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
         require(arenaPlayerContract != address(0), "ArenaBattle: Player contract not set");
         
         IArenaPlayer(arenaPlayerContract).decrementAttempts(msg.sender);
@@ -292,7 +292,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function _checkSeasonActive() internal view {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(\"arenaRankingManager\");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
         require(arenaRankingManager != address(0), "ArenaBattle: Ranking manager not set");
         require(IArenaRanking(arenaRankingManager).currentSeasonId() > 0, "ArenaBattle: Season not active");
     }
@@ -357,7 +357,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
         
         uint256 currentEpoch = _currentEpoch();
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(\"arenaRankingManager\");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
         uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         
         PlayerRecord storage record = players[currentEpoch][player];
@@ -383,7 +383,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
         record.lastBattleTime = block.timestamp;
 
-        address arenaLeaderboard = IAuthorizer(authorizer).getAddressByName(\"arenaLeaderboard\");
+        address arenaLeaderboard = IAuthorizer(authorizer).getAddressByName("arenaLeaderboard");
         if (arenaLeaderboard != address(0)) {
             IArenaLeaderboard(arenaLeaderboard).updateRanking(player, record.score, currentSeasonId);
         }
@@ -398,7 +398,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function getRemainingAttempts(address player) external view returns (uint256) {
-        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
         require(arenaPlayerContract != address(0), "ArenaBattle: Player contract not set");
         return IArenaPlayer(arenaPlayerContract).getRemainingAttempts(player);
     }
@@ -425,7 +425,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256[6] calldata playerTeam,
         uint256 mockIndex
     ) external onlyOwnerOrAuthorizer nonReentrant whenNotPaused returns (bool success_, uint256 winner, uint256 battleId) {
-        address battleContract = IAuthorizer(authorizer).getAddressByName(\"battle\");
+        address battleContract = IAuthorizer(authorizer).getAddressByName("battle");
         require(battleContract != address(0), "ArenaBattle: Battle contract not set");
         require(mockIndex < MAX_MOCK_RANKING, "ArenaBattle: Invalid mock player index");
         uint256 currentEpoch = _currentEpoch();
@@ -466,7 +466,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         uint256[6] calldata playerTeam,
         uint256[6] calldata challengedTeam
     ) external onlyOwnerOrAuthorizer nonReentrant whenNotPaused returns (bool success_, uint256 winner, uint256 battleId) {
-        address battleContract = IAuthorizer(authorizer).getAddressByName(\"battle\");
+        address battleContract = IAuthorizer(authorizer).getAddressByName("battle");
         require(battleContract != address(0), "ArenaBattle: Battle contract not set");
         require(challengedPlayer != address(0), "ArenaBattle: Invalid challenged player");
         require(challengedPlayer != msg.sender, "ArenaBattle: Cannot challenge self");
@@ -519,7 +519,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function _calculateTeamPower(uint256[6] memory team) internal view returns (uint256) {
         uint256 totalPower = 0;
-        address nftContract = IAuthorizer(authorizer).getAddressByName(\"nftMintCore\");
+        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
         for (uint256 i = 0; i < team.length; i++) {
             if (team[i] > 0) {
                 uint256 level = INFTMint(nftContract).tokenLevel(team[i]);
@@ -593,7 +593,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 是否有战斗队伍
      */
     function _hasBattleTeam(address player) internal view returns (bool) {
-        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(\"arenaPlayer\");
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
         if (arenaPlayerContract == address(0)) {
             return false;
         }

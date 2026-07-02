@@ -277,7 +277,7 @@ contract WeightManager is
     function _calcUserWeight(address user) internal view returns (uint256) {
         if (user == owner()) return ownerWeight;
         
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(\"nftData\");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
         if (nftDataAddr == address(0)) return 0;
         
         INFTDataInterface m = INFTDataInterface(nftDataAddr);
@@ -311,7 +311,7 @@ contract WeightManager is
      * @param user 目标用户地址
      */
     function refreshUserWeightCache(address user) external onlyOperator {
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(\"nftData\");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
         if (nftDataAddr == address(0)) return;
         
         INFTDataInterface nftData = INFTDataInterface(nftDataAddr);

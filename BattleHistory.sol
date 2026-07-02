@@ -122,7 +122,7 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 防止外部账户或未授权合约篡改战斗历史
      */
     modifier onlyBattleContract() {
-        address battleContract = IAuthorizer(authorizer).getAddressByName(\"battle\");
+        address battleContract = IAuthorizer(authorizer).getAddressByName("battle");
         require(msg.sender == battleContract, "BattleHistory: Only battle contract");
         _;
     }

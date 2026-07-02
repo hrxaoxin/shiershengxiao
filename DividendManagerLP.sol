@@ -1,4 +1,4 @@
-﻿﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -7,7 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
-import "./LPLib.sol";
+import "./DividendManagerLPLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
@@ -35,6 +35,22 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contr
  */
 contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
+    
+    error DML_InvalidAuthorizer();
+    error DML_NotAuthorized();
+    error DML_InvalidAmount();
+    error DML_InvalidTokenAddress();
+    error DML_ArraysLengthMismatch();
+    error DML_LPOverflow();
+    error DML_TokenOverflow();
+    error DML_BNBOverflow();
+    error DML_CumulativeOverflow();
+    error DML_NoWeight();
+    error DML_BNBTransferFailed();
+    error DML_InsufficientLP();
+    error DML_InsufficientToken();
+    error DML_InvalidToken();
+    error DML_InvalidRecipient();
     
     /** @dev 授权合约地址 */
     address public authorizer;
@@ -106,7 +122,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @param _authorizerAddress 授权合约地址
      */
     function initialize(address _authorizerAddress) external initializer {
-        require(_authorizerAddress != address(0), "DividendManagerLP: Invalid authorizer");
+        if (_authorizerAddress == address(0)) revert DML_InvalidAuthorizer();
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -146,7 +162,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             return;
         }
         IAuthorizer auth = IAuthorizer(authorizer);
-        require(auth.isSystemContract(msg.sender), "DividendManagerLP: Not authorized");
+        if (!auth.isSystemContract(msg.sender)) revert DML_NotAuthorized();
         _;
     }
 
@@ -164,7 +180,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @param amount BNB数量
      */
     function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
-        require(amount > 0, "DividendManagerLP: Amount must be > 0");
+        if (amount == 0) revert DML_InvalidAmount();
         _processIncomingBNB(amount);
     }
 
@@ -174,8 +190,8 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @param amount 代币数量
      */
     function receiveToken(address token, uint256 amount) external onlyOwnerOrAuthorizer {
-        require(token != address(0), "DividendManagerLP: Invalid token address");
-        require(amount > 0, "DividendManagerLP: Amount must be > 0");
+        if (token == address(0)) revert DML_InvalidTokenAddress();
+        if (amount == 0) revert DML_InvalidAmount();
         
         IBEP20(token).transferFrom(msg.sender, address(this), amount);
         _processIncomingToken(token, amount);
@@ -187,7 +203,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @param amounts 代币数量数组
      */
     function receiveMultipleTokens(address[] calldata tokens, uint256[] calldata amounts) external onlyOwnerOrAuthorizer {
-        require(tokens.length == amounts.length, "DividendManagerLP: Arrays length mismatch");
+        if (tokens.length != amounts.length) revert DML_ArraysLengthMismatch();
         
         for (uint256 i = 0; i < tokens.length; i++) {
             if (amounts[i] > 0) {
@@ -205,12 +221,12 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         RewardType currentType = rewardType;
         
         if (currentType == RewardType.LP) {
-            uint256 lpAmount = LPLib.convertBNBToLP(IAuthorizer(authorizer), amount);
+            uint256 lpAmount = DividendManagerLPLib.convertBNBToLP(IAuthorizer(authorizer), amount);
             if (lpAmount > 0) {
                 _addToDividendPool(lpAmount, currentType);
             }
         } else if (currentType == RewardType.TOKEN) {
-            uint256 tokenAmount = LPLib.swapBNBToToken(IAuthorizer(authorizer), amount);
+            uint256 tokenAmount = DividendManagerLPLib.swapBNBToToken(IAuthorizer(authorizer), amount);
             if (tokenAmount > 0) {
                 _addToDividendPool(tokenAmount, currentType);
             }
@@ -226,18 +242,18 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      */
     function _processIncomingToken(address token, uint256 amount) internal {
         RewardType currentType = rewardType;
-        address wbnb = IAuthorizer(authorizer).getAddressByName(\"wbnb\");
-        address mainToken = IAuthorizer(authorizer).getAddressByName(\"token\");
+        address wbnb = IAuthorizer(authorizer).getAddressByName("wbnb");
+        address mainToken = IAuthorizer(authorizer).getAddressByName("token");
         
         if (token == wbnb) {
             if (currentType == RewardType.LP) {
                 IWBNB(wbnb).withdraw(amount);
-                uint256 lpAmount = LPLib.convertBNBToLP(IAuthorizer(authorizer), amount);
+                uint256 lpAmount = DividendManagerLPLib.convertBNBToLP(IAuthorizer(authorizer), amount);
                 if (lpAmount > 0) {
                     _addToDividendPool(lpAmount, currentType);
                 }
             } else if (currentType == RewardType.TOKEN) {
-                uint256 tokenAmount = LPLib.swapWBNBToToken(IAuthorizer(authorizer), amount);
+                uint256 tokenAmount = DividendManagerLPLib.swapWBNBToToken(IAuthorizer(authorizer), amount);
                 if (tokenAmount > 0) {
                     _addToDividendPool(tokenAmount, currentType);
                 }
@@ -247,20 +263,20 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (token == mainToken) {
             if (currentType == RewardType.LP) {
-                uint256 lpAmount = LPLib.convertTokenToLP(IAuthorizer(authorizer), amount);
+                uint256 lpAmount = DividendManagerLPLib.convertTokenToLP(IAuthorizer(authorizer), amount);
                 if (lpAmount > 0) {
                     _addToDividendPool(lpAmount, currentType);
                 }
             } else if (currentType == RewardType.TOKEN) {
                 _addToDividendPool(amount, currentType);
             } else if (currentType == RewardType.BNB) {
-                uint256 bnbAmount = LPLib.swapTokenToBNB(IAuthorizer(authorizer), amount);
+                uint256 bnbAmount = DividendManagerLPLib.swapTokenToBNB(IAuthorizer(authorizer), amount);
                 if (bnbAmount > 0) {
                     _addToDividendPool(bnbAmount, currentType);
                 }
             }
         } else {
-            uint256 bnbAmount = LPLib.swapTokenToBNB(IAuthorizer(authorizer), amount);
+            uint256 bnbAmount = DividendManagerLPLib.swapTokenToBNB(IAuthorizer(authorizer), amount);
             if (bnbAmount > 0) {
                 _processIncomingBNB(bnbAmount);
             }
@@ -275,29 +291,29 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     function _addToDividendPool(uint256 amount, RewardType type_) internal {
         if (type_ == RewardType.LP) {
             uint256 newBalance = lpDividendPoolBalance + amount;
-            require(newBalance >= lpDividendPoolBalance, "DividendManagerLP: LP overflow");
+            if (newBalance < lpDividendPoolBalance) revert DML_LPOverflow();
             lpDividendPoolBalance = newBalance;
             emit LPAddedToDividendPool(amount);
         } else if (type_ == RewardType.TOKEN) {
             uint256 newBalance = tokenDividendPoolBalance + amount;
-            require(newBalance >= tokenDividendPoolBalance, "DividendManagerLP: Token overflow");
+            if (newBalance < tokenDividendPoolBalance) revert DML_TokenOverflow();
             tokenDividendPoolBalance = newBalance;
             emit TokenAddedToDividendPool(amount);
         } else if (type_ == RewardType.BNB) {
             uint256 newBalance = bnbDividendPoolBalance + amount;
-            require(newBalance >= bnbDividendPoolBalance, "DividendManagerLP: BNB overflow");
+            if (newBalance < bnbDividendPoolBalance) revert DML_BNBOverflow();
             bnbDividendPoolBalance = newBalance;
             emit BNBAddedToDividendPool(amount);
         }
 
         if (type_ == RewardType.LP || type_ == RewardType.TOKEN) {
-            address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
+            address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
             uint256 totalWeight = IDividendManager(dividendManager).getTotalWeight();
             
             if (totalWeight > 0) {
                 uint256 perWeightIncrement = (amount * 1e18) / totalWeight;
                 uint256 newCumulative = cumulativePerWeightDividend + perWeightIncrement;
-                require(newCumulative >= cumulativePerWeightDividend, "DividendManagerLP: Cumulative overflow");
+                if (newCumulative < cumulativePerWeightDividend) revert DML_CumulativeOverflow();
                 cumulativePerWeightDividend = newCumulative;
             }
         }
@@ -327,7 +343,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     function _convertPoolAssets(RewardType fromType, RewardType toType) internal {
         if (fromType == RewardType.LP && toType == RewardType.TOKEN) {
             if (lpDividendPoolBalance > 0) {
-                uint256 tokenAmount = LPLib.redeemLPToToken(IAuthorizer(authorizer), lpDividendPoolBalance);
+                uint256 tokenAmount = DividendManagerLPLib.redeemLPToToken(IAuthorizer(authorizer), lpDividendPoolBalance);
                 lpDividendPoolBalance = 0;
                 if (tokenAmount > 0) {
                     tokenDividendPoolBalance += tokenAmount;
@@ -335,7 +351,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (fromType == RewardType.LP && toType == RewardType.BNB) {
             if (lpDividendPoolBalance > 0) {
-                uint256 wbnbAmount = LPLib.redeemLPToWBNB(IAuthorizer(authorizer), lpDividendPoolBalance);
+                uint256 wbnbAmount = DividendManagerLPLib.redeemLPToWBNB(IAuthorizer(authorizer), lpDividendPoolBalance);
                 lpDividendPoolBalance = 0;
                 if (wbnbAmount > 0) {
                     bnbDividendPoolBalance += wbnbAmount;
@@ -343,7 +359,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (fromType == RewardType.TOKEN && toType == RewardType.LP) {
             if (tokenDividendPoolBalance > 0) {
-                uint256 lpAmount = LPLib.convertTokenToLP(IAuthorizer(authorizer), tokenDividendPoolBalance);
+                uint256 lpAmount = DividendManagerLPLib.convertTokenToLP(IAuthorizer(authorizer), tokenDividendPoolBalance);
                 tokenDividendPoolBalance = 0;
                 if (lpAmount > 0) {
                     lpDividendPoolBalance += lpAmount;
@@ -351,7 +367,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (fromType == RewardType.TOKEN && toType == RewardType.BNB) {
             if (tokenDividendPoolBalance > 0) {
-                uint256 bnbAmount = LPLib.swapTokenToBNB(IAuthorizer(authorizer), tokenDividendPoolBalance);
+                uint256 bnbAmount = DividendManagerLPLib.swapTokenToBNB(IAuthorizer(authorizer), tokenDividendPoolBalance);
                 tokenDividendPoolBalance = 0;
                 if (bnbAmount > 0) {
                     bnbDividendPoolBalance += bnbAmount;
@@ -359,7 +375,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (fromType == RewardType.BNB && toType == RewardType.LP) {
             if (bnbDividendPoolBalance > 0) {
-                uint256 lpAmount = LPLib.convertBNBToLP(IAuthorizer(authorizer), bnbDividendPoolBalance);
+                uint256 lpAmount = DividendManagerLPLib.convertBNBToLP(IAuthorizer(authorizer), bnbDividendPoolBalance);
                 bnbDividendPoolBalance = 0;
                 if (lpAmount > 0) {
                     lpDividendPoolBalance += lpAmount;
@@ -367,7 +383,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             }
         } else if (fromType == RewardType.BNB && toType == RewardType.TOKEN) {
             if (bnbDividendPoolBalance > 0) {
-                uint256 tokenAmount = LPLib.swapBNBToToken(IAuthorizer(authorizer), bnbDividendPoolBalance);
+                uint256 tokenAmount = DividendManagerLPLib.swapBNBToToken(IAuthorizer(authorizer), bnbDividendPoolBalance);
                 bnbDividendPoolBalance = 0;
                 if (tokenAmount > 0) {
                     tokenDividendPoolBalance += tokenAmount;
@@ -380,16 +396,16 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @dev 复利手续费（仅owner）
      */
     function compoundFees() external onlyOwner {
-        LPLib.compoundFees(IAuthorizer(authorizer));
+        DividendManagerLPLib.compoundFees(IAuthorizer(authorizer));
     }
 
     /**
      * @dev 领取分红
      */
     function claimLPDividend() external nonReentrant whenNotPaused {
-        address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
         uint256 userWeight = IDividendManager(dividendManager).getUserWeight(msg.sender);
-        require(userWeight > 0, "DividendManagerLP: No weight");
+        if (userWeight == 0) revert DML_NoWeight();
 
         RewardType currentType = rewardType;
         
@@ -399,7 +415,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             if (reward > 0 && reward <= bnbDividendPoolBalance) {
                 bnbDividendPoolBalance -= reward;
                 (bool success, ) = payable(msg.sender).call{value: reward}("");
-                require(success, "DividendManagerLP: BNB transfer failed");
+                if (!success) revert DML_BNBTransferFailed();
                 emit BNBDividendClaimed(msg.sender, reward);
             }
             return;
@@ -414,14 +430,14 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         }
 
         if (currentType == RewardType.LP) {
-            require(dividend <= lpDividendPoolBalance, "DividendManagerLP: Insufficient LP");
+            if (dividend > lpDividendPoolBalance) revert DML_InsufficientLP();
             lpDividendPoolBalance -= dividend;
-            LPLib.redeemLPToUser(IAuthorizer(authorizer), dividend, msg.sender);
+            DividendManagerLPLib.redeemLPToUser(IAuthorizer(authorizer), dividend, msg.sender);
             emit LPDividendClaimed(msg.sender, dividend);
         } else if (currentType == RewardType.TOKEN) {
-            require(dividend <= tokenDividendPoolBalance, "DividendManagerLP: Insufficient Token");
+            if (dividend > tokenDividendPoolBalance) revert DML_InsufficientToken();
             tokenDividendPoolBalance -= dividend;
-            IERC20(IAuthorizer(authorizer).getAddressByName(\"token\")).safeTransfer(msg.sender, dividend);
+            IERC20(IAuthorizer(authorizer).getAddressByName("token")).safeTransfer(msg.sender, dividend);
             emit TokenDividendClaimed(msg.sender, dividend);
         }
 
@@ -434,7 +450,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 可领取的分红总额
      */
     function getClaimableLPDividend(address user) external view returns (uint256) {
-        address dividendManager = IAuthorizer(authorizer).getAddressByName(\"dividendManager\");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
         uint256 userWeight = IDividendManager(dividendManager).getUserWeight(user);
         
         RewardType currentType = rewardType;
@@ -458,7 +474,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @param _authorizerAddress 新的授权合约地址
      */
     function setAuthorizer(address _authorizerAddress) external onlyOwnerOrAuthorizer {
-        require(_authorizerAddress != address(0), "DividendManagerLP: Invalid authorizer");
+        if (_authorizerAddress == address(0)) revert DML_InvalidAuthorizer();
         authorizer = _authorizerAddress;
     }
 
@@ -472,8 +488,8 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @param to 接收地址
      */
     function withdrawToken(address token, address to) external onlyOwner {
-        require(token != address(0), "DividendManagerLP: Invalid token");
-        require(to != address(0), "DividendManagerLP: Invalid recipient");
+        if (token == address(0)) revert DML_InvalidToken();
+        if (to == address(0)) revert DML_InvalidRecipient();
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (balance > 0) {
             IERC20(token).safeTransfer(to, balance);
@@ -485,11 +501,11 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @param to 接收地址
      */
     function withdrawBNB(address to) external onlyOwner {
-        require(to != address(0), "DividendManagerLP: Invalid recipient");
+        if (to == address(0)) revert DML_InvalidRecipient();
         uint256 balance = address(this).balance;
         if (balance > 0) {
             (bool success, ) = payable(to).call{value: balance}("");
-            require(success, "DividendManagerLP: BNB transfer failed");
+            if (!success) revert DML_BNBTransferFailed();
         }
     }
 

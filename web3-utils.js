@@ -8,6 +8,48 @@ window.ZODIAC_WEB3 = (function() {
     const NETWORK_NAME = config.NETWORK_NAME || 'Binance Mainnet';
     const CONTRACT_ADDRESSES = config.CONTRACT_ADDRESSES || {};
     const ABIS = config.ABIS || {};
+    const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000';
+    const addressCache = {};
+    const addressNameMap = {
+        tokenContract: 'token',
+        nftContract: 'nftMintCore',
+        nftMint: 'nftMintCore',
+        nftData: 'nftData',
+        nftTrading: 'nftTrading',
+        staking: 'staking',
+        stakingLP: 'stakingLP',
+        tokenStaking: 'tokenStaking',
+        tokenStakingLP: 'tokenStakingLP',
+        breeding: 'breedingCore',
+        breedingCore: 'breedingCore',
+        breedingMarket: 'breedingMarket',
+        rewardManager: 'rewardManager',
+        dividendManager: 'dividendManager',
+        dividendManagerLP: 'dividendManagerLP',
+        tokenBurner: 'tokenBurner',
+        nftUpdate: 'nftUpdate',
+        nftBuyback: 'nftBuyback',
+        buyback: 'nftBuyback',
+        battle: 'battle',
+        battleSkillData: 'battleSkillData',
+        battleHistory: 'battleHistory',
+        arena: 'arena',
+        arenaRankingManager: 'arenaRankingManager',
+        arenaRankingQuery: 'arenaRankingQuery',
+        arenaReward: 'arenaReward',
+        arenaRewardLP: 'arenaRewardLP',
+        arenaLeaderboard: 'arenaLeaderboard',
+        arenaPlayer: 'arenaPlayer',
+        arenaBattle: 'arenaBattle',
+        priceOracle: 'priceOracle',
+        poolManager: 'poolManager',
+        weightManager: 'weightManager',
+        feeReceiver: 'feeReceiver',
+        pancakeSwapRouter: 'pancakeSwapRouter',
+        flapSwapRouter: 'flapSwapRouter',
+        uniswapRouter: 'uniswapRouter',
+        authorizer: 'authorizer'
+    };
 
     let web3 = null;
     let account = null;
@@ -224,26 +266,54 @@ window.ZODIAC_WEB3 = (function() {
         'authorizer': ABIS.authorizerABI
     };
 
-    // 动态获取 authorizer 中的 token 地址
-    async function getTokenAddressFromAuthorizer() {
+    async function getAuthorizerContract() {
+        if (contracts.authorizer) return contracts.authorizer;
+        const authorizerAddr = CONTRACT_ADDRESSES.authorizer;
+        if (!authorizerAddr || authorizerAddr === ZERO_ADDRESS || !ABIS.authorizerABI) return null;
         try {
-            const authorizerAddr = CONTRACT_ADDRESSES.authorizer;
-            if (!authorizerAddr || authorizerAddr === '0x0000000000000000000000000000000000000000') {
-                console.warn('[ZODIAC_WEB3] authorizer address not configured');
-                return CONTRACT_ADDRESSES.tokenContract;
-            }
-            const authorizerContract = new web3.eth.Contract(ABIS.authorizerABI, authorizerAddr);
-            const tokenAddress = await authorizerContract.methods.getAddressByName("token").call();
-            console.log('[ZODIAC_WEB3] Token address from authorizer:', tokenAddress);
-            if (tokenAddress && tokenAddress !== '0x0000000000000000000000000000000000000000') {
-                return tokenAddress;
-            } else {
-                console.warn('[ZODIAC_WEB3] Authorizer returned zero token address, falling back to config');
-                return CONTRACT_ADDRESSES.tokenContract;
+            contracts.authorizer = new web3.eth.Contract(ABIS.authorizerABI, authorizerAddr);
+            return contracts.authorizer;
+        } catch (e) {
+            console.warn('[ZODIAC_WEB3] Failed to init authorizer:', e);
+            return null;
+        }
+    }
+
+    async function getContractAddress(name) {
+        if (!name) return null;
+        const cacheKey = name;
+        if (addressCache[cacheKey] && addressCache[cacheKey] !== ZERO_ADDRESS) {
+            return addressCache[cacheKey];
+        }
+
+        try {
+            const authorizerContract = await getAuthorizerContract();
+            const authorizerKey = addressNameMap[name] || name;
+            if (authorizerContract && typeof authorizerContract.methods.getAddressByName === 'function') {
+                const resolvedAddress = await authorizerContract.methods.getAddressByName(authorizerKey).call();
+                if (resolvedAddress && resolvedAddress !== ZERO_ADDRESS) {
+                    addressCache[cacheKey] = resolvedAddress;
+                    return resolvedAddress;
+                }
             }
         } catch (e) {
-            console.warn('[ZODIAC_WEB3] Failed to get token from authorizer, using configured address:', e.message);
-            return CONTRACT_ADDRESSES.tokenContract;
+            console.warn(`[ZODIAC_WEB3] Failed to resolve contract address from authorizer for ${name}:`, e);
+        }
+
+        const fallbackAddress = CONTRACT_ADDRESSES[name] || CONTRACT_ADDRESSES[addressNameMap[name]] || null;
+        if (fallbackAddress && fallbackAddress !== ZERO_ADDRESS) {
+            addressCache[cacheKey] = fallbackAddress;
+            return fallbackAddress;
+        }
+        return null;
+    }
+
+    async function getTokenAddressFromAuthorizer() {
+        try {
+            return await getContractAddress('tokenContract');
+        } catch (e) {
+            console.warn('[ZODIAC_WEB3] Failed to get token from authorizer:', e.message);
+            return null;
         }
     }
 
@@ -251,19 +321,10 @@ window.ZODIAC_WEB3 = (function() {
         if (!web3 || !account) return;
         contracts = {};
         
-        // 先初始化 authorizer 合约
-        const authorizerAddr = CONTRACT_ADDRESSES.authorizer;
-        if (authorizerAddr && authorizerAddr !== '0x0000000000000000000000000000000000000000') {
-            try {
-                contracts.authorizer = new web3.eth.Contract(ABIS.authorizerABI, authorizerAddr);
-            } catch (e) {
-                console.warn('[ZODIAC_WEB3] Failed to init authorizer:', e);
-            }
-        }
+        await getAuthorizerContract();
         
-        // 动态获取 token 地址
         const tokenAddr = await getTokenAddressFromAuthorizer();
-        if (tokenAddr && tokenAddr !== '0x0000000000000000000000000000000000000000') {
+        if (tokenAddr && tokenAddr !== ZERO_ADDRESS) {
             try {
                 contracts.tokenContract = new web3.eth.Contract(ABIS.tokenABI, tokenAddr);
             } catch (e) {
@@ -271,11 +332,10 @@ window.ZODIAC_WEB3 = (function() {
             }
         }
         
-        // 初始化其他合约
         for (const [name, abi] of Object.entries(ABI_MAP)) {
-            if (name === 'tokenContract' || name === 'authorizer') continue; // 已单独处理
-            const addr = CONTRACT_ADDRESSES[name];
-            if (addr && addr !== '0x0000000000000000000000000000000000000000' && abi) {
+            if (name === 'tokenContract' || name === 'authorizer') continue;
+            const addr = await getContractAddress(name);
+            if (addr && addr !== ZERO_ADDRESS && abi) {
                 try {
                     contracts[name] = new web3.eth.Contract(abi, addr);
                 } catch (e) {
@@ -348,14 +408,14 @@ window.ZODIAC_WEB3 = (function() {
             return contracts[name];
         }
         
-        let addr = CONTRACT_ADDRESSES[name];
+        let addr = await getContractAddress(name);
         if (!addr && name === 'buyback') {
-            addr = CONTRACT_ADDRESSES.nftBuyback;
+            addr = await getContractAddress('nftBuyback');
         }
         if (!addr && name === 'nftContract') {
-            addr = CONTRACT_ADDRESSES.nftMint;
+            addr = await getContractAddress('nftMint');
         }
-        if (!addr || addr === '0x0000000000000000000000000000000000000000') {
+        if (!addr || addr === ZERO_ADDRESS) {
             throw new Error(`[ZODIAC_WEB3] Contract address not configured: ${name}`);
         }
         
@@ -1339,7 +1399,10 @@ window.ZODIAC_WEB3 = (function() {
         }
         
         const tokenContract = await getContract('tokenContract');
-        const tradingAddress = CONTRACT_ADDRESSES.nftTrading;
+        const tradingAddress = await getContractAddress('nftTrading');
+        if (!tradingAddress || tradingAddress === ZERO_ADDRESS) {
+            throw new Error('[ZODIAC_WEB3] NFT trading address not resolved from authorizer');
+        }
         
         const balance = await tokenContract.methods.balanceOf(account).call();
         const allowance = await tokenContract.methods.allowance(account, tradingAddress).call();
@@ -1435,9 +1498,9 @@ window.ZODIAC_WEB3 = (function() {
     // --- Token Burner Methods (Mint) ---
     async function checkTokenBalanceAndAllowance(requiredAmount) {
         const tokenContract = await getContract('tokenContract');
-        const burnerAddress = CONTRACT_ADDRESSES.tokenBurner;
+        const burnerAddress = await getContractAddress('tokenBurner');
         
-        if (!burnerAddress || burnerAddress === '0x0000000000000000000000000000000000000000') {
+        if (!burnerAddress || burnerAddress === ZERO_ADDRESS) {
             throw new Error('[ZODIAC_WEB3] TokenBurner address not configured');
         }
         
@@ -2201,6 +2264,7 @@ window.ZODIAC_WEB3 = (function() {
         isConnected,
         getChainIdDecimal,
         getContract,
+        getContractAddress,
         getUserWeight,
 
         // Events
