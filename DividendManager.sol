@@ -9,6 +9,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 import "./DividendManagerLib.sol";
+import "./AddressLib.sol";
 
 /**
  * @title DividendManager - NFT分红管理合约
@@ -247,7 +248,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     function addDividendPool(uint256 amount) external onlyOwner whenNotPaused {
         if (amount == 0) revert DM_InvalidAmount();
         _addToDividendPool(amount);
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         if (tokenContract != address(0)) {
             lastSyncedBalance = IERC20(tokenContract).balanceOf(address(this));
         }
@@ -257,7 +258,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @dev 手动同步合约代币余额与分红池，更新新的分红
     /// @dev 仅管理员或授权者可调用
     function syncDividendPool() external onlyOwnerOrAuthorizer {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         if (tokenContract == address(0)) revert DM_TokenNotSet();
         IERC20 token = IERC20(tokenContract);
         uint256 currentBalance = token.balanceOf(address(this));
@@ -381,7 +382,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         }
         lastClaimTime[currentEpoch][msg.sender] = block.timestamp;
 
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         if (tokenContract == address(0)) revert DM_TokenNotSet();
         IERC20 token = IERC20(tokenContract);
         if (token.balanceOf(address(this)) < totalDividend) revert DM_InsufficientBalance();
@@ -535,7 +536,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     function syncUserWeight(address user) external onlyOwnerOrAuthorizer {
         uint256 currentEpoch = _currentEpoch();
         if (user == address(0)) revert DM_ZeroUser();
-        address nftDataContract = IAuthorizer(authorizer).getAddressByName("nftData");
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_DATA);
         if (nftDataContract == address(0)) return;
         
         INFTDataInterface nftData = INFTDataInterface(nftDataContract);
@@ -591,7 +592,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     /// @return normalWeights 普通元素各等级权重
     /// @return rareWeights 稀有元素各等级权重
     function getWeightConfig() external view returns (uint256[5] memory normalWeights, uint256[5] memory rareWeights) {
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_DATA);
         if (nftDataAddr != address(0)) {
             bool hasData = false;
             for (uint8 i = 0; i < 5; i++) {
@@ -765,7 +766,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         uint256 snapshotCount,
         uint256 lastSnapshotTime
     ) {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         if (tokenContract != address(0)) {
             currentPool = IERC20(tokenContract).balanceOf(address(this));
         }
@@ -821,7 +822,7 @@ contract DividendManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         if (!emergencyWithdrawRequested) revert DM_NotRequested();
         if (block.timestamp < emergencyWithdrawRequestedAt + emergencyWithdrawTimelock) revert DM_Timelock();
         if (amount == 0) revert DM_AmountZero();
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         if (tokenContract == address(0)) revert DM_TokenNotSet();
         IERC20 token = IERC20(tokenContract);
         if (token.balanceOf(address(this)) < amount) revert DM_InsufficientToken();

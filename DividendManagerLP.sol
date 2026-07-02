@@ -8,6 +8,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
 import "./DividendManagerLPLib.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
@@ -242,8 +243,8 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      */
     function _processIncomingToken(address token, uint256 amount) internal {
         RewardType currentType = rewardType;
-        address wbnb = IAuthorizer(authorizer).getAddressByName("wbnb");
-        address mainToken = IAuthorizer(authorizer).getAddressByName("token");
+        address wbnb = IAuthorizer(authorizer).getAddressByName(AddressLib.WBNB);
+        address mainToken = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         
         if (token == wbnb) {
             if (currentType == RewardType.LP) {
@@ -307,7 +308,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         }
 
         if (type_ == RewardType.LP || type_ == RewardType.TOKEN) {
-            address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
+            address dividendManager = IAuthorizer(authorizer).getAddressByName(AddressLib.DIVIDEND_MANAGER);
             uint256 totalWeight = IDividendManager(dividendManager).getTotalWeight();
             
             if (totalWeight > 0) {

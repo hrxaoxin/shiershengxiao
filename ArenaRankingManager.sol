@@ -10,6 +10,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 import "./ArenaRankingLib.sol";
+import "./AddressLib.sol";
 
 /**
  * @title ArenaRankingManager
@@ -436,7 +437,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @return 待发放奖励金额
      */
     function getPendingMockReward(uint256 seasonId) external view returns (uint256) {
-        address arenaReward = IAuthorizer(authorizer).getAddressByName("arenaReward");
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_REWARD);
         if (arenaReward == address(0)) {
             return 0;
         }
@@ -453,10 +454,10 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
         require(mockRewardRecipients.length > 0, "ArenaRankingManager: No reward recipients set");
         require(amount > 0, "ArenaRankingManager: Amount must be > 0");
         
-        address arenaReward = IAuthorizer(authorizer).getAddressByName("arenaReward");
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_REWARD);
         require(arenaReward != address(0), "ArenaRankingManager: ArenaReward contract not set");
         
-        address wbnb = IAuthorizer(authorizer).getAddressByName("wbnb");
+        address wbnb = IAuthorizer(authorizer).getAddressByName(AddressLib.WBNB);
         require(wbnb != address(0), "ArenaRankingManager: WBNB contract not set");
         
         uint256 balance = IERC20(wbnb).balanceOf(arenaReward);
@@ -513,7 +514,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @param _rewardType 奖励类型：LP = 0, TOKEN = 1, BNB = 2
      */
     function setRewardType(RewardType _rewardType) external onlyOwner {
-        address arenaRewardLP = IAuthorizer(authorizer).getAddressByName("arenaRewardLP");
+        address arenaRewardLP = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_REWARD_LP);
         require(arenaRewardLP != address(0), "ArenaRankingManager: ArenaRewardLP contract not set");
         
         RewardType oldRewardType = IArenaRewardLP(arenaRewardLP).rewardType();
@@ -531,7 +532,7 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @param team 队伍 NFT ID 数组
      */
     function _validateTeamOwnership(address owner, uint256[6] calldata team) internal view {
-        address arenaPlayer = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
+        address arenaPlayer = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_PLAYER);
         require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer contract not set");
         for (uint256 i = 0; i < 6; i++) {
             uint256 tokenId = team[i];
@@ -547,9 +548,9 @@ contract ArenaRankingManager is Initializable, Ownable2StepUpgradeable, UUPSUpgr
      * @return success 挑战是否成功
      */
     function challengeMockPlayer(uint256[6] calldata playerTeam, uint256 mockIndex) external nonReentrant whenNotPaused returns (bool success) {
-        address arenaBattle = IAuthorizer(authorizer).getAddressByName("arenaBattle");
+        address arenaBattle = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_BATTLE);
         require(arenaBattle != address(0), "ArenaRankingManager: ArenaBattle contract not set");
-        address arenaPlayer = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
+        address arenaPlayer = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_PLAYER);
         require(arenaPlayer != address(0), "ArenaRankingManager: ArenaPlayer contract not set");
         require(mockIndex > 0, "ArenaRankingManager: Invalid mock index");
         IArenaPlayer(arenaPlayer).decrementAttempts(msg.sender);

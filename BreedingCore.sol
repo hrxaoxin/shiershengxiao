@@ -7,6 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/IERC721Upgradeable.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./BreedingLib.sol";
@@ -139,7 +140,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     modifier onlyBreedingExecutor() {
-        address breedingExecutor = IAuthorizer(authorizer).getAddressByName("breedingExecutor");
+        address breedingExecutor = IAuthorizer(authorizer).getAddressByName(AddressLib.BREEDING_EXECUTOR);
         if (msg.sender != breedingExecutor) revert OnlyExecutor();
         _;
     }

@@ -10,6 +10,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
 import "./ArenaRankingLib.sol";
+import "./AddressLib.sol";
 
 /**
  * @title ArenaReward
@@ -211,7 +212,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return rewardPool BNB 奖励池, tokenRewardPool 代币奖励池, totalPlayers 总玩家数
      */
     function _getSeasonData(uint256 seasonId) internal view returns (uint256, uint256, uint256) {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         return IArenaRanking(arenaRankingManager).getSeasonRewardData(seasonId);
     }
 
@@ -222,7 +223,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 模拟玩家奖励总额
      */
     function _calculateMockRewards(uint256 seasonId, uint256 totalReward) internal view returns (uint256) {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         address[] memory rankings = IArenaRanking(arenaRankingManager).getSeasonRankings(seasonId);
         uint256 totalPlayers = rankings.length;
         uint256 mockRewardTotal = 0;
@@ -257,7 +258,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 已分配奖励总额
      */
     function _calculateRealPlayerRewards(uint256 seasonId, uint256 totalReward, uint256 mockRewardTotal) internal returns (uint256) {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         address[] memory rankings = IArenaRanking(arenaRankingManager).getSeasonRankings(seasonId);
         uint256 totalRealPlayers = IArenaRanking(arenaRankingManager).countRealPlayers(seasonId);
         
@@ -329,7 +330,7 @@ contract ArenaReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      */
     function getTotalPendingRewards(address player) external view returns (uint256) {
         uint256 currentEpoch = _currentEpoch();
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         uint256 total = 0;
         

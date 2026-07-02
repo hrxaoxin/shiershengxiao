@@ -7,6 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC721/IERC721Upgradeable.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./BreedingLib.sol";
@@ -104,7 +105,7 @@ contract BreedingExecutor is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function _getBreedingCore() internal view returns (IBreedingCoreState) {
-        address breedingCore = IAuthorizer(authorizer).getAddressByName("breedingCore");
+        address breedingCore = IAuthorizer(authorizer).getAddressByName(AddressLib.BREEDING_CORE);
         if (breedingCore == address(0)) revert AuthorizerNotSet();
         return IBreedingCoreState(breedingCore);
     }
@@ -112,8 +113,8 @@ contract BreedingExecutor is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     function createSelfBreedingPair(address caller, uint256 fatherId, uint256 motherId, uint256 coOwnerId) external nonReentrant returns (uint256) {
         IBreedingCoreState core = _getBreedingCore();
         uint256 currentEpoch = core.epoch();
-        address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
-        address stakingContract = IAuthorizer(authorizer).getAddressByName("staking");
+        address nftMintContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
+        address stakingContract = IAuthorizer(authorizer).getAddressByName(AddressLib.STAKING);
         if (nftMintContract == address(0)) revert NFTContractNotSet();
         if (fatherId == 0) revert InvalidFatherId();
         if (motherId == 0) revert InvalidMotherId();

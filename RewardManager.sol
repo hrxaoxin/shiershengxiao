@@ -8,6 +8,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 
 /**
  * @title RewardManager
@@ -478,10 +479,10 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
         address tokenContract
     ) internal {
         IERC20 token = IERC20(tokenContract);
-        address nftStakingPool = IAuthorizer(authorizer).getAddressByName("staking");
-        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName("tokenStaking");
-        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName("arenaReward");
-        address poolManager = IAuthorizer(authorizer).getAddressByName("poolManager");
+        address nftStakingPool = IAuthorizer(authorizer).getAddressByName(AddressLib.STAKING);
+        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN_STAKING);
+        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_REWARD);
+        address poolManager = IAuthorizer(authorizer).getAddressByName(AddressLib.POOL_MANAGER);
         
         // 计算各池应得代币数量（按BNB金额比例）
         uint256 nftStakingTokenAmount;
@@ -667,13 +668,13 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 分配奖励到各个池
      */
     function _distributeReward(uint256 amount) internal {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
-        address dividendPool = IAuthorizer(authorizer).getAddressByName("dividendManager");
-        address nftStakingPool = IAuthorizer(authorizer).getAddressByName("staking");
-        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName("tokenStaking");
-        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName("arenaReward");
-        address nftBuybackPool = IAuthorizer(authorizer).getAddressByName("nftBuyback");
-        address poolManager = IAuthorizer(authorizer).getAddressByName("poolManager");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
+        address dividendPool = IAuthorizer(authorizer).getAddressByName(AddressLib.DIVIDEND_MANAGER);
+        address nftStakingPool = IAuthorizer(authorizer).getAddressByName(AddressLib.STAKING);
+        address tokenStakingPool = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN_STAKING);
+        address arenaRewardPool = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_REWARD);
+        address nftBuybackPool = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_BUYBACK);
+        address poolManager = IAuthorizer(authorizer).getAddressByName(AddressLib.POOL_MANAGER);
         require(tokenContract != address(0), "RewardManager: Token contract not set");
 
         IERC20 token = IERC20(tokenContract);

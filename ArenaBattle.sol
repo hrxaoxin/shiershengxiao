@@ -7,6 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 
 /**
  * @title ArenaBattle
@@ -235,7 +236,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(mockIndex < MAX_MOCK_RANKING, "ArenaBattle: Invalid mock player index");
         
         uint256 currentEpoch = _currentEpoch();
-        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_PLAYER);
         require(arenaPlayerContract != address(0), "ArenaBattle: Player contract not set");
         
         IArenaPlayer(arenaPlayerContract).decrementAttempts(msg.sender);
@@ -292,7 +293,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
     }
 
     function _checkSeasonActive() internal view {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         require(arenaRankingManager != address(0), "ArenaBattle: Ranking manager not set");
         require(IArenaRanking(arenaRankingManager).currentSeasonId() > 0, "ArenaBattle: Season not active");
     }
@@ -383,7 +384,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         }
         record.lastBattleTime = block.timestamp;
 
-        address arenaLeaderboard = IAuthorizer(authorizer).getAddressByName("arenaLeaderboard");
+        address arenaLeaderboard = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_LEADERBOARD);
         if (arenaLeaderboard != address(0)) {
             IArenaLeaderboard(arenaLeaderboard).updateRanking(player, record.score, currentSeasonId);
         }
@@ -519,7 +520,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
 
     function _calculateTeamPower(uint256[6] memory team) internal view returns (uint256) {
         uint256 totalPower = 0;
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         for (uint256 i = 0; i < team.length; i++) {
             if (team[i] > 0) {
                 uint256 level = INFTMint(nftContract).tokenLevel(team[i]);
@@ -593,7 +594,7 @@ contract ArenaBattle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
      * @return 是否有战斗队伍
      */
     function _hasBattleTeam(address player) internal view returns (bool) {
-        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_PLAYER);
         if (arenaPlayerContract == address(0)) {
             return false;
         }

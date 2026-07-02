@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -245,7 +246,7 @@ library BreedingLib {
         uint256 marketBreedingFee,
         address blackHole
     ) internal {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         require(tokenContract != address(0), "BC: TNS");
         uint256 fee = breedingType == 0 ? selfBreedingFee : marketBreedingFee;
         if (fee == 0) return;
@@ -263,7 +264,7 @@ library BreedingLib {
         address to,
         uint256 tokenId
     ) internal {
-        address nftDataContract = IAuthorizer(authorizer).getAddressByName("nftData");
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_DATA);
         if (nftDataContract != address(0)) {
             try INFTDataInterface(nftDataContract).removeUserNFT(from, tokenId) {
             } catch {
@@ -273,7 +274,7 @@ library BreedingLib {
             }
         }
 
-        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName(AddressLib.DIVIDEND_MANAGER);
         if (dividendManager != address(0)) {
             try IDividendManager(dividendManager).syncUserWeight(from) {
             } catch {
@@ -283,7 +284,7 @@ library BreedingLib {
             }
         }
 
-        address weightManager = IAuthorizer(authorizer).getAddressByName("weightManager");
+        address weightManager = IAuthorizer(authorizer).getAddressByName(AddressLib.WEIGHT_MANAGER);
         if (weightManager != address(0)) {
             try IWeightManager(weightManager).syncUserWeight(from) {
             } catch {

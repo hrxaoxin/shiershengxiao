@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 
 library DividendManagerLib {
@@ -123,7 +124,7 @@ library DividendManagerLib {
     }
 
     function getWeightConfig(address authorizer) internal view returns (uint256[5] memory normalWeights, uint256[5] memory rareWeights) {
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_DATA);
         if (nftDataAddr != address(0)) {
             bool hasData = true;
             for (uint8 i = 0; i < 5; i++) {
@@ -182,7 +183,7 @@ library DividendManagerLib {
     function getWeightByConfig(uint256 level, bool isRare, address authorizer) internal view returns (uint256) {
         if (level == 0) return 0;
 
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_DATA);
         if (nftDataAddr != address(0)) {
             try INFTData(nftDataAddr).getWeightByLevel(uint8(level), isRare) returns (uint256 w) {
                 if (w > 0) return w;

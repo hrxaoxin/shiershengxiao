@@ -6,6 +6,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -309,7 +310,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         
         address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
         address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
-        address feeReceiver = IAuthorizer(authorizer).getAddressByName("feeReceiver");
+        address feeReceiver = IAuthorizer(authorizer).getAddressByName(AddressLib.FEE_RECEIVER);
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(feeReceiver != address(0), "NFTTrading: Fee receiver not set");
         require(tokenContract != address(0), "NFTTrading: Token contract not set");

@@ -8,6 +8,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
 import "./ArenaRankingLib.sol";
+import "./AddressLib.sol";
 
 /**
  * @title ArenaRankingQuery
@@ -66,7 +67,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @dev 玩家记录结构体
      * @param score 玩家当前积分
      * @param wins 胜利次数
-     * @param losses 失败次数
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_LEADERBOARD);
      * @param draws 平局次数
      * @param lastBattleTime 上次战斗时间
      * @param lastResetTime 上次重置时间（用于每日次数重置）
@@ -266,7 +267,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 排名位置（从1开始，未上榜返回0）
      */
     function getPlayerRank(address player) external view returns (uint256) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName("arenaLeaderboard");
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_LEADERBOARD);
         if (arenaLeaderboardContract != address(0)) {
             return IArenaLeaderboard(arenaLeaderboardContract).getPlayerRank(player);
         }
@@ -300,7 +301,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 排行榜条目数组
      */
     function getLeaderboard(uint256 seasonId, uint256 limit) external view returns (LeaderboardEntry[] memory) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName("arenaLeaderboard");
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_LEADERBOARD);
         if (arenaLeaderboardContract == address(0)) {
             return new LeaderboardEntry[](0);
         }
@@ -350,7 +351,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      */
     function getMockPlayerRank(address player) external view returns (uint256) {
         if (!_isMockPlayer(player)) return 0;
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName("arenaLeaderboard");
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_LEADERBOARD);
         if (arenaLeaderboardContract != address(0)) {
             return IArenaLeaderboard(arenaLeaderboardContract).getMockPlayerRank(player);
         }
@@ -458,7 +459,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      */
     function getRemainingAttempts(address player) external view returns (uint256) {
         uint256 currentEpoch = _currentEpoch();
-        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_PLAYER);
         if (arenaPlayerContract == address(0)) {
             PlayerRecord memory p = players[currentEpoch][player];
             if (p.lastResetTime == 0 || block.timestamp > p.lastResetTime + 24 hours) {
@@ -615,7 +616,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     function _claimSeasonReward(uint256 seasonId) internal returns (uint256) {
         require(seasonId > 0 && seasonId <= currentSeasonId, "ArenaRankingQuery: Invalid season");
         require(!seasonRewardsClaimed[seasonId][msg.sender], "ArenaRankingQuery: Already claimed");
-        address arenaRewardLPContract = IAuthorizer(authorizer).getAddressByName("arenaRewardLP");
+        address arenaRewardLPContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_REWARD_LP);
         require(arenaRewardLPContract != address(0), "ArenaRankingQuery: ArenaRewardLP not set");
         // 修复：遵循 CEI 模式，先改状态再转账
         seasonRewardsClaimed[seasonId][msg.sender] = true;

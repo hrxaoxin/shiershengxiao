@@ -5,6 +5,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 
 /**
  * @title ArenaLeaderboard
@@ -176,7 +177,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      * @notice 赛季状态由 ArenaRankingManager 管理，此函数仅保留兼容性
      */
     function endSeason() external onlyOwner {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
         uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         require(currentSeasonId > 0, "ArenaLeaderboard: No active season");
@@ -218,7 +219,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
 
     function _checkSeasonActive(uint256 seasonId) internal view {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
         require(IArenaRanking(arenaRankingManager).currentSeasonId() >= seasonId, "ArenaLeaderboard: Season not active");
     }
@@ -436,7 +437,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
     
     function getSeasonHistory(uint256 startSeasonId, uint256 count) external view returns (SeasonInfo[] memory) {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
         
         SeasonInfo[] memory result = new SeasonInfo[](count);
@@ -465,7 +466,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      * @return 赛季信息数组（从最近到最早）
      */
     function getRecentSeasons(uint256 count) external view returns (SeasonInfo[] memory) {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
         
         uint256 currentId = IArenaRanking(arenaRankingManager).currentSeasonId();
