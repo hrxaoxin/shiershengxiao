@@ -1015,6 +1015,7 @@
                 }
 
                 const breedingCoreAddress = await window.ZODIAC_WEB3.getContractAddress('breedingCore');
+                const breedingExecutorAddress = await window.ZODIAC_WEB3.getContractAddress('breedingExecutor');
                 if (!breedingCoreAddress) {
                     throw new Error('孕育合约地址未配置');
                 }
@@ -1048,7 +1049,7 @@
                     throw new Error('NFT合约未初始化，请刷新页面重试');
                 }
 
-                const isApproved = await nftContract.methods.isApprovedForAll(account, breedingCoreAddress).call();
+                const isApproved = await nftContract.methods.isApprovedForAll(account, breedingExecutorAddress).call();
                 if (!isApproved) {
                     const approveConfirm = await ZODIAC_UI.showConfirmModal(
                         '需要授权',
@@ -1059,7 +1060,7 @@
                         return;
                     }
                     btn.textContent = '正在授权...';
-                    await ZODIAC_WEB3.setNFTApprovalForAll(breedingCoreAddress, true);
+                    await ZODIAC_WEB3.setNFTApprovalForAll(breedingExecutorAddress, true);
                     ZODIAC_UI.showToast('授权成功！', 'success');
                 }
 
@@ -1135,7 +1136,7 @@
                     throw new Error('两个NFT必须是不同性别');
                 }
                 
-                const isApprovedForAll = await nftContract.methods.isApprovedForAll(account, breedingCoreAddress).call();
+                const isApprovedForAll = await nftContract.methods.isApprovedForAll(account, breedingExecutorAddress).call();
                 if (!isApprovedForAll) {
                     const approveNFTConfirm = await ZODIAC_UI.showConfirmModal(
                         '需要授权NFT',
@@ -1146,7 +1147,7 @@
                         throw new Error('用户取消了NFT授权');
                     }
                     btn.textContent = '正在授权NFT...';
-                    await nftContract.methods.setApprovalForAll(breedingCoreAddress, true).send({ from: account });
+                    await nftContract.methods.setApprovalForAll(breedingExecutorAddress, true).send({ from: account });
                     ZODIAC_UI.showToast('NFT授权成功！', 'success');
                 }
                 
@@ -1866,13 +1867,14 @@
             }
 
             const breedingCoreAddress = await window.ZODIAC_WEB3.getContractAddress('breedingCore');
+            const breedingExecutorAddress = await window.ZODIAC_WEB3.getContractAddress('breedingExecutor');
             if (!breedingCoreAddress) {
                 ZODIAC_UI.showToast('孕育合约地址未配置', 'error');
                 return;
             }
 
             if (nftContract) {
-                const isApproved = await nftContract.methods.isApprovedForAll(account, breedingCoreAddress).call();
+                const isApproved = await nftContract.methods.isApprovedForAll(account, breedingExecutorAddress).call();
                 if (!isApproved) {
                     const approveConfirm = await ZODIAC_UI.showConfirmModal(
                         '需要授权',
@@ -1883,7 +1885,7 @@
                         return;
                     }
                     btn.textContent = '正在授权...';
-                    await ZODIAC_WEB3.setNFTApprovalForAll(breedingCoreAddress, true);
+                    await ZODIAC_WEB3.setNFTApprovalForAll(breedingExecutorAddress, true);
                     ZODIAC_UI.showToast('授权成功！', 'success');
                 }
             }

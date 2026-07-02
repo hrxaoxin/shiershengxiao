@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "./BreedingLib.sol";
+
 interface IERC721Receiver {
     function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data) external returns (bytes4);
 }
@@ -232,6 +234,53 @@ interface IBreedingCore {
     function getCooldownEndTime(uint256 tokenId) external view returns (uint256);
     function listForMarketBreeding(uint256 tokenId) external;
     function delistFromMarketBreeding(uint256 tokenId) external;
+}
+
+interface IBreedingExecutor {
+    function createSelfBreedingPair(address caller, uint256 fatherId, uint256 motherId, uint256 coOwnerId) external returns (uint256);
+    function createMarketBreedingPairPublic(address caller, uint256 fatherId, uint256 motherId) external returns (uint256);
+    function completeBreeding(address caller, uint256 pairId) external returns (uint256, uint256);
+    function cancelBreeding(address caller, uint256 pairId) external;
+}
+
+interface IBreedingCoreState {
+    function breedingPairs(uint256 epoch, uint256 pairId) external view returns (BreedingLib.BreedingPairData memory);
+    function breedingPairCount(uint256 epoch) external view returns (uint256);
+    function breedingCooldowns(uint256 epoch, uint256 tokenId) external view returns (uint256);
+    function isNFTInActiveBreeding(uint256 epoch, uint256 tokenId) external view returns (bool);
+    function getDailyPublicBreedings(uint256 epoch, address user) external view returns (uint256);
+    function getLastBreedingDay(uint256 epoch, address user) external view returns (uint256);
+    function get_userActiveOrderIds(uint256 epoch, address user) external view returns (uint256[] memory);
+    function get_userAllOrderIds(uint256 epoch, address user) external view returns (uint256[] memory);
+    function get_breedingPairExists(uint256 epoch, uint256 fatherId, uint256 motherId) external view returns (bool);
+    
+    function setBreedingPair(uint256 epoch, uint256 pairId, BreedingLib.BreedingPairData calldata data) external;
+    function setBreedingPairCount(uint256 epoch, uint256 count) external;
+    function setBreedingCooldown(uint256 epoch, uint256 tokenId, uint256 cooldown) external;
+    function setNFTInActiveBreeding(uint256 epoch, uint256 tokenId, bool active) external;
+    function setDailyPublicBreeding(uint256 epoch, address user, uint256 count) external;
+    function setLastBreedingDay(uint256 epoch, address user, uint256 day) external;
+    function addActiveOrder(uint256 epoch, address user, uint256 pairId) external;
+    function removeActiveOrder(uint256 epoch, address user, uint256 pairId) external;
+    function addAllOrder(uint256 epoch, address user, uint256 pairId) external;
+    function setBreedingPairExists(uint256 epoch, uint256 fatherId, uint256 motherId, bool exists) external;
+    
+    function selfBreedingCooldown() external view returns (uint256);
+    function marketBreedingCooldown() external view returns (uint256);
+    function selfBreedingFee() external view returns (uint256);
+    function marketBreedingFee() external view returns (uint256);
+    function maxDailyPublicBreedings() external view returns (uint256);
+    function epoch() external view returns (uint256);
+    function paused() external view returns (bool);
+    function authorizer() external view returns (address);
+    
+    event BreedingPairCreated(uint256 indexed pairId, uint256 indexed fatherId, uint256 indexed motherId, uint256 breedingType);
+    event BreedingCompleted(uint256 indexed pairId, uint256 indexed childId, uint256 zodiacType);
+    event MaleChildGenerated(uint256 indexed pairId, uint256 indexed childId);
+    event FemaleChildGenerated(uint256 indexed pairId, uint256 indexed childId);
+    event BreedingFeeBurned(uint256 amount);
+    event BreedingCancelled(uint256 indexed pairId, uint256 fatherId, uint256 motherId, address indexed canceller);
+    event EmergencyNFTLocked(uint256 indexed tokenId, address indexed owner);
 }
 
 /**
@@ -914,11 +963,26 @@ interface ITokenStakingLP {
     function calculateDailyReward() external;
     function rewardRate() external view returns (uint256);
     function todayRewardAmount() external view returns (uint256);
+    
+    function emergencyWithdrawWBNB(uint256 amount) external;
+    function setAuthorizer(address _authorizerAddress) external;
+    function setRateStep(uint256 _rateStep) external;
+    function emergencyWithdraw(uint256 tokenType, address tokenOrTo, uint256 amount) external;
+    function lastRewardAccumulatedRate(address user) external view returns (uint256);
+    function resetContractData() external;
+    
+    function MAX_EPOCHS() external view returns (uint256);
+    function epoch() external view returns (uint256);
+    function authorizer() external view returns (address);
+    function rewardType() external view returns (RewardType);
+    function lpRewardPoolBalance() external view returns (uint256);
+    function tokenRewardPoolBalance() external view returns (uint256);
+    function bnbRewardPoolBalance() external view returns (uint256);
 }
 
 /**
  * @title IStakingLP
- * @dev NFT质押LP奖励合约接口
+ * @dev NFT质押LP奖励合约接口（旧版，兼容前端）
  */
 interface IStakingLP {
     function updateTotalWeight(uint256 _totalWeightedNFTs) external;
@@ -938,6 +1002,77 @@ interface IStakingLP {
     function calculateDailyReward() external;
     function rewardRate() external view returns (uint256);
     function todayRewardAmount() external view returns (uint256);
+}
+
+/**
+ * @title IStakingLPReward
+ * @dev NFT质押LP奖励合约 - 奖励分发子合约接口
+ */
+interface IStakingLPReward {
+    function claimLPReward() external;
+    function getPendingLPReward(address user) external view returns (uint256);
+    function calculateDailyReward() external;
+    function shouldCalculateDailyReward() external view returns (bool);
+    function syncUserWeight(address user, uint256 snapshotWeight) external;
+    function updateTotalWeight(uint256 _totalWeightedNFTs) external;
+    function recordIncomingBNB(uint256 amount) external;
+    function setRewardType(RewardType _rewardType) external;
+    function setRewardRate(uint256 __rewardRate) external;
+    function setMaxRewardRate(uint256 __maxRewardRate) external;
+    function setMaxDailyRewardPercent(uint256 __percent) external;
+    function setRateStep(uint256 __rateStep) external;
+    function recordIncomingTokens(uint256 amount) external;
+    function resetContractData() external;
+    function userRewardSnapshotWeight(address user) external view returns (uint256);
+    
+    function rewardType() external view returns (RewardType);
+    function epoch() external view returns (uint256);
+    function globalRewardPerWeight() external view returns (uint256);
+    function totalWeightedNFTs() external view returns (uint256);
+    function lpRewardPoolBalance() external view returns (uint256);
+    function tokenRewardPoolBalance() external view returns (uint256);
+    function bnbRewardPoolBalance() external view returns (uint256);
+    
+    function addToRewardPool(uint256 amount, RewardType type_) external;
+    function getPoolState() external view returns (
+        uint256, uint256, uint256, uint256, uint256, uint256, RewardType,
+        uint256, uint256, uint256, uint256, uint256, uint256, uint256
+    );
+    function setPoolState(
+        uint256, uint256, uint256, uint256, uint256, uint256,
+        uint256, uint256, uint256
+    ) external;
+    
+    event LPRewardClaimed(address indexed user, uint256 lpAmount);
+    event TokenRewardClaimed(address indexed user, uint256 tokenAmount);
+    event BNBRewardClaimed(address indexed user, uint256 bnbAmount);
+    event RewardTypeChanged(RewardType oldType, RewardType newType);
+    event DailyRewardCalculated(uint256 dailyReward, uint256 increment);
+    event RewardRateUpdated(uint256 rewardRate);
+    event ContractDataReset(address indexed operator, uint256 timestamp, uint256 oldEpoch, uint256 newEpoch);
+}
+
+/**
+ * @title IStakingLPAsset
+ * @dev NFT质押LP奖励合约 - 资产管理子合约接口
+ */
+interface IStakingLPAsset {
+    function recordIncomingBNB(uint256 amount) external;
+    function receiveToken(address token, uint256 amount) external;
+    function compoundFees() external;
+    function migrateLP(uint8 oldDexType, uint8 newDexType, uint256 lpAmount) external returns (uint256);
+    function emergencyWithdrawWBNB(uint256 amount) external;
+    function withdrawToken(address token, address to) external;
+    function withdrawBNB(address to) external;
+    function setSlippage(uint256 __slippage) external;
+    
+    function setRewardContract(address _rewardContract) external;
+    function setAuthorizer(address _authorizer) external;
+    
+    event FeesCompounded(uint256 lpAmount);
+    event EmergencyWBNBWithdrawn(address indexed operator, address indexed to, uint256 amount);
+    event LPMigrated(uint8 oldDexType, uint8 newDexType, uint256 oldLPAmount, uint256 newLPAmount);
+    event EmergencyLPRedeemed(uint256 tokenAmount, uint256 wbnbAmount);
 }
 
 /**

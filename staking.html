@@ -371,7 +371,7 @@
         let nftContract;
         let tokenContract;
         let stakingContract;
-        let stakingLPContract;
+        let stakingLPRewardContract;
         let tokenStakingContract;
         let tokenStakingLPContract;
         let selectedNFTs = [];
@@ -629,7 +629,7 @@
                 nftContract = await window.ZODIAC_WEB3.getContract('nftMint');
                 tokenContract = await window.ZODIAC_WEB3.getContract('tokenContract');
                 stakingContract = await window.ZODIAC_WEB3.getContract('staking');
-                stakingLPContract = await window.ZODIAC_WEB3.getContract('stakingLP');
+                stakingLPRewardContract = await window.ZODIAC_WEB3.getContract('stakingLPReward');
                 tokenStakingContract = await window.ZODIAC_WEB3.getContract('tokenStaking');
                 tokenStakingLPContract = await window.ZODIAC_WEB3.getContract('tokenStakingLP');
             } catch (error) {
@@ -976,8 +976,8 @@
 
         async function loadRewards() {
             try {
-                const lpRewards = await stakingLPContract.methods.getPendingLPReward(account).call();
-                const rewardType = await stakingLPContract.methods.rewardType().call();
+                const lpRewards = await stakingLPRewardContract.methods.getPendingLPReward(account).call();
+                const rewardType = await stakingLPRewardContract.methods.rewardType().call();
                 
                 const rewardsFormatted = web3.utils.fromWei(lpRewards, 'ether');
                 const unit = getRewardUnit(rewardType);
@@ -1262,7 +1262,7 @@
             btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>领取中...';
 
             try {
-                await stakingLPContract.methods.claimLPReward().send({ from: account });
+                await stakingLPRewardContract.methods.claimLPReward().send({ from: account });
                 
                 ZODIAC_UI.showToast('LP奖励领取成功！已兑换为代币和WBNB', 'success');
                 loadRewards();

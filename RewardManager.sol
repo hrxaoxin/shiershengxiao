@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -366,16 +366,16 @@ contract RewardManager is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function _distributeStakingPool(uint256 amount) private {
-        address stakingLP = IAuthorizer(authorizer).getAddressByName("stakingLP");
+        address stakingLPReward = IAuthorizer(authorizer).getAddressByName("stakingLPReward");
         uint256 stakingAmount = amount * nftStakingPercent / PRECISION;
         
-        if (stakingLP != address(0) && stakingAmount > 0) {
-            (bool success, ) = payable(stakingLP).call{value: stakingAmount}("");
+        if (stakingLPReward != address(0) && stakingAmount > 0) {
+            (bool success, ) = payable(stakingLPReward).call{value: stakingAmount}("");
             if (success) {
-                try IStakingLP(stakingLP).recordIncomingBNB(stakingAmount) {} catch {}
+                try IStakingLPReward(stakingLPReward).recordIncomingBNB(stakingAmount) {} catch {}
             } else {
                 lockedBNBAmount += stakingAmount;
-                emit BNBTransferFailed(1, stakingLP, stakingAmount);
+                emit BNBTransferFailed(1, stakingLPReward, stakingAmount);
             }
         }
     }

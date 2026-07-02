@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 // 导入NFT接口
@@ -127,6 +127,11 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @dev 余额比例回购是否开启
      */
     bool public balanceRatioBuybackOpen = false;
+    
+    /**
+     * @dev 锁定的余额，用于防止竞态条件（多个用户同时回购时的资金锁定）
+     */
+    uint256 public lockedBalance;
 
     /**
      * @dev 获取最高加成百分比
@@ -499,21 +504,21 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         INFTMint nft = INFTMint(nftContract);
         require(nft.ownerOf(tokenId) == msg.sender, "NFTBuyback: Not owner");
 
-        // 计算回购价格
         uint256 buybackPrice = calculateGrowthPrice(tokenId);
         
-        // 检查合约余额
         IERC20 token = IERC20(tokenContract);
-        require(token.balanceOf(address(this)) >= buybackPrice, "NFTBuyback: Insufficient contract balance");
-
-        // 同步权重（NFT销毁前）
-        _syncWeightAfterBurn(msg.sender, tokenId);
+        uint256 availableBalance = token.balanceOf(address(this)) - lockedBalance;
+        require(availableBalance >= buybackPrice, "NFTBuyback: Insufficient contract balance");
         
-        // 转移NFT到黑洞（销毁）
+        lockedBalance += buybackPrice;
+        
         nft.safeTransferFrom(msg.sender, BLACK_HOLE, tokenId);
         
-        // 转移代币给卖家
         token.safeTransfer(msg.sender, buybackPrice);
+        
+        lockedBalance -= buybackPrice;
+        
+        _syncWeightAfterBurn(msg.sender, tokenId);
 
         emit NFTBurnedForBuyback(tokenId, msg.sender, buybackPrice, "growth");
     }
@@ -534,14 +539,18 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(fixedBuybackPrice > 0, "NFTBuyback: Fixed price not set");
 
         IERC20 token = IERC20(tokenContract);
-        require(token.balanceOf(address(this)) >= fixedBuybackPrice, "NFTBuyback: Insufficient contract balance");
-
-        // 同步权重（NFT销毁前）
-        _syncWeightAfterBurn(msg.sender, tokenId);
+        uint256 availableBalance = token.balanceOf(address(this)) - lockedBalance;
+        require(availableBalance >= fixedBuybackPrice, "NFTBuyback: Insufficient contract balance");
+        
+        lockedBalance += fixedBuybackPrice;
         
         nft.safeTransferFrom(msg.sender, BLACK_HOLE, tokenId);
         
         token.safeTransfer(msg.sender, fixedBuybackPrice);
+        
+        lockedBalance -= fixedBuybackPrice;
+        
+        _syncWeightAfterBurn(msg.sender, tokenId);
 
         emit NFTBurnedForBuyback(tokenId, msg.sender, fixedBuybackPrice, "fixed");
     }
@@ -600,14 +609,18 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(buybackPrice > 0, "NFTBuyback: Buyback price is zero");
         
         IERC20 token = IERC20(tokenContract);
-        require(token.balanceOf(address(this)) >= buybackPrice, "NFTBuyback: Insufficient contract balance");
+        uint256 availableBalance = token.balanceOf(address(this)) - lockedBalance;
+        require(availableBalance >= buybackPrice, "NFTBuyback: Insufficient contract balance");
         
-        // 同步权重（NFT销毁前）
-        _syncWeightAfterBurn(msg.sender, tokenId);
+        lockedBalance += buybackPrice;
         
         nft.safeTransferFrom(msg.sender, BLACK_HOLE, tokenId);
         
         token.safeTransfer(msg.sender, buybackPrice);
+        
+        lockedBalance -= buybackPrice;
+        
+        _syncWeightAfterBurn(msg.sender, tokenId);
         
         emit NFTBurnedForBuyback(tokenId, msg.sender, buybackPrice, "balanceRatio");
     }
@@ -709,7 +722,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
         uint256[] memory amounts = IDexRouter(router).getAmountsOut(bnbAmount, path);
         uint256 expectedOut = amounts[1];
-        uint256 minOut = expectedOut * 95 / 100; // 5%滑点保护
+        uint256 minOut = expectedOut * 95 / 100;
 
         try IDexRouter(router).swapExactETHForTokens{value: bnbAmount}(
             minOut,
@@ -720,6 +733,10 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             emit BNBConverted(bnbAmount, outputAmounts[1]);
         } catch {
             emit BNBConversionFailed(bnbAmount);
+            (bool refundSuccess, ) = payable(msg.sender).call{value: bnbAmount}("");
+            if (refundSuccess) {
+                emit BNBRefunded(msg.sender, bnbAmount);
+            }
         }
     }
 
@@ -771,6 +788,13 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     event BNBConversionFailed(uint256 bnbAmount);
     
     /**
+     * @dev BNB退款事件
+     * @param to 接收地址
+     * @param amount 退款金额
+     */
+    event BNBRefunded(address indexed to, uint256 amount);
+    
+    /**
      * @dev 紧急提取BNB事件
      * @param operator 操作地址
      * @param to 接收地址
@@ -797,6 +821,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         fixedBuybackOpen = false;
         growthBuybackOpen = false;
         balanceRatioBuybackOpen = false;
+        lockedBalance = 0;
         
         emit ContractDataReset(msg.sender, block.timestamp, oldEpoch, epoch);
     }

@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -389,21 +389,20 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function getListedNFTs() external view returns (uint256[] memory) {
         uint256 currentEpoch = _currentEpoch();
+        uint256 len = listedNFTs[currentEpoch].length;
+        uint256[] memory temp = new uint256[](len);
         uint256 count = 0;
-        for (uint256 i = 0; i < listedNFTs[currentEpoch].length; i++) {
+        
+        for (uint256 i = 0; i < len; i++) {
             uint256 tokenId = listedNFTs[currentEpoch][i];
             if (listings[currentEpoch][tokenId].seller != address(0)) {
-                count++;
+                temp[count++] = tokenId;
             }
         }
         
         uint256[] memory result = new uint256[](count);
-        uint256 index = 0;
-        for (uint256 i = 0; i < listedNFTs[currentEpoch].length; i++) {
-            uint256 tokenId = listedNFTs[currentEpoch][i];
-            if (listings[currentEpoch][tokenId].seller != address(0)) {
-                result[index++] = tokenId;
-            }
+        for (uint256 i = 0; i < count; i++) {
+            result[i] = temp[i];
         }
         return result;
     }
@@ -416,12 +415,14 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function getListingsPaginated(uint256 offset, uint256 limit) external view returns (uint256[] memory tokenIds) {
         uint256 currentEpoch = _currentEpoch();
+        uint256 len = listedNFTs[currentEpoch].length;
+        uint256[] memory temp = new uint256[](len);
         uint256 totalCount = 0;
-        for (uint256 i = 0; i < listedNFTs[currentEpoch].length; i++) {
+        
+        for (uint256 i = 0; i < len; i++) {
             uint256 tokenId = listedNFTs[currentEpoch][i];
-            // 检查挂牌是否存在（seller != address(0) 表示有效挂牌）
             if (listings[currentEpoch][tokenId].seller != address(0)) {
-                totalCount++;
+                temp[totalCount++] = tokenId;
             }
         }
         
@@ -435,17 +436,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         }
         
         tokenIds = new uint256[](size);
-        uint256 resultIndex = 0;
-        uint256 count = 0;
-        for (uint256 i = 0; i < listedNFTs[currentEpoch].length; i++) {
-            uint256 tokenId = listedNFTs[currentEpoch][i];
-            // 检查挂牌是否存在（seller != address(0) 表示有效挂牌）
-            if (listings[currentEpoch][tokenId].seller != address(0)) {
-                if (count >= offset && resultIndex < size) {
-                    tokenIds[resultIndex++] = tokenId;
-                }
-                count++;
-            }
+        for (uint256 i = 0; i < size; i++) {
+            tokenIds[i] = temp[offset + i];
         }
     }
 

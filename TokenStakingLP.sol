@@ -70,8 +70,6 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     mapping(uint256 => mapping(address => uint256)) private _lastRewardAccumulatedRate;
 
     uint256 private constant DAILY_REWARD_PRECISION = 10000;
-    
-    address public handler;
 
     /** @dev 存储间隙，用于合约升级兼容性 */
     uint256[47] private __gap;
@@ -93,7 +91,6 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     error TSLP_AlreadyInitialized();
     error TSLP_AuthorizerNotSet();
     error TSLP_BNBTransferFailed();
-    error TSLP_InvalidHandler();
 
     /**
      * @dev LP奖励领取事件
@@ -142,15 +139,13 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         _disableInitializers();
     }
 
-    function initialize(address _authorizerAddress, address _handler) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         if (_authorizerAddress == address(0)) revert TSLP_InvalidAuthorizer();
-        if (_handler == address(0)) revert TSLP_InvalidAuthorizer();
         __Ownable2Step_init();
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
         authorizer = _authorizerAddress;
-        handler = _handler;
         rewardType = RewardType.BNB;
         
         rewardRate = 100;
@@ -303,8 +298,51 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     }
 
     function claimLPReward() external nonReentrant whenNotPaused {
-        (bool success, ) = handler.delegatecall(abi.encodeWithSignature("claimLPRewardHandler()"));
-        require(success, "TSLP: DH");
+        _claimLPReward();
+    }
+
+    function _claimLPReward() internal {
+        address tokenStaking = IAuthorizer(authorizer).getAddressByName("tokenStaking");
+        ITokenStaking.StakeInfo memory stake = ITokenStaking(tokenStaking).getUserStake(msg.sender);
+        if (stake.amount == 0) revert TSLP_NoStakedTokens();
+
+        RewardType currentType = rewardType;
+        
+        if (currentType == RewardType.BNB) {
+            uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
+            uint256 reward = bnbRewardPoolBalance * stake.amount / (totalStaked + 1);
+            if (reward > 0 && reward <= bnbRewardPoolBalance) {
+                bnbRewardPoolBalance -= reward;
+                (bool success, ) = payable(msg.sender).call{value: reward}("");
+                if (!success) revert TSLP_BNBTransferFailed();
+                emit BNBRewardsClaimed(msg.sender, reward);
+            }
+            return;
+        }
+
+        uint256 currentEpoch = _currentEpoch();
+        uint256 currentRate = dailyRewardPerToken;
+        uint256 lastRate = _lastRewardAccumulatedRate[currentEpoch][msg.sender];
+        
+        if (currentRate <= lastRate) {
+            return;
+        }
+
+        uint256 reward = stake.amount * (currentRate - lastRate) / REWARD_PRECISION;
+        
+        if (currentType == RewardType.LP) {
+            if (reward > lpRewardPoolBalance) revert TSLP_InsufficientLP();
+            lpRewardPoolBalance -= reward;
+            TokenStakingLPLib.redeemLPToUser(IAuthorizer(authorizer), reward, msg.sender);
+            emit LPRewardsClaimed(msg.sender, reward);
+        } else if (currentType == RewardType.TOKEN) {
+            if (reward > tokenRewardPoolBalance) revert TSLP_InsufficientToken();
+            tokenRewardPoolBalance -= reward;
+            IERC20(IAuthorizer(authorizer).getAddressByName("token")).safeTransfer(msg.sender, reward);
+            emit TokenRewardsClaimed(msg.sender, reward);
+        }
+
+        _lastRewardAccumulatedRate[currentEpoch][msg.sender] = currentRate;
     }
 
     /**
@@ -349,11 +387,6 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         authorizer = _authorizerAddress;
     }
     
-    function setHandler(address _handler) external onlyOwner {
-        if (_handler == address(0)) revert TSLP_InvalidHandler();
-        handler = _handler;
-    }
-
     /**
      * @dev 设置每日释放比例
      * @param _rewardRate 新的奖励率（万分比）
@@ -383,8 +416,78 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     }
 
     function calculateDailyReward() external whenNotPaused {
-        (bool success, ) = handler.delegatecall(abi.encodeWithSignature("calculateDailyRewardHandler()"));
-        require(success, "TSLP: DH");
+        _calculateDailyReward();
+    }
+
+    function _calculateDailyReward() internal {
+        uint256 currentDayStart = (block.timestamp / 1 days) * 1 days;
+        if (currentDayStart <= todayStart) return;
+
+        todayStart = currentDayStart;
+        rewardRate = 100;
+
+        address tokenStaking = IAuthorizer(authorizer).getAddressByName("tokenStaking");
+        uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
+
+        RewardType currentType = rewardType;
+        uint256 poolBalance;
+
+        if (currentType == RewardType.LP) {
+            poolBalance = lpRewardPoolBalance;
+        } else if (currentType == RewardType.TOKEN) {
+            poolBalance = tokenRewardPoolBalance;
+        } else {
+            poolBalance = bnbRewardPoolBalance;
+        }
+
+        if (poolBalance == 0 || totalStaked == 0) {
+            todayRewardAmount = 0;
+            todayIncomingTokens = 0;
+            return;
+        }
+
+        uint256 expectedDailyReward = poolBalance * rewardRate / DAILY_REWARD_PRECISION;
+        
+        if (expectedDailyReward > 0 && todayIncomingTokens > expectedDailyReward) {
+            uint256 multiple = todayIncomingTokens / expectedDailyReward;
+            uint256 steps = multiple - 1;
+            uint256 maxSteps = (maxRewardRate - rewardRate) / rateStep;
+
+            if (steps > maxSteps) {
+                steps = maxSteps;
+            }
+
+            uint256 newRate = rewardRate + (steps * rateStep);
+            if (newRate != rewardRate) {
+                rewardRate = newRate;
+                emit RewardRateUpdated(rewardRate);
+            }
+        }
+
+        uint256 dailyReward = poolBalance * rewardRate / DAILY_REWARD_PRECISION;
+        uint256 maxDailyReward = poolBalance * maxDailyRewardPercent / 1000;
+        
+        if (dailyReward > maxDailyReward) {
+            dailyReward = maxDailyReward;
+        }
+
+        if (dailyReward > 0) {
+            uint256 increment = (dailyReward * REWARD_PRECISION) / totalStaked;
+            dailyRewardPerToken += increment;
+            todayRewardAmount = dailyReward;
+            
+            if (currentType == RewardType.LP) {
+                lpRewardPoolBalance -= dailyReward;
+            } else if (currentType == RewardType.TOKEN) {
+                tokenRewardPoolBalance -= dailyReward;
+            } else {
+                bnbRewardPoolBalance -= dailyReward;
+            }
+            
+            emit DailyRewardCalculated(dailyReward, increment);
+        }
+
+        todayIncomingTokens = 0;
     }
 
     /**

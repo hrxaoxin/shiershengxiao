@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "./NFTDataType.sol";
@@ -341,19 +341,24 @@ contract NFTUpdate is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, R
         require(newLevel >= 1 && newLevel <= 5, "NFTUpdate: Invalid level");
         IAuthorizer auth = IAuthorizer(authorizer);
         address nftAddr = auth.getAddressByName("nftMintCore");
+        address metadataAddr = auth.getAddressByName("nftData");
         address dividendAddr = auth.getAddressByName("dividendManager");
         require(nftAddr != address(0), "NFTUpdate: NFT contract not set");
+        require(metadataAddr != address(0), "NFTUpdate: Metadata contract not set");
+        
         INFTMint nft = INFTMint(nftAddr);
+        INFTDataInterface m = INFTDataInterface(metadataAddr);
         
         address owner = nft.ownerOf(tokenId);
-        uint8 oldLevel = nft.tokenLevel(tokenId);
-        uint256 tokenType = nft.tokenType(tokenId);
+        uint8 oldLevel = m.tokenLevel(tokenId);
+        uint256 tokenType = m.tokenType(tokenId);
         NFTDataTypes.ElementType element = NFTDataTypes.ElementType(tokenType / 24);
         
         if (oldLevel >= 1 && oldLevel <= 5 && dividendAddr != address(0)) {
             _updateUserWeight(owner, oldLevel, false, element, dividendAddr);
         }
         
+        m.setTokenLevel(tokenId, newLevel);
         nft.adminSetNFTLevel(tokenId, newLevel);
         
         if (dividendAddr != address(0)) {
