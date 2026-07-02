@@ -13,7 +13,6 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     using SafeERC20 for IERC20;
 
     address public authorizer;
-    address public assetContract;
     
     RewardType public rewardType;
     
@@ -57,7 +56,7 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         _disableInitializers();
     }
 
-    function initialize(address _authorizerAddress, address _assetContractAddress) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         if (_authorizerAddress == address(0)) revert InvalidParam();
         
         __Ownable2Step_init();
@@ -66,7 +65,6 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         __Pausable_init();
         
         authorizer = _authorizerAddress;
-        assetContract = _assetContractAddress;
         rewardType = RewardType.BNB;
         
         _slippage = 1000;
@@ -108,14 +106,14 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         authorizer = _authorizerAddress;
     }
 
-    function setAssetContract(address _assetContractAddress) external onlyOwner {
-        if (_assetContractAddress == address(0)) revert InvalidParam();
-        assetContract = _assetContractAddress;
+    function _getStakingLPAsset() private view returns (IStakingLPAsset) {
+        address assetAddr = IAuthorizer(authorizer).getAddressByName("stakingLPAsset");
+        return IStakingLPAsset(assetAddr);
     }
 
     function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
         if (amount == 0) revert InvalidParam();
-        IStakingLPAsset(assetContract).recordIncomingBNB(amount);
+        _getStakingLPAsset().recordIncomingBNB(amount);
     }
 
     function updateTotalWeight(uint256 _totalWeightedNFTs) external onlyOwnerOrAuthorizer {
@@ -132,7 +130,7 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
             return;
         }
         
-        IStakingLPAsset asset = IStakingLPAsset(assetContract);
+        IStakingLPAsset asset = _getStakingLPAsset();
         (uint256 lpBalance, uint256 tokenBalance, uint256 bnbBalance) = _getAssetBalances();
         
         if (oldType == RewardType.LP && _rewardType == RewardType.TOKEN) {
@@ -194,17 +192,17 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     function _redeemLPToToken(uint256 lpAmount) internal returns (uint256) {
-        IStakingLPAsset(assetContract).migrateLP(0, 0, lpAmount);
+        _getStakingLPAsset().migrateLP(0, 0, lpAmount);
         return lpAmount;
     }
 
     function _redeemLPToWBNB(uint256 lpAmount) internal returns (uint256) {
-        IStakingLPAsset(assetContract).migrateLP(0, 0, lpAmount);
+        _getStakingLPAsset().migrateLP(0, 0, lpAmount);
         return lpAmount;
     }
 
     function _convertTokenToLP(uint256 tokenAmount) internal returns (uint256) {
-        IStakingLPAsset(assetContract).receiveToken(IAuthorizer(authorizer).getAddressByName("token"), tokenAmount);
+        _getStakingLPAsset().receiveToken(IAuthorizer(authorizer).getAddressByName("token"), tokenAmount);
         return tokenAmount;
     }
 
@@ -213,7 +211,7 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     function _convertBNBToLP(uint256 bnbAmount) internal returns (uint256) {
-        IStakingLPAsset(assetContract).recordIncomingBNB(bnbAmount);
+        _getStakingLPAsset().recordIncomingBNB(bnbAmount);
         return bnbAmount;
     }
 
@@ -253,7 +251,7 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         if (currentType == RewardType.LP) {
             if (reward > lpRewardPoolBalance) revert InsufficientLP();
             lpRewardPoolBalance -= reward;
-            IStakingLPAsset(assetContract).migrateLP(0, 0, reward);
+            _getStakingLPAsset().migrateLP(0, 0, reward);
             emit LPRewardClaimed(msg.sender, reward);
         } else if (currentType == RewardType.TOKEN) {
             if (reward > tokenRewardPoolBalance) revert InsufficientToken();

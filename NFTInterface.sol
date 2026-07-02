@@ -1065,8 +1065,6 @@ interface IStakingLPAsset {
     function withdrawToken(address token, address to) external;
     function withdrawBNB(address to) external;
     function setSlippage(uint256 __slippage) external;
-    
-    function setRewardContract(address _rewardContract) external;
     function setAuthorizer(address _authorizer) external;
     
     event FeesCompounded(uint256 lpAmount);

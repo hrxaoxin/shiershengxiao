@@ -14,7 +14,6 @@ contract StakingLPAsset is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     using SafeERC20 for IERC20;
 
     address public authorizer;
-    address public rewardContract;
     
     uint256 private _slippage = 1000;
 
@@ -26,7 +25,7 @@ contract StakingLPAsset is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         _disableInitializers();
     }
 
-    function initialize(address _authorizerAddress, address _rewardContractAddress) external initializer {
+    function initialize(address _authorizerAddress) external initializer {
         if (_authorizerAddress == address(0)) revert InvalidParam();
         
         __Ownable2Step_init();
@@ -35,8 +34,12 @@ contract StakingLPAsset is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         __Pausable_init();
         
         authorizer = _authorizerAddress;
-        rewardContract = _rewardContractAddress;
         _slippage = 1000;
+    }
+
+    function _getStakingLPReward() private view returns (IStakingLPReward) {
+        address rewardAddr = IAuthorizer(authorizer).getAddressByName("StakingLPReward");
+        return IStakingLPReward(rewardAddr);
     }
     
     modifier onlyOwnerOrAuthorizer() {
@@ -65,11 +68,6 @@ contract StakingLPAsset is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         authorizer = _authorizerAddress;
     }
 
-    function setRewardContract(address _rewardContractAddress) external onlyOwner {
-        if (_rewardContractAddress == address(0)) revert InvalidParam();
-        rewardContract = _rewardContractAddress;
-    }
-
     function recordIncomingBNB(uint256 amount) external onlyOwnerOrAuthorizer {
         _recordIncomingBNB(amount);
     }
@@ -77,7 +75,7 @@ contract StakingLPAsset is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     function _recordIncomingBNB(uint256 amount) internal {
         if (amount == 0) revert InvalidParam();
         
-        IStakingLPReward reward = IStakingLPReward(rewardContract);
+        IStakingLPReward reward = _getStakingLPReward();
         RewardType currentType = reward.rewardType();
         
         if (currentType == RewardType.LP) {
@@ -101,7 +99,7 @@ contract StakingLPAsset is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         
         IBEP20(token).transferFrom(msg.sender, address(this), amount);
         
-        IStakingLPReward reward = IStakingLPReward(rewardContract);
+        IStakingLPReward reward = _getStakingLPReward();
         RewardType currentType = reward.rewardType();
         
         address wbnb = IAuthorizer(authorizer).getAddressByName("wbnb");
@@ -140,7 +138,7 @@ contract StakingLPAsset is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         } else {
             uint256 bnbAmount = StakingLPLib.swapTokenToBNB(IAuthorizer(authorizer), amount);
             if (bnbAmount > 0) {
-                IStakingLPReward(rewardContract).addToRewardPool(bnbAmount, RewardType.BNB);
+                _getStakingLPReward().addToRewardPool(bnbAmount, RewardType.BNB);
             }
         }
     }
@@ -155,7 +153,7 @@ contract StakingLPAsset is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     }
 
     function _migrateLPInternal(uint8 oldDexType, uint8 newDexType, uint256 lpAmount) private returns (uint256) {
-        IStakingLPReward reward = IStakingLPReward(rewardContract);
+        IStakingLPReward reward = _getStakingLPReward();
         StakingLPLib.RewardPoolState memory state = StakingLPLib.RewardPoolState({
             lpRewardPoolBalance: reward.lpRewardPoolBalance(),
             tokenRewardPoolBalance: 0,
