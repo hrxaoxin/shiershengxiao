@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 // 导入NFT接口
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 // 导入ERC20接口和安全转账工具
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -268,7 +269,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return 总铸造成本
      */
     function getNFTMintCost(uint8 level, bool isRare) public view returns (uint256) {
-        address tokenBurnerContract = IAuthorizer(authorizer).getAddressByName("tokenBurner");
+        address tokenBurnerContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN_BURNER);
         require(tokenBurnerContract != address(0), "NFTBuyback: Token burner not set");
         
         (uint256 normalCost, uint256 rareCost) = ITokenBurner(tokenBurnerContract).getAllCosts();
@@ -278,7 +279,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
             return baseCost;
         }
 
-        address nftUpdateContract = IAuthorizer(authorizer).getAddressByName("nftUpdate");
+        address nftUpdateContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_UPDATE);
         uint256[4] memory upgradeCosts = INFTUpdate(nftUpdateContract).getAllLevelUpgradeCosts();
         uint256 level1Cost = upgradeCosts[0];
         uint256 level2Cost = upgradeCosts[1];
@@ -329,7 +330,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return 最终回购价格
      */
     function calculateGrowthPrice(uint256 tokenId) public view returns (uint256) {
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         
         INFTMint nft = INFTMint(nftContract);
@@ -384,7 +385,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return daysToMax 达到最高回购价所需天数
      */
     function calculateBuybackPrice(uint256 tokenId) public view returns (uint256, uint256, uint256, uint256) {
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         
         INFTMint nft = INFTMint(nftContract);
@@ -410,7 +411,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     function _getMintTime(uint256 tokenId) private view returns (uint256) {
-        address nftDataContract = IAuthorizer(authorizer).getAddressByName("nftData");
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_DATA);
         if (nftDataContract == address(0)) {
             return 0;
         }
@@ -428,9 +429,9 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @param tokenId NFT ID
      */
     function _syncWeightAfterBurn(address user, uint256 tokenId) internal {
-        address nftDataContract = IAuthorizer(authorizer).getAddressByName("nftData");
-        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
-        address weightManager = IAuthorizer(authorizer).getAddressByName("weightManager");
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_DATA);
+        address dividendManager = IAuthorizer(authorizer).getAddressByName(AddressLib.DIVIDEND_MANAGER);
+        address weightManager = IAuthorizer(authorizer).getAddressByName(AddressLib.WEIGHT_MANAGER);
         
         // 移除用户NFT记录
         if (nftDataContract != address(0)) {
@@ -496,8 +497,8 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function sellWithGrowthPrice(uint256 tokenId) external whenNotPaused nonReentrant {
         require(growthBuybackOpen, "NFTBuyback: Growth buyback not open");
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
 
@@ -529,8 +530,8 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function sellWithFixedPrice(uint256 tokenId) external whenNotPaused nonReentrant {
         require(fixedBuybackOpen, "NFTBuyback: Fixed buyback not open");
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
 
@@ -562,9 +563,9 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @return NFT总供应量
      */
     function calculateBalanceRatioPrice(uint256 tokenId) public view returns (uint256, uint256, uint256) {
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
-        address nftDataContract = IAuthorizer(authorizer).getAddressByName("nftData");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_DATA);
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
         
@@ -597,8 +598,8 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function sellWithBalanceRatioPrice(uint256 tokenId) external whenNotPaused nonReentrant {
         require(balanceRatioBuybackOpen, "NFTBuyback: Balance ratio buyback not open");
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         require(nftContract != address(0), "NFTBuyback: NFT contract not set");
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
         
@@ -631,7 +632,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      */
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "NFTBuyback: Amount must be > 0");
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         require(tokenContract != address(0), "NFTBuyback: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "NFTBuyback: Insufficient balance");
@@ -710,9 +711,9 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @param bnbAmount 要兑换的BNB数量
      */
     function _convertBNBToToken(uint256 bnbAmount) internal {
-        address token = IAuthorizer(authorizer).getAddressByName("token");
-        address wbnb = IAuthorizer(authorizer).getAddressByName("wbnb");
-        address router = IAuthorizer(authorizer).getAddressByName("pancakeSwapRouter");
+        address token = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
+        address wbnb = IAuthorizer(authorizer).getAddressByName(AddressLib.WBNB);
+        address router = IAuthorizer(authorizer).getAddressByName(AddressLib.PANCAKE_SWAP_ROUTER);
         
         require(token != address(0) && wbnb != address(0) && router != address(0), "NFTBuyback: Missing config");
 
@@ -759,7 +760,7 @@ contract NFTBuyback is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
      * @param amount 提取数量
      */
     function emergencyWithdrawWBNB(uint256 amount) external onlyOwner nonReentrant {
-        address wbnb = IAuthorizer(authorizer).getAddressByName("wbnb");
+        address wbnb = IAuthorizer(authorizer).getAddressByName(AddressLib.WBNB);
         require(amount > 0, "NFTBuyback: Amount must be > 0");
         require(IWBNB(wbnb).balanceOf(address(this)) >= amount, "NFTBuyback: Insufficient WBNB");
         

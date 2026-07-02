@@ -247,7 +247,7 @@ library DividendManagerLib {
         uint256 newCumulativePerWeightDividend,
         uint256 newSnapshotStartIndex
     ) {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         if (tokenContract == address(0)) {
             return (lastSyncedBalance, lastAutoSyncTime, dividendPoolBalance, cumulativePerWeightDividend, snapshotStartIndex);
         }

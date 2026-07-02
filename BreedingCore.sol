@@ -182,25 +182,25 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     }
 
     function createSelfBreedingPair(uint256 fatherId, uint256 motherId, uint256 coOwnerId) external nonReentrant whenNotPaused returns (uint256) {
-        address breedingExecutor = IAuthorizer(authorizer).getAddressByName("breedingExecutor");
+        address breedingExecutor = IAuthorizer(authorizer).getAddressByName(AddressLib.BREEDING_EXECUTOR);
         if (breedingExecutor == address(0)) revert AuthorizerNotSet();
         return IBreedingExecutor(breedingExecutor).createSelfBreedingPair(msg.sender, fatherId, motherId, coOwnerId);
     }
 
     function createMarketBreedingPairPublic(uint256 fatherId, uint256 motherId) external nonReentrant whenNotPaused returns (uint256) {
-        address breedingExecutor = IAuthorizer(authorizer).getAddressByName("breedingExecutor");
+        address breedingExecutor = IAuthorizer(authorizer).getAddressByName(AddressLib.BREEDING_EXECUTOR);
         if (breedingExecutor == address(0)) revert AuthorizerNotSet();
         return IBreedingExecutor(breedingExecutor).createMarketBreedingPairPublic(msg.sender, fatherId, motherId);
     }
 
     function completeBreeding(uint256 pairId) external nonReentrant whenNotPaused returns (uint256, uint256) {
-        address breedingExecutor = IAuthorizer(authorizer).getAddressByName("breedingExecutor");
+        address breedingExecutor = IAuthorizer(authorizer).getAddressByName(AddressLib.BREEDING_EXECUTOR);
         if (breedingExecutor == address(0)) revert AuthorizerNotSet();
         return IBreedingExecutor(breedingExecutor).completeBreeding(msg.sender, pairId);
     }
 
     function cancelBreeding(uint256 pairId) external nonReentrant whenNotPaused {
-        address breedingExecutor = IAuthorizer(authorizer).getAddressByName("breedingExecutor");
+        address breedingExecutor = IAuthorizer(authorizer).getAddressByName(AddressLib.BREEDING_EXECUTOR);
         if (breedingExecutor == address(0)) revert AuthorizerNotSet();
         IBreedingExecutor(breedingExecutor).cancelBreeding(msg.sender, pairId);
     }
@@ -264,7 +264,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 claimablePairs
     ) {
         uint256 currentEpoch = _currentEpoch();
-        address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         return BreedingLib.getUserBreedingStats(_userAllOrderIds, breedingPairs, currentEpoch, user, nftMintContract);
     }
 
@@ -299,14 +299,14 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             emit EmergencyBNBWithdrawn(msg.sender, owner(), tokenIdOrAmount);
         } else if (tokenType == 1) {
             if (amount == 0) revert AmountZero();
-            address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+            address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
             if (tokenContract == address(0)) revert TokenContractNotSet();
             IERC20 token = IERC20(tokenContract);
             if (token.balanceOf(address(this)) < amount) revert InsufficientBalance();
             token.safeTransfer(owner(), amount);
             emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);
         } else {
-            address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+            address nftMintContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
             if (nftMintContract == address(0)) revert NFTContractNotSet();
             if (isNFTInActiveBreeding[currentEpoch][tokenIdOrAmount]) revert NFTBreeding();
             IERC721Upgradeable(nftMintContract).safeTransferFrom(address(this), owner(), tokenIdOrAmount);
@@ -318,7 +318,7 @@ contract BreedingCore is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
     function recoverStuckNFT(uint256 tokenId, address to) external onlyOwner nonReentrant {
         if (to == address(0)) revert InvalidTo();
         uint256 currentEpoch = _currentEpoch();
-        address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         if (nftMintContract == address(0)) revert NFTContractNotSet();
         IERC721Upgradeable nft = IERC721Upgradeable(nftMintContract);
         if (nft.ownerOf(tokenId) != address(this)) revert NotNftHolder();

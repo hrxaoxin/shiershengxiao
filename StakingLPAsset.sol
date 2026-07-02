@@ -7,6 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "./StakingLPLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -38,7 +39,7 @@ contract StakingLPAsset is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     }
 
     function _getStakingLPReward() private view returns (IStakingLPReward) {
-        address rewardAddr = IAuthorizer(authorizer).getAddressByName("StakingLPReward");
+        address rewardAddr = IAuthorizer(authorizer).getAddressByName(AddressLib.STAKING_LP_REWARD);
         return IStakingLPReward(rewardAddr);
     }
     
@@ -102,8 +103,8 @@ contract StakingLPAsset is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         IStakingLPReward reward = _getStakingLPReward();
         RewardType currentType = reward.rewardType();
         
-        address wbnb = IAuthorizer(authorizer).getAddressByName("wbnb");
-        address mainToken = IAuthorizer(authorizer).getAddressByName("token");
+        address wbnb = IAuthorizer(authorizer).getAddressByName(AddressLib.WBNB);
+        address mainToken = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
 
         if (token == wbnb) {
             if (currentType == RewardType.LP) {

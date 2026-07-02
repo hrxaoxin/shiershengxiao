@@ -154,7 +154,7 @@ contract BreedingExecutor is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     function createMarketBreedingPairPublic(address caller, uint256 fatherId, uint256 motherId) external nonReentrant returns (uint256) {
         IBreedingCoreState core = _getBreedingCore();
         uint256 currentEpoch = core.epoch();
-        address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         if (nftMintContract == address(0)) revert NFTContractNotSet();
         if (fatherId == 0) revert InvalidFatherId2();
         if (motherId == 0) revert InvalidMotherId2();
@@ -220,7 +220,7 @@ contract BreedingExecutor is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     ) internal returns (uint256 pairId) {
         IBreedingCoreState core = _getBreedingCore();
         uint256 currentEpoch = core.epoch();
-        address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         if (nftMintContract == address(0)) revert NFTContractNotSet();
         
         INFTMint nft = INFTMint(nftMintContract);
@@ -274,7 +274,7 @@ contract BreedingExecutor is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 pairId, uint256 currentEpoch, IBreedingCoreState core
     ) private {
         IERC721Upgradeable nft721 = IERC721Upgradeable(nftMintContract);
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         
         _transferBreedingNFTs(nft721, fatherId, motherId, maleOwner, femaleOwner, fee, tokenContract);
 
@@ -301,7 +301,7 @@ contract BreedingExecutor is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 fee, address tokenContract
     ) internal {
         bool fatherTransferred = false;
-        address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
 
         try nft.safeTransferFrom(maleOwner, address(_getBreedingCore()), fatherId) {
             fatherTransferred = true;
@@ -343,7 +343,7 @@ contract BreedingExecutor is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         if (pair.childId != 0) revert AlreadyCompleted();
         if (caller != pair.maleOwner && caller != pair.femaleOwner) revert NotPairOwner();
         
-        address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         if (nftMintContract == address(0)) revert NFTContractNotSet();
 
         uint256 cooldown = pair.breedingType == BREEDING_TYPE_SELF ? core.selfBreedingCooldown() : core.marketBreedingCooldown();
@@ -383,7 +383,7 @@ contract BreedingExecutor is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         
         uint256 fee = pair.breedingType == BREEDING_TYPE_SELF ? core.selfBreedingFee() : core.marketBreedingFee();
         if (fee > 0) {
-            address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+            address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
             if (tokenContract != address(0)) {
                 IERC20(tokenContract).safeTransferFrom(address(core), caller, fee);
             }
@@ -400,7 +400,7 @@ contract BreedingExecutor is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         if (pair.childId != 0) revert AlreadyCompleted();
         if (caller != pair.maleOwner && caller != pair.femaleOwner) revert NotPairOwner();
         
-        address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         if (nftMintContract == address(0)) revert NFTContractNotSet();
 
         IERC721Upgradeable nft721 = IERC721Upgradeable(nftMintContract);
@@ -526,7 +526,7 @@ contract BreedingExecutor is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
 
         address fatherOwner = pair.maleOwner;
         address motherOwner = pair.femaleOwner;
-        address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
 
         try nft721.safeTransferFrom(address(core), pair.maleOwner, pair.fatherId) {} catch { emit EmergencyNFTLocked(pair.fatherId, pair.maleOwner); }
         _syncWeightAfterTransfer(address(core), fatherOwner, pair.fatherId, nftMintContract);
@@ -545,7 +545,7 @@ contract BreedingExecutor is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     }
 
     function _burnFee(uint256 breedingType, IBreedingCoreState core) internal {
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         require(tokenContract != address(0), "BC: TNS");
         uint256 fee = breedingType == 0 ? core.selfBreedingFee() : core.marketBreedingFee();
         if (fee == 0) return;

@@ -1,4 +1,4 @@
-﻿// SPDX-License-Identifier: MIT
+﻿﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/IERC20Upgradeable.sol";
@@ -9,6 +9,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 
 /**
  * @title TokenStaking
@@ -244,7 +245,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     function recordIncomingTokens(uint256 amount) external {
         if (amount == 0) revert TS_AmountMustBeGreaterThanZero();
-        if (!(msg.sender == owner() || msg.sender == authorizer || msg.sender == IAuthorizer(authorizer).getAddressByName("rewardManager"))) revert TS_NotAuthorized();
+        if (!(msg.sender == owner() || msg.sender == authorizer || msg.sender == IAuthorizer(authorizer).getAddressByName(AddressLib.REWARD_MANAGER))) revert TS_NotAuthorized();
         todayIncomingTokens += amount;
         emit IncomingTokensRecorded(amount, todayIncomingTokens);
     }
@@ -263,7 +264,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         if (stake.amount + amount > maxUserStaked) revert TS_UserStakeLimitExceeded();
         if (totalStakedTokens + amount > maxTotalStaked) revert TS_TotalStakeLimitExceeded();
         
-        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName("token"));
+        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN));
         if (token.balanceOf(msg.sender) < amount) revert TS_InsufficientBalance();
         if (token.allowance(msg.sender, address(this)) < amount) revert TS_InsufficientAllowance();
         
@@ -325,7 +326,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
             stake.stakedAt = 0;
         }
         
-        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName("token"));
+        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN));
         token.safeTransfer(msg.sender, amount);
         
         emit TokensUnstaked(msg.sender, amount);
@@ -369,7 +370,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
         uint256 userReward = stake.accumulatedRewards;
         if (userReward == 0) revert TS_NoRewardsToClaim();
         
-        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName("token"));
+        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN));
         if (token.balanceOf(address(this)) < userReward + totalStakedTokens) revert TS_InsufficientTokenBalanceInContract();
 
         stake.accumulatedRewards = 0;
@@ -459,7 +460,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @return uint256 代币余额
      */
     function getContractTokenBalance() external view returns (uint256) {
-        return IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName("token")).balanceOf(address(this));
+        return IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN)).balanceOf(address(this));
     }
 
     /**
@@ -467,7 +468,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      * @return uint256 奖励代币余额
      */
     function getRewardTokenBalance() external view returns (uint256) {
-        uint256 balance = IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName("token")).balanceOf(address(this));
+        uint256 balance = IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN)).balanceOf(address(this));
         return balance > totalStakedTokens ? balance - totalStakedTokens : 0;
     }
 
@@ -489,7 +490,7 @@ contract TokenStaking is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable
      */
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         if (amount == 0) revert TS_AmountMustBeGreaterThanZero();
-        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName("token"));
+        IERC20Upgradeable token = IERC20Upgradeable(IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN));
         if (amount > token.balanceOf(address(this))) revert TS_InsufficientTokenBalanceInContract();
         SafeERC20Upgradeable.safeTransfer(token, owner(), amount);
         emit EmergencyTokensWithdrawn(msg.sender, owner(), amount);

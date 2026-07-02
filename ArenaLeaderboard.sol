@@ -503,7 +503,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         bool isSettled,
         uint256 totalPlayers
     ) {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
         return IArenaRanking(arenaRankingManager).getSeasonInfo(seasonId);
     }
@@ -551,7 +551,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
         uint256 endTime,
         bool isActive
     ) {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
         uint256 totalPlayers;
         uint256 rewardPool;
@@ -572,7 +572,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
     
     function getPlayerRank(address player) external view returns (uint256) {
         uint256 currentEpoch = _currentEpoch();
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
         uint256 currentSeasonId = IArenaRanking(arenaRankingManager).currentSeasonId();
         return playerRankIndex[currentEpoch][currentSeasonId][player];
@@ -584,7 +584,7 @@ contract ArenaLeaderboard is Initializable, Ownable2StepUpgradeable, UUPSUpgrade
      * @return 玩家数量
      */
     function getTotalPlayersInSeason(uint256 seasonId) external view returns (uint256) {
-        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName("arenaRankingManager");
+        address arenaRankingManager = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_RANKING_MANAGER);
         require(arenaRankingManager != address(0), "ArenaLeaderboard: Ranking manager not set");
         (, , , , uint256 totalPlayers) = IArenaRanking(arenaRankingManager).getSeasonInfo(seasonId);
         return totalPlayers;

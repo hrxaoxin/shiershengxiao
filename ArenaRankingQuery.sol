@@ -375,7 +375,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return entries 排行榜条目, totalPages 总页数, totalPlayers 总玩家数
      */
     function getLeaderboardByPage(uint256 seasonId, uint256 page, uint256 pageSize) external view returns (LeaderboardEntry[] memory entries, uint256 totalPages, uint256 totalPlayers) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName("arenaLeaderboard");
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_LEADERBOARD);
         if (arenaLeaderboardContract == address(0)) {
             return (new LeaderboardEntry[](0), 0, 0);
         }
@@ -389,7 +389,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 总页数
      */
     function getLeaderboardPageCount(uint256 seasonId, uint256 pageSize) external view returns (uint256) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName("arenaLeaderboard");
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_LEADERBOARD);
         if (arenaLeaderboardContract != address(0)) {
             return IArenaLeaderboard(arenaLeaderboardContract).getLeaderboardPageCount(seasonId, pageSize);
         }
@@ -403,7 +403,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return playerAddrs 玩家地址数组, scores 积分数组
      */
     function getTopPlayers(uint256 seasonId, uint256 count) external view returns (address[] memory playerAddrs, uint256[] memory scores) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName("arenaLeaderboard");
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_LEADERBOARD);
         if (arenaLeaderboardContract != address(0)) {
             return IArenaLeaderboard(arenaLeaderboardContract).getTopPlayers(seasonId, count);
         }
@@ -500,7 +500,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 代币数量（wei单位）
      */
     function rechargeCost() external view returns (uint256) {
-        address arenaPlayer = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
+        address arenaPlayer = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_PLAYER);
         if (arenaPlayer != address(0)) {
             return IArenaPlayer(arenaPlayer).rechargeCost();
         }
@@ -541,7 +541,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
             wins = 0;
             losses = 0;
         }
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName("arenaLeaderboard");
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_LEADERBOARD);
         if (arenaLeaderboardContract != address(0)) {
             rank = IArenaLeaderboard(arenaLeaderboardContract).getPlayerRank(player);
         } else {
@@ -561,7 +561,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         address[] memory playerAddrs,
         uint256[] memory scores
     ) {
-        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName("arenaLeaderboard");
+        address arenaLeaderboardContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_LEADERBOARD);
         if (arenaLeaderboardContract != address(0)) {
             return IArenaLeaderboard(arenaLeaderboardContract).getPlayersByRankRange(seasonId, startRank, endRank);
         }
@@ -580,7 +580,7 @@ contract ArenaRankingQuery is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
     ) {
         uint256 currentEpoch = _currentEpoch();
         PlayerRecord memory p = players[currentEpoch][player];
-        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
+        address arenaPlayerContract = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_PLAYER);
         if (arenaPlayerContract != address(0)) {
             remainingAttempts = IArenaPlayer(arenaPlayerContract).getRemainingAttempts(player);
         } else {

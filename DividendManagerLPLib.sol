@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 
 library DividendManagerLPLib {
     using SafeERC20 for IERC20;
@@ -27,23 +28,23 @@ library DividendManagerLPLib {
     function getConfig(IAuthorizer authorizer, uint8 dexType) private view returns (LPConfig memory) {
         address router;
         if (dexType == 0) {
-            router = authorizer.getAddressByName("flapSwapRouter");
+            router = authorizer.getAddressByName(AddressLib.FLAP_SWAP_ROUTER);
         } else if (dexType == 1) {
-            router = authorizer.getAddressByName("pancakeSwapRouter");
+            router = authorizer.getAddressByName(AddressLib.PANCAKE_SWAP_ROUTER);
         } else {
-            router = authorizer.getAddressByName("uniswapRouter");
+            router = authorizer.getAddressByName(AddressLib.UNISWAP_ROUTER);
         }
         
         address lpToken = address(0);
         if (router != address(0)) {
             try IDexRouter(router).factory() returns (address factory) {
-                lpToken = IDexFactory(factory).getPair(authorizer.getAddressByName("token"), authorizer.getAddressByName("wbnb"));
+                lpToken = IDexFactory(factory).getPair(authorizer.getAddressByName(AddressLib.TOKEN), authorizer.getAddressByName(AddressLib.WBNB));
             } catch {}
         }
         
         return LPConfig({
-            token: authorizer.getAddressByName("token"),
-            wbnb: authorizer.getAddressByName("wbnb"),
+            token: authorizer.getAddressByName(AddressLib.TOKEN),
+            wbnb: authorizer.getAddressByName(AddressLib.WBNB),
             router: router,
             slippage: 1000,
             lpToken: lpToken
@@ -55,7 +56,7 @@ library DividendManagerLPLib {
     }
 
     function _convertBNBToLPWithFallback(IAuthorizer authorizer, uint256 bnbAmount) private returns (uint256) {
-        IWBNB(authorizer.getAddressByName("wbnb")).deposit{value: bnbAmount}();
+        IWBNB(authorizer.getAddressByName(AddressLib.WBNB)).deposit{value: bnbAmount}();
         
         uint256 lpAmount;
         lpAmount = _tryConvertBNBToLP(authorizer, bnbAmount, 0);
@@ -67,7 +68,7 @@ library DividendManagerLPLib {
         lpAmount = _tryConvertBNBToLP(authorizer, bnbAmount, 2);
         if (lpAmount > 0) return lpAmount;
         
-        IWBNB(authorizer.getAddressByName("wbnb")).withdraw(bnbAmount);
+        IWBNB(authorizer.getAddressByName(AddressLib.WBNB)).withdraw(bnbAmount);
         (bool success, ) = payable(msg.sender).call{value: bnbAmount}("");
         if (!success) revert DML_BNBTransferFailed();
         return 0;
@@ -185,7 +186,7 @@ library DividendManagerLPLib {
         lpAmount = _tryConvertTokenToLP(authorizer, tokenAmount, 2);
         if (lpAmount > 0) return lpAmount;
         
-        IERC20(authorizer.getAddressByName("token")).safeTransfer(msg.sender, tokenAmount);
+        IERC20(authorizer.getAddressByName(AddressLib.TOKEN)).safeTransfer(msg.sender, tokenAmount);
         return 0;
     }
 
@@ -366,8 +367,8 @@ library DividendManagerLPLib {
     }
 
     function _transferRewards(IAuthorizer authorizer, address user, uint256 tokenAmount, uint256 wbnbAmount) private {
-        address token = authorizer.getAddressByName("token");
-        address wbnb = authorizer.getAddressByName("wbnb");
+        address token = authorizer.getAddressByName(AddressLib.TOKEN);
+        address wbnb = authorizer.getAddressByName(AddressLib.WBNB);
 
         if (tokenAmount > 0) {
             IERC20(token).safeTransfer(user, tokenAmount);
@@ -381,7 +382,7 @@ library DividendManagerLPLib {
     }
 
     function compoundFees(IAuthorizer authorizer) internal {
-        address wbnb = authorizer.getAddressByName("wbnb");
+        address wbnb = authorizer.getAddressByName(AddressLib.WBNB);
         uint256 balance = IWBNB(wbnb).balanceOf(address(this));
 
         if (balance >= 1000000000000000) {

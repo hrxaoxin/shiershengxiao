@@ -8,6 +8,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 
 /**
  * @title BreedingMarket - 繁殖市场合约
@@ -210,8 +211,8 @@ contract BreedingMarket is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * - 挂牌信息被记录
      */
     function listForMarketBreeding(uint256 tokenId) external nonReentrant whenNotPaused {
-        address nftMintContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
-        address breedingCoreContract = IAuthorizer(authorizer).getAddressByName("breedingCore");
+        address nftMintContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
+        address breedingCoreContract = IAuthorizer(authorizer).getAddressByName(AddressLib.BREEDING_CORE);
         require(nftMintContract != address(0), "BM: NFT contract not set");
         require(breedingCoreContract != address(0), "BM: Breeding core not set");
         require(INFTMint(nftMintContract).ownerOf(tokenId) == msg.sender, "BM: Not token owner");

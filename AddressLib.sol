@@ -32,4 +32,5 @@ library AddressLib {
     string public constant FEE_RECEIVER = "feeReceiver";
     string public constant POOL_MANAGER = "poolManager";
     string public constant NFT_TRADING = "nftTrading";
+    string public constant PRICE_ORACLE = "priceOracle";
 }

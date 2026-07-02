@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 
 library StakingLPLib {
     using SafeERC20 for IERC20;
@@ -59,23 +60,23 @@ library StakingLPLib {
     function _getConfig(IAuthorizer authorizer, uint8 dexType) internal view returns (LPConfig memory) {
         address router;
         if (dexType == 0) {
-            router = authorizer.getAddressByName("flapSwapRouter");
+            router = authorizer.getAddressByName(AddressLib.FLAP_SWAP_ROUTER);
         } else if (dexType == 1) {
-            router = authorizer.getAddressByName("pancakeSwapRouter");
+            router = authorizer.getAddressByName(AddressLib.PANCAKE_SWAP_ROUTER);
         } else {
-            router = authorizer.getAddressByName("uniswapRouter");
+            router = authorizer.getAddressByName(AddressLib.UNISWAP_ROUTER);
         }
 
         address lpToken = address(0);
         if (router != address(0)) {
             try IDexRouter(router).factory() returns (address factory) {
-                lpToken = IDexFactory(factory).getPair(authorizer.getAddressByName("token"), authorizer.getAddressByName("wbnb"));
+                lpToken = IDexFactory(factory).getPair(authorizer.getAddressByName(AddressLib.TOKEN), authorizer.getAddressByName(AddressLib.WBNB));
             } catch {}
         }
 
         return LPConfig({
-            token: authorizer.getAddressByName("token"),
-            wbnb: authorizer.getAddressByName("wbnb"),
+            token: authorizer.getAddressByName(AddressLib.TOKEN),
+            wbnb: authorizer.getAddressByName(AddressLib.WBNB),
             router: router,
             slippage: 1000,
             lpToken: lpToken
@@ -200,14 +201,14 @@ library StakingLPLib {
     }
 
     function convertBNBToLP(IAuthorizer authorizer, uint256 bnbAmount) internal returns (uint256) {
-        IWBNB(authorizer.getAddressByName("wbnb")).deposit{value: bnbAmount};
+        IWBNB(authorizer.getAddressByName(AddressLib.WBNB)).deposit{value: bnbAmount};
         for (uint8 dexType = 0; dexType <= 2; dexType++) {
             LPConfig memory config = _getConfig(authorizer, dexType);
             if (config.router == address(0)) continue;
             uint256 lpAmount = _generateLPFromWBNB(config, bnbAmount);
             if (lpAmount > 0) return lpAmount;
         }
-        IWBNB(authorizer.getAddressByName("wbnb")).withdraw(bnbAmount);
+        IWBNB(authorizer.getAddressByName(AddressLib.WBNB)).withdraw(bnbAmount);
         (bool success2, ) = payable(msg.sender).call{value: bnbAmount}("");
         if (!success2) revert SL_BNBTransferFailed();
         return 0;
@@ -348,8 +349,8 @@ library StakingLPLib {
     }
 
     function _transferRewards(IAuthorizer authorizer, address user, uint256 tokenAmount, uint256 wbnbAmount) internal {
-        address token = authorizer.getAddressByName("token");
-        address wbnb = authorizer.getAddressByName("wbnb");
+        address token = authorizer.getAddressByName(AddressLib.TOKEN);
+        address wbnb = authorizer.getAddressByName(AddressLib.WBNB);
 
         if (tokenAmount > 0) {
             IERC20(token).safeTransfer(user, tokenAmount);
@@ -502,8 +503,8 @@ library StakingLPLib {
         address token,
         uint256 amount
     ) internal returns (RewardPoolState memory) {
-        address wbnb = authorizer.getAddressByName("wbnb");
-        address mainToken = authorizer.getAddressByName("token");
+        address wbnb = authorizer.getAddressByName(AddressLib.WBNB);
+        address mainToken = authorizer.getAddressByName(AddressLib.TOKEN);
 
         if (token == wbnb) {
             if (rewardType == RewardType.LP) {
@@ -546,7 +547,7 @@ library StakingLPLib {
     }
 
     function compoundFees(IAuthorizer authorizer) internal {
-        address wbnb = authorizer.getAddressByName("wbnb");
+        address wbnb = authorizer.getAddressByName(AddressLib.WBNB);
         uint256 balance = IWBNB(wbnb).balanceOf(address(this));
 
         if (balance >= 1000000000000000) {
@@ -556,7 +557,7 @@ library StakingLPLib {
     }
 
     function emergencyWithdrawWBNB(IAuthorizer authorizer, uint256 amount) internal {
-        address wbnb = authorizer.getAddressByName("wbnb");
+        address wbnb = authorizer.getAddressByName(AddressLib.WBNB);
         if (amount == 0) revert SL_AmountMustBeGreaterThanZero();
         if (IWBNB(wbnb).balanceOf(address(this)) < amount) revert SL_InsufficientWBNB();
 

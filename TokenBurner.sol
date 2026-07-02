@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -272,10 +273,10 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(authorizer != address(0), "TokenBurner: authorizer not set");
         require(user != address(0), "TokenBurner: Zero user address");
 
-        address tokenAddress = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenAddress = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         _validateContractAddress(tokenAddress, "tokenContract");
 
-        address nftMintAddress = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintAddress = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         _validateContractAddress(nftMintAddress, "nftMintContract");
 
         // 检查 NFTMintCore 是否暂停
@@ -314,10 +315,10 @@ contract TokenBurner is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable,
         require(authorizer != address(0), "TokenBurner: authorizer not set");
         require(user != address(0), "TokenBurner: Zero user address");
 
-        address tokenAddress = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenAddress = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         _validateContractAddress(tokenAddress, "tokenContract");
 
-        address nftMintAddress = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintAddress = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         _validateContractAddress(nftMintAddress, "nftMintContract");
 
         require(!INFTMintCore(nftMintAddress).paused(), "TokenBurner: NFT Mint paused");
@@ -358,10 +359,10 @@ function burnAndMintTargeted(address user, uint8 zodiac) external nonReentrant w
     require(user != address(0), "TokenBurner: Zero user address");
     require(zodiac < 12, "TokenBurner: Invalid zodiac type");
 
-    address tokenAddress = IAuthorizer(authorizer).getAddressByName("token");
+    address tokenAddress = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
     _validateContractAddress(tokenAddress, "tokenContract");
 
-    address nftMintAddress = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+    address nftMintAddress = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
     _validateContractAddress(nftMintAddress, "nftMintContract");
 
     // 检查 NFTMintCore 是否暂停

@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/IERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 
 library ArenaRewardLPLib {
     using SafeERC20 for IERC20;
@@ -58,23 +59,23 @@ library ArenaRewardLPLib {
     function _getLPConfig(IAuthorizer authorizer, uint8 dexType) private view returns (LPConfig memory) {
         address router;
         if (dexType == 0) {
-            router = authorizer.getAddressByName("flapSwapRouter");
+            router = authorizer.getAddressByName(AddressLib.FLAP_SWAP_ROUTER);
         } else if (dexType == 1) {
-            router = authorizer.getAddressByName("pancakeSwapRouter");
+            router = authorizer.getAddressByName(AddressLib.PANCAKE_SWAP_ROUTER);
         } else {
-            router = authorizer.getAddressByName("uniswapRouter");
+            router = authorizer.getAddressByName(AddressLib.UNISWAP_ROUTER);
         }
 
         address lpToken = address(0);
         if (router != address(0)) {
             try IDexRouter(router).factory() returns (address factory) {
-                lpToken = IDexFactory(factory).getPair(authorizer.getAddressByName("token"), authorizer.getAddressByName("wbnb"));
+                lpToken = IDexFactory(factory).getPair(authorizer.getAddressByName(AddressLib.TOKEN), authorizer.getAddressByName(AddressLib.WBNB));
             } catch {}
         }
 
         return LPConfig({
-            token: authorizer.getAddressByName("token"),
-            wbnb: authorizer.getAddressByName("wbnb"),
+            token: authorizer.getAddressByName(AddressLib.TOKEN),
+            wbnb: authorizer.getAddressByName(AddressLib.WBNB),
             router: router,
             slippage: 1000,
             lpToken: lpToken
@@ -213,7 +214,7 @@ library ArenaRewardLPLib {
     }
 
     function convertBNBToLP(IAuthorizer authorizer, uint256 bnbAmount) internal returns (uint256) {
-        address wbnb = authorizer.getAddressByName("wbnb");
+        address wbnb = authorizer.getAddressByName(AddressLib.WBNB);
         IWBNB(wbnb).deposit{value: bnbAmount}();
 
         for (uint8 dexType = 0; dexType < 3; dexType++) {
@@ -345,8 +346,8 @@ library ArenaRewardLPLib {
 
     function redeemLPToUser(IAuthorizer authorizer, uint256 lpAmount, address user) internal {
         (uint256 tokenAmount, uint256 wbnbAmount) = _redeemLPWithAutoDetect(authorizer, lpAmount);
-        address token = authorizer.getAddressByName("token");
-        address wbnb = authorizer.getAddressByName("wbnb");
+        address token = authorizer.getAddressByName(AddressLib.TOKEN);
+        address wbnb = authorizer.getAddressByName(AddressLib.WBNB);
 
         if (tokenAmount > 0) {
             IERC20(token).safeTransfer(user, tokenAmount);
@@ -360,7 +361,7 @@ library ArenaRewardLPLib {
     }
 
     function compoundFees(IAuthorizer authorizer) internal {
-        address wbnb = authorizer.getAddressByName("wbnb");
+        address wbnb = authorizer.getAddressByName(AddressLib.WBNB);
         uint256 balance = IWBNB(wbnb).balanceOf(address(this));
 
         if (balance >= 1000000000000000) {
@@ -370,7 +371,7 @@ library ArenaRewardLPLib {
     }
 
     function emergencyWithdrawWBNB(IAuthorizer authorizer, uint256 amount) internal {
-        address wbnb = authorizer.getAddressByName("wbnb");
+        address wbnb = authorizer.getAddressByName(AddressLib.WBNB);
         if (amount == 0) revert ARL_ZeroAmount();
         if (IWBNB(wbnb).balanceOf(address(this)) < amount) revert ARL_InsufficientBNB();
 
@@ -430,8 +431,8 @@ library ArenaRewardLPLib {
         uint256 amount
     ) internal {
         RewardType currentType = pool.rewardType;
-        address wbnb = authorizer.getAddressByName("wbnb");
-        address mainToken = authorizer.getAddressByName("token");
+        address wbnb = authorizer.getAddressByName(AddressLib.WBNB);
+        address mainToken = authorizer.getAddressByName(AddressLib.TOKEN);
 
         if (token == wbnb) {
             if (currentType == RewardType.LP) {
@@ -634,7 +635,7 @@ library ArenaRewardLPLib {
             redeemLPToUser(authorizer, reward, user);
             emit LPRewardClaimed(user, seasonId, reward);
         } else if (currentType == RewardType.TOKEN) {
-            IERC20(authorizer.getAddressByName("token")).safeTransfer(user, reward);
+            IERC20(authorizer.getAddressByName(AddressLib.TOKEN)).safeTransfer(user, reward);
             emit TokenRewardClaimed(user, seasonId, reward);
         } else if (currentType == RewardType.BNB) {
             (bool success, ) = payable(user).call{value: reward}("");

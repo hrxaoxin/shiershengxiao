@@ -8,6 +8,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
 import "./ArenaRewardLPLib.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable {
@@ -140,13 +141,13 @@ contract ArenaRewardLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
     }
 
     function claimLPReward(uint256 seasonId) external nonReentrant whenNotPaused returns (uint256) {
-        address arenaReward = IAuthorizer(authorizer).getAddressByName("arenaReward");
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_REWARD);
         uint256 reward = IArenaReward(arenaReward).getPendingRewardsByPlayer(msg.sender, seasonId);
         return _pool.claimReward(IAuthorizer(authorizer), msg.sender, seasonId, reward, arenaReward);
     }
 
     function getPendingLPReward(address user, uint256 seasonId) external view returns (uint256) {
-        address arenaReward = IAuthorizer(authorizer).getAddressByName("arenaReward");
+        address arenaReward = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_REWARD);
         return _pool.getPendingReward(user, seasonId, arenaReward);
     }
 

@@ -7,6 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "./TokenStakingLPLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
@@ -302,7 +303,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
     }
 
     function _claimLPReward() internal {
-        address tokenStaking = IAuthorizer(authorizer).getAddressByName("tokenStaking");
+        address tokenStaking = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN_STAKING);
         ITokenStaking.StakeInfo memory stake = ITokenStaking(tokenStaking).getUserStake(msg.sender);
         if (stake.amount == 0) revert TSLP_NoStakedTokens();
 
@@ -338,7 +339,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         } else if (currentType == RewardType.TOKEN) {
             if (reward > tokenRewardPoolBalance) revert TSLP_InsufficientToken();
             tokenRewardPoolBalance -= reward;
-            IERC20(IAuthorizer(authorizer).getAddressByName("token")).safeTransfer(msg.sender, reward);
+            IERC20(IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN)).safeTransfer(msg.sender, reward);
             emit TokenRewardsClaimed(msg.sender, reward);
         }
 
@@ -351,7 +352,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
      * @return uint256 待领取奖励金额
      */
     function getPendingLPReward(address user) external view returns (uint256) {
-        address tokenStaking = IAuthorizer(authorizer).getAddressByName("tokenStaking");
+        address tokenStaking = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN_STAKING);
         ITokenStaking.StakeInfo memory stake = ITokenStaking(tokenStaking).getUserStake(user);
         if (stake.amount == 0) return 0;
 
@@ -426,7 +427,7 @@ contract TokenStakingLP is Initializable, Ownable2StepUpgradeable, UUPSUpgradeab
         todayStart = currentDayStart;
         rewardRate = 100;
 
-        address tokenStaking = IAuthorizer(authorizer).getAddressByName("tokenStaking");
+        address tokenStaking = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN_STAKING);
         uint256 totalStaked = ITokenStaking(tokenStaking).getTotalStaked();
 
         RewardType currentType = rewardType;

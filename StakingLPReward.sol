@@ -7,6 +7,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/v4.9.0/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, ReentrancyGuardUpgradeable, PausableUpgradeable, IStakingLPReward {
@@ -107,7 +108,7 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     function _getStakingLPAsset() private view returns (IStakingLPAsset) {
-        address assetAddr = IAuthorizer(authorizer).getAddressByName("stakingLPAsset");
+        address assetAddr = IAuthorizer(authorizer).getAddressByName(AddressLib.STAKING_LP_ASSET);
         return IStakingLPAsset(assetAddr);
     }
 
@@ -202,7 +203,7 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     function _convertTokenToLP(uint256 tokenAmount) internal returns (uint256) {
-        _getStakingLPAsset().receiveToken(IAuthorizer(authorizer).getAddressByName("token"), tokenAmount);
+        _getStakingLPAsset().receiveToken(IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN), tokenAmount);
         return tokenAmount;
     }
 
@@ -220,7 +221,7 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     function claimLPReward() external nonReentrant whenNotPaused {
-        address staking = IAuthorizer(authorizer).getAddressByName("staking");
+        address staking = IAuthorizer(authorizer).getAddressByName(AddressLib.STAKING);
         uint256 userWeight = IStaking(staking).userStakedWeight(msg.sender);
         if (userWeight == 0) revert NoStakedNFTs();
 
@@ -256,7 +257,7 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
         } else if (currentType == RewardType.TOKEN) {
             if (reward > tokenRewardPoolBalance) revert InsufficientToken();
             tokenRewardPoolBalance -= reward;
-            IERC20(IAuthorizer(authorizer).getAddressByName("token")).safeTransfer(msg.sender, reward);
+            IERC20(IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN)).safeTransfer(msg.sender, reward);
             emit TokenRewardClaimed(msg.sender, reward);
         }
 
@@ -264,7 +265,7 @@ contract StakingLPReward is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
     }
 
     function getPendingLPReward(address user) external view returns (uint256) {
-        address staking = IAuthorizer(authorizer).getAddressByName("staking");
+        address staking = IAuthorizer(authorizer).getAddressByName(AddressLib.STAKING);
         uint256 userWeight = IStaking(staking).userStakedWeight(user);
         if (userWeight == 0) return 0;
 

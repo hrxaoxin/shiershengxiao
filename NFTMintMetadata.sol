@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "./NFTLib.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
@@ -104,7 +105,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @dev 修饰器：仅NFTMintCore合约可调用
      */
     modifier onlyMintCore() {
-        require(msg.sender == IAuthorizer(authorizer).getAddressByName("nftMintCore"), "NFTMintMetadata: Only NFTMintCore");
+        require(msg.sender == IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE), "NFTMintMetadata: Only NFTMintCore");
         _;
     }
     
@@ -167,7 +168,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @return TokenURI字符串
      */
     function tokenURI(uint256 tokenId) public view returns (string memory) {
-        address nftMintCore = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintCore = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         require(INFTMintCore(nftMintCore)._exists(tokenId), "NFTMint: Token not exists");
         
         uint256 tokenType_ = INFTMintCore(nftMintCore).tokenType(tokenId);
@@ -183,7 +184,7 @@ contract NFTMintMetadata is Initializable, Ownable2StepUpgradeable, UUPSUpgradea
      * @return NFTDataResult 包含NFT的所有属性信息
      */
     function getNFTData(uint256 tokenId) external view returns (NFTDataResult memory) {
-        address nftMintCore = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftMintCore = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         require(INFTMintCore(nftMintCore)._exists(tokenId), "NFTMint: Token not exists");
         
         uint256 t = INFTMintCore(nftMintCore).tokenType(tokenId);

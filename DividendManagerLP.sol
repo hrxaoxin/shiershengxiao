@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+﻿// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
@@ -404,7 +404,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @dev 领取分红
      */
     function claimLPDividend() external nonReentrant whenNotPaused {
-        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName(AddressLib.DIVIDEND_MANAGER);
         uint256 userWeight = IDividendManager(dividendManager).getUserWeight(msg.sender);
         if (userWeight == 0) revert DML_NoWeight();
 
@@ -438,7 +438,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
         } else if (currentType == RewardType.TOKEN) {
             if (dividend > tokenDividendPoolBalance) revert DML_InsufficientToken();
             tokenDividendPoolBalance -= dividend;
-            IERC20(IAuthorizer(authorizer).getAddressByName("token")).safeTransfer(msg.sender, dividend);
+            IERC20(IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN)).safeTransfer(msg.sender, dividend);
             emit TokenDividendClaimed(msg.sender, dividend);
         }
 
@@ -451,7 +451,7 @@ contract DividendManagerLP is Initializable, Ownable2StepUpgradeable, UUPSUpgrad
      * @return 可领取的分红总额
      */
     function getClaimableLPDividend(address user) external view returns (uint256) {
-        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName(AddressLib.DIVIDEND_MANAGER);
         uint256 userWeight = IDividendManager(dividendManager).getUserWeight(user);
         
         RewardType currentType = rewardType;

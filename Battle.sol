@@ -5,6 +5,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/ReentrancyGuardUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/security/PausableUpgradeable.sol";
 
@@ -240,7 +241,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     modifier onlyBattleCaller() {
         // 修复：先检查authorizer是否有效
         require(authorizer != address(0), "Battle: Authorizer not set");
-        address battleCaller = IAuthorizer(authorizer).getAddressByName("arenaPlayer");
+        address battleCaller = IAuthorizer(authorizer).getAddressByName(AddressLib.ARENA_PLAYER);
         require(msg.sender == owner() || msg.sender == battleCaller, "Battle: Only authorized caller");
         _;
     }
@@ -293,7 +294,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
     function _getNFTTraits(uint256 tokenId) internal view returns (NFTTraits memory) {
         NFTTraits memory traits;
         traits.tokenId = tokenId;
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         if (nftContract != address(0)) {
             (uint256 zodiacType, uint256 level, uint256 growth) = _getNFTData(tokenId);
             traits.level = uint8(level);
@@ -349,7 +350,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @return growth 成长值
      */
     function _getNFTData(uint256 tokenId) internal view returns (uint256 tokenType, uint256 level, uint256 growth) {
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         if (nftContract == address(0)) {
             return (0, 1, 50);
         }
@@ -393,7 +394,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @param team 队伍NFT数组（6个）
      */
     function _requireNFTOwnership(uint256[6] memory team) internal view {
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         require(nftContract != address(0), "Battle: NFT contract not set");
         for (uint256 i = 0; i < 6; i++) {
             uint256 tokenId = team[i];
@@ -424,7 +425,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         address challengedAddress
     ) external nonReentrant onlyBattleCaller whenNotPaused returns (bool, uint256) {
         bool isMockBattle = (challengedAddress == address(0));
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
 
         // 修复：统一验证NFT合约设置
         if (!isMockBattle) {
@@ -520,7 +521,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
      * @param owner 所有权地址
      */
     function _requireNFTOwnershipForAddress(uint256[6] memory team, address owner) internal view {
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         require(nftContract != address(0), "Battle: NFT contract not set");
         for (uint256 i = 0; i < 6; i++) {
             uint256 tokenId = team[i];
@@ -543,7 +544,7 @@ contract Battle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, Reen
         if (isMockBattle) {
             return true;
         }
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         if (nftContract == address(0)) return false;
         (bool success, bytes memory data) = nftContract.staticcall(
             abi.encodeWithSignature("ownerOf(uint256)", tokenId)

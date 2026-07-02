@@ -6,6 +6,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "./NFTDataType.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 
 /**
  * @title NFTData
@@ -673,14 +674,14 @@ contract NFTData is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable {
         _addUserNFT(to, tokenId);
         _addToTypeOwners(zodiacType, to);
         
-        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName(AddressLib.DIVIDEND_MANAGER);
         if (dividendManager != address(0)) {
             uint8 element = uint8(zodiacType / 24);
             IDividendManager(dividendManager).updateUserWeight(to, uint256(level), true, element);
         }
         
         // 修复：添加 WeightManager 同步，确保权重数据一致性
-        address weightManager = IAuthorizer(authorizer).getAddressByName("weightManager");
+        address weightManager = IAuthorizer(authorizer).getAddressByName(AddressLib.WEIGHT_MANAGER);
         if (weightManager != address(0)) {
             IWeightManager(weightManager).syncUserWeight(to);
         }

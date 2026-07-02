@@ -5,6 +5,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 
 interface IFlapPortal {
     struct TokenStateV5 {
@@ -86,7 +87,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
 
     function getTokenPriceUSD() external view returns (uint256) {
         IAuthorizer auth = IAuthorizer(authorizer);
-        address token = auth.getAddressByName("token");
+        address token = auth.getAddressByName(AddressLib.TOKEN);
         
         if (token == address(0)) return 0;
 
@@ -126,7 +127,7 @@ contract PriceOracle is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable 
 
     function getTokenPriceUSDV8() external view returns (uint256) {
         IAuthorizer auth = IAuthorizer(authorizer);
-        address token = auth.getAddressByName("token");
+        address token = auth.getAddressByName(AddressLib.TOKEN);
         
         if (token == address(0)) return 0;
 

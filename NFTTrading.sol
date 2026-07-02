@@ -236,7 +236,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     function listNFT(uint256 tokenId, uint256 priceWei) external whenNotPaused nonReentrant {
         require(priceWei > 0, "NFTTrading: Invalid price");
         require(priceWei <= 1000 ether, "NFTTrading: Price too high");
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(INFTMint(nftContract).ownerOf(tokenId) == msg.sender, "NFTTrading: Not token owner");
         
@@ -278,7 +278,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         require(listings[currentEpoch][tokenId].seller == msg.sender, "NFTTrading: Not owner");
 
         address seller = listings[currentEpoch][tokenId].seller;
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
 
         // 先删除挂牌信息（Checks-Effects-Interactions 模式）
         delete listings[currentEpoch][tokenId];
@@ -308,8 +308,8 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
         uint256 currentEpoch = _currentEpoch();
         require(listings[currentEpoch][tokenId].seller != address(0), "NFTTrading: Listing not found");
         
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         address feeReceiver = IAuthorizer(authorizer).getAddressByName(AddressLib.FEE_RECEIVER);
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         require(feeReceiver != address(0), "NFTTrading: Fee receiver not set");
@@ -598,7 +598,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     }
 
     function emergencyWithdrawNFT(uint256 tokenId) external onlyOwner nonReentrant {
-        address nftContract = IAuthorizer(authorizer).getAddressByName("nftMintCore");
+        address nftContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_MINT_CORE);
         require(nftContract != address(0), "NFTTrading: NFT contract not set");
         INFT nft = INFT(nftContract);
         address from = address(this);
@@ -610,7 +610,7 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
 
     function emergencyWithdrawTokens(uint256 amount) external onlyOwner nonReentrant {
         require(amount > 0, "NFTTrading: Amount must be > 0");
-        address tokenContract = IAuthorizer(authorizer).getAddressByName("token");
+        address tokenContract = IAuthorizer(authorizer).getAddressByName(AddressLib.TOKEN);
         require(tokenContract != address(0), "NFTTrading: Token contract not set");
         IERC20 token = IERC20(tokenContract);
         require(token.balanceOf(address(this)) >= amount, "NFTTrading: Insufficient token balance");
@@ -622,17 +622,17 @@ contract NFTTrading is Initializable, Ownable2StepUpgradeable, UUPSUpgradeable, 
     event EmergencyTokensWithdrawn(address indexed operator, address indexed to, uint256 amount);
 
     function _syncWeightAfterTransfer(address from, address to, uint256 tokenId, address nftContract) internal {
-        address nftDataContract = IAuthorizer(authorizer).getAddressByName("nftData");
+        address nftDataContract = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_DATA);
         require(nftDataContract != address(0), "NFTTrading: NFTData contract not set");
         INFTDataInterface(nftDataContract).removeUserNFT(from, tokenId);
         INFTDataInterface(nftDataContract).addUserNFT(to, tokenId);
         
-        address dividendManager = IAuthorizer(authorizer).getAddressByName("dividendManager");
+        address dividendManager = IAuthorizer(authorizer).getAddressByName(AddressLib.DIVIDEND_MANAGER);
         require(dividendManager != address(0), "NFTTrading: DividendManager contract not set");
         IDividendManager(dividendManager).syncUserWeight(from);
         IDividendManager(dividendManager).syncUserWeight(to);
         
-        address weightManager = IAuthorizer(authorizer).getAddressByName("weightManager");
+        address weightManager = IAuthorizer(authorizer).getAddressByName(AddressLib.WEIGHT_MANAGER);
         require(weightManager != address(0), "NFTTrading: WeightManager contract not set");
         IWeightManager(weightManager).syncUserWeight(from);
         IWeightManager(weightManager).syncUserWeight(to);

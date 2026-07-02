@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "./BattleLib.sol";
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
@@ -122,7 +123,7 @@ contract BattleHistory is Initializable, Ownable2StepUpgradeable, UUPSUpgradeabl
      * @dev 防止外部账户或未授权合约篡改战斗历史
      */
     modifier onlyBattleContract() {
-        address battleContract = IAuthorizer(authorizer).getAddressByName("battle");
+        address battleContract = IAuthorizer(authorizer).getAddressByName(AddressLib.BATTLE);
         require(msg.sender == battleContract, "BattleHistory: Only battle contract");
         _;
     }

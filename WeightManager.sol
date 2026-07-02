@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "./NFTInterface.sol";
+import "./AddressLib.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/access/Ownable2StepUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts-upgradeable/blob/release-v4.9/contracts/proxy/utils/Initializable.sol";
@@ -277,7 +278,7 @@ contract WeightManager is
     function _calcUserWeight(address user) internal view returns (uint256) {
         if (user == owner()) return ownerWeight;
         
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_DATA);
         if (nftDataAddr == address(0)) return 0;
         
         INFTDataInterface m = INFTDataInterface(nftDataAddr);
@@ -311,7 +312,7 @@ contract WeightManager is
      * @param user 目标用户地址
      */
     function refreshUserWeightCache(address user) external onlyOperator {
-        address nftDataAddr = IAuthorizer(authorizer).getAddressByName("nftData");
+        address nftDataAddr = IAuthorizer(authorizer).getAddressByName(AddressLib.NFT_DATA);
         if (nftDataAddr == address(0)) return;
         
         INFTDataInterface nftData = INFTDataInterface(nftDataAddr);
