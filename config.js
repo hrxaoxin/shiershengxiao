@@ -381,6 +381,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "MAX_RETRY_COUNT",
 		"outputs": [
 			{
@@ -541,6 +554,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "failedSyncCount",
 		"outputs": [
 			{
@@ -554,6 +580,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",
@@ -1390,17 +1421,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "constructor"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			}
-		],
-		"name": "SafeERC20FailedOperation",
-		"type": "error"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -1671,6 +1691,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -1759,6 +1792,19 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -2097,17 +2143,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			}
-		],
-		"name": "SafeERC20FailedOperation",
-		"type": "error"
 	},
 	{
 		"anonymous": false,
@@ -2645,6 +2680,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "PRECISION",
 		"outputs": [
 			{
@@ -2913,6 +2961,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "emergencyWithdrawTokens",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -3287,6 +3348,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -3527,6 +3593,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "address",
 				"name": "",
@@ -4079,6 +4150,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -4139,6 +4223,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "emergencyWithdrawTokens",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -4670,17 +4767,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "constructor"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			}
-		],
-		"name": "SafeERC20FailedOperation",
-		"type": "error"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -4985,6 +5071,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -5053,6 +5152,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "emergencyWithdrawTokens",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -5290,6 +5402,11 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"name": "listedNFTIndex",
@@ -5309,6 +5426,11 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"name": "listedNFTs",
@@ -5324,6 +5446,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",
@@ -5588,6 +5715,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -5617,14 +5749,288 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "constructor"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			}
-		],
-		"name": "SafeERC20FailedOperation",
+		"inputs": [],
+		"name": "ActiveBreedingPairs",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "AlreadyCompleted",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "AmountZero",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "AuthorizerNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "BNBTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CannotBreedSame",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CannotCancelCompleted",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CannotSelfBreed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ChildMintFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CoOwnerBreeding",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CoOwnerOnCooldown",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CoOwnerZodiacMismatch",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ContractPaused",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CooldownMustBePositive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CooldownNotEnded",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DifferentOwnersRequired",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DifferentZodiac",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherBreeding",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherNotApproved",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherNotHeld",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherOnCooldown",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherStaked",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FemaleChildMintFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InsufficientBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidAuthorizer",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidChildType",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidFatherId",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidFatherId2",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidMotherId",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidMotherId2",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidTo",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "LevelBelow5",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MaleChildMintFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MaxBreedingPairs",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherBreeding",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherNotApproved",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherNotHeld",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherOnCooldown",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherStaked",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherTransferFailedWithRevert",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MustBeOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NFTBreeding",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NFTContractNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotAuthorized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotCoOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotFatherOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotMotherOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotNftHolder",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotPairOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "OnlyExecutor",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PairAlreadyExists",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PairNotActive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ParentZodiacMismatch",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "SameGender",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TokenContractNotSet",
 		"type": "error"
 	},
 	{
@@ -6121,7 +6527,7 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "MAX_BREEDING_PAIRS",
+		"name": "MAX_EPOCHS",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -6135,6 +6541,52 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "acceptOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pairId",
+				"type": "uint256"
+			}
+		],
+		"name": "addActiveOrder",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pairId",
+				"type": "uint256"
+			}
+		],
+		"name": "addAllOrder",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -6158,6 +6610,11 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"name": "breedingCooldowns",
@@ -6172,7 +6629,13 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
 		"name": "breedingPairCount",
 		"outputs": [
 			{
@@ -6186,6 +6649,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",
@@ -6356,25 +6824,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "dailyPublicBreedings",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "tokenType",
 				"type": "uint256"
@@ -6396,6 +6845,19 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -6406,64 +6868,76 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "getBreedingInfo",
 		"outputs": [
 			{
-				"internalType": "uint256",
-				"name": "fatherId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "motherId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "maleOwner",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "femaleOwner",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "maleCoOwnerId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "femaleCoOwnerId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "startTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "breedingType",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "status",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "childId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "maleChildId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "rewardsClaimed",
-				"type": "bool"
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "fatherId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "motherId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "maleOwner",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "femaleOwner",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "maleCoOwnerId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "femaleCoOwnerId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "startTime",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "breedingType",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "status",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "childId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "maleChildId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "rewardsClaimed",
+						"type": "bool"
+					},
+					{
+						"internalType": "uint256",
+						"name": "cancelledAt",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct BreedingLib.BreedingPairData",
+				"name": "",
+				"type": "tuple"
 			}
 		],
 		"stateMutability": "view",
@@ -6535,6 +7009,54 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "epoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getDailyPublicBreedings",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "epoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getLastBreedingDay",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "user",
 				"type": "address"
@@ -6588,6 +7110,83 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "fatherId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "motherId",
+				"type": "uint256"
+			}
+		],
+		"name": "get_breedingPairExists",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "get_userActiveOrderIds",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "get_userAllOrderIds",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
@@ -6623,6 +7222,11 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"name": "isNFTInActiveBreeding",
@@ -6631,25 +7235,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "bool",
 				"name": "",
 				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "lastBreedingDay",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -6773,6 +7358,47 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "recoverStuckNFT",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pairId",
+				"type": "uint256"
+			}
+		],
+		"name": "removeActiveOrder",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "renounceOwnership",
 		"outputs": [],
@@ -6829,6 +7455,211 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "cooldown",
+				"type": "uint256"
+			}
+		],
+		"name": "setBreedingCooldown",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pairId",
+				"type": "uint256"
+			},
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "fatherId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "motherId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "maleOwner",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "femaleOwner",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "maleCoOwnerId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "femaleCoOwnerId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "startTime",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "breedingType",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "status",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "childId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "maleChildId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "rewardsClaimed",
+						"type": "bool"
+					},
+					{
+						"internalType": "uint256",
+						"name": "cancelledAt",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct BreedingLib.BreedingPairData",
+				"name": "data",
+				"type": "tuple"
+			}
+		],
+		"name": "setBreedingPair",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "count",
+				"type": "uint256"
+			}
+		],
+		"name": "setBreedingPairCount",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "fatherId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "motherId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "exists",
+				"type": "bool"
+			}
+		],
+		"name": "setBreedingPairExists",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "count",
+				"type": "uint256"
+			}
+		],
+		"name": "setDailyPublicBreeding",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "day",
+				"type": "uint256"
+			}
+		],
+		"name": "setLastBreedingDay",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
 				"name": "cooldown",
 				"type": "uint256"
 			}
@@ -6868,6 +7699,29 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "active",
+				"type": "bool"
+			}
+		],
+		"name": "setNFTInActiveBreeding",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
 				"name": "cooldown",
 				"type": "uint256"
 			}
@@ -6888,6 +7742,25 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "setSelfBreedingFee",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "stuckNFTs",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -6953,14 +7826,288 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "constructor"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			}
-		],
-		"name": "SafeERC20FailedOperation",
+		"inputs": [],
+		"name": "ActiveBreedingPairs",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "AlreadyCompleted",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "AmountZero",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "AuthorizerNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "BNBTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CannotBreedSame",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CannotCancelCompleted",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CannotSelfBreed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ChildMintFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CoOwnerBreeding",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CoOwnerOnCooldown",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CoOwnerZodiacMismatch",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ContractPaused",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CooldownMustBePositive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "CooldownNotEnded",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DifferentOwnersRequired",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DifferentZodiac",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherBreeding",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherNotApproved",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherNotHeld",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherOnCooldown",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherStaked",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FatherTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FemaleChildMintFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InsufficientBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidAuthorizer",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidChildType",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidFatherId",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidFatherId2",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidMotherId",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidMotherId2",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidTo",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "LevelBelow5",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MaleChildMintFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MaxBreedingPairs",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherBreeding",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherNotApproved",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherNotHeld",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherOnCooldown",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherStaked",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MotherTransferFailedWithRevert",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "MustBeOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NFTBreeding",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NFTContractNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotAuthorized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotCoOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotFatherOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotMotherOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotNftHolder",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotPairOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "OnlyExecutor",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PairAlreadyExists",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "PairNotActive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ParentZodiacMismatch",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "SameGender",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TokenContractNotSet",
 		"type": "error"
 	},
 	{
@@ -7457,7 +8604,7 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "MAX_BREEDING_PAIRS",
+		"name": "MAX_EPOCHS",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -7471,6 +8618,52 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "acceptOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pairId",
+				"type": "uint256"
+			}
+		],
+		"name": "addActiveOrder",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pairId",
+				"type": "uint256"
+			}
+		],
+		"name": "addAllOrder",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -7494,6 +8687,11 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"name": "breedingCooldowns",
@@ -7508,7 +8706,13 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
 		"name": "breedingPairCount",
 		"outputs": [
 			{
@@ -7522,6 +8726,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",
@@ -7692,25 +8901,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "dailyPublicBreedings",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "uint256",
 				"name": "tokenType",
 				"type": "uint256"
@@ -7732,6 +8922,19 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -7742,64 +8945,76 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "getBreedingInfo",
 		"outputs": [
 			{
-				"internalType": "uint256",
-				"name": "fatherId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "motherId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "maleOwner",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "femaleOwner",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "maleCoOwnerId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "femaleCoOwnerId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "startTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "breedingType",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "status",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "childId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "maleChildId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "rewardsClaimed",
-				"type": "bool"
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "fatherId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "motherId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "maleOwner",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "femaleOwner",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "maleCoOwnerId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "femaleCoOwnerId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "startTime",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "breedingType",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "status",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "childId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "maleChildId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "rewardsClaimed",
+						"type": "bool"
+					},
+					{
+						"internalType": "uint256",
+						"name": "cancelledAt",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct BreedingLib.BreedingPairData",
+				"name": "",
+				"type": "tuple"
 			}
 		],
 		"stateMutability": "view",
@@ -7871,6 +9086,54 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "epoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getDailyPublicBreedings",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "epoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getLastBreedingDay",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "user",
 				"type": "address"
@@ -7924,6 +9187,83 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "fatherId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "motherId",
+				"type": "uint256"
+			}
+		],
+		"name": "get_breedingPairExists",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "get_userActiveOrderIds",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "get_userAllOrderIds",
+		"outputs": [
+			{
+				"internalType": "uint256[]",
+				"name": "",
+				"type": "uint256[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
@@ -7959,6 +9299,11 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"name": "isNFTInActiveBreeding",
@@ -7967,25 +9312,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "bool",
 				"name": "",
 				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "lastBreedingDay",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -8109,6 +9435,47 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "recoverStuckNFT",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pairId",
+				"type": "uint256"
+			}
+		],
+		"name": "removeActiveOrder",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "renounceOwnership",
 		"outputs": [],
@@ -8165,6 +9532,211 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "cooldown",
+				"type": "uint256"
+			}
+		],
+		"name": "setBreedingCooldown",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "pairId",
+				"type": "uint256"
+			},
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "fatherId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "motherId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "address",
+						"name": "maleOwner",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "femaleOwner",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "maleCoOwnerId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "femaleCoOwnerId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "startTime",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "breedingType",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "status",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "childId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "maleChildId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "rewardsClaimed",
+						"type": "bool"
+					},
+					{
+						"internalType": "uint256",
+						"name": "cancelledAt",
+						"type": "uint256"
+					}
+				],
+				"internalType": "struct BreedingLib.BreedingPairData",
+				"name": "data",
+				"type": "tuple"
+			}
+		],
+		"name": "setBreedingPair",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "count",
+				"type": "uint256"
+			}
+		],
+		"name": "setBreedingPairCount",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "fatherId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "motherId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "exists",
+				"type": "bool"
+			}
+		],
+		"name": "setBreedingPairExists",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "count",
+				"type": "uint256"
+			}
+		],
+		"name": "setDailyPublicBreeding",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "day",
+				"type": "uint256"
+			}
+		],
+		"name": "setLastBreedingDay",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
 				"name": "cooldown",
 				"type": "uint256"
 			}
@@ -8204,6 +9776,29 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
+				"name": "currentEpoch",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "tokenId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bool",
+				"name": "active",
+				"type": "bool"
+			}
+		],
+		"name": "setNFTInActiveBreeding",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
 				"name": "cooldown",
 				"type": "uint256"
 			}
@@ -8224,6 +9819,25 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "setSelfBreedingFee",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "stuckNFTs",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -8491,6 +10105,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -8539,6 +10166,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "delistFromMarketBreeding",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -8655,6 +10295,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",
@@ -8855,17 +10500,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "constructor"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			}
-		],
-		"name": "SafeERC20FailedOperation",
-		"type": "error"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -8914,6 +10548,25 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BNBConverted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "BNBRefunded",
 		"type": "event"
 	},
 	{
@@ -9246,6 +10899,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -9413,6 +11079,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "fixedBuybackOpen",
 		"outputs": [
 			{
@@ -9523,6 +11202,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "initialize",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "lockedBalance",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -10037,6 +11729,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "MAX_LEVEL",
 		"outputs": [
 			{
@@ -10153,6 +11858,19 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "calcUserWeight",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -10631,14 +12349,148 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "constructor"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			}
-		],
-		"name": "SafeERC20FailedOperation",
+		"inputs": [],
+		"name": "S_AlreadyStaked",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_AmountMustBePositive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_AuthorizerNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_BNBTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_CannotResetWithActiveStakes",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_ContractNotApproved",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_EmptyTokenIds",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_InsufficientBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_InsufficientRewardBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_InsufficientTokenBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_InvalidAuthorizerAddress",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_InvalidTokenId",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_LockPeriodNotEnded",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_MinimumLevelTooLow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_NFTContractNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_NFTLevelBelowMinimum",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_NoPendingReward",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_NoStakedNFTs",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_NotAuthorized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_NotOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_NotTokenOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_Paused",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_PendingRewardsOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_RewardCalculationOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_RewardTokenNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_SnapshotUnderflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_TimelockNotExpired",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_TimelockTooShort",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "S_TokenNotInUserStakedList",
 		"type": "error"
 	},
 	{
@@ -10909,6 +12761,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "STAKING_REWARD_PRECISION",
 		"outputs": [
 			{
@@ -10923,6 +12788,25 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "USER_SNAPSHOT_OVERFLOW_THRESHOLD",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "_userSnapshotWeight",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -11002,6 +12886,19 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "emergencyWithdrawUnlockTime",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -11352,7 +13249,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "",
+				"name": "user",
 				"type": "address"
 			}
 		],
@@ -11698,7 +13595,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "",
+				"name": "user",
 				"type": "address"
 			}
 		],
@@ -11715,6 +13612,11 @@ window.ZODIAC_CONFIG = (function() {
 	}
 		],
 		arenaABI: [
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
 	{
 		"anonymous": false,
 		"inputs": [
@@ -12201,6 +14103,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "MAX_LEADERBOARD_SIZE",
 		"outputs": [
 			{
@@ -12541,6 +14456,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "getCurrentRewardPool",
 		"outputs": [
 			{
@@ -12757,6 +14685,11 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			},
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -12775,6 +14708,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "address",
 				"name": "",
@@ -12908,6 +14846,11 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			},
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -12926,6 +14869,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",
@@ -13196,6 +15144,11 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		arenaRankingManagerABI: [
 	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -13681,6 +15634,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "MAX_LEADERBOARD_SIZE",
 		"outputs": [
 			{
@@ -14021,6 +15987,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "getCurrentRewardPool",
 		"outputs": [
 			{
@@ -14237,6 +16216,11 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			},
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -14255,6 +16239,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "address",
 				"name": "",
@@ -14388,6 +16377,11 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			},
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -14406,6 +16400,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",
@@ -14716,6 +16715,37 @@ window.ZODIAC_CONFIG = (function() {
 		"anonymous": false,
 		"inputs": [
 			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
+			}
+		],
+		"name": "ContractDataReset",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
 				"indexed": false,
 				"internalType": "uint8",
 				"name": "version",
@@ -14829,6 +16859,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "MAX_MOCK_PLAYERS_COUNT",
 		"outputs": [
 			{
@@ -14902,6 +16945,19 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "currentSeasonId",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -15760,6 +17816,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -15845,6 +17906,13 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "resetContractData",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -16004,6 +18072,11 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		arenaLeaderboardABI: [
 	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -16033,6 +18106,37 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BeaconUpgraded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
+			}
+		],
+		"name": "ContractDataReset",
 		"type": "event"
 	},
 	{
@@ -16189,6 +18293,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "MAX_LEADERBOARD_SIZE",
 		"outputs": [
 			{
@@ -16225,6 +18342,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "endSeason",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -16877,6 +19007,11 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			},
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -16895,6 +19030,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "address",
 				"name": "",
@@ -16953,7 +19093,19 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "resetContractData",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",
@@ -17056,18 +19208,12 @@ window.ZODIAC_CONFIG = (function() {
 		"stateMutability": "payable",
 		"type": "function"
 	}
-],
+		],
 		arenaPlayerABI: [
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			}
-		],
-		"name": "SafeERC20FailedOperation",
-		"type": "error"
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
 	},
 	{
 		"anonymous": false,
@@ -17150,6 +19296,37 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "ChallengeAttemptsRecharged",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
+			}
+		],
+		"name": "ContractDataReset",
 		"type": "event"
 	},
 	{
@@ -17314,6 +19491,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "MAX_TEAM_SIZE",
 		"outputs": [
 			{
@@ -17382,6 +19572,19 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -17544,7 +19747,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "tokenId",
 				"type": "uint256"
 			}
 		],
@@ -17642,6 +19845,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -17666,6 +19874,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -17685,6 +19898,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -17703,6 +19921,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "address",
 				"name": "",
@@ -17769,6 +19992,13 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "resetContractData",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -17959,6 +20189,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -17980,8 +20215,13 @@ window.ZODIAC_CONFIG = (function() {
 		"stateMutability": "view",
 		"type": "function"
 	}
-],
+		],
 		arenaBattleABI: [
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
 	{
 		"anonymous": false,
 		"inputs": [
@@ -18068,6 +20308,37 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BeaconUpgraded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
+			}
+		],
+		"name": "ContractDataReset",
 		"type": "event"
 	},
 	{
@@ -18219,6 +20490,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "MAX_MOCK_PLAYERS_COUNT",
 		"outputs": [
 			{
@@ -18318,6 +20602,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -18380,6 +20669,19 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -18581,6 +20883,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -18617,6 +20924,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",
@@ -18682,6 +20994,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "address",
 				"name": "",
@@ -18750,6 +21067,13 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "resetContractData",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -18855,8 +21179,8 @@ window.ZODIAC_CONFIG = (function() {
 		"stateMutability": "payable",
 		"type": "function"
 	}
-],
-		stakingLPABI: [
+		],
+		stakingLPAssetABI: [
 	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
@@ -18864,47 +21188,7 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "AlreadyInitialized",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "AmountZero",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "ContractPaused",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InsufficientBNB",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InsufficientLP",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InsufficientToken",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InvalidAmount",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InvalidDexType",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InvalidRecipient",
+		"name": "InvalidParam",
 		"type": "error"
 	},
 	{
@@ -18934,42 +21218,22 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "NoStakedNFTs",
+		"name": "SLP_BNBTransferFailed",
 		"type": "error"
 	},
 	{
 		"inputs": [],
-		"name": "NotAuthorizer",
+		"name": "SL_AmountMustBeGreaterThanZero",
 		"type": "error"
 	},
 	{
 		"inputs": [],
-		"name": "RP_BNBOverflow",
+		"name": "SL_BNBTransferFailed",
 		"type": "error"
 	},
 	{
 		"inputs": [],
-		"name": "RP_InvalidAmount",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "RP_LPOverflow",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "RP_TokenOverflow",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "SameDEXType",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "SameRewardType",
+		"name": "SL_InsufficientWBNB",
 		"type": "error"
 	},
 	{
@@ -19000,38 +21264,6 @@ window.ZODIAC_CONFIG = (function() {
 		"anonymous": false,
 		"inputs": [
 			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "bnbAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "BNBAddedToPool",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "bnbAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "BNBRewardClaimed",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
 				"indexed": true,
 				"internalType": "address",
 				"name": "beacon",
@@ -19039,44 +21271,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BeaconUpgraded",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "dailyReward",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "increment",
-				"type": "uint256"
-			}
-		],
-		"name": "DailyRewardCalculated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "dailyReward",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "rewardPerWeight",
-				"type": "uint256"
-			}
-		],
-		"name": "DailyRewardCalculated",
 		"type": "event"
 	},
 	{
@@ -19154,19 +21348,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"indexed": false,
-				"internalType": "uint256",
-				"name": "lpAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "LPAddedToPool",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
 				"internalType": "uint8",
 				"name": "oldDexType",
 				"type": "uint8"
@@ -19222,25 +21403,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "LPMigrated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "lpAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "LPRewardClaimed",
 		"type": "event"
 	},
 	{
@@ -19299,83 +21461,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"indexed": false,
-				"internalType": "uint256",
-				"name": "rewardRate",
-				"type": "uint256"
-			}
-		],
-		"name": "RewardRateUpdated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "newRate",
-				"type": "uint256"
-			}
-		],
-		"name": "RewardRateUpdated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "enum RewardType",
-				"name": "oldType",
-				"type": "uint8"
-			},
-			{
-				"indexed": false,
-				"internalType": "enum RewardType",
-				"name": "newType",
-				"type": "uint8"
-			}
-		],
-		"name": "RewardTypeChanged",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "tokenAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "TokenAddedToPool",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "tokenAmount",
-				"type": "uint256"
-			}
-		],
-		"name": "TokenRewardClaimed",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
 				"internalType": "address",
 				"name": "account",
 				"type": "address"
@@ -19398,36 +21483,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"stateMutability": "payable",
-		"type": "fallback"
-	},
-	{
-		"inputs": [],
-		"name": "REWARD_PRECISION",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "STAKING_REWARD_PRECISION",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"name": "acceptOwnership",
 		"outputs": [],
@@ -19445,33 +21500,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "bnbRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "calculateDailyReward",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "claimLPReward",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -19498,38 +21526,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			}
-		],
-		"name": "getPendingLPReward",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "globalRewardPerWeight",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
 				"name": "_authorizerAddress",
 				"type": "address"
 			}
@@ -19537,45 +21533,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "initialize",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "lpRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "maxDailyRewardPercent",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "maxRewardRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -19667,19 +21624,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "rateStep",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -19695,6 +21639,781 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "receiveToken",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "recordIncomingBNB",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "lpAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "redeemLPToUser",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
+			}
+		],
+		"name": "setAuthorizer",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "__slippage",
+				"type": "uint256"
+			}
+		],
+		"name": "setSlippage",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "unpause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			}
+		],
+		"name": "upgradeTo",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "withdrawBNB",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			}
+		],
+		"name": "withdrawToken",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"stateMutability": "payable",
+		"type": "receive"
+	}
+		],
+		stakingLPRewardABI: [
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [],
+		"name": "AlreadyInitialized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ContractPaused",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InsufficientBNB",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InsufficientLP",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InsufficientToken",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidParam",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NoStakedNFTs",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "SameRewardType",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "Unauthorized",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "previousAdmin",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "newAdmin",
+				"type": "address"
+			}
+		],
+		"name": "AdminChanged",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "bnbAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "BNBRewardClaimed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "beacon",
+				"type": "address"
+			}
+		],
+		"name": "BeaconUpgraded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
+			}
+		],
+		"name": "ContractDataReset",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "dailyReward",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "increment",
+				"type": "uint256"
+			}
+		],
+		"name": "DailyRewardCalculated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint8",
+				"name": "version",
+				"type": "uint8"
+			}
+		],
+		"name": "Initialized",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "lpAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "LPRewardClaimed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferStarted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferred",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "Paused",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "rewardRate",
+				"type": "uint256"
+			}
+		],
+		"name": "RewardRateUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "enum RewardType",
+				"name": "oldType",
+				"type": "uint8"
+			},
+			{
+				"indexed": false,
+				"internalType": "enum RewardType",
+				"name": "newType",
+				"type": "uint8"
+			}
+		],
+		"name": "RewardTypeChanged",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "tokenAmount",
+				"type": "uint256"
+			}
+		],
+		"name": "TokenRewardClaimed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "Unpaused",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "implementation",
+				"type": "address"
+			}
+		],
+		"name": "Upgraded",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "REWARD_PRECISION",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "STAKING_REWARD_PRECISION",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "acceptOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "enum RewardType",
+				"name": "type_",
+				"type": "uint8"
+			}
+		],
+		"name": "addToRewardPool",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "authorizer",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "bnbRewardPoolBalance",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "calculateDailyReward",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "claimLPReward",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getPendingLPReward",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getPoolState",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "enum RewardType",
+				"name": "",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "globalRewardPerWeight",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
+			}
+		],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "lpRewardPoolBalance",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "pause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "paused",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "pendingOwner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "proxiableUUID",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -19732,15 +22451,9 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "rewardRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
+		"name": "resetContractData",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -19773,7 +22486,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "_percent",
+				"name": "__percent",
 				"type": "uint256"
 			}
 		],
@@ -19786,7 +22499,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "_maxRewardRate",
+				"name": "__maxRewardRate",
 				"type": "uint256"
 			}
 		],
@@ -19799,7 +22512,60 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "_rateStep",
+				"name": "lp",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "token",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "bnb",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "totalWeight",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "globalReward",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "todayStart",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "rewardRate",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "todayRewardAmount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "todayIncomingTokens",
+				"type": "uint256"
+			}
+		],
+		"name": "setPoolState",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "__rateStep",
 				"type": "uint256"
 			}
 		],
@@ -19812,7 +22578,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "_rewardRate",
+				"name": "__rewardRate",
 				"type": "uint256"
 			}
 		],
@@ -19835,19 +22601,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_slippage",
-				"type": "uint256"
-			}
-		],
-		"name": "setSlippage",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"name": "shouldCalculateDailyReward",
 		"outputs": [
@@ -19855,19 +22608,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "bool",
 				"name": "",
 				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "slippage",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -19889,45 +22629,6 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "syncUserWeight",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "todayIncomingTokens",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "todayRewardAmount",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "todayStart",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -20024,7 +22725,7 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "",
+				"name": "user",
 				"type": "address"
 			}
 		],
@@ -20040,46 +22741,130 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			}
-		],
-		"name": "withdrawBNB",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			}
-		],
-		"name": "withdrawToken",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"stateMutability": "payable",
 		"type": "receive"
 	}
-],
+		],
 		tokenStakingABI: [
 	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
+	},
+	{
+		"inputs": [],
+		"name": "TS_AccumulatedRewardsOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_AmountMustBeGreaterThanZero",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_AuthorizerNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_CannotResetWithActiveStakes",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_FailedToWithdrawBNB",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_InsufficientAllowance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_InsufficientBNBBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_InsufficientBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_InsufficientStakedAmount",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_InsufficientTokenBalanceInContract",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_InvalidAuthorizerAddress",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_MaxTotalMustBeGreaterThanZero",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_MaxUserMustBeGreaterThanZero",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_MustStakeForAtLeast30Minutes",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_NoRewardsToClaim",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_NoStakeFound",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_NoStakedTokens",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_NotAuthorized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_RewardUnderflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_ThereArePendingRewards",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_TotalPendingRewardsOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_TotalStakeLimitExceeded",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TS_UserStakeLimitExceeded",
+		"type": "error"
 	},
 	{
 		"anonymous": false,
@@ -20111,6 +22896,37 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BeaconUpgraded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
+			}
+		],
+		"name": "ContractDataReset",
 		"type": "event"
 	},
 	{
@@ -20186,6 +23002,31 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "EmergencyTokensWithdrawn",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "to",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "EmergencyWBNBWithdrawn",
 		"type": "event"
 	},
 	{
@@ -20282,19 +23123,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "Paused",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "newStep",
-				"type": "uint256"
-			}
-		],
-		"name": "RateStepUpdated",
 		"type": "event"
 	},
 	{
@@ -20421,6 +23249,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "MIN_STAKING_DURATION",
 		"outputs": [
 			{
@@ -20450,13 +23291,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "calculateDailyReward",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -20516,6 +23350,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "emergencyWithdrawTokens",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -20639,19 +23486,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "maxRewardRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "maxTotalStaked",
 		"outputs": [
 			{
@@ -20736,19 +23570,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "rateStep",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
@@ -20770,22 +23591,16 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "resetDailyRewardPerToken",
+		"name": "resetContractData",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
 		"inputs": [],
-		"name": "rewardRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
+		"name": "resetDailyRewardPerToken",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -20797,19 +23612,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setAuthorizer",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_maxRewardRate",
-				"type": "uint256"
-			}
-		],
-		"name": "setMaxRewardRate",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -20844,32 +23646,6 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "_rateStep",
-				"type": "uint256"
-			}
-		],
-		"name": "setRateStep",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "_rewardRate",
-				"type": "uint256"
-			}
-		],
-		"name": "setRewardRate",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
 			}
@@ -20882,32 +23658,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "todayIncomingTokens",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "todayRewardAmount",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "todayStart",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -21041,12 +23791,8 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"stateMutability": "view",
 		"type": "function"
-	},
-	{
-		"stateMutability": "payable",
-		"type": "receive"
 	}
-],
+		],
 		dividendManagerABI: [
 	{
 		"inputs": [],
@@ -21054,14 +23800,193 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "constructor"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			}
-		],
-		"name": "SafeERC20FailedOperation",
+		"inputs": [],
+		"name": "DM_AmountZero",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_AuthorizerNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_BNBFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_BatchMax",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_ChangeUnderflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_CumOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_InsufficientBalance",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_InsufficientToken",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_InsufficientWeight",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_InvalidAmount",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_InvalidAuthorizer",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_InvalidCount",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_InvalidIndex",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_InvalidStart",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_LengthMismatch",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_Lib_CumOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_Lib_InvalidIndex",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_Lib_Overflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_Lib_PendingOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_Lib_ScaleOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_NewWeightMax",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_NoDividend",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_NotAuthorized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_NotRequested",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_Overflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_Paused",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_PendingOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_ScaleOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_SyncOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_Timelock",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_TokenNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_TooFrequent",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_TotalOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_TotalUnderflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_WeightCalcOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_WeightMax",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_WeightOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DM_ZeroUser",
 		"type": "error"
 	},
 	{
@@ -21094,6 +24019,37 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BeaconUpgraded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
+			}
+		],
+		"name": "ContractDataReset",
 		"type": "event"
 	},
 	{
@@ -21371,6 +24327,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "MAX_NFT_LEVEL",
 		"outputs": [
 			{
@@ -21596,6 +24565,19 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -21692,6 +24674,25 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getPendingDividends",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "uint256",
 				"name": "count",
 				"type": "uint256"
@@ -21722,7 +24723,7 @@ window.ZODIAC_CONFIG = (function() {
 						"type": "uint256"
 					}
 				],
-				"internalType": "struct DividendManager.DividendSnapshot[]",
+				"internalType": "struct DividendSnapshot[]",
 				"name": "",
 				"type": "tuple[]"
 			}
@@ -21815,7 +24816,7 @@ window.ZODIAC_CONFIG = (function() {
 						"type": "uint256"
 					}
 				],
-				"internalType": "struct DividendManager.DividendSnapshot[]",
+				"internalType": "struct DividendSnapshot[]",
 				"name": "",
 				"type": "tuple[]"
 			}
@@ -21839,6 +24840,25 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "getTotalWeight",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getUserCumulativeSnapshots",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -21915,6 +24935,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -21959,6 +24984,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "address",
 				"name": "",
@@ -22044,6 +25074,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -22096,6 +25131,13 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "requestEmergencyWithdraw",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "resetContractData",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -22324,6 +25366,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -22343,6 +25390,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -22359,15 +25411,8 @@ window.ZODIAC_CONFIG = (function() {
 		"stateMutability": "view",
 		"type": "function"
 	}
-],
+		],
 		priceOracleABI: [
-	{
-		"inputs": [],
-		"name": "acceptOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
 	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
@@ -22406,17 +25451,35 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
+		"anonymous": false,
 		"inputs": [
 			{
+				"indexed": true,
 				"internalType": "address",
-				"name": "_authorizerAddress",
+				"name": "operator",
 				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
 			}
 		],
-		"name": "initialize",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
+		"name": "ContractDataReset",
+		"type": "event"
 	},
 	{
 		"anonymous": false,
@@ -22470,26 +25533,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "renounceOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "transferOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -22503,34 +25546,75 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "FLAP_PORTAL",
+		"outputs": [
 			{
-				"internalType": "address",
-				"name": "newImplementation",
+				"internalType": "contract IFlapPortal",
+				"name": "",
 				"type": "address"
 			}
 		],
-		"name": "upgradeTo",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
 			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
-			},
-			{
-				"internalType": "bytes",
-				"name": "data",
-				"type": "bytes"
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
-		"name": "upgradeToAndCall",
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "PANCAKE_ROUTER",
+		"outputs": [
+			{
+				"internalType": "contract IPancakeRouter02",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "USDT",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "WBNB",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "acceptOwnership",
 		"outputs": [],
-		"stateMutability": "payable",
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -22548,12 +25632,12 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "FLAP_PORTAL",
+		"name": "epoch",
 		"outputs": [
 			{
-				"internalType": "contract IFlapPortal",
+				"internalType": "uint256",
 				"name": "",
-				"type": "address"
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -22586,24 +25670,24 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
+			}
+		],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "owner",
 		"outputs": [
 			{
 				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "PANCAKE_ROUTER",
-		"outputs": [
-			{
-				"internalType": "contract IPancakeRouter02",
 				"name": "",
 				"type": "address"
 			}
@@ -22639,39 +25723,64 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "USDT",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "WBNB",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	}
-],
-		battleABI: [
-	{
-		"inputs": [],
-		"name": "acceptOwnership",
+		"name": "renounceOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
+	{
+		"inputs": [],
+		"name": "resetContractData",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			}
+		],
+		"name": "upgradeTo",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	}
+		],
+		battleABI: [
 	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
@@ -22766,61 +25875,35 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
+		"anonymous": false,
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "challengerId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "challengedId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256[6]",
-				"name": "challengerTeam",
-				"type": "uint256[6]"
-			},
-			{
-				"internalType": "uint256[6]",
-				"name": "challengedTeam",
-				"type": "uint256[6]"
-			},
-			{
+				"indexed": true,
 				"internalType": "address",
-				"name": "challengedAddress",
+				"name": "operator",
 				"type": "address"
-			}
-		],
-		"name": "challenge",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
 			},
 			{
+				"indexed": false,
 				"internalType": "uint256",
-				"name": "",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_authorizerAddress",
-				"type": "address"
-			}
-		],
-		"name": "initialize",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
+		"name": "ContractDataReset",
+		"type": "event"
 	},
 	{
 		"anonymous": false,
@@ -22834,13 +25917,6 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"name": "Initialized",
 		"type": "event"
-	},
-	{
-		"inputs": [],
-		"name": "initSkills",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
 	},
 	{
 		"anonymous": false,
@@ -22881,19 +25957,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"name": "pause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -22905,46 +25968,6 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"name": "Paused",
 		"type": "event"
-	},
-	{
-		"inputs": [],
-		"name": "reinitializeSkills",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "renounceOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_authorizerAddress",
-				"type": "address"
-			}
-		],
-		"name": "setAuthorizer",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "transferOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
 	},
 	{
 		"anonymous": false,
@@ -22975,157 +25998,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"stateMutability": "payable",
 		"type": "fallback"
-	},
-	{
-		"inputs": [],
-		"name": "unpause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
-			}
-		],
-		"name": "upgradeTo",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
-			},
-			{
-				"internalType": "bytes",
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"name": "upgradeToAndCall",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"stateMutability": "payable",
-		"type": "receive"
-	},
-	{
-		"inputs": [],
-		"name": "authorizer",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256[6]",
-				"name": "attackerTeam",
-				"type": "uint256[6]"
-			},
-			{
-				"internalType": "uint256[6]",
-				"name": "defenderTeam",
-				"type": "uint256[6]"
-			}
-		],
-		"name": "battle",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "battleHistory",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "battleId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "startTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint8",
-				"name": "status",
-				"type": "uint8"
-			},
-			{
-				"internalType": "uint8",
-				"name": "winner",
-				"type": "uint8"
-			},
-			{
-				"internalType": "uint256",
-				"name": "challengerId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "challengedId",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "challenger",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "challenged",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "battleHistoryIndex",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
 	},
 	{
 		"inputs": [],
@@ -23221,6 +26093,320 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "GENDER_COUNT",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "GROWTH_RANGE",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MAX_BATTLE_HISTORY",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MAX_ROUNDS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "MIN_GROWTH",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "SKILL_USE_CHANCE_DENOMINATOR",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "TEAM_SIZE",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "TOTAL_TYPE_COUNT",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "ZODIAC_COUNT",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "ZODIAC_TYPE_COUNT",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "acceptOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "authorizer",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256[6]",
+				"name": "attackerTeam",
+				"type": "uint256[6]"
+			},
+			{
+				"internalType": "uint256[6]",
+				"name": "defenderTeam",
+				"type": "uint256[6]"
+			}
+		],
+		"name": "battle",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "battleHistory",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "battleId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "startTime",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint8",
+				"name": "status",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint8",
+				"name": "winner",
+				"type": "uint8"
+			},
+			{
+				"internalType": "uint256",
+				"name": "challengerId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "challengedId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "challenger",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "challenged",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "battleHistoryIndex",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "challengerId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "challengedId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256[6]",
+				"name": "challengerTeam",
+				"type": "uint256[6]"
+			},
+			{
+				"internalType": "uint256[6]",
+				"name": "challengedTeam",
+				"type": "uint256[6]"
+			},
+			{
+				"internalType": "address",
+				"name": "challengedAddress",
+				"type": "address"
+			}
+		],
+		"name": "challenge",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -23362,54 +26548,22 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "GROWTH_RANGE",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
+		"name": "initSkills",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "MAX_BATTLE_HISTORY",
-		"outputs": [
+		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
 			}
 		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "MAX_ROUNDS",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "MIN_GROWTH",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -23423,6 +26577,19 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"name": "pause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -23465,6 +26632,40 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "reinitializeSkills",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "resetContractData",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
+			}
+		],
+		"name": "setAuthorizer",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "uint256[6]",
@@ -23483,19 +26684,6 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "uint8",
 				"name": "",
 				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "SKILL_USE_CHANCE_DENOMINATOR",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -23546,58 +26734,61 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "TEAM_SIZE",
-		"outputs": [
+		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
 			}
 		],
-		"stateMutability": "view",
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
 		"inputs": [],
-		"name": "TOTAL_TYPE_COUNT",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
+		"name": "unpause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "ZODIAC_COUNT",
-		"outputs": [
+		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
 			}
 		],
-		"stateMutability": "view",
+		"name": "upgradeTo",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "ZODIAC_TYPE_COUNT",
-		"outputs": [
+		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
 			}
 		],
-		"stateMutability": "view",
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
 		"type": "function"
+	},
+	{
+		"stateMutability": "payable",
+		"type": "receive"
 	}
-],
+		],
         authorizerABI: [
 	{
 		"inputs": [],
@@ -23612,7 +26803,7 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "bytes32"
 			}
 		],
-		"name": "ContractNotSet",
+		"name": "ContractNotRegistered",
 		"type": "error"
 	},
 	{
@@ -23623,11 +26814,6 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "InvalidAuthorizer",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InvalidOldAuthorizer",
 		"type": "error"
 	},
 	{
@@ -23655,6 +26841,25 @@ window.ZODIAC_CONFIG = (function() {
 			{
 				"indexed": true,
 				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			}
+		],
+		"name": "AllContractDataReset",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
 				"name": "beacon",
 				"type": "address"
 			}
@@ -23666,7 +26871,20 @@ window.ZODIAC_CONFIG = (function() {
 		"anonymous": false,
 		"inputs": [
 			{
-				"indexed": false,
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "key",
+				"type": "bytes32"
+			}
+		],
+		"name": "ContractAddressRemoved",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
 				"internalType": "bytes32",
 				"name": "key",
 				"type": "bytes32"
@@ -23683,8 +26901,28 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"anonymous": false,
-		"inputs": [],
-		"name": "GlobalAddressesUpdated",
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "contractAddress",
+				"type": "address"
+			}
+		],
+		"name": "ContractResetFailed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "contractAddress",
+				"type": "address"
+			}
+		],
+		"name": "ContractResetSuccess",
 		"type": "event"
 	},
 	{
@@ -23823,8 +27061,14 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "getArenaBattle",
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			}
+		],
+		"name": "getAddressByName",
 		"outputs": [
 			{
 				"internalType": "address",
@@ -23837,12 +27081,17 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "getArenaLeaderboard",
+		"name": "getAllRegisteredContracts",
 		"outputs": [
 			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
+				"internalType": "bytes32[]",
+				"name": "keys",
+				"type": "bytes32[]"
+			},
+			{
+				"internalType": "address[]",
+				"name": "values",
+				"type": "address[]"
 			}
 		],
 		"stateMutability": "view",
@@ -23850,12 +27099,12 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "getArenaPlayer",
+		"name": "getAllRegisteredKeys",
 		"outputs": [
 			{
-				"internalType": "address",
+				"internalType": "bytes32[]",
 				"name": "",
-				"type": "address"
+				"type": "bytes32[]"
 			}
 		],
 		"stateMutability": "view",
@@ -23863,428 +27112,41 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "getArenaRankingManager",
+		"name": "getRegisteredContractCount",
 		"outputs": [
 			{
-				"internalType": "address",
+				"internalType": "uint256",
 				"name": "",
-				"type": "address"
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "getArenaRankingQuery",
-		"outputs": [
+		"inputs": [
 			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
+				"internalType": "uint256",
+				"name": "offset",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "limit",
+				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getArenaReward",
+		"name": "getRegisteredContractsByPage",
 		"outputs": [
 			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getArenaRewardLP",
-		"outputs": [
+				"internalType": "bytes32[]",
+				"name": "keys",
+				"type": "bytes32[]"
+			},
 			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getBattle",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getBattleHistory",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getBattleSkillData",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getBreedingCore",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getBreedingMarket",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getDividendManager",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getDividendManagerLP",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getFeeReceiver",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getFlapSwapRouter",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getNFTBuyback",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getNFTData",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getNFTMintCore",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getNFTMintMetadata",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getNFTTrading",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getNFTUpdate",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getPancakeSwapRouter",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getPoolManager",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getPriceOracle",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getRewardManager",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getStaking",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getStakingLP",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getToken",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getTokenBurner",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getTokenStaking",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getTokenStakingLP",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getUSDT",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getUniswapRouter",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getWBNB",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getWeightManager",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
+				"internalType": "address[]",
+				"name": "values",
+				"type": "address[]"
 			}
 		],
 		"stateMutability": "view",
@@ -24314,6 +27176,19 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_newAuthorizer",
+				"type": "address"
+			}
+		],
+		"name": "notifyAllContractsSetAuthorizer",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -24395,8 +27270,54 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			}
+		],
+		"name": "removeContractAddress",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "key",
+				"type": "bytes32"
+			}
+		],
+		"name": "removeContractByKey",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string[]",
+				"name": "names",
+				"type": "string[]"
+			}
+		],
+		"name": "removeMultipleContracts",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "resetAllContractData",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -24415,42 +27336,6 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "setAddress",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_expectedOldAuthorizer",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_newAuthorizer",
-				"type": "address"
-			},
-			{
-				"internalType": "address[]",
-				"name": "_contracts",
-				"type": "address[]"
-			}
-		],
-		"name": "setAllAuthorizers",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address[]",
-				"name": "_addr",
-				"type": "address[]"
-			}
-		],
-		"name": "setAllContracts",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -24542,83 +27427,12 @@ window.ZODIAC_CONFIG = (function() {
 		"stateMutability": "payable",
 		"type": "function"
 	}
-],
-	// TokenStakingLP ABI
-	tokenStakingLPABI: [
+		],
+		tokenStakingLPABI: [
 	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
-	},
-	{
-		"inputs": [],
-		"name": "AlreadyInitialized",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "AmountZero",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "ArraysLengthMismatch",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InsufficientBNB",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InsufficientLP",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InsufficientToken",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InvalidAuthorizer",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InvalidMaxRate",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InvalidPercent",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InvalidRewardRate",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InvalidStep",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "InvalidToken",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "NoStakedTokens",
-		"type": "error"
-	},
-	{
-		"inputs": [],
-		"name": "NotAuthorized",
-		"type": "error"
 	},
 	{
 		"inputs": [],
@@ -24633,6 +27447,101 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "RP_TokenOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_AlreadyInitialized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_AmountZero",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_AuthorizerNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_BNBTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_InsufficientBNB",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_InsufficientLP",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_InsufficientToken",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_InvalidAuthorizer",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_InvalidMaxRate",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_InvalidPercent",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_InvalidRecipient",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_InvalidRewardRate",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_InvalidStep",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_InvalidToken",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_NoStakedTokens",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSLP_NotAuthorized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSL_AmountZero",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSL_BNBTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "TSL_InsufficientWBNB",
 		"type": "error"
 	},
 	{
@@ -24710,6 +27619,37 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BeaconUpgraded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
+			}
+		],
+		"name": "ContractDataReset",
 		"type": "event"
 	},
 	{
@@ -24970,20 +27910,7 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "DAILY_REWARD_PRECISION",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "STAKING_REWARD_PRECISION",
+		"name": "MAX_EPOCHS",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -25016,19 +27943,6 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "bnbRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
 		"name": "calculateDailyReward",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -25049,16 +27963,26 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "dailyRewardPerToken",
-		"outputs": [
+		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "tokenType",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "tokenOrTo",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
+		"name": "emergencyWithdraw",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -25072,6 +27996,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "emergencyWithdrawWBNB",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -25110,50 +28047,11 @@ window.ZODIAC_CONFIG = (function() {
 		"inputs": [
 			{
 				"internalType": "address",
-				"name": "",
+				"name": "user",
 				"type": "address"
 			}
 		],
 		"name": "lastRewardAccumulatedRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "lpRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "maxDailyRewardPercent",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "maxRewardRate",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -25224,37 +28122,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "rateStep",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address[]",
-				"name": "tokens",
-				"type": "address[]"
-			},
-			{
-				"internalType": "uint256[]",
-				"name": "amounts",
-				"type": "uint256[]"
-			}
-		],
-		"name": "receiveMultipleTokens",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -25307,28 +28174,9 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
-		"name": "rewardRate",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rewardType",
-		"outputs": [
-			{
-				"internalType": "enum RewardType",
-				"name": "",
-				"type": "uint8"
-			}
-		],
-		"stateMutability": "view",
+		"name": "resetContractData",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -25410,71 +28258,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "shouldCalculateDailyReward",
-		"outputs": [
-			{
-				"internalType": "bool",
-				"name": "",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "todayIncomingTokens",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "todayRewardAmount",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "todayStart",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "tokenRewardPoolBalance",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -25526,48 +28309,115 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			}
-		],
-		"name": "withdrawBNB",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "to",
-				"type": "address"
-			}
-		],
-		"name": "withdrawToken",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"stateMutability": "payable",
 		"type": "receive"
 	}
-],
-
-	// DividendManagerLP ABI
-	dividendManagerLPABI: [
+		],
+		dividendManagerLPABI: [
 	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
+	},
+	{
+		"inputs": [],
+		"name": "DML_ArraysLengthMismatch",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_BNBOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_BNBTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_BNBTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_CumulativeOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_InsufficientLP",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_InsufficientToken",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_InvalidAmount",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_InvalidAuthorizer",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_InvalidRecipient",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_InvalidToken",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_InvalidTokenAddress",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_LPOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_MissingConfig",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_NoWeight",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_NotAuthorized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_RedeemLPFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_RedeemLPToTokenFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_RedeemLPToWBNBFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "DML_TokenOverflow",
+		"type": "error"
 	},
 	{
 		"anonymous": false,
@@ -25631,6 +28481,37 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BeaconUpgraded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
+			}
+		],
+		"name": "ContractDataReset",
 		"type": "event"
 	},
 	{
@@ -25808,6 +28689,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -25867,6 +28761,19 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
 		"inputs": [
 			{
 				"internalType": "address",
@@ -25875,6 +28782,44 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "getClaimableLPDividend",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getPendingTokenDividends",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			}
+		],
+		"name": "getUserRewardSnapshots",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -25960,6 +28905,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -26041,6 +28991,13 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "resetContractData",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -26151,6 +29108,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -26202,8 +29164,13 @@ window.ZODIAC_CONFIG = (function() {
 		"stateMutability": "payable",
 		"type": "receive"
 	}
-],
-	arenaRewardABI: [
+		],
+		arenaRewardABI: [
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
 	{
 		"anonymous": false,
 		"inputs": [
@@ -26234,6 +29201,37 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BeaconUpgraded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
+			}
+		],
+		"name": "ContractDataReset",
 		"type": "event"
 	},
 	{
@@ -26366,6 +29364,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -26455,6 +29466,11 @@ window.ZODIAC_CONFIG = (function() {
 				"type": "uint256"
 			},
 			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
+			{
 				"internalType": "address",
 				"name": "",
 				"type": "address"
@@ -26482,6 +29498,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "emergencyWithdrawWBNB",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -26655,6 +29684,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "pendingBNBPool",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "pendingOwner",
 		"outputs": [
 			{
@@ -26668,6 +29710,11 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",
@@ -26711,7 +29758,19 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "function"
 	},
 	{
+		"inputs": [],
+		"name": "resetContractData",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			},
 			{
 				"internalType": "uint256",
 				"name": "",
@@ -26813,13 +29872,72 @@ window.ZODIAC_CONFIG = (function() {
 		"stateMutability": "payable",
 		"type": "function"
 	}
-],
-	// ArenaRewardLP ABI
-	arenaRewardLPABI: [
+		],
+		arenaRewardLPABI: [
 	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_AmountMustBePositive",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_ArraysLengthMismatch",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_AuthorizerNotSet",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_BNBTransferFailed",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_InvalidAuthorizer",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_InvalidPercent",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_InvalidRecipient",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_InvalidRewardRate",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_InvalidTokenAddress",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_MaxRateTooLow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_NotAuthorized",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARLP_StepMustBePositive",
+		"type": "error"
 	},
 	{
 		"inputs": [],
@@ -26829,6 +29947,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "ARL_BNBOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARL_BNBTransferFailed",
 		"type": "error"
 	},
 	{
@@ -26859,6 +29982,11 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "ARL_TokenOverflow",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ARL_ZeroAmount",
 		"type": "error"
 	},
 	{
@@ -26967,6 +30095,37 @@ window.ZODIAC_CONFIG = (function() {
 			}
 		],
 		"name": "BeaconUpgraded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "operator",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
+			}
+		],
+		"name": "ContractDataReset",
 		"type": "event"
 	},
 	{
@@ -27284,6 +30443,19 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "acceptOwnership",
 		"outputs": [],
 		"stateMutability": "nonpayable",
@@ -27346,6 +30518,19 @@ window.ZODIAC_CONFIG = (function() {
 		"name": "emergencyWithdrawWBNB",
 		"outputs": [],
 		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -27509,6 +30694,13 @@ window.ZODIAC_CONFIG = (function() {
 	{
 		"inputs": [],
 		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "resetContractData",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -27690,15 +30882,8 @@ window.ZODIAC_CONFIG = (function() {
 		"stateMutability": "payable",
 		"type": "receive"
 	}
-],
-	battleSkillDataABI: [
-	{
-		"inputs": [],
-		"name": "acceptOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
+		],
+		battleSkillDataABI: [
 	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
@@ -27737,31 +30922,35 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "confirmSkillInitialization",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "initAllSkills",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
+		"anonymous": false,
 		"inputs": [
 			{
+				"indexed": true,
 				"internalType": "address",
-				"name": "_authorizerAddress",
+				"name": "operator",
 				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "timestamp",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "oldEpoch",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEpoch",
+				"type": "uint256"
 			}
 		],
-		"name": "initialize",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
+		"name": "ContractDataReset",
+		"type": "event"
 	},
 	{
 		"anonymous": false,
@@ -27815,39 +31004,6 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "renounceOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_authorizerAddress",
-				"type": "address"
-			}
-		],
-		"name": "setAuthorizer",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "transferOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -27861,34 +31017,23 @@ window.ZODIAC_CONFIG = (function() {
 		"type": "event"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "MAX_EPOCHS",
+		"outputs": [
 			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
-		"name": "upgradeTo",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
-			},
-			{
-				"internalType": "bytes",
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"name": "upgradeToAndCall",
+		"inputs": [],
+		"name": "acceptOwnership",
 		"outputs": [],
-		"stateMutability": "payable",
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -27899,6 +31044,26 @@ window.ZODIAC_CONFIG = (function() {
 				"internalType": "address",
 				"name": "",
 				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "confirmSkillInitialization",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "epoch",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -28091,6 +31256,26 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "initAllSkills",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
+			}
+		],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "owner",
 		"outputs": [
 			{
@@ -28130,6 +31315,33 @@ window.ZODIAC_CONFIG = (function() {
 	},
 	{
 		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "resetContractData",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_authorizerAddress",
+				"type": "address"
+			}
+		],
+		"name": "setAuthorizer",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "skillsInitializationPending",
 		"outputs": [
 			{
@@ -28153,8 +31365,52 @@ window.ZODIAC_CONFIG = (function() {
 		],
 		"stateMutability": "view",
 		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			}
+		],
+		"name": "upgradeTo",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
 	}
-],
+		],
     };
 
     function getContractAddresses() {
